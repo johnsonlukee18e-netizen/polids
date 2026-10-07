@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logowanie · {{NAME}}</title>
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <style>
+    /* style inline - /static wymaga zalogowania */
+    :root { --bg: #000; --panel: #0d0f0d; --line: #2a2f2a; --text: #e8e8e8; --muted: #8c948c;
+            --green-text: #5fbf4a; --yellow: #f2d21b; --bad: #e0302a; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", Roboto, Arial, sans-serif;
+           display: flex; align-items: center; justify-content: center; padding: 16px; }
+    main { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+    header { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); text-align: center; }
+    header img { width: 56px; height: 56px; display: block; margin: 0 auto 10px; }
+    h1 { margin: 0; font: 700 22px Verdana, Tahoma, sans-serif; letter-spacing: 1px; color: #fff; }
+    header small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+    section { padding: 18px 20px 20px; }
+    .btn { display: block; width: 100%; padding: 9px 6px; margin-top: 6px; text-align: center; text-decoration: none;
+           background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 2px; color: #f4fff0;
+           font: 700 15px/1.35 Verdana, Tahoma, sans-serif; font-variant: small-caps; letter-spacing: .5px; cursor: pointer; }
+    .btn:hover { background: linear-gradient(#52bd3c, #36992a); }
+    .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--green-text); outline-offset: 1px; }
+    label { display: block; margin-bottom: 9px; color: var(--muted); font-size: 12px; }
+    input, select { display: block; width: 100%; margin-top: 3px; padding: 6px 8px; background: #000; color: var(--text);
+                    border: 1px solid var(--line); border-radius: 2px; font: 14px Consolas, "DejaVu Sans Mono", monospace; }
+    .error { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--bad); color: #ffb3ad; }
+    .warn { margin: 0 0 12px; color: var(--yellow); font-size: 12px; }
+    .hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+    footer { padding: 8px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="/static/icons/icon.svg" alt="">
+      <h1>{{NAME}}</h1>
+      <small>{{TAGLINE}}</small>
+    </header>
+    <section>
+      {{ERROR}}
+      {{BODY}}
+    </section>
+    <footer>v{{VERSION}}</footer>
+  </main>
+</body>
+</html>

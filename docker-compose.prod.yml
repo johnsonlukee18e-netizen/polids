@@ -1,0 +1,34 @@
+# VPS: obraz z GHCR + Caddy (HTTPS). Wymagane w .env: POLIDS_IMAGE, DOMAIN, ACME_EMAIL,
+# POLIDS_SECRET_KEY, POLIDS_VATSIM_CLIENT_ID, POLIDS_VATSIM_CLIENT_SECRET. Szczegóły w deploy/README.md.
+services:
+  app:
+    image: ${POLIDS_IMAGE:?brak POLIDS_IMAGE w .env}
+    build: !reset null
+    environment:
+      POLIDS_AUTH_MODE: vatsim
+      POLIDS_PUBLIC_URL: https://${DOMAIN:?brak DOMAIN w .env}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?brak DOMAIN w .env}
+      ACME_EMAIL: ${ACME_EMAIL:?brak ACME_EMAIL w .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  caddy_data:
+  caddy_config:

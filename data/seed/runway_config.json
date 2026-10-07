@@ -1,0 +1,5 @@
+{
+  "_uwaga": "Ustawienia wyboru pasa preferowanego (AERODROME). Jak w vatiris (runways_preferred.json): arr/dep = pas preferowany do ladowania/startu przy wietrze slabszym niz limit (kt), never = kierunki nigdy nie wybierane automatycznie. equipment nadpisuje wyposazenie odczytane z procedur w pliku .ese, np. {\"29\": [\"ILS\", \"RNP\"]}. DEFAULT dotyczy wszystkich lotnisk. Konfiguracje do sprawdzenia z LoA/AIP.",
+  "DEFAULT": {"limit": 5},
+  "EPWA": {"arr": "33", "dep": "29"}
+}

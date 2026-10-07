@@ -1,0 +1,547 @@
+// AWOS w zakładce AERODROME: ekran jak lotniskowy system obserwacji meteo na stanowisku TWR.
+// Pomysł i układ za vAWOS (Aleksander Gadomski); kod napisany od nowa.
+// VATSIM nie ma czujników wiatru, więc wiatr chwilowy jest SYMULOWANY z METAR: co sekundę próbka z płynnego
+// błądzenia losowego wokół kierunku i prędkości z METAR, w sektorze zmienności dddVddd, z porywami do wartości G.
+// Z próbek liczymy średnią 2-minutową, zakres kierunku i maksimum 10-minutowe jak prawdziwy AWOS.
+import { api, esc, vatsimAtc } from "./api.js";
+import { colorize, wxLines } from "./tabs/meteo.js";
+
+const RAD = Math.PI / 180;
+const has = (v) => v !== null && v !== undefined;
+const norm = (d) => ((d % 360) + 360) % 360;
+const sdiff = (a, b) => norm(a - b + 180) - 180; // a − b w zakresie −180…180
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const pad = (n, w) => String(n).padStart(w, "0");
+const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
+// proces Ornsteina-Uhlenbecka, krok 1 s: płynne błądzenie wracające do zera (tau = czas korelacji w s, sd = rozrzut)
+const ou = (x, tau, sd) => x - x / tau + Math.sqrt(2 / tau) * sd * gauss();
+const HIST = 600; // 10 min próbek co 1 s
+
+// --- symulacja wiatru -------------------------------------------------------------------------------
+
+// Wiatr z METAR jako podstawa symulacji: kierunek, prędkość, poryw, dopuszczalny sektor względem kierunku
+function windBasis(p) {
+  if (!p || !has(p.wind_speed)) return null;
+  const spd = p.wind_speed, calm = spd === 0;
+  const vrb = !calm && (p.wind_variable || !has(p.wind_dir));
+  let dir = vrb || calm ? 0 : p.wind_dir;
+  // bez grupy dddVddd zmiany kierunku są mniejsze niż 60° (przy słabym wietrze dopuszczamy więcej)
+  let lo = spd < 3 ? -45 : -29, hi = -lo;
+  const sector = !vrb && !calm && has(p.wind_var_from) && has(p.wind_var_to);
+  if (sector) {
+    const span = norm(p.wind_var_to - p.wind_var_from);
+    let a = norm(dir - p.wind_var_from);
+    if (a > span) { dir = norm(p.wind_var_from + span / 2); a = span / 2; }
+    lo = -a; hi = span - a;
+  }
+  const sd = sector ? (hi - lo) * 0.28 : clamp(4 + 30 / Math.max(spd, 2), 5, 12);
+  // porywy: częstość (na sekundę spokoju), średnia amplituda i średni wkład do prędkości, który odejmujemy,
+  // żeby średnia z próbek zgadzała się z prędkością z METAR (impuls sin² ~8 s daje ok. 4 kt·s na 1 kt amplitudy)
+  const gust = p.wind_gust > spd ? p.wind_gust : 0;
+  const rate = spd < 4 ? 0 : gust ? 1 / 22 : 1 / 45;
+  const amp = gust ? (gust - spd) * 0.75 : 0.5 * Math.min(7, spd * 0.3 + 1);
+  const bias = rate ? amp * 4 / (1 / rate + 8) : 0;
+  return { dir, spd, gust, vrb, calm, lo, hi, sd, rate, bias };
+}
+
+// Wspólne dla lotniska: wolne zmiany kierunku i prędkości oraz porywy. Czujniki widzą je z małym opóźnieniem
+// (podmuch przechodzi wzdłuż pasa) i dokładają własne zaburzenia, więc kolumny są podobne, ale nie identyczne.
+class WindField {
+  constructor(b) {
+    this.b = b;
+    this.d = 0; this.s = 0; this.vd = Math.random() * 360; this.vv = 0; this.g = null; this.hist = [];
+  }
+  step() {
+    const b = this.b;
+    this.d = clamp(ou(this.d, 60, b.sd * 0.5), b.lo, b.hi);
+    this.s = ou(this.s, 90, Math.max(0.7, b.spd * 0.1));
+    if (b.vrb || b.calm) { this.vv = clamp(ou(this.vv, 15, 3), -8, 8); this.vd = norm(this.vd + this.vv); }
+    // poryw: gładki impuls sin² trwający 4–10 s; przy G w METAR szczyty sięgają G
+    let gust = 0, veer = 0;
+    if (this.g) {
+      const g = this.g, f = Math.sin(Math.PI * g.t / g.T) ** 2;
+      gust = g.A * f; veer = g.veer * f;
+      if (++g.t > g.T) this.g = null;
+    } else if (Math.random() < b.rate) {
+      const A = b.gust ? (b.gust - b.spd) * (0.5 + 0.5 * Math.random()) + b.bias : Math.random() * Math.min(7, b.spd * 0.3 + 1);
+      this.g = { t: 0, T: 4 + Math.round(Math.random() * 6), A, veer: gauss() * 6 };
+    }
+    this.hist.push({ d: this.d, s: this.s, gust, veer, vd: this.vd });
+    if (this.hist.length > 8) this.hist.shift();
+  }
+  at(lag) { return this.hist[Math.max(0, this.hist.length - 1 - lag)]; }
+}
+
+class Sensor {
+  constructor(field, lag) { this.f = field; this.lag = lag; this.ld = 0; this.ls = 0; this.buf = []; }
+  step() {
+    const b = this.f.b, f = this.f.at(this.lag);
+    this.ld = ou(this.ld, 12, b.sd * 0.45);
+    this.ls = ou(this.ls, 10, Math.max(0.4, b.spd * 0.05));
+    let s = b.spd - b.bias + f.s + f.gust + this.ls + gauss() * (0.4 + b.spd * 0.04), d;
+    if (b.calm) { s = Math.abs(gauss()) * 0.45 + Math.max(0, this.ls) * 0.5; d = f.vd + gauss() * 20; }
+    else if (b.vrb) d = f.vd + this.ld * 2 + gauss() * 10;
+    else d = b.dir + clamp(f.d + f.veer + this.ld + gauss() * b.sd * 0.35, b.lo, b.hi);
+    s = clamp(Math.round(s), 0, b.gust || b.spd + 9);
+    this.buf.push({ d: Math.round(norm(d)) || 360, s });
+    if (this.buf.length > HIST) this.buf.shift();
+  }
+  // średnia 2 min (kierunek wektorowo, prędkość skalarnie), zakres kierunku i prędkości, maksimum 10 min
+  stats() {
+    const last = this.buf.slice(-120);
+    let x = 0, y = 0, sum = 0, smin = Infinity, smax = 0, max10 = 0, dmin = 0, dmax = 0;
+    last.forEach((p) => { x += Math.sin(p.d * RAD); y += Math.cos(p.d * RAD); sum += p.s; smin = Math.min(smin, p.s); smax = Math.max(smax, p.s); });
+    const dir = norm(Math.atan2(x, y) / RAD), spd = sum / last.length;
+    last.forEach((p) => { const k = sdiff(p.d, dir); dmin = Math.min(dmin, k); dmax = Math.max(dmax, k); });
+    this.buf.forEach((p) => { max10 = Math.max(max10, p.s); });
+    return { dir, spd, from: norm(dir + dmin), to: norm(dir + dmax), range: dmax - dmin, smin, smax, max10 };
+  }
+}
+
+// --- formatowanie -------------------------------------------------------------------------------------
+
+// wiek METAR w minutach z "DDHHMMZ": dzień z bieżącego, poprzedniego albo następnego miesiąca, najbliższy teraz
+// (przełom miesiąca i zegar komputera spóźniony o kilka minut nie dają ujemnego ani miesięcznego wieku)
+function metarAge(time, now = Date.now()) {
+  const m = /^(\d{2})(\d{2})(\d{2})Z$/.exec(time || "");
+  if (!m) return null;
+  const d = new Date(now);
+  const t = [-1, 0, 1].map((k) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + k, +m[1], +m[2], +m[3]))
+    .reduce((a, b) => (Math.abs(b - now) < Math.abs(a - now) ? b : a));
+  return Math.max(0, Math.round((now - t) / 60000));
+}
+const ageText = (m) => (m < 60 ? `${m} min` : m < 2880 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.round(m / 1440)} dni`);
+
+// pora dnia z godzin UTC "HH:MM" (BMCT – SR – SS – EECT)
+function sunPhase(sun) {
+  const now = new Date(), cur = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const m = (t) => (t ? +t.slice(0, 2) * 60 + +t.slice(3, 5) : null);
+  const [dawn, sr, ss, dusk] = [sun.civil_dawn, sun.sunrise, sun.sunset, sun.civil_dusk].map(m);
+  if (sr === null || ss === null) return sun.day ? "DZIEŃ" : "NOC";
+  const inside = (a, b) => (a <= b ? cur >= a && cur < b : cur >= a || cur < b);
+  if (inside(sr, ss)) return "DZIEŃ";
+  if (dawn !== null && inside(dawn, sr)) return "ŚWIT";
+  if (dusk !== null && inside(ss, dusk)) return "ZMIERZCH";
+  return "NOC";
+}
+
+// VMC w strefie kontrolowanej lotniska (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft
+function vmc(p) {
+  if (!p || (!has(p.visibility_m) && !p.flight_category)) return null;
+  const imc = ["IFR", "LIFR"].includes(p.flight_category) || (p.visibility_m ?? 9999) < 5000 || (p.ceiling_ft ?? 99999) < 1500;
+  return imc ? "IMC" : "VMC";
+}
+
+const metarWind = (p) => {
+  if (!p || !has(p.wind_speed)) return "–";
+  if (p.wind_speed === 0) return "00000KT";
+  const dir = p.wind_variable || !has(p.wind_dir) ? "VRB" : pad(p.wind_dir, 3);
+  return `${dir}${pad(p.wind_speed, 2)}${p.wind_gust ? "G" + p.wind_gust : ""}KT${has(p.wind_var_from) ? ` ${pad(p.wind_var_from, 3)}V${pad(p.wind_var_to, 3)}` : ""}`;
+};
+const visText = (p) => (!p || !has(p.visibility_m) ? "–" : p.cavok ? "CAVOK" : p.visibility_m >= 9999 ? "≥10 KM" : `${p.visibility_m} M`);
+const cloudList = (p) => (!p ? [] : p.clouds?.length
+  ? p.clouds.map((c) => `${c.cover} ${has(c.base_ft) ? c.base_ft : "///"} FT${c.type ? " " + c.type : ""}`) : [p.cavok ? "CAVOK" : "NSC"]);
+const tempText = (v) => (has(v) ? (v < 0 ? "M" + Math.abs(v) : String(v)) : "–");
+// RVR: P2000 → >2000, M0050 → <50, 0350V0600 → 350–600; tendencja U/D/N jako strzałka
+function rvrText(r) {
+  const one = (x) => (x.startsWith("P") ? ">" + +x.slice(1) : x.startsWith("M") ? "<" + +x.slice(1) : String(+x));
+  return `${String(r.value || "").split("V").map(one).join("–")} M${{ U: " ↑", D: " ↓", N: " =" }[r.trend] || ""}`;
+}
+const windStr = (dir, spd) => `${dir}/${pad(spd, 2)} KT`;
+
+// Pasy pogrupowane w pary przeciwnych kierunków (11/29, 15/33…)
+function runwayPairs(rwys) {
+  const pairs = [];
+  rwys.forEach((r) => {
+    const key = Math.round(norm(r.heading) % 180 / 5) % 36;
+    let g = pairs.find((q) => q.key === key);
+    if (!g) pairs.push(g = { key, ends: [] });
+    if (!g.ends.some((e) => e.designator === r.designator)) g.ends.push(r);
+  });
+  pairs.forEach((g) => g.ends.sort((a, b) => a.designator.localeCompare(b.designator, "en", { numeric: true })));
+  return pairs;
+}
+
+// przeciwny kierunek pasa: 28L -> 10R, 36 -> 18
+const recip = (des) => {
+  const m = /^(\d{2})([LCR]?)$/.exec(des || "");
+  return m ? pad(((+m[1] + 17) % 36) + 1, 2) + ({ L: "R", R: "L", C: "C" }[m[2]] || "") : null;
+};
+
+// --- tarcza wiatru (SVG 240×240) ----------------------------------------------------------------------
+const C = 120, R = 94;
+const pt = (deg, r) => [C + Math.sin(deg * RAD) * r, C - Math.cos(deg * RAD) * r].map((v) => +v.toFixed(1));
+
+function dialStatic(rwys, selDes) {
+  let s = `<circle class="bg" cx="${C}" cy="${C}" r="${R}"/>`;
+  for (let a = 0; a < 360; a += 10) {
+    const big = a % 30 === 0, [x1, y1] = pt(a, R), [x2, y2] = pt(a, R - (big ? 9 : 5));
+    s += `<line class="tk${big ? " tk30" : ""}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  }
+  // pasy: wybrany szeroki, pozostałe cienkie; kreska progu i oznaczenie (poza tarczą) po stronie,
+  // z której się ląduje / startuje na wybrany kierunek
+  const near = [];
+  let marks = "";
+  runwayPairs(rwys).forEach((g) => {
+    const on = g.ends.some((e) => e.designator === selDes), w = on ? 12 : 6;
+    s += `<rect class="rw${on ? " on" : ""}" x="${C - w / 2}" y="${C - 72}" width="${w}" height="144" transform="rotate(${g.ends[0].heading} ${C} ${C})"/>`;
+    if (!on) return;
+    // pasy równoległe o tym samym kursie są w jednej parze: opisujemy tylko wybrany kierunek i jego przeciwny
+    g.ends.filter((e) => e.designator === selDes || e.designator === recip(selDes)).forEach((e) => {
+      const sel = e.designator === selDes, [x, y] = pt(e.heading + 180, 109), lw = e.designator.length * 7 + 8;
+      near.push(e.heading + 180);
+      if (sel) s += `<line class="thr" x1="${C - 8}" y1="${C + 64}" x2="${C + 8}" y2="${C + 64}" transform="rotate(${e.heading} ${C} ${C})"/>`;
+      marks += `<g class="rl${sel ? " sel" : ""}"><rect x="${x - lw / 2}" y="${y - 8}" width="${lw}" height="16"/><text x="${x}" y="${y + 4}">${esc(e.designator)}</text></g>`;
+    });
+  });
+  ["36", "09", "18", "27"].forEach((t, i) => {
+    if (near.some((a) => Math.abs(sdiff(a, i * 90)) < 14)) return;
+    const [x, y] = pt(i * 90, 109);
+    s += `<text class="cd" x="${x}" y="${y + 4}">${t}</text>`;
+  });
+  return s + marks;
+}
+// łuk zakresu kierunku z ostatnich 2 min (zgodnie z ruchem wskazówek zegara od a do b)
+function arcPath(a, b, r = 80) {
+  let ext = norm(b - a);
+  if (ext < 2) { a -= 1; ext = 2; }
+  if (ext >= 358) return `M${C},${C - r} A${r},${r} 0 1 1 ${C},${C + r} A${r},${r} 0 1 1 ${C},${C - r}`;
+  const [x1, y1] = pt(a, r), [x2, y2] = pt(a + ext, r);
+  return `M${x1},${y1} A${r},${r} 0 ${ext > 180 ? 1 : 0} 1 ${x2},${y2}`;
+}
+
+const SYM = "wiatr chwilowy symulowany z METAR";
+const COLS_SPLIT = [{ k: "dep", title: "DEP", sel: "dep", lag: 0 }, { k: "arr", title: "ARR", sel: "arr", lag: 2 }];
+const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0 }, { k: "mid", title: "MID", sel: "rwy", lag: 1 }, { k: "end", title: "END", sel: "rwy", lag: 3 }];
+const ROWS = [["inst", `INST <i class="aw-sym" title="${SYM}">SYM</i>`], ["avg", "2 MIN"], ["rng", "2 MIN MIN/MAX"], ["max", "10 MIN MAX"],
+  ["hw", "HW / TW"], ["xw", "XW"], ["rvr", "RVR"], ["vis", "VIS"], ["cld", "CLD"], ["t", "T / TD"]];
+
+const colHtml = (c) => `<div class="aw-col" data-k="${c.k}">
+  <div class="aw-h"><span>${c.title}</span><span class="rwy"></span></div>
+  <div class="aw-rsel"></div>
+  <div class="aw-dialbox"><svg class="aw-dial" viewBox="0 0 240 240">
+    <g class="stat"></g><path class="arc"/>
+    <g class="mean"><line x1="${C}" y1="${C - R + 3}" x2="${C}" y2="${C - 54}"/><polygon points="${C - 8},${C - 58} ${C + 8},${C - 58} ${C},${C - 40}"/></g>
+    <circle class="inst" cx="${C}" cy="${C - R}" r="6"/>
+    <g class="ctr"><rect x="${C - 38}" y="${C - 23}" width="76" height="46"/><text class="d" x="${C}" y="${C - 2}">///</text><text class="s" x="${C}" y="${C + 16}"></text></g>
+  </svg></div>
+  <table class="aw-rows">${ROWS.map(([k, l]) => `<tr class="r-${k}"><th>${l}</th><td></td></tr>`).join("")}</table>
+</div>`;
+
+// Stacje ATIS lotniska z VATSIM (osobne kolumny dla EPWA_ATIS albo EPWA_A_ATIS / EPWA_D_ATIS)
+function atisStations(atc, st, icao) {
+  const ad = (atc?.airports || []).find((a) => a.icao === icao);
+  const letterOf = (lines) => (/INFORMATION\s+([A-Z])\b/.exec((lines || []).join(" ")) || [])[1] || "?";
+  let list = (ad?.facilities?.ATIS || []).map((c) => ({ callsign: c.callsign, freq: c.frequency, letter: c.atis_code || letterOf(c.text_atis), lines: c.text_atis || [] }));
+  if (!list.length && st?.atis) list = [{ callsign: st.atis.callsign, freq: st.atis.frequency, letter: st.atis.letter || "?", lines: st.atis.lines || [] }];
+  const rank = (cs) => (/_D_ATIS$/.test(cs) ? 1 : /_A_ATIS$/.test(cs) ? 2 : 0);
+  return list.sort((a, b) => rank(a.callsign) - rank(b.callsign) || a.callsign.localeCompare(b.callsign));
+}
+
+function notamValidity(n, now = Date.now()) {
+  const d = (iso) => { const t = new Date(iso); return `${pad(t.getUTCDate(), 2)}.${pad(t.getUTCMonth() + 1, 2)} ${t.toISOString().slice(11, 16)}Z`; };
+  const s = n.start ? Date.parse(n.start) : null, e = n.end ? Date.parse(n.end) : null;
+  const end = n.perm ? "PERM" : e ? d(n.end) + (n.est ? " EST" : "") : "?";
+  if (e && e < now) return ["expired", `WYGASŁ ${d(n.end)}`];
+  if (s && s > now) return ["future", `OD ${d(n.start)} DO ${end}`];
+  return ["active", n.perm ? "AKTYWNY · PERM" : `AKTYWNY DO ${end}`];
+}
+
+// --- widok --------------------------------------------------------------------------------------------
+
+export function mountAwos(el, icao) {
+  el.innerHTML = `<div class="awos">
+    <div class="aw-top">
+      <div class="aw-box aw-ad"><span class="k">AWOS<span class="aw-elev"></span></span><span class="v"><b class="icao">${esc(icao)}</b><span class="aw-nm"></span></span></div>
+      <div class="aw-box aw-utc"><span class="k">UTC</span><span class="v aw-clock">--:--:--</span></div>
+      <div class="aw-box aw-q"><span class="k">QNH hPa</span><span class="v qnh">–</span></div>
+      <div class="aw-box aw-q"><span class="k">QFE hPa</span><span class="v qfe">–</span></div>
+      <div class="aw-box aw-lvp">LVP</div>
+      <div class="aw-box aw-vmc">–</div>
+      <div class="aw-box aw-age"><span class="k">METAR</span><span class="v">–</span><span class="aw-sub"></span></div>
+      <div class="aw-box aw-sun" hidden></div>
+      <div class="aw-err"></div>
+    </div>
+    <div class="aw-mid">
+      <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-simnote" title="VATSIM nie ma czujników wiatru. INST = próbka co 1 s, 2 MIN = średnia z próbek, 10 MIN MAX = największa próbka. RVR, VIS, chmury i temperatura są z METAR."><b>SYM</b> ${SYM} · INST co 1 s, średnia 2 min i maks. 10 min z próbek symulacji</div></div>
+      <div class="aw-atis"></div>
+      <div class="aw-ovl" hidden><div class="aw-h"><span class="t"></span><button class="aw-x" title="Zamknij (Esc)">ZAMKNIJ ✕</button></div><div class="aw-ovl-body"></div></div>
+    </div>
+    <div class="aw-bot">
+      ${[["wind", "WIND (METAR)"], ["temp", "TEMP"], ["dew", "DEW"], ["qnh", "QNH"], ["vis", "VIS"], ["cld", "CLOUDS"]]
+        .map(([k, l]) => `<div class="aw-cell b-${k}"><span class="k">${l}</span><span class="v">–</span></div>`).join("")}
+      <span class="aw-sp"></span>
+      ${["METAR", "TAF", "NOTAM"].map((k) => `<button class="aw-btn" data-ovl="${k}">${k}</button>`).join("")}
+    </div>
+  </div>`;
+  // wszystko w obrębie własnego .awos: el (.content) zostaje po destroy() i dostaje nowy widok, więc nasłuchy
+  // i zapytania starej instancji nie mogą go dotykać
+  const root = el.querySelector(".awos"), $ = (s) => root.querySelector(s);
+  let st = null, stations = [], metarRaw, modeKey = "", field = null, cols = [], manual = {}, ovl = null, notams = null;
+  let dead = false, loading = 0, lastLoad = 0, loadErr = "", lastStep = 0, lastMin = -1;
+  const letters = {}, changed = {};
+
+  const defaults = () => {
+    const u = st?.runway_in_use || {};
+    return { dep: u.dep || u.arr, arr: u.arr || u.dep, rwy: u.arr || u.dep || st?.runways?.[0]?.designator };
+  };
+  const selOf = (c) => manual[c.sel] || defaults()[c.sel];
+  const rwyOf = (des) => (st?.runways || []).find((r) => r.designator === des);
+
+  // nowe próbki od zera (nowy METAR albo inny układ kolumn): 10 min historii liczymy od razu
+  const reseed = () => {
+    const b = windBasis(st?.parsed);
+    field = b ? new WindField(b) : null;
+    cols.forEach((c) => { c.sensor = field ? new Sensor(field, c.lag) : null; });
+    if (!field) return;
+    for (let i = 0; i < HIST; i++) { field.step(); cols.forEach((c) => c.sensor.step()); }
+    lastStep = Date.now();
+  };
+
+  const buildCols = (defs) => {
+    cols = defs.map((d) => ({ ...d }));
+    $(".aw-winds").innerHTML = cols.map(colHtml).join("");
+    cols.forEach((c) => {
+      c.el = $(`.aw-col[data-k="${c.k}"]`);
+      const q = (s) => c.el.querySelector(s);
+      c.svg = q("svg"); c.stat = q(".stat"); c.arc = q(".arc"); c.mean = q(".mean"); c.inst = q(".inst"); c.d = q(".ctr .d"); c.s = q(".ctr .s");
+      c.row = Object.fromEntries(ROWS.map(([k]) => [k, q(`.r-${k} td`)]));
+    });
+  };
+
+  // części kolumny zależne od METAR i wyboru pasa (odświeżane co minutę albo po kliknięciu pasa)
+  const drawColStatic = (c) => {
+    const des = selOf(c), p = st?.parsed, def = defaults()[c.sel];
+    const src = manual[c.sel] ? "ręcznie" : st?.runway_in_use?.source === "ATIS" ? "ATIS" : "sugestia";
+    c.el.querySelector(".rwy").innerHTML = des ? `RWY <b>${esc(des)}</b> <span class="src">${src}</span>` : "brak pasa";
+    c.el.querySelector(".aw-rsel").innerHTML = runwayPairs(st?.runways || []).map((g) => `<span class="aw-pair">${g.ends.map((e) =>
+      `<button data-rwy="${esc(e.designator)}" class="${e.designator === des ? "sel" : ""} ${e.designator === def ? "use" : ""}"
+        title="${e.designator === def ? `pas w użyciu (${st?.runway_in_use?.source === "ATIS" ? "ATIS" : "sugestia systemu"})` : "pokaż wiatr dla tego kierunku"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
+    c.stat.innerHTML = dialStatic(st?.runways || [], des);
+    const rvr = (p?.rvr || []).filter((x) => x.runway === des);
+    c.row.rvr.innerHTML = rvr.length ? rvr.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;
+    c.row.rvr.classList.toggle("warn", rvr.length > 0);
+    c.row.vis.textContent = visText(p);
+    c.row.cld.innerHTML = cloudList(p).map(esc).join("<br>") || "–";
+    const spread = has(p?.temperature) && has(p?.dewpoint) && p.temperature - p.dewpoint <= 2;
+    c.row.t.innerHTML = p ? `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C${spread ? ` <span class="warn" title="mały spread: ryzyko mgły">Δ${p.temperature - p.dewpoint}</span>` : ""}` : "–";
+  };
+
+  // wartości zmieniające się co sekundę
+  const drawColLive = (c) => {
+    const s = c.sensor;
+    if (!s || !s.buf.length) {
+      ["inst", "avg", "rng", "max", "hw", "xw"].forEach((k) => { c.row[k].textContent = "///"; });
+      c.svg.setAttribute("class", "aw-dial nodata"); c.d.textContent = "///"; c.s.textContent = "";
+      return;
+    }
+    const b = field.b, cur = s.buf[s.buf.length - 1], a = s.stats();
+    // CALM poniżej 1 kt; VRB jak w raportach ICAO: zmiany ≥ 60° przy średniej < 3 kt albo ≥ 180° przy każdej prędkości
+    const spd2 = Math.round(a.spd), calm = spd2 === 0, vrb = !calm && (b.vrb || a.range >= 180 || (a.spd < 3 && a.range >= 60));
+    const dir2 = (Math.round(a.dir / 10) * 10) || 360;
+    const gusting = !calm && a.max10 - a.spd >= 10, gustNow = cur.s - a.spd >= 5;
+    c.svg.setAttribute("class", `aw-dial${calm ? " calm" : ""}${vrb ? " vrb" : ""}${gusting ? " gst" : ""}${gustNow ? " gnow" : ""}`);
+    c.row.inst.textContent = cur.s === 0 ? "CALM" : windStr(pad(cur.d, 3), cur.s);
+    c.row.inst.classList.toggle("warn", gustNow);
+    c.row.avg.innerHTML = calm ? "CALM" : `${windStr(vrb ? "VRB" : pad(dir2, 3), spd2)}${gusting ? ` <span class="warn">G${a.max10}</span>` : ""}`;
+    c.row.rng.innerHTML = calm ? "–" : `<span>${vrb ? "VRB" : `${pad(Math.round(a.from) || 360, 3)}–${pad(Math.round(a.to) || 360, 3)}°`}</span> · <span>${a.smin}–${a.smax} KT</span>`;
+    c.row.max.textContent = `${pad(a.max10, 2)} KT`;
+    c.row.max.classList.toggle("warn", gusting);
+    // składowe dla wybranego kierunku pasa ze średniej 2 min
+    const r = rwyOf(selOf(c));
+    if (r && !calm && !vrb) {
+      const ang = (a.dir - r.heading) * RAD, hw = Math.round(a.spd * Math.cos(ang)), xw = Math.round(a.spd * Math.sin(ang));
+      c.row.hw.innerHTML = hw < 0 ? `<span class="${hw <= -5 ? "bad" : "warn"}">TW ${-hw} KT</span>` : `HW ${hw} KT`;
+      c.row.xw.innerHTML = `<span class="${Math.abs(xw) >= 20 ? "warn" : ""}">${Math.abs(xw)} KT${xw > 0 ? " R" : xw < 0 ? " L" : ""}</span>`;
+    } else {
+      c.row.hw.textContent = c.row.xw.textContent = r ? (calm ? "CALM" : "VRB") : "–";
+    }
+    // tarcza: łuk zakresu 2 min, strzałka średniej, kropka = wiatr chwilowy
+    c.arc.setAttribute("d", arcPath(a.from, a.to));
+    c.mean.setAttribute("transform", `rotate(${a.dir.toFixed(1)} ${C} ${C})`);
+    c.inst.setAttribute("transform", `rotate(${cur.d} ${C} ${C})`);
+    c.d.textContent = calm ? "CALM" : vrb ? "VRB" : pad(dir2, 3) + "°";
+    c.s.innerHTML = calm ? "" : `${pad(spd2, 2)}${gusting ? `<tspan class="g">G${a.max10}</tspan>` : ""} KT`;
+  };
+
+  const drawAtis = () => {
+    const list = stations, box = $(".aw-atis");
+    const stack = cols.length + list.length > 4;
+    box.className = "aw-atis" + (stack ? " stack" : "");
+    box.style.flexGrow = stack ? 1 : Math.max(1, list.length);
+    box.innerHTML = list.length ? list.map((a) => {
+      const kind = /_D_ATIS$/.test(a.callsign) ? "DEP" : /_A_ATIS$/.test(a.callsign) ? "ARR" : "";
+      const fresh = changed[a.callsign] && Date.now() - changed[a.callsign] < 180000;
+      return `<div class="aw-atiscol"><div class="aw-h"><span>ATIS ${kind}</span>${fresh ? `<span class="aw-new">NOWA LITERA</span>` : ""}</div>
+        <div class="aw-letter"><b>${esc(a.letter)}</b><span class="aw-stn">${a.callsign.split(" / ").map(esc).join("<br>")}<br><em>${esc(a.freq || "")}</em></span></div>
+        <div class="aw-atistxt">${a.lines.map(esc).join("<br>") || `<span class="dim">brak tekstu ATIS</span>`}</div></div>`;
+    }).join("") : `<div class="aw-atiscol off"><div class="aw-h"><span>ATIS</span></div><div class="aw-letter"><b>–</b></div>
+      <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : `Brak stacji ATIS ${esc(icao)} w sieci VATSIM.`}</span></div></div>`;
+  };
+
+  const drawTop = () => {
+    const p = st.parsed, lvp = st.lvp || {}, sun = st.sun;
+    $(".aw-ad .aw-nm").textContent = " " + (st.name || "");
+    $(".aw-elev").textContent = has(st.elevation_ft) ? ` · ELEV ${Math.round(st.elevation_ft)} FT` : "";
+    $(".qnh").textContent = p?.qnh ?? "–";
+    $(".qfe").textContent = st.qfe ?? "–";
+    const lv = $(".aw-lvp");
+    lv.className = "aw-box aw-lvp" + (lvp.state === "LVP" ? " on" : lvp.state ? " prep" : "");
+    lv.innerHTML = lvp.state === "LVP" ? "LVP" : lvp.state ? "LVP<small>PRZYGOT.</small>" : "LVP";
+    lv.title = lvp.state ? (lvp.reasons || []).join("\n") : "LVP nie obowiązują";
+    const v = vmc(p), vm = $(".aw-vmc");
+    vm.className = "aw-box aw-vmc " + (v || "").toLowerCase();
+    vm.innerHTML = `${v || "–"}${p?.flight_category ? `<small>${esc(p.flight_category)}</small>` : ""}`;
+    vm.title = "VMC w CTR (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft" + (p?.flight_category ? `\nkategoria METAR: ${p.flight_category}` : "");
+    $(".aw-sun").innerHTML = sun ? `<span class="k">Słońce UTC · ${sunPhase(sun)}</span><span class="aw-sunrow">${[["BMCT", sun.civil_dawn, "początek zmierzchu cywilnego rano"],
+      ["SR", sun.sunrise, "wschód"], ["SS", sun.sunset, "zachód"], ["EECT", sun.civil_dusk, "koniec zmierzchu cywilnego wieczorem"]]
+      .map(([k, t, tip]) => `<span title="${tip}"><i>${k}</i>${t || "--:--"}</span>`).join("")}</span>` : "";
+    $(".aw-sun").hidden = !sun;
+    const errs = [loadErr, ...(st.errors || []), st.network_error].filter(Boolean);
+    $(".aw-err").innerHTML = errs.map(esc).join("<br>");
+    $(".aw-err").title = errs.join("\n");
+  };
+  const drawAge = () => {
+    const p = st?.parsed, age = metarAge(p?.time), box = $(".aw-age");
+    box.querySelector(".v").textContent = p?.time ? `${p.time.slice(2, 4)}:${p.time.slice(4, 6)}Z` : "–";
+    box.querySelector(".aw-sub").textContent = age !== null ? ageText(age) + " temu" : "";
+    box.classList.toggle("stale", age !== null && age > 70);
+  };
+  const drawBottom = () => {
+    const p = st.parsed, set = (k, v) => { $(`.b-${k} .v`).textContent = v; };
+    set("wind", metarWind(p)); set("temp", p ? tempText(p.temperature) + " °C" : "–"); set("dew", p ? tempText(p.dewpoint) + " °C" : "–");
+    set("qnh", p?.qnh ? p.qnh + " hPa" : "–"); set("vis", visText(p)); set("cld", cloudList(p).join("  ") || "–");
+    $(".b-cld .v").title = cloudList(p).join(", ");
+  };
+
+  // --- nakładka METAR / TAF / NOTAM
+  const decoded = (p) => {
+    const age = metarAge(p.time);
+    const rows = [["Obserwacja", p.time ? `dzień ${p.time.slice(0, 2)}, ${p.time.slice(2, 4)}:${p.time.slice(4, 6)} UTC${age !== null ? ` (${ageText(age)} temu)` : ""}` : "–"],
+      ["Wiatr", `${metarWind(p)}${has(p.wind_speed) ? ` · ${Math.round(p.wind_speed * 0.514)} m/s` : ""}`], ["Widzialność", visText(p)],
+      ["RVR", (p.rvr || []).map((x) => `R${x.runway} ${rvrText(x)}`).join(" · ") || "–"], ["Zjawiska", (p.weather || []).join(" ") || "–"],
+      ["Chmury", cloudList(p).join(" · ")], ["Podstawa (ceiling)", has(p.ceiling_ft) ? p.ceiling_ft + " ft" : "–"],
+      ["Temperatura / punkt rosy", `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C`], ["QNH / QFE", `${p.qnh ?? "–"} / ${st.qfe ?? "–"} hPa`],
+      ["Trend", p.trend || "–"], ["Kategoria", p.flight_category || "–"]];
+    return `<table class="aw-dec">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>`;
+  };
+  const drawNotams = () => {
+    if (!notams) return `<span class="dim">Ładowanie NOTAM…</span>`;
+    if (notams.error) return `<span class="bad">${esc(notams.error)}</span>`;
+    const list = [...notams.notams].sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+    return list.length ? `<div class="dim">${list.length} NOTAM · ${esc(icao)}</div>` + list.map((n) => {
+      const [cls, txt] = notamValidity(n);
+      return `<div class="aw-notam ${cls}"><div><b>${esc(n.id || "")}</b><span>${esc(txt)}</span>${n.schedule ? `<span class="dim">${esc(n.schedule)}</span>` : ""}</div><pre>${esc(n.raw)}</pre></div>`;
+    }).join("") : `<span class="dim">Brak NOTAM-ów dla ${esc(icao)}.</span>`;
+  };
+  const drawOvl = () => {
+    const box = $(".aw-ovl");
+    box.hidden = !ovl;
+    el.querySelectorAll("[data-ovl]").forEach((b) => b.classList.toggle("active", b.dataset.ovl === ovl));
+    if (!ovl) return;
+    box.querySelector(".t").textContent = `${ovl} · ${icao}`;
+    const body = box.querySelector(".aw-ovl-body");
+    if (ovl === "METAR") body.innerHTML = st?.metar ? `<div class="wx aw-raw">${colorize(st.metar)}</div>${decoded(st.parsed || {})}` : `<div class="wx">${colorize(null)}</div>`;
+    else if (ovl === "TAF") body.innerHTML = `<div class="wx aw-raw">${st?.taf ? wxLines("taf", st.taf) : colorize(null)}</div>`;
+    else body.innerHTML = drawNotams();
+  };
+  // NOTAM-y pobieramy od razu (liczba na przycisku) i odświeżamy przy otwarciu, jeśli mają ponad 10 min
+  const loadNotams = async () => {
+    try { notams = { ...(await api(`/api/notam/${icao}`)), t: Date.now() }; } catch (e) { notams = { error: e.message, t: Date.now() }; }
+    if (dead) return;
+    $("[data-ovl=NOTAM]").innerHTML = `NOTAM${notams.notams ? ` <b>${notams.notams.length}</b>` : ""}`;
+    if (ovl === "NOTAM") drawOvl();
+  };
+  const openOvl = (k) => {
+    ovl = ovl === k ? null : k;
+    drawOvl();
+    if (ovl === "NOTAM" && notams && Date.now() - notams.t > 600000) loadNotams();
+  };
+
+  const draw = () => {
+    if (!st) {
+      $(".aw-err").textContent = loadErr;
+      $(".aw-winds").innerHTML = `<div class="aw-none"><b>Brak danych AWOS dla ${esc(icao)}</b><span>${esc(loadErr)}</span></div>`;
+      return;
+    }
+    drawTop(); drawAge(); drawBottom();
+    cols.forEach((c) => { drawColStatic(c); drawColLive(c); });
+    drawAtis();
+    if (ovl && ovl !== "NOTAM") drawOvl();
+  };
+
+  const load = async () => {
+    loading = Date.now();
+    const [s, a] = await Promise.allSettled([api(`/api/aerodromes/${icao}/status`), vatsimAtc()]);
+    loading = 0;
+    lastLoad = Date.now();
+    if (dead) return;
+    loadErr = s.status === "rejected" ? s.reason.message : "";
+    if (loadErr) { if (st) drawTop(); else draw(); return; }
+    st = s.value;
+    stations = atisStations(a.status === "fulfilled" ? a.value : null, st, icao);
+    stations.forEach((x) => {
+      if (letters[x.callsign] && letters[x.callsign] !== x.letter) changed[x.callsign] = Date.now();
+      letters[x.callsign] = x.letter;
+    });
+    const u = st.runway_in_use || {}, split = u.arr && u.dep && u.arr !== u.dep;
+    const key = split ? "split" : "one";
+    let fresh = false;
+    if (key !== modeKey) { modeKey = key; buildCols(split ? COLS_SPLIT : COLS_ONE); fresh = true; }
+    // ręcznie wybrany pas, którego już nie ma na liście, wraca do automatu
+    Object.keys(manual).forEach((k) => { if (!rwyOf(manual[k])) delete manual[k]; });
+    if (fresh || st.metar !== metarRaw) { metarRaw = st.metar; reseed(); }
+    draw();
+  };
+
+  // kliknięcia: wybór kierunku pasa (TDZ/MID/END razem, DEP i ARR osobno), nakładki
+  root.addEventListener("click", (e) => {
+    const rb = e.target.closest("button[data-rwy]");
+    if (rb) {
+      const c = cols.find((x) => x.k === rb.closest(".aw-col")?.dataset.k);
+      if (!c) return;
+      manual[c.sel] = rb.dataset.rwy === defaults()[c.sel] ? null : rb.dataset.rwy;
+      if (!manual[c.sel]) delete manual[c.sel];
+      cols.filter((x) => x.sel === c.sel).forEach((x) => { drawColStatic(x); drawColLive(x); });
+      return;
+    }
+    const ob = e.target.closest("button[data-ovl]");
+    if (ob) openOvl(ob.dataset.ovl);
+    if (e.target.closest(".aw-x")) { ovl = null; drawOvl(); }
+  });
+  const onKey = (e) => { if (e.key === "Escape" && ovl && root.offsetParent !== null) { ovl = null; drawOvl(); } };
+  document.addEventListener("keydown", onKey);
+
+  // jeden zegar co 1 s: czas UTC, próbka wiatru, rysowanie; dane co 60 s (tylko gdy widok jest na ekranie)
+  // (gdy widok jest ukryty albo przeglądarka wstrzymała kartę, nie próbkujemy; po przerwie > 10 s nowa historia)
+  const tick = () => {
+    if (root.offsetParent === null) return;
+    const now = new Date();
+    if (field) {
+      if (now - lastStep > 10000) reseed();
+      else { field.step(); cols.forEach((c) => c.sensor.step()); }
+    }
+    lastStep = now.getTime();
+    $(".aw-clock").textContent = now.toISOString().slice(11, 19);
+    if (st) {
+      cols.forEach(drawColLive);
+      if (now.getUTCMinutes() !== lastMin) { lastMin = now.getUTCMinutes(); drawAge(); drawTop(); }
+    }
+    if ((!loading || now - loading > 90000) && now - lastLoad >= 60000) load();
+  };
+  const timer = setInterval(tick, 1000);
+  load();
+  tick();
+  loadNotams();
+
+  return {
+    destroy() {
+      dead = true;
+      clearInterval(timer);
+      document.removeEventListener("keydown", onKey);
+    },
+  };
+}
+
+// do testów symulacji (node)
+export const awosSim = { windBasis, WindField, Sensor, metarAge };

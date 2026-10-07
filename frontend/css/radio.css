@@ -1,0 +1,24 @@
+/* radio: styl dodany w rundzie 7 */
+
+/* Sąsiedzi, INNE, ONLINE: ID pozycji wg profilu VACS ACC_EPWW (np. "EDUU OSE22/HVL22") z dopiskiem wysokości obok.
+   Szerokość kolumny ID: najdłuższa etykieta VACS w znakach (--pid-ch) + miejsce na dopisek. */
+.radio-list.vacs .radio-group { max-width: 1180px; }
+.radio-list.single.vacs .pid { width: calc(var(--pid-ch, 16) * 1ch + 64px); flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-list.vacs .pid .alt { display: inline-block; margin-left: 8px; padding: 0 5px; vertical-align: 2px; font: 700 12px/17px var(--mono);
+  color: #b9c2b9; background: #121612; border: 1px solid #2f3a2f; border-radius: 2px; cursor: help; }
+/* sąsiad spoza profilu VACS: ID z pliku .ese, drugoplanowe */
+.radio-list.vacs .pid.ese { color: #6f776f; font-weight: 400; }
+.radio-list.single.vacs .cs { width: 150px; flex: none; }
+/* nazwa zwęża się na wąskim ekranie jednakowo we wszystkich wierszach (cqw), żeby kolumna "kto / → przejmuje" była równa */
+.radio-list.single.vacs .radio-group { container-type: inline-size; }
+.radio-list.single.vacs .nm { width: clamp(100px, 100cqw - 820px, 240px); }
+/* długie imię zalogowanego: wielokropek zamiast wyjścia za wiersz (pełne w dymku wiersza) */
+.radio-list.single.vacs .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* dziedziczenie VACS: kto przejmuje obszar, gdy główne stanowisko jest offline; kilka przejęć zawija się w wierszu */
+.radio-row .inhs { display: flex; flex-wrap: wrap; column-gap: 14px; min-width: 0; }
+.radio-row .inh { font-size: 14px; color: var(--muted); white-space: nowrap; cursor: help; }
+.radio-row .inh b { font: 700 14px var(--mono); color: var(--green-hi); }
+/* najechanie na etykietę VACS, dopisek albo przejęcie (własny title): bez drugiego dymka wiersza */
+.radio-row[data-tip]:has([title]:hover)::after { display: none; }
+.vacs-note { margin: -4px 0 10px; }
+.vacs-note a { color: var(--green-text); }

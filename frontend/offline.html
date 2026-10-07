@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brak połączenia</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { background: #000; color: #e8e8e8; font: 14px/1.5 "Segoe UI", Roboto, Arial, sans-serif;
+           display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; }
+    h1 { font: 700 20px Verdana, Tahoma, sans-serif; color: #f2d21b; margin: 0 0 8px; }
+    p { color: #8c948c; margin: 0 0 16px; }
+    button { padding: 8px 18px; background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16;
+             border-radius: 2px; color: #f4fff0; font: 700 14px Verdana, Tahoma, sans-serif; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Brak połączenia z serwerem</h1>
+    <p>Aplikacja potrzebuje internetu (METAR, VATSIM, vIFF są pobierane na bieżąco).</p>
+    <button type="button" onclick="location.reload()">Spróbuj ponownie</button>
+  </div>
+</body>
+</html>

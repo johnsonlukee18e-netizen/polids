@@ -1,0 +1,7 @@
+{
+  "_uwaga": "Progi LVP (Low Visibility Procedures). Wartosci domyslne do sprawdzenia z INOP EPWW (om.plvacc.pl) i AIP AD 2.22; mozna je zmienic dla kazdego lotniska. RVR, a gdy brak RVR widzialnosc, w metrach; podstawa chmur (BKN/OVC/VV) w stopach.",
+  "DEFAULT": {
+    "lvp": {"rvr_m": 550, "ceiling_ft": 200},
+    "prep": {"rvr_m": 800, "ceiling_ft": 300}
+  }
+}

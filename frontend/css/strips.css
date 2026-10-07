@@ -1,0 +1,163 @@
+/* AERODROME › RUCH: paski postępu lotu jak w EFES. Odlot niebieski, przylot żółty, lokalny różowy, planowany przygaszony.
+   Paski to jedyne miejsce z dominującym kolorem innym niż zielony; obudowa (pasek informacji, zatoki) jak NM UI.
+   Bez poświaty: żadnych text-shadow ani cieni wokół pasków. */
+.ad-pane .strips { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.strips {
+  --strip-font: "Arial Narrow", "Bahnschrift SemiCondensed", Bahnschrift, "Roboto Condensed", "Liberation Sans Narrow",
+    "Nimbus Sans Narrow", "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+}
+
+/* pasek informacji: pasy w użyciu, ATIS, A-CDM, legenda */
+.sx-bar { flex: none; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 4px 10px; min-height: 32px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.sx-bar .kv { display: inline-flex; align-items: baseline; gap: 6px; font: 13px var(--mono); color: #fff; white-space: nowrap; }
+.sx-bar .kv i { font: 700 10px/1 var(--sans); font-style: normal; letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.sx-bar .kv b { font-size: 18px; }
+.sx-bar .kv b.dep { color: #6db8ff; }
+.sx-bar .kv b.arr { color: #ffd84a; }
+.sx-bar .kv.sugg { color: var(--warn); font: 12px var(--sans); }
+.sx-legend { display: inline-flex; gap: 10px; font-size: 12px; color: var(--text); white-space: nowrap; }
+.sx-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.lg { display: inline-block; width: 18px; height: 11px; border-radius: 2px; border: 1px solid; }
+.lg.dep { background: linear-gradient(#e8f3ff, #6db3f2); border-color: #2f74c0; }
+.lg.arr { background: linear-gradient(#fffbe0, #f5c400); border-color: #c79a00; }
+.lg.loc { background: linear-gradient(#fff3f7, #f5aec4); border-color: #c97e95; }
+.lg.plan { background: linear-gradient(#eef1f4, #a3b2c0); border-color: #6a7d90; }
+.sx-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; text-align: right; }
+.sx-bar .error { color: var(--bad); font-size: 12px; }
+
+/* tablica: dwie kolumny zatok, każda zatoka przewija się w sobie */
+.sx-board { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.sx-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.sx-bay { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.sx-bay.main { flex: 1 1 0; }
+.sx-bay.side { flex: 0 1 auto; max-height: 36%; }
+.sx-bay > h3 { flex: none; display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 5px 10px; background: var(--head);
+  border-bottom: 1px solid var(--head-line); border-left: 3px solid var(--bay, var(--green)); border-radius: 3px 3px 0 0;
+  font: 700 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.sx-bay > h3 .n { color: #fff; font: 700 12px var(--mono); }
+.sx-bay > h3 .sub { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.sx-bay.dep { --bay: #3d8fe0; }
+.sx-bay.arr { --bay: #e8b800; }
+.sx-bay.loc { --bay: #e07f9e; }
+.sx-bay.plan { --bay: #6a7d90; }
+.sx-list { flex: 1; min-height: 0; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 5px; background: #070807;
+  container: sxlist / inline-size; }
+.sx-bay.empty .sx-list { flex: none; padding: 4px 10px; }
+.sx-empty { padding: 2px 0; }
+.sx-div { flex: none; display: flex; align-items: center; gap: 8px; margin: 3px 0 0; font: 700 10px/1.2 var(--sans); letter-spacing: .8px;
+  text-transform: uppercase; color: var(--muted); }
+.sx-div::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+
+/* pasek EFES */
+.strip { flex: none; position: relative; color: #000; border: 1px solid; border-radius: 5px; font-family: var(--strip-font);
+  font-stretch: semi-condensed; line-height: 1.1; cursor: pointer; user-select: none; }
+.strip.dep { background: linear-gradient(#eef6ff 0%, #c2e0ff 42%, #6fb4f3 100%); border-color: #2f74c0; }
+.strip.arr { background: linear-gradient(#fffbe3 0%, #ffe788 42%, #f5c200 100%); border-color: #c08f00; }
+.strip.local { background: linear-gradient(#fff4f8 0%, #ffd6e3 50%, #f4b0c6 100%); border-color: #c4788f; }
+.strip.planned { filter: saturate(.25); opacity: .82; }
+/* na ziemi daleko od lotniska (przylot jeszcze na lotnisku odlotu, odlot po przylocie): przygaszony */
+.strip.away { border-style: dashed; filter: saturate(.45) brightness(.94); }
+.strip:hover { border-color: #000; }
+.strip.sel { outline: 2px solid var(--green-hi); outline-offset: 1px; }
+.strip .s-top { display: grid; grid-template-columns: 66px 64px minmax(112px, 1fr) 56px 112px 44px 56px; height: 46px; }
+.strip .c { display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-width: 0; overflow: hidden;
+  padding: 3px 4px 2px; border-right: 1px dashed rgba(0, 0, 0, .38); white-space: nowrap; }
+.strip .c-taxi { border-right: 0; }
+.strip .t, .strip .ty, .strip .atis, .strip .proc { font-size: 19px; font-weight: 400; }
+.strip .s { font-size: 13px; display: flex; align-items: baseline; gap: 4px; }
+.strip .s i, .strip .cur i, .strip .c-box .k { font-style: normal; font-size: 9px; letter-spacing: .2px; color: rgba(0, 0, 0, .62); }
+.strip .c-time .s { gap: 2px; }
+.strip .ph { color: rgba(0, 0, 0, .3); font-size: 12px; letter-spacing: .3px; }
+.strip .c-time .ph, .strip .c-type .ph { font-size: 11px; }
+/* TYP i kategoria turbulencji (W) */
+.strip .ty { display: inline-flex; align-items: flex-start; gap: 1px; }
+.strip .w { font-style: normal; font-size: 11px; font-weight: 700; margin-left: 1px; color: #333; }
+.strip .w-L { color: #1f7a1a; } .strip .w-H { color: #b8160f; } .strip .w-J { color: #9a128f; }
+.strip .c-type.three { justify-content: flex-start; gap: 0; padding-top: 2px; }
+.strip .c-type.three .ty { font-size: 15px; }
+.strip .c-type.three .s { font-size: 11px; line-height: 1.05; }
+/* CALLSIGN duży, STATUS pod nim z prawej */
+.strip .c-cs { align-items: stretch; padding: 0 6px 2px 8px; }
+.strip .cs { font-size: 29px; line-height: 30px; letter-spacing: .2px; overflow: hidden; text-overflow: clip; }
+.strip .cs.long { font-size: 23px; }
+.strip .st { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 12px; margin-top: -2px; }
+.strip .mv { letter-spacing: .3px; }
+.strip .fs { font: 700 10px/13px var(--sans); padding: 0 3px; border-radius: 2px; border: 1px solid; cursor: inherit; }
+.strip .fs-fi { color: #2b3138; background: rgba(255, 255, 255, .55); border-color: #59636d; }
+.strip .fs-si { color: #1d1400; background: #ffb020; border-color: #9c6500; }
+.strip .fs-su { color: #fff; background: #c81e1e; border-color: #7d0d0d; }
+.strip .fs-aa { color: #fff; background: #006f80; border-color: #003f49; }
+.strip .fs-ta { color: #fff; background: #2b7f1d; border-color: #164b0d; }
+.strip .fs-rea { color: #164b0d; background: rgba(255, 255, 255, .6); border-color: #2b7f1d; }
+/* A / reguły + pas */
+.strip .ru { font-size: 12px; }
+.strip .ru.vfr { font-weight: 700; }
+.strip .rw { font-weight: 700; font-size: 14px; }
+/* SID/STAR / CFL + SSR */
+.strip .c-proc .s { gap: 10px; }
+.strip .cfl, .strip .ssr { font-size: 14px; }
+.strip .ssr.cur { color: rgba(0, 0, 0, .5); }
+.strip .pr { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.strip .cur { display: inline-flex; gap: 3px; align-items: baseline; }
+/* prawe pole zamiast przycisku SU: najważniejszy czas */
+.strip .c-box { margin: 4px 5px 4px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid rgba(0, 0, 0, .45); border-radius: 3px; background: rgba(255, 255, 255, .5); }
+.strip .c-box b { font-size: 16px; font-weight: 400; line-height: 1.05; }
+.strip .c-box.empty { border-style: dashed; background: transparent; }
+.strip .c-box.ctot.d15 { background: #2f6fd6; color: #fff; } .strip .c-box.ctot.d30 { background: #e8c400; }
+.strip .c-box.ctot.d45 { background: #ff8c1a; } .strip .c-box.ctot.d60 { background: #d62828; color: #fff; }
+.strip .c-box.ctot.d15 .k, .strip .c-box.ctot.d60 .k { color: rgba(255, 255, 255, .85); }
+/* FREETEXT pod przerywaną linią */
+.strip .s-free { display: flex; gap: 6px; justify-content: center; height: 16px; padding: 0 10px; border-top: 1px dashed rgba(0, 0, 0, .45);
+  font-size: 12px; line-height: 15px; white-space: nowrap; overflow: hidden; }
+.strip .s-free .ft { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.strip .s-free .lp { flex: none; color: rgba(0, 0, 0, .45); }
+.strip.local .s-free { justify-content: flex-start; }
+
+/* węższa zatoka (np. 1366 px): mniejsze pismo i kolumny, żeby CALLSIGN się mieścił */
+@container sxlist (max-width: 580px) {
+  .strip .s-top { grid-template-columns: 62px 56px minmax(96px, 1fr) 48px 96px 38px 50px; height: 44px; }
+  .strip .c-time .s { font-size: 11px; }
+  .strip .s i, .strip .cur i, .strip .c-box .k { font-size: 8px; }
+  .strip .t, .strip .ty, .strip .atis, .strip .proc { font-size: 16px; }
+  .strip .s, .strip .cfl, .strip .ssr, .strip .pr { font-size: 12px; }
+  .strip .rw { font-size: 13px; }
+  .strip .cs { font-size: 25px; line-height: 27px; }
+  .strip .cs.long { font-size: 20px; }
+  .strip .c { padding: 3px 3px 2px; }
+  .strip .c-cs { padding: 0 4px 2px 6px; }
+  .strip .c-box b { font-size: 14px; }
+  .strip .c-box { margin: 4px 3px; }
+  .strip .ph { font-size: 11px; }
+  .strip .s-free { font-size: 11px; }
+}
+@container sxlist (max-width: 470px) {
+  .strip .s-top { grid-template-columns: 56px 50px minmax(84px, 1fr) 42px 84px 0 46px; }
+  .strip .c-taxi { padding: 0; border: 0; }
+  .strip .c-taxi .ph { display: none; }
+  .strip .cs { font-size: 21px; }
+}
+
+/* dymek: opis pola + pełne dane paska (position: fixed, żeby nie obcinało go przewijanie zatoki) */
+.sx-tip { position: fixed; z-index: 2000; max-width: 560px; pointer-events: none; background: #0b0d0b; color: #e8e8e8;
+  border: 1px solid var(--green-hi); border-radius: 2px; padding: 6px 9px; font: 12px/1.45 var(--mono); white-space: pre-wrap; }
+.sx-tip .h { color: var(--green-hi); font-family: var(--sans); font-size: 12px; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+
+/* PRZEGLĄD: jednowierszowe podsumowanie ruchu, klik przełącza na RUCH */
+.ad-col > .card.ad-ruch { flex: none; cursor: pointer; }
+.ad-ruch .ruch-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; }
+.ad-ruch .ruch-line b { font: 700 15px var(--mono); color: #fff; }
+.ad-ruch .ruch-line span { display: inline-flex; align-items: center; gap: 5px; }
+.ad-ruch h3 { display: flex; }
+.ad-ruch .ruch-go { margin-left: auto; color: var(--text); }
+.ad-ruch:hover .ruch-go { color: var(--green-hi); }
+.ad-ruch:hover { border-color: var(--green); }
+
+@media (max-width: 1180px), (max-height: 560px) {
+  .ad-pane .strips { overflow: auto; }
+  .sx-board { display: flex; flex-direction: column; flex: none; }
+  .sx-bay.main, .sx-bay.side { flex: none; max-height: none; }
+  .sx-list { max-height: 60vh; }
+}

@@ -1,0 +1,12 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy app:1337
+}

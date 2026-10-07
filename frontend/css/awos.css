@@ -1,0 +1,170 @@
+/* AWOS (AERODROME › AWOS): wygląd jak NM UI: cienkie ramki 1px, paski tytułów małymi literami z odstępami,
+   wartości monospace, bez poświaty. Przełącznik PRZEGLĄD / AWOS na pasku narzędzi AERODROME. */
+.ad-view { display: inline-flex; border: 1px solid var(--line); }
+.ad-view button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 5px 12px;
+  font: 700 11px var(--ui); letter-spacing: 1.5px; cursor: pointer; }
+.ad-view button:last-child { border-right: 0; }
+.ad-view button:hover { color: var(--text); background: var(--panel-2); }
+.ad-view button.active { background: #14240f; color: var(--green-hi); box-shadow: inset 0 -2px 0 var(--green-hi); }
+
+.awos { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.awos .k { font: 700 10px/1.3 var(--ui); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.awos .dim { color: var(--muted); }
+.awos .warn { color: var(--yellow); }
+.awos .bad { color: var(--bad); }
+
+/* pasek górny */
+.aw-top { flex: none; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+.aw-box[hidden] { display: none; }
+.aw-box { flex: none; background: var(--panel); border: 1px solid var(--line); padding: 3px 10px; display: flex; flex-direction: column; justify-content: center; }
+.aw-box .v { font: 700 22px/1.15 var(--mono); color: #fff; white-space: nowrap; }
+.aw-ad { flex: 1 1 auto; min-width: 140px; }
+.aw-ad .v { overflow: hidden; text-overflow: ellipsis; }
+.aw-ad .icao { color: var(--green-hi); }
+.aw-ad .aw-nm { font: 13px var(--ui); color: var(--text); }
+.aw-utc .v { color: var(--cyan); }
+.aw-q .v { color: var(--yellow); font-size: 26px; }
+.aw-lvp, .aw-vmc { min-width: 72px; align-items: center; font: 700 18px var(--mono); letter-spacing: 1px; color: #3a423a; }
+.aw-lvp small, .aw-vmc small { font: 700 10px var(--ui); letter-spacing: 1px; }
+.aw-lvp.on { background: #b0201a; border-color: #ff5a4a; color: #fff; }
+.aw-lvp.prep { color: var(--yellow); border-color: var(--yellow); }
+.aw-vmc.vmc { color: var(--green-hi); border-color: var(--green); }
+.aw-vmc.imc { color: #fff; background: #3a2a00; border-color: var(--yellow); }
+.aw-vmc small { color: var(--muted); }
+.aw-age .v { font-size: 18px; }
+.aw-age .aw-sub { font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.aw-age.stale { border-color: var(--bad); }
+.aw-age.stale .v, .aw-age.stale .aw-sub { color: var(--bad); }
+.aw-sunrow { display: grid; grid-template-columns: auto auto; gap: 0 12px; font: 700 13px/16px var(--mono); color: #fff; white-space: nowrap; }
+.aw-sun i { display: inline-block; min-width: 34px; margin-right: 5px; font: 700 10px var(--ui); font-style: normal; letter-spacing: 1px; color: var(--muted); }
+.aw-err { flex: 0 1 220px; min-width: 0; align-self: center; font: 11px var(--mono); color: var(--bad); overflow: hidden; max-height: 48px; }
+.aw-err:empty { display: none; }
+
+/* środek: kolumny wiatru + ATIS */
+.aw-mid { flex: 1; min-height: 0; display: flex; gap: 6px; position: relative; }
+.aw-windwrap { flex: 3 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.aw-winds { flex: 1; min-height: 0; display: flex; gap: 6px; }
+/* brak danych lotniska (np. nieznany ICAO albo serwer nie odpowiada) */
+.aw-none { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; background: var(--panel);
+  border: 1px solid var(--line); font: 13px var(--mono); color: var(--bad); }
+.aw-none b { font: 700 12px var(--ui); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.aw-simnote b { color: var(--yellow); letter-spacing: 1px; margin-right: 4px; }
+.aw-simnote { flex: none; font: 11px var(--ui); color: var(--muted); border: 1px solid #4a4220; background: #12100a; padding: 2px 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aw-col, .aw-atiscol { flex: 1 1 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); }
+.aw-h { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; padding: 0 8px;
+  background: var(--panel-2); border-bottom: 1px solid var(--line); font: 700 11px var(--ui); letter-spacing: 1.5px; text-transform: uppercase; color: var(--green-text); white-space: nowrap; }
+.aw-h > span:first-child { font-size: 13px; color: #fff; }
+.aw-h .rwy { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.aw-h .rwy b { font: 700 14px var(--mono); color: var(--green-hi); letter-spacing: 0; }
+.aw-h .src { font-size: 9px; letter-spacing: 1px; }
+.aw-rsel { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.aw-rsel .aw-pair { display: inline-flex; }
+.aw-rsel button { min-width: 38px; padding: 2px 6px; background: #0b0d0b; border: 1px solid var(--line); margin-left: -1px; color: var(--muted);
+  font: 700 13px var(--mono); cursor: pointer; }
+.aw-rsel .aw-pair button:first-child { margin-left: 0; }
+.aw-rsel button:hover { color: #fff; border-color: #4a544a; position: relative; }
+.aw-rsel button.use { box-shadow: inset 0 -2px 0 var(--green); }
+.aw-rsel button.sel { background: #14240f; color: var(--green-hi); border-color: var(--green); position: relative; }
+
+/* tarcza wiatru */
+.aw-dialbox { flex: 1 1 auto; min-height: 120px; display: flex; justify-content: center; align-items: center; padding: 4px; }
+.aw-dial { width: 100%; height: 100%; max-height: 420px; }
+.aw-dial .bg { fill: #050605; stroke: #4a544a; stroke-width: 1.5; }
+.aw-dial .tk { stroke: #5a645a; stroke-width: 1; }
+.aw-dial .tk.tk30 { stroke: #9aa49a; stroke-width: 1.6; }
+.aw-dial .cd { fill: var(--muted); font: 700 10px var(--mono); text-anchor: middle; }
+.aw-dial .rw { fill: #1c211c; stroke: #2e352e; stroke-width: 1; }
+.aw-dial .rw.on { fill: #4a514a; stroke: #8c948c; }
+.aw-dial .thr { stroke: #fff; stroke-width: 2; }
+.aw-dial .rl rect { fill: #000; stroke: #4a544a; stroke-width: 1; }
+.aw-dial .rl text { fill: var(--muted); font: 700 11px var(--mono); text-anchor: middle; }
+.aw-dial .rl.sel rect { stroke: var(--green-hi); }
+.aw-dial .rl.sel text { fill: #fff; }
+.aw-dial .arc { fill: none; stroke: var(--cyan); stroke-width: 6; }
+.aw-dial .mean line { stroke: var(--green-hi); stroke-width: 3; }
+.aw-dial .mean polygon { fill: var(--green-hi); }
+.aw-dial .inst { fill: #fff; stroke: #000; stroke-width: 1.5; }
+.aw-dial .ctr rect { fill: #000; stroke: #4a544a; stroke-width: 1; }
+.aw-dial .ctr text { fill: #fff; font-family: var(--mono); font-weight: 700; text-anchor: middle; }
+.aw-dial .ctr .d { font-size: 20px; }
+.aw-dial .ctr .s { font-size: 13px; }
+.aw-dial .ctr .g { fill: var(--yellow); }
+.aw-dial.gst .arc { stroke: var(--yellow); }
+.aw-dial.gst .ctr rect { stroke: var(--yellow); }
+.aw-dial.gnow .inst { fill: var(--yellow); }
+.aw-dial.calm .arc, .aw-dial.calm .mean, .aw-dial.calm .inst, .aw-dial.vrb .mean, .aw-dial.vrb .arc,
+.aw-dial.nodata .arc, .aw-dial.nodata .mean, .aw-dial.nodata .inst { display: none; }
+
+/* tabela wartości pod tarczą */
+table.aw-rows { flex: none; width: 100%; border-collapse: collapse; border-top: 1px solid var(--line); }
+table.aw-rows th, table.aw-rows td { padding: 2px 8px; border-bottom: 1px solid #1a1e1a; vertical-align: top; }
+table.aw-rows th { width: 1%; white-space: nowrap; text-align: left; font: 700 10px/19px var(--ui); letter-spacing: 1px; color: var(--muted); }
+table.aw-rows td { font: 700 15px/19px var(--mono); color: #fff; text-align: right; white-space: nowrap; }
+table.aw-rows tr:nth-child(odd) { background: var(--row-alt, #0f130f); }
+table.aw-rows .r-inst td { color: var(--cyan); }
+table.aw-rows .r-avg td { font-size: 17px; }
+table.aw-rows .r-rng td { font-size: 13px; color: var(--text); font-weight: 400; white-space: normal; }
+table.aw-rows .r-rng span { white-space: nowrap; }
+table.aw-rows .r-cld td { font-size: 13px; }
+table.aw-rows td.warn, table.aw-rows .r-inst td.warn { color: var(--yellow); }
+.aw-rows .aw-sym { font: 700 9px var(--ui); font-style: normal; color: var(--yellow); border: 1px solid #6a5a10; padding: 0 3px; margin-left: 4px; letter-spacing: 1px; }
+
+/* ATIS */
+.aw-atis { flex: 1 1 0; min-width: 0; display: flex; gap: 6px; }
+.aw-atis.stack { flex-direction: column; }
+.aw-letter { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.aw-letter b { display: inline-block; min-width: 64px; text-align: center; font: 700 48px/60px var(--mono); color: #fff; background: #14240f; border: 1px solid var(--green); }
+.aw-atiscol.off .aw-letter b { color: #3a423a; background: #0b0d0b; border-color: var(--line); }
+.aw-atiscol .aw-new { font: 700 10px var(--ui); letter-spacing: 1px; color: #000; background: var(--yellow); padding: 1px 6px; }
+.aw-stn { min-width: 0; overflow: hidden; font: 700 12px/1.35 var(--mono); color: var(--text); }
+.aw-stn em { font-style: normal; font-size: 18px; color: var(--cyan); }
+.aw-atistxt { flex: 1; min-height: 0; overflow: auto; padding: 6px 10px; font: 13px/1.45 var(--mono); color: var(--text); }
+.aw-atis.stack .aw-letter b { min-width: 48px; font-size: 34px; line-height: 44px; }
+
+/* nakładka METAR / TAF / NOTAM nad środkiem ekranu */
+.aw-ovl { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--green); }
+.aw-ovl[hidden] { display: none; }
+.aw-ovl .aw-h > span:first-child { color: var(--green-hi); }
+.aw-x { background: #0b0d0b; border: 1px solid var(--line); color: var(--text); font: 700 10px var(--ui); letter-spacing: 1px; padding: 2px 8px; cursor: pointer; }
+.aw-x:hover { border-color: var(--green); color: #fff; }
+.aw-ovl-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
+.aw-raw { font-size: 18px; line-height: 1.7; padding: 6px 10px; border: 1px solid var(--line); background: #050605; margin-bottom: 10px; }
+table.aw-dec { border-collapse: collapse; min-width: 560px; }
+table.aw-dec th, table.aw-dec td { padding: 3px 10px; border-bottom: 1px solid #1a1e1a; text-align: left; }
+table.aw-dec th { font: 700 10px var(--ui); letter-spacing: 1px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+table.aw-dec td { font: 15px var(--mono); color: #fff; }
+.aw-notam { border: 1px solid var(--line); border-left: 3px solid var(--yellow); background: #0a0c0a; padding: 5px 10px; margin: 6px 0; }
+.aw-notam > div { display: flex; gap: 14px; align-items: baseline; font: 13px var(--mono); }
+.aw-notam > div span { font-weight: 700; color: var(--yellow); }
+.aw-notam.active { border-left-color: var(--green-hi); }
+.aw-notam.active > div span { color: var(--green-hi); }
+.aw-notam.future { border-left-color: var(--cyan); }
+.aw-notam.future > div span { color: var(--cyan); }
+.aw-notam.expired { opacity: .55; }
+.aw-notam pre { font-size: 13px; margin: 3px 0 0; color: var(--text); }
+
+/* pasek dolny */
+.aw-bot { flex: none; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+.aw-cell { background: var(--panel); border: 1px solid var(--line); padding: 2px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.aw-cell .v { font: 700 15px/1.25 var(--mono); color: var(--cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aw-bot .b-cld { flex: 0 1 auto; }
+.aw-bot .aw-sp { flex: 1; }
+.aw-btn { min-width: 80px; background: #0b0d0b; border: 1px solid var(--line); color: var(--text); font: 700 12px var(--ui); letter-spacing: 1.5px; cursor: pointer; }
+.aw-btn:hover { border-color: var(--green); color: #fff; }
+.aw-btn b { color: var(--yellow); margin-left: 4px; }
+.aw-btn.active { background: #14240f; border-color: var(--green-hi); color: var(--green-hi); }
+
+@media (max-width: 1450px) {
+  .aw-box { padding: 3px 7px; }
+  .aw-sunrow { font-size: 12px; gap: 0 8px; }
+  .aw-sun i { margin-right: 4px; letter-spacing: .5px; }
+  table.aw-rows th, table.aw-rows td { padding: 2px 5px; }
+  table.aw-rows th { letter-spacing: .5px; }
+  table.aw-rows .r-rng td { font-size: 12px; }
+}
+@media (max-width: 1250px), (max-height: 700px) {
+  .aw-q .v { font-size: 22px; }
+  .aw-box .v { font-size: 18px; }
+  .aw-simnote { white-space: normal; }
+}

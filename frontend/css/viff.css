@@ -1,0 +1,179 @@
+/* MAP: vIFF (scenariusze, wykres TV, szczegóły lotu), zwijane sekcje panelu i legenda w zakładkach.
+   Styl jak EUROCONTROL NM UI: cienkie ramki 1px, paski tytułu małymi literami z odstępami, gęste tabele, czasy czcionką mono.
+   Reguły nadpisują starsze z style.css bardziej szczegółowymi selektorami. */
+
+/* --- zwijane sekcje panelu bocznego */
+.mapside .ms-card > h4.ms-tog { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.mapside .ms-card > h4.ms-tog::before { content: "▾"; flex: none; width: 9px; font-size: 10px; color: var(--muted); }
+.mapside .ms-card > h4.ms-tog:hover { color: var(--green-hi); }
+.mapside .ms-card.shut > h4.ms-tog::before { content: "▸"; }
+.mapside .ms-card.shut { padding-bottom: 0; }
+.mapside .ms-card.shut > h4 { margin-bottom: 0; border-bottom-color: transparent; }
+.mapside .ms-card.shut > :not(h4) { display: none !important; }
+
+/* --- wspólne: chip stanu, przycisk zamknięcia, pasek tytułu panelu */
+.vs-chip { display: inline-block; flex: none; padding: 1px 4px; border: 1px solid var(--line); color: var(--muted);
+  font: 700 9px/1.2 var(--ui); letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; }
+.vs-chip.on { background: var(--green-hi); border-color: var(--green-hi); color: #000; }
+.vf-close, .fd-close { margin-left: auto; flex: none; padding: 0 6px; background: transparent; border: 1px solid var(--line); color: var(--muted);
+  font: 12px/18px var(--ui); cursor: pointer; }
+.vf-close:hover, .fd-close:hover { color: var(--text); border-color: var(--green-hi); }
+
+/* --- panel: scenariusze i traffic volumes */
+.mapside .swatch.viff, .lgx .swatch.viff { background: rgba(255,212,0,.08); border: 2px solid #ffd400; }
+.vf-card .vs-sub { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin: 8px 0 3px;
+  font: 700 10px/1.2 var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.vf-card .vs-sub span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+.vs-scn { margin: 0 0 4px; padding: 3px 0 2px; background: var(--bg); border: 1px solid var(--line); }
+.vs-scn.on { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green-hi); }
+.vs-top { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 8px; }
+.vs-top b { font: 700 12px var(--mono); color: var(--text); }
+.vs-n { margin-left: auto; font: 10px var(--mono); color: var(--muted); }
+.vs-cond { padding: 1px 6px 3px 8px; font: 11px/1.35 var(--ui); color: var(--muted); }
+.vs-cond b { font: 400 11px var(--mono); color: var(--text); }
+.vs-none { padding: 2px 0 4px; font-size: 11px; color: var(--muted); }
+.vs-more { margin-top: 2px; }
+.vs-more > summary { list-style: none; cursor: pointer; padding: 3px 0; font: 11px var(--ui); color: var(--muted); }
+.vs-more > summary::-webkit-details-marker { display: none; }
+.vs-more > summary::before { content: "▸"; display: inline-block; width: 12px; }
+.vs-more[open] > summary::before { content: "▾"; }
+.vs-more > summary:hover { color: var(--text); }
+.vf-card .viff-tv { width: 100%; margin: 0 0 4px; font: 12px var(--mono); }
+.vf-card.off > .vs-sub, .vf-card.off > .viff-tv { display: none; }
+
+/* wiersz TV z paskiem obciążenia (w scenariuszu i w legendzie) */
+.mapside .vf-row { display: grid; grid-template-columns: 86px 1fr 46px; gap: 8px; align-items: center; width: 100%; margin: 0; padding: 1px 6px 1px 8px;
+  background: transparent; border: 0; border-radius: 0; color: var(--text); font: 11px/16px var(--mono); text-align: left; cursor: pointer; }
+.mapside .vf-row b { font-weight: 400; }
+.mapside .vf-row:hover { background: var(--panel-2); }
+.mapside .vf-row.on { background: rgba(255,212,0,.1); box-shadow: inset 2px 0 0 #ffd400; }
+.mapside .vf-row.on b { color: #ffd400; font-weight: 700; }
+.mapside .vf-bar { display: block; height: 6px; background: #1d221d; border-radius: 0; overflow: hidden; }
+.mapside .vf-bar i { display: block; height: 100%; }
+.mapside .vf-num { text-align: right; color: var(--muted); }
+.mapside .vf-bar i.ok { background: #3fb950; } .mapside .vf-bar i.near { background: #ffb020; }
+.mapside .vf-bar i.over { background: #f0453a; } .mapside .vf-bar i.nolim { background: #56606a; }
+
+/* --- wykres TV (lewy dolny róg mapy) */
+.leaflet-control.viff-chart { width: 560px; margin-bottom: 24px; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 0; box-shadow: none;
+  color: var(--text); font: 12px var(--ui); }
+.viff-chart .vf-title { display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 8px; background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.viff-chart .vf-kind { font: 700 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.viff-chart .vf-title b { font: 700 13px var(--mono); color: #ffd400; }
+.viff-chart .vf-desc { color: var(--text); }
+.viff-chart .vf-body { padding: 4px 8px 6px; }
+.viff-chart .vf-meta { display: flex; flex-wrap: wrap; gap: 1px 14px; font-size: 11px; color: var(--muted); }
+.viff-chart .vf-meta b { font: 700 11px var(--mono); color: var(--text); }
+.viff-chart .vf-svg { width: 100%; height: auto; display: block; margin-top: 2px; }
+.viff-chart .vf-svg rect.vf-ok { fill: #3fb950; } .viff-chart .vf-svg rect.vf-near { fill: #ffb020; }
+.viff-chart .vf-svg rect.vf-over { fill: #f0453a; } .viff-chart .vf-svg rect.vf-nolim { fill: #4a7bd0; }
+.viff-chart .vf-svg .vf-occ { stroke-width: 1.5; }
+.viff-chart .vf-svg .vf-occ.vf-ok { fill: rgba(63,185,80,.35); stroke: #3fb950; } .viff-chart .vf-svg .vf-occ.vf-near { fill: rgba(255,176,32,.35); stroke: #ffb020; }
+.viff-chart .vf-svg .vf-occ.vf-over { fill: rgba(240,69,58,.4); stroke: #f0453a; } .viff-chart .vf-svg .vf-occ.vf-nolim { fill: rgba(74,123,208,.35); stroke: #4a7bd0; }
+.viff-chart .vf-svg .vf-cap { stroke: #ff5cc8; stroke-width: 1.6; stroke-dasharray: 5 3; }
+.viff-chart .vf-svg text { text-anchor: middle; }
+.viff-chart .vf-svg .vf-ax.end { text-anchor: end; }
+.viff-chart .vf-svg .vf-capt { fill: #ff5cc8; text-anchor: start; }
+.viff-chart .vf-svg text { font: 10px var(--mono); fill: var(--muted); }
+.viff-chart .vf-svg .vf-val { fill: var(--text); font-weight: 700; }
+.viff-chart .vf-svg .vf-sub { font: 700 9px var(--ui); letter-spacing: .6px; text-transform: uppercase; fill: var(--muted); }
+.viff-chart .vf-svg .vf-grid { stroke: #1f251f; }
+.viff-chart .vf-svg .vf-base { stroke: var(--line); }
+.viff-chart .vf-svg .vf-capt { font: 700 10px var(--mono); }
+.viff-chart .vf-legend i.vf-ok { background: #3fb950; } .viff-chart .vf-legend i.vf-near { background: #ffb020; }
+.viff-chart .vf-legend i.vf-over { background: #f0453a; }
+.viff-chart .vf-legend i.vf-capl { width: 14px; height: 0; border-top: 2px dashed #ff5cc8; }
+.viff-chart .vf-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: center; margin: 2px 0 4px; font-size: 11px; color: var(--text); }
+.viff-chart .vf-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 0; vertical-align: -1px; }
+.viff-chart .vf-legend .vf-stat { color: var(--muted); }
+.viff-chart .vf-fhead { margin: 4px 0 2px; font: 700 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.viff-chart .vf-fhead span { color: var(--muted); font-weight: 400; }
+.viff-chart .vf-tblwrap { max-height: 156px; overflow: auto; border: 1px solid var(--line); }
+.viff-chart .vf-empty { padding: 3px 0; font-size: 11px; color: var(--muted); }
+
+/* --- tabele wyników w stylu NM (lista lotów wykresu, wejścia w sektory) */
+.vf-tbl, .fd-tbl { width: 100%; border-collapse: collapse; font: 11px var(--mono); }
+.vf-tbl th, .fd-tbl th { padding: 3px 6px; background: var(--panel-2); border-bottom: 1px solid var(--line); color: var(--muted);
+  font: 700 9px var(--ui); letter-spacing: .5px; text-transform: uppercase; text-align: left; white-space: nowrap; }
+.vf-tbl th { position: sticky; top: 0; z-index: 1; }
+.vf-tbl td, .fd-tbl td { padding: 2px 6px; border-bottom: 1px solid #141814; color: var(--text); white-space: nowrap; }
+.vf-tbl tbody tr:nth-child(even) td, .fd-tbl tbody tr:nth-child(even) td { background: rgba(255,255,255,.025); }
+.vf-tbl tbody tr, .fd-tbl tbody tr { cursor: pointer; }
+.vf-tbl tbody tr:hover td, .fd-tbl tbody tr:hover td { background: #18221a; }
+.vf-tbl td.cs, .fd-tbl td.cs { font-weight: 700; color: #fff; }
+.vf-tbl tr.gnd td { color: var(--muted); }
+.vf-tbl tr.gnd td.cs { color: #c9d1c9; }
+.vf-tbl tbody tr.on td { background: rgba(255,159,26,.16); }
+.vf-tbl tbody tr.on td.cs { color: #ff9f1a; box-shadow: inset 3px 0 0 #ff9f1a; }
+
+/* --- szczegóły lotu (prawy górny róg mapy) */
+.leaflet-control.fd-panel { width: 420px; display: flex; flex-direction: column; padding: 0; background: var(--panel); border: 1px solid var(--line);
+  color: var(--text); font: 12px var(--ui); cursor: default; }
+.fd-panel .fd-bar { display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 10px; background: var(--panel-2); border-bottom: 1px solid var(--line);
+  font: 700 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.fd-panel .fd-head { padding: 6px 10px 7px; border-bottom: 1px solid var(--line); }
+.fd-panel .fd-l1 { display: flex; align-items: center; gap: 8px; }
+.fd-panel .fd-cs { font: 700 20px/1.2 var(--mono); letter-spacing: .5px; color: #fff; }
+.fd-panel .fd-l1 .fs { font-size: 12px; padding: 0 5px; }
+.fd-panel .fd-od { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; font: 13px var(--mono); }
+.fd-panel .fd-od b { color: var(--text); }
+.fd-panel .fd-od .ar { color: var(--muted); }
+.fd-panel .fd-tag { margin-left: 4px; padding: 0 4px; border: 1px solid var(--line); color: var(--text); font: 11px var(--mono); }
+.fd-panel .fd-who { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.fd-panel .fd-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 10px; }
+.fd-panel .fd-sec { margin: 8px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--line);
+  font: 700 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.fd-panel .fd-grid { display: grid; gap: 2px 8px; align-items: baseline; }
+.fd-panel .fd-grid.g4 { grid-template-columns: repeat(4, auto 1fr); }
+.fd-panel .fd-grid.g2 { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); margin-top: 4px; padding-top: 4px; border-top: 1px dotted var(--line); }
+.fd-panel .fd-grid .k { color: var(--muted); font: 10px var(--ui); white-space: nowrap; }
+.fd-panel .fd-grid .k[title] { cursor: help; }
+.fd-panel .fd-grid .v { font: 12px var(--mono); color: var(--text); overflow-wrap: break-word; }
+.fd-panel .fd-reg { color: #ffb020; }
+.fd-ctot { padding: 0 3px; font-weight: 700; white-space: nowrap; }
+.fd-ctot.d15 { background: #2f6fd6; color: #fff; } .fd-ctot.d30 { background: #e8c400; color: #1d1400; }
+.fd-ctot.d45 { background: #ff8c1a; color: #1d1400; } .fd-ctot.d60 { background: #d62828; color: #fff; }
+.fd-panel .fd-route { padding: 3px 6px; background: var(--bg); border: 1px solid var(--line); font: 11px/1.45 var(--mono); color: var(--text); word-break: break-word; }
+.fd-panel .fd-meta, .fd-panel .fd-note { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.fd-panel .fd-warn { margin-top: 2px; font-size: 11px; color: var(--warn); }
+.fd-panel .fd-x { margin-top: 8px; border: 1px solid var(--line); }
+.fd-panel .fd-x > summary { list-style: none; cursor: pointer; padding: 4px 8px; background: var(--panel-2);
+  font: 700 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.fd-panel .fd-x > summary::-webkit-details-marker { display: none; }
+.fd-panel .fd-x > summary::before { content: "▸"; display: inline-block; width: 12px; }
+.fd-panel .fd-x[open] > summary::before { content: "▾"; }
+.fd-panel .fd-x > summary:hover { color: var(--green-hi); }
+.fd-panel .fd-x > summary span { margin-left: 4px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+.fd-panel .fd-x[open] > summary { border-bottom: 1px solid var(--line); }
+.fd-panel .fd-x > .fd-note { padding: 4px 8px; margin: 0; }
+.fd-tbl thead tr:first-child th[colspan] { text-align: center; border-left: 1px solid var(--line); }
+.fd-tbl thead tr:last-child th { padding-top: 0; text-transform: none; letter-spacing: 0; }
+.fd-tbl thead tr:last-child th:nth-child(odd) { border-left: 1px solid var(--line); }
+.fd-tbl td.t:nth-child(3), .fd-tbl td.t:nth-child(5) { border-left: 1px solid var(--line); }
+.fd-tbl td.d { font: 11px var(--ui); color: var(--muted); white-space: normal; }
+.fd-tbl tr.past td { color: var(--muted); }
+.fd-tbl tr.past td.cs { color: #9aa49a; font-weight: 400; }
+.fd-tbl tbody tr.now td { background: rgba(255,212,0,.13); }
+.fd-tbl tr.now td.cs { color: #ffd400; box-shadow: inset 3px 0 0 #ffd400; }
+.fd-tbl tr.now td.d { color: var(--text); }
+.fd-hist { margin: 0; padding: 2px 0; list-style: none; font-size: 11px; }
+.fd-hist li { display: grid; grid-template-columns: 76px 1fr; gap: 6px; padding: 2px 8px; border-bottom: 1px solid #141814; line-height: 1.35; }
+.fd-hist li:last-child { border-bottom: 0; }
+.fd-hist .t { font-family: var(--mono); color: var(--muted); }
+
+/* --- legenda w zakładkach */
+.lgx .lgx-tabs { display: flex; margin: 0 0 6px; border: 1px solid var(--line); }
+.lgx .lgx-tabs button { flex: 1 1 auto; padding: 3px 4px; background: var(--bg); border: 0; border-right: 1px solid var(--line); color: var(--muted);
+  font: 700 9.5px var(--ui); letter-spacing: .2px; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.lgx .lgx-tabs button:last-child { border-right: 0; }
+.lgx .lgx-tabs button:hover { color: var(--text); }
+.lgx .lgx-tabs button.on { background: var(--green); color: #fff; }
+.lgx .lgx-body { display: none; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+.lgx .lgx-body.on { display: grid; }
+.lgx .lgx-i { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; line-height: 1.25; color: var(--text); }
+.lgx .lgx-i.w { grid-column: 1 / -1; }
+.lgx .lgx-s { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 24px; }
+.lgx .lgx-s .vf-bar { width: 24px; }
+.lgx .lgx-s .lg-line { width: 22px; }
+.lgx .lgx-s .fs { cursor: default; }
+.lgx .lgx-note { grid-column: 1 / -1; margin: 4px 0 0; font-size: 11px; color: var(--muted); }

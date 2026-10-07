@@ -1,0 +1,1443 @@
+icao,iata,manufacturer,model,aircraft_type,engine_type,engine_count,wtc,recat,wingspan,length,height,mtow,mlw,ceiling_ft,vmo_kt,mmo
+A1,,Douglas,A-1 Skyraider,airplane,piston,1,,,,,,,,,,
+A109,,AgustaWestland,AW109 (A109),helicopter,turboshaft,2,L,,,11.43,3.42,3175,3175,20000,,
+A119,,AgustaWestland,AW119 Koala (A119),helicopter,turboshaft,1,L,,,11.14,3.6,2850,2850,15000,,
+A122,,Aerotec,A-122 Uirapuru,airplane,piston,1,L,,,,,840,840,,,
+A122,,Aerotec,T-23 Uirapuru,airplane,piston,1,L,,,,,840,840,,,
+A124,,Antonov,An-124 Ruslan,airplane,turbofan,4,H,A,73.3,69.1,21.08,392000,345000,38100,308,0.77
+A139,,AgustaWestland,AW139,helicopter,turboshaft,2,L,,,,,6400,6400,20000,,
+A139,,"Boeing Defense, Space & Security",MH-139 Grey Wolf,helicopter,turboshaft,2,,,,,,,,,,
+A140,,Antonov,An-140,airplane,turboprop,2,M,,,,,21500,21000,25000,227,0.5
+A148,,Antonov,An-148,airplane,turbofan,2,M,E,28.91,29.13,8.2,43700,37800,38000,286,0.8
+A149,,AgustaWestland,AW149,helicopter,turboshaft,2,M,,,14.6,4.04,8600,8600,15000,,
+A158,,Antonov,An-158,airplane,turbofan,2,M,E,28.91,31.63,8.2,43700,38800,38000,286,0.8
+A169,,AgustaWestland,AW169,helicopter,turboshaft,2,L,,,12.19,3.88,4600,4600,15000,,
+A178,,Antonov,An-178,airplane,turbofan,2,M,E,30.57,32.23,9.57,52400,47000,40000,,
+A189,,AgustaWestland,AW189,helicopter,turboshaft,2,M,,,14.6,4.04,8300,8300,10000,,
+A19N,31N,Airbus,A319neo,airplane,turbofan,2,M,D,35.8,33.84,11.76,64000,62800,39100,350,0.82
+A20,,Douglas,A-20 Havoc,airplane,piston,2,M,,,,,11431,10886,,,
+A20N,32N,Airbus,A320neo,airplane,turbofan,2,M,D,35.8,37.57,11.76,73500,66300,39100,350,0.82
+A210,,Aquila,A210 (AT01),airplane,piston,1,L,F,10.3,7.4,2.4,750,750,16400,,
+A21N,32Q,Airbus,A321neo,airplane,turbofan,2,M,D,35.8,44.51,11.76,89000,77300,39100,350,0.82
+A225,,Antonov,An-225 Mriya,airplane,turbofan,6,J,A,88.4,84,18.2,640000,550000,38100,308,0.77
+A270,,Aero Vodochody,Ae 270,airplane,turboprop,1,L,F,14.13,12.23,4.78,3800,3800,26000,205,0.42
+A3,,Douglas,A-3 Skywarrior,airplane,turbojet,2,,,,,,,,,,
+A306,,Airbus,A300 B4-600,airplane,turbofan,2,H,C,44.83,54.08,16.66,165000,138000,40000,335,0.82
+A306,,Airbus,A300 B4-600R,airplane,turbofan,2,H,C,44.83,54.08,16.66,170500,140000,40000,335,0.82
+A306,,Airbus,A300 C4-600,airplane,turbofan,2,H,C,44.83,54.08,16.66,165000,138000,40000,335,0.82
+A306,,Airbus,A300 C4-600R,airplane,turbofan,2,H,C,44.83,54.08,16.66,170500,140000,40000,335,0.82
+A306,,Airbus,A300 F4-600R,airplane,turbofan,2,H,C,44.83,54.08,16.66,170500,140000,40000,335,0.82
+A30B,,Airbus,A300 B1,airplane,turbofan,2,H,C,44.83,51,16.72,137000,122000,40000,345,0.86
+A30B,,Airbus,A300 B2-100,airplane,turbofan,2,H,C,44.83,53.61,16.72,137000,127500,40000,360,0.86
+A30B,,Airbus,A300 B2-200,airplane,turbofan,2,H,C,44.83,53.61,16.72,142000,130000,40000,345,0.86
+A30B,,Airbus,A300 B2-320,airplane,turbofan,2,H,C,44.83,53.61,16.72,142000,136000,40000,345,0.86
+A30B,,Airbus,A300 B4-100,airplane,turbofan,2,H,C,44.83,53.61,16.72,150000,133000,40000,360,0.86
+A30B,,Airbus,A300 B4-200,airplane,turbofan,2,H,C,44.83,53.61,16.72,165000,134000,40000,345,0.82
+A30B,,Airbus,A300 C4-200,airplane,turbofan,2,H,C,44.83,53.61,16.72,165000,134000,40000,345,0.82
+A30B,,Airbus,A300 F4-200,airplane,turbofan,2,H,C,44.83,53.61,16.72,165000,136000,40000,345,0.82
+A310,312,Airbus,A310-200,airplane,turbofan,2,H,C,43.9,46.66,15.95,132000,118500,41100,360,0.84
+A310,,Airbus,A310-200C,airplane,turbofan,2,H,C,43.9,46.66,15.95,138600,121500,41100,360,0.84
+A310,313,Airbus,A310-300,airplane,turbofan,2,H,C,43.9,46.66,15.95,150000,123000,41100,360,0.84
+A310,,Airbus Defence and Space,A310 MRTT,airplane,turbofan,2,H,C,43.9,46.66,15.95,,,,,
+A310,,Airbus Defence and Space,CC-150 Polaris,airplane,turbofan,2,H,C,43.9,46.66,15.95,,,,,
+A318,318,Airbus,A318,airplane,turbofan,2,M,D,34.1,31.45,12.79,59000,56000,39800,350,0.82
+A319,319,Airbus,A319,airplane,turbofan,2,M,D,34.1,33.84,11.76,64000,61000,39100,350,0.82
+A320,320,Airbus,A320,airplane,turbofan,2,M,D,34.1,37.57,11.76,73500,64500,39100,350,0.82
+A321,321,Airbus,A321-100,airplane,turbofan,2,M,D,34.1,44.51,11.76,83000,73500,39100,350,0.82
+A321,321,Airbus,A321-200,airplane,turbofan,2,M,D,34.1,44.51,11.76,89000,75500,39100,350,0.82
+A32E,,Schleicher,ASG 32 El,glider,electric,1,L,F,20,9.07,1.84,850,850,,,
+A32P,,Schleicher,ASG 32 M,glider,piston,1,L,F,20,9.07,1.84,850,850,,,
+A332,332,Airbus,A330-200,airplane,turbofan,2,H,B,60.3,58.82,17.38,230000,180000,41450,330,0.86
+A332,,Airbus Defence and Space,A330 MRTT,airplane,turbofan,2,H,B,60.3,58.82,17.38,,,,,
+A332,,Airbus Defence and Space,KC-30 Voyager,airplane,turbofan,2,H,B,60.3,58.82,17.38,,,,,
+A333,333,Airbus,A330-300,airplane,turbofan,2,H,B,60.3,63.66,16.83,212000,174000,41450,330,0.86
+A337,,Airbus,A330-700L Beluga XL,airplane,turbofan,2,H,B,60.3,63.12,18.95,227000,187000,35200,,
+A338,338,Airbus,A330-800,airplane,turbofan,2,H,B,64,58.82,17.38,242000,186000,41450,330,0.86
+A339,339,Airbus,A330-900,airplane,turbofan,2,H,B,64,63.66,16.79,242000,191000,41450,330,0.86
+A33E,,Schleicher,AS 33 Me,glider,electric,1,L,F,18,6.5,,600,600,,,
+A33P,,Schleicher,AS 33 Es,glider,piston,1,L,F,18,6.5,,600,600,,,
+A342,342,Airbus,A340-200,airplane,turbofan,4,H,B,60.3,59.39,16.83,253500,181000,41100,330,0.86
+A343,343,Airbus,A340-300,airplane,turbofan,4,H,B,60.3,63.66,16.63,253500,186000,41450,330,0.86
+A345,345,Airbus,A340-500,airplane,turbofan,4,H,B,63.45,67.33,17.11,368000,240000,41450,330,0.86
+A346,346,Airbus,A340-600,airplane,turbofan,4,H,B,63.45,74.77,17.29,365000,256000,41450,330,0.86
+A359,359,Airbus,A350-900,airplane,turbofan,2,H,B,64.75,66.8,17.05,268000,205000,43100,340,0.89
+A35K,351,Airbus,A350-1000,airplane,turbofan,2,H,B,64.75,73.79,17.08,308000,233000,41450,340,0.89
+A37,,Cessna,A-37 Dragonfly,airplane,turbojet,2,,,,,,,,,,
+A388,380,Airbus,A380-800,airplane,turbofan,4,J,A,79.75,72.73,24.09,560000,386000,43000,340,0.89
+A3ST,,Airbus,A300-600ST Beluga,airplane,turbofan,2,H,C,44.84,56.15,17.24,153000,140000,35000,295,0.7
+A4,,Douglas,A-4 Skyhawk,airplane,turbojet,1,,,,,,,,,,
+A400,,Airbus Defence and Space,A400M Atlas,airplane,turboprop,4,H,C,42.36,45.09,14.68,137500,121500,35000,300,0.72
+A50,,Beriev,A-50,airplane,turbofan,4,,,,,,,,,,
+A660,,Thrush,S2R-T660 Turbo Thrush,airplane,turboprop,1,L,F,16.46,10.78,3.14,5670,5670,12000,,
+A743,,Antonov,An-74-300,airplane,turbofan,2,M,,,,,37500,34000,33100,270,0.65
+A748,,Hawker Siddeley,HS 748,airplane,turboprop,2,M,E,31.24,20.42,7.57,21092,19504,25000,220,
+A9,,IMCO,Callair A-9,airplane,piston,1,L,,,,,1361,1361,,,
+AA1,,Grumman American,AA-1,airplane,piston,1,L,,,,,726,726,,,
+AA5,,Grumman American,AA-5,airplane,piston,1,L,,,,,1089,1089,,,
+AAT3,,Aero,AT-3,airplane,piston,1,L,F,7.55,6.25,2.23,582,582,,,
+AB11,,Aero Boero,AB-115,airplane,piston,1,L,,,,,770,770,,,
+AC11,,Aero Commander,112,airplane,piston,1,L,,,,,1338,1338,20000,,
+AC11,,Aero Commander,114,airplane,piston,1,L,,,,,1499,1424,25000,,
+AC50,,Aero Commander,500,airplane,piston,2,L,,,,,3062,3062,,,
+AC52,,Aero Commander,520,airplane,piston,2,L,,,,,2495,2495,,,
+AC56,,Aero Commander,560,airplane,piston,2,L,,,,,3402,3402,,,
+AC68,,Aero Commander,680,airplane,piston,2,L,,,,,3629,3629,,,
+AC6L,,Aero Commander,680FL Grand Commander,airplane,piston,2,L,,,,,3856,3856,,,
+AC6L,,Aero Commander,685 Commander,airplane,piston,2,L,,,,,4082,4082,25000,,
+AC72,,Aero Commander,720 AltiCruiser,airplane,piston,2,L,,,,,3402,3402,,,
+AC80,,Aero Commander,680 Turbo Commander,airplane,turboprop,2,L,,,,,4264,4082,25000,217,
+AC80,,Aero Commander,681 Hawk Commander,airplane,turboprop,2,L,,,,,4264,4082,25000,217,
+AC90,,Aero Commander,690 Turbo Commander / JetProp Commander,airplane,turboprop,2,L,F,15.89,13.1,4.56,4853,4785,31000,252,0.6
+AC95,,Aero Commander,695 JetProp Commander,airplane,turboprop,2,L,F,15.89,13.1,4.56,5330,4990,35000,252,0.6
+ACAR,,Auster,J/5 Autocar,airplane,piston,1,L,F,11,7.1,2.5,1088,1088,,,
+AE45,,Aero Vodochody,Ae 45,airplane,piston,2,L,F,12.3,7.55,2.38,1500,1500,19400,,
+AERK,,Aeronca,CF Scout,airplane,piston,1,L,,,,,490,490,,,
+AERK,,Aeronca,K Scout,airplane,piston,1,L,,,,,522,522,,,
+AEST,,Piper,PA-60 Aerostar,airplane,piston,2,L,,,,,2864,2722,25000,,
+AIRD,,Beagle,A.109 Airedale,airplane,piston,1,L,F,11,8,3,1246,1246,,,
+AJ27,,COMAC,ARJ21-700 Xiangfeng,airplane,turbofan,2,M,E,27.29,33.46,8.44,43500,40455,,,
+ALO2,,Aérospatiale,SA318 Alouette II Astazou,helicopter,turboshaft,1,L,,,9.7,2.75,1600,1600,14760,,
+ALO2,,Aérospatiale,SE313 Alouette II,helicopter,turboshaft,1,,,,,,,,,,
+ALO3,,Aérospatiale,SA316 Alouette III,helicopter,turboshaft,1,L,,,10.18,2.97,2200,2200,21300,,
+ALO3,,Aérospatiale,SA319 Alouette III Astazou,helicopter,turboshaft,1,L,,,10.18,3,2250,2250,21300,,
+AMX,,AMX International,A-1,airplane,turbofan,1,,,,,,,,,,
+AMX,,AMX International,A-11 Ghibli,airplane,turbofan,1,,,,,,,,,,
+AN12,,Antonov,An-12,airplane,turboprop,4,,,38.02,33.11,11.44,,,32800,,
+AN2,,Antonov,An-2,airplane,piston,1,L,F,1817,12.4,5.35,5500,5250,14800,,
+AN22,,Antonov,An-22 Antei,airplane,turboprop,4,,,64.4,57.84,12.54,,,29900,,
+AN24,,Antonov,An-24,airplane,turboprop,2,,,29.2,23.53,8.32,,,29900,,
+AN26,,Antonov,An-26,airplane,turboprop,2,M,E,29.19,23.8,8.58,24000,24000,23000,,
+AN28,,Antonov,An-28,airplane,turboprop,2,L,F,22.06,12.95,4.5,6500,1961,13800,189,
+AN3,,Antonov,An-3,airplane,turboprop,1,L,,,,,5800,5800,12800,138,
+AN30,,Antonov,An-30,airplane,turboprop,2,,,29.2,23.8,8.32,,,27200,,
+AN32,,Antonov,An-32,airplane,turboprop,2,M,E,29.2,23.68,8.75,27000,25000,26200,248,0.65
+AN38,,Antonov,An-38,airplane,turboprop,2,M,F,22.06,15.54,4.3,9500,9500,9800,194,
+AN70,,Antonov,An-70,airplane,propfan,4,,,44.06,40.65,16.4,,,39300,,
+AN72,,Antonov,An-72,airplane,turbofan,2,M,E,31.89,28.07,8.65,34800,33000,33100,270,0.65
+AN72,,Antonov,An-74,airplane,turbofan,2,M,E,31.89,28.01,8.65,36500,33000,33100,270,0.65
+AN8,,Antonov,An-8,airplane,turboprop,2,,,37,30.74,10.05,,,31500,,
+ANST,,Kazan Helicopters,Ansat,helicopter,turboshaft,2,L,,,11.16,3.65,3600,3600,18000,,
+APM2,,Issoire Aviation,APM-20 Lionceau,airplane,piston,1,L,F,8.66,6.6,2.4,620,620,,,
+AR11,,Aeronca,11 Chief,airplane,piston,1,L,F,10.9,6.3,2.2,567,567,,,
+AR50,,Aeronca,50 Chief,airplane,piston,1,L,,,,,522,522,,,
+AR5T,,Aeronca,50-T Tandem,airplane,piston,1,L,,,,,522,522,,,
+AR65,,Aeronca,65 Super Chief,airplane,piston,1,L,,,,,567,567,,,
+AR6T,,Aeronca,60-T Tandem,airplane,piston,1,L,,,,,522,522,,,
+AR6T,,Aeronca,65-T Tandem,airplane,piston,1,L,,,,,522,522,,,
+AR6T,,Aeronca,O-58 / L-3 Grasshopper,airplane,piston,1,L,,,,,522,522,,,
+ARCP,,Schempp-Hirth,Arcus M,glider,piston,1,L,F,20,8.73,,800,800,,,
+ARCP,,Schempp-Hirth,Arcus T,glider,piston,1,L,F,20,8.73,,800,800,,,
+AS14,,Schleicher,ASK 14,glider,piston,1,L,F,14.3,6.65,1.6,360,360,,,
+AS16,,Schleicher,ASK 16,glider,piston,1,L,F,16,7.32,2.08,750,750,,,
+AS21,,Schleicher,ASK 21 M,glider,piston,1,L,F,17,8.35,,705,705,,,
+AS22,,Schleicher,ASW 22 E,glider,piston,1,L,F,26.58,7.95,1.66,810,810,,,
+AS22,,Schleicher,ASW 22 M,glider,piston,1,L,F,24,7.95,1.66,640,640,,,
+AS24,,Schleicher,ASW 24 E,glider,piston,1,L,F,15,,,500,500,,,
+AS25,,Schleicher,ASH 25 E,glider,piston,1,L,F,26,,,750,750,,,
+AS25,,Schleicher,ASH 25 M,glider,piston,1,L,F,26,,,790,790,,,
+AS26,,Schleicher,ASH 26 E,glider,piston,1,L,F,18,7.05,1.51,525,525,,,
+AS28,,Schleicher,ASW 28 E,glider,piston,1,L,F,18,6.59,1.3,575,575,,,
+AS29,,Schleicher,ASG 29 E (ASW 27-18 E),glider,piston,1,L,F,18,6.5,,600,600,,,
+AS30,,Schleicher,ASH 30 M,glider,piston,1,L,F,26.5,,,850,850,,,
+AS31,,Schleicher,ASH 31 M,glider,piston,1,L,F,21,7.1,1.5,700,700,,,
+AS32,,Airbus Helicopters,AS332 Super Puma / H215,helicopter,turboshaft,2,,,,15.53,4.94,,,20000,,
+AS32,,Airbus Helicopters,AS532 Cougar / H215M,helicopter,turboshaft,2,,,,,,,,,,
+AS50,,Airbus Helicopters,AS350 Écureuil / H125,helicopter,turboshaft,1,L,,,10.93,3.14,1950,1950,16000,,
+AS50,,Airbus Helicopters,AS550 Fennec / H125M,helicopter,turboshaft,1,,,,,,,,,,
+AS55,,Airbus Helicopters,AS355 Écureuil 2,helicopter,turboshaft,2,L,,,10.93,3.14,2100,2100,16000,,
+AS55,,Airbus Helicopters,AS555 Fennec 2,helicopter,turboshaft,2,,,,,,,,,,
+AS65,,Airbus Helicopters,AS365 Dauphin 2,helicopter,turboshaft,2,L,,,11.63,3.81,4250,4250,20000,,
+AS65,,Airbus Helicopters,AS565 Panther,helicopter,turboshaft,2,,,,,,,,,,
+AS65,,Aérospatiale,HH-65 Dolphin,helicopter,turboshaft,2,L,,,11.44,3.21,4300,4300,18000,,
+AS65,,Aérospatiale,SA365 Dauphin 2,helicopter,turboshaft,2,L,,,10.98,3.27,3400,3400,15000,,
+AS65,,Aérospatiale,SA366 Dauphin 2,helicopter,turboshaft,2,L,,,11.44,3.21,4060,4060,18000,,
+ASTR,,Gulfstream Aerospace,Gulfstream G100,airplane,turbofan,2,M,,,,,11839,9843,45000,310,0.85
+ASTR,,Israel Aerospace Industries,1125 Astra,airplane,turbofan,2,M,,,,,11181,9389,45000,350,0.87
+AT2P,,Air Tractor,AT-250,airplane,piston,1,L,,,,,2041,2041,,,
+AT3P,,Air Tractor,AT-300,airplane,piston,1,L,,,,,2268,2268,,,
+AT3P,,Air Tractor,AT-301,airplane,piston,1,L,,,,,2268,2268,,,
+AT3P,,Air Tractor,AT-401,airplane,piston,1,L,,,,,2722,2722,,,
+AT3T,,Air Tractor,AT-302,airplane,turboprop,1,L,,,,,2268,2268,8000,,
+AT3T,,Air Tractor,AT-400,airplane,turboprop,1,L,,,,,2268,2268,,,
+AT3T,,Air Tractor,AT-402,airplane,turboprop,1,L,F,15.54,9.32,2.9,2722,2722,,,
+AT43,,ATR,42-300,airplane,turboprop,2,M,E,24.57,22.67,7.59,16150,16000,25000,250,0.55
+AT44,,ATR,42-400,airplane,turboprop,2,M,E,24.57,22.67,7.59,17900,17600,25000,250,0.55
+AT45,,ATR,42-500,airplane,turboprop,2,M,E,24.57,22.67,7.59,18600,18300,25000,250,0.55
+AT46,,ATR,42-600,airplane,turboprop,2,M,E,24.57,22.67,7.59,18600,18300,25000,250,0.55
+AT5P,,Air Tractor,AT-501,airplane,piston,1,L,,,,,2948,2948,,,
+AT5T,,Air Tractor,AT-502,airplane,turboprop,1,L,F,15.84,10.11,3.12,3629,3629,,,
+AT5T,,Air Tractor,AT-503,airplane,turboprop,1,L,,,,,3629,3629,,,
+AT5T,,Air Tractor,AT-504,airplane,turboprop,1,L,F,15.84,10.11,3.12,3629,3629,,,
+AT6T,,Air Tractor,AT-602,airplane,turboprop,1,L,F,17.06,10.21,3.35,5670,5443,,,
+AT72,,ATR,72-200,airplane,turboprop,2,M,E,27.05,27.17,7.65,21500,21350,25000,250,0.55
+AT73,,ATR,72-210,airplane,turboprop,2,M,E,27.05,27.17,7.65,21500,21350,25000,250,0.55
+AT75,,ATR,72-500 (72-212A),airplane,turboprop,2,M,E,27.05,27.17,7.65,22000,21850,25000,250,0.55
+AT76,,ATR,72-600 (72-212A),airplane,turboprop,2,M,E,27.05,27.17,7.65,22000,21850,25000,250,0.55
+AT8T,,Air Tractor,AT-802,airplane,turboprop,1,L,F,18.04,10.97,3.39,6713,6713,,,
+ATL,,Robin,ATL,airplane,piston,1,L,F,10.25,6.83,2,580,580,,,
+ATP,,British Aerospace,ATP,airplane,turboprop,2,M,E,30.63,26.01,7.14,22930,22250,25000,227,
+AUS5,,Auster,5,airplane,piston,1,L,F,11,6.8,2.5,862,862,,,
+AUS6,,Beagle,A.61 Terrier,airplane,piston,1,L,F,11,7.2,2.6,1089,1089,,,
+AV68,,M&D Flugzeugbau,AVO 68 Samburo,glider,piston,1,L,F,16.68,8.05,,825,825,,,
+B06,,Bell,206 JetRanger,helicopter,turboshaft,1,L,,,9.5,2.54,1451,1451,20000,,
+B06,,Bell,206L LongRanger,helicopter,turboshaft,1,L,,,12.92,3.15,2018,2018,20000,,
+B06,,Bell,OH-58 Kiowa,helicopter,turboshaft,1,L,,,9.5,2.54,1361,1361,20000,,
+B103,,Beriev,Be-103,amphibious,piston,2,L,,,,,2270,2270,9800,130,
+B105,,MBB,BO105,helicopter,turboshaft,2,L,,,4.55,3,2600,2600,20000,,
+B14A,,Bellanca,14-12 Cruisair,airplane,piston,1,L,,,,,862,862,,,
+B14A,,Bellanca,14-13 Cruisair Senior,airplane,piston,1,L,,,,,975,975,,,
+B14A,,Bellanca,14-19 Cruisemaster,airplane,piston,1,L,,,,,1361,1361,,,
+B14A,,Bellanca,14-9 Junior,airplane,piston,1,L,,,,,794,794,,,
+B17,,"Boeing Defense, Space & Security",B-17 Flying Fortress,airplane,piston,4,M,,,,,26762,26762,,,
+B18T,,Beechcraft,18 Twin Beech Turboprop,airplane,turboprop,2,,,,,,,,,,
+B190,,Beechcraft,1900,airplane,turboprop,2,M,,,,,7766,7604,25000,248,0.48
+B190,,Beechcraft,C-12J Huron,airplane,turboprop,2,M,,,,,7530,7303,25000,247,0.48
+B209,,Bölkow,Bo 209,airplane,piston,1,L,F,8.4,6.6,2.2,820,820,,,
+B212,,Bell,212,helicopter,turboshaft,2,L,,,12.84,3.17,5080,5080,20000,,
+B214,,Bell,214,helicopter,turboshaft,1,L,,,,,6260,6260,,,
+B222,,Bell,222,helicopter,turboshaft,2,L,,,12.91,3.37,3742,3742,20000,,
+B23,,Douglas,B-23 Dragon,airplane,piston,2,M,,,,,12474,12474,,,
+B23,,Douglas,UC-67 Dragon,airplane,piston,2,M,,,,,12474,12474,,,
+B230,,Bell,230,helicopter,turboshaft,2,L,,,12.96,3.26,3810,3810,120,,
+B25,,North American,B-25 Mitchell,airplane,piston,2,M,,,,,15422,14606,28000,,
+B26,,Douglas,A-26 Invader,airplane,piston,2,M,E,21.3,15.2,5.6,15876,14061,,,
+B29,,"Boeing Defense, Space & Security",B-29 Superfortress,airplane,piston,4,,,,,,,,,,
+B350,,Beechcraft,350 Super King Air,airplane,turboprop,2,M,F,17.6,14.2,4.36,6804,6804,35000,263,0.58
+B350,,Beechcraft,C-12W Huron,airplane,turboprop,2,M,F,,,,6804,6804,35000,263,0.58
+B36T,,Beechcraft,36 Bonanza Turboprop,airplane,turboprop,1,,,,,,,,,,
+B37M,,Boeing,737-7,airplane,turbofan,2,M,D,35.92,35.56,12.29,80286,66043,41000,340,0.82
+B38M,,Boeing,737-8,airplane,turbofan,2,M,D,35.92,39.5,12.29,82645,69308,41000,340,0.82
+B39M,,Boeing,737-9,airplane,turbofan,2,M,D,35.92,42.11,12.29,88314,74343,41000,340,0.82
+B3XM,,Boeing,737-10,airplane,turbofan,2,,,35.92,42.11,12.29,,,41000,340,0.82
+B407,,Bell,407,helicopter,turboshaft,1,L,,,10.42,3.1,2268,2268,20000,,
+B412,,Bell,412,helicopter,turboshaft,2,L,,,12.7,3.17,5534,5534,20000,,
+B427,,Bell,427,helicopter,turboshaft,2,L,,,12.99,3.23,2880,2880,10000,,
+B429,,Bell,429 GlobalRanger,helicopter,turboshaft,2,L,,,11.68,3.23,3175,3175,20000,,
+B430,,Bell,430,helicopter,turboshaft,2,L,,,13.43,3.7,4218,4218,20000,,
+B461,,British Aerospace,BAe 146-100,airplane,turbofan,4,M,E,26.34,26.19,8.61,34473,32817,31000,250,0.7
+B462,,British Aerospace,BAe 146-200,airplane,turbofan,4,M,E,26.34,28.55,8.61,40596,35153,31000,250,0.7
+B463,,British Aerospace,BAe 146-300,airplane,turbofan,4,M,E,26.34,31,8.59,43091,37468,31000,250,0.73
+B505,,Bell,505 JetRanger X,helicopter,turboshaft,1,L,,,10.53,3.1,1669,1669,20000,,
+B52,,"Boeing Defense, Space & Security",B-52 Stratofortress,airplane,turbofan,8,H,,56.39,48.56,12.4,221353,,50000,,
+B58T,,Beechcraft,58TC Turbo Baron,airplane,turboprop,2,L,,,,,2812,2812,25000,,
+B60T,,Beechcraft,60 Duke Turboprop,airplane,turboprop,2,,,,,,,,,,
+B701,,Boeing,707-100,airplane,turbojet,4,M,C,39.88,44.22,11.79,116120,86183,,349,0.884
+B701,,Boeing,707-100B,airplane,turbofan,4,M,C,39.88,44.22,11.79,117027,86183,,379,0.9
+B701,,Boeing,707-100B Short Body,airplane,turbofan,4,M,C,39.88,41,11.79,117027,86183,,378,0.91
+B701,,Boeing,707-200,airplane,turbojet,4,M,C,39.88,44.22,12.7,116573,86183,,349,0.884
+B703,,Boeing,707-300,airplane,turbojet,4,H,C,43.4,46.61,12.85,141067,90038,,339,0.887
+B703,,Boeing,707-300B,airplane,turbofan,4,H,C,44.42,46.61,12.83,148325,93894,,375,0.887
+B703,,Boeing,707-300C,airplane,turbofan,4,H,C,44.42,46.61,12.8,148325,112264,,375,0.887
+B703,,Boeing,707-400,airplane,turbojet,4,H,C,43.4,46.61,12.85,141067,90038,,339,0.887
+B703,,"Boeing Defense, Space & Security",C-137 Stratoliner,airplane,turbofan,4,,,,,,,,,,
+B703,,"Boeing Defense, Space & Security",C-18,airplane,turbofan,4,,,,,,,,,,
+B703,,Northrop Grumman,E-8 Joint STARS,airplane,turbofan,4,,,,,,,,,,
+B712,,Boeing,717-200,airplane,turbofan,2,M,E,28.45,37.8,9.04,54885,49895,37000,340,
+B720,,Boeing,720,airplane,turbojet,4,M,D,39.88,41.5,12.62,96615,79379,42000,378,0.906
+B720,,Boeing,720B,airplane,turbofan,4,M,C,39.88,41.68,12.55,100698,79379,,378,0.9
+B721,,Boeing,727,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+B721,,Boeing,727-100,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+B721,,Boeing,727-100C,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+B721,,Boeing,727C,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+B721,,"Boeing Defense, Space & Security",C-22,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+B722,,Boeing,727-200,airplane,turbofan,3,,,32.92,46.68,10.65,,,42000,390,0.9
+B722,,Boeing,727-200F,airplane,turbofan,3,,,32.92,46.68,10.65,,,42000,350,0.88
+B732,,Boeing,737-200,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,350,0.82
+B732,,Boeing,737-200C,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,0,350
+B732,,"Boeing Defense, Space & Security",T-43,airplane,turbofan,2,,,23.35,30.48,11.28,,,,,
+B732,,"Boeing Defense, Space & Security",VC-96,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,350,0.82
+B733,,Boeing,737-300,airplane,turbofan,2,M,E,28.88,33.4,11.13,63276,52888,37000,340,0.82
+B734,,Boeing,737-400,airplane,turbofan,2,M,E,28.88,36.45,11.13,68038,56245,37000,340,0.82
+B735,,Boeing,737-500,airplane,turbofan,2,M,E,28.88,31.01,11.13,61688,49895,37000,340,0.82
+B736,,Boeing,737-600,airplane,turbofan,2,M,D,34.32,31.2,12.57,65997,54657,41000,340,0.82
+B737,,Boeing,737-700,airplane,turbofan,2,M,D,34.32,32.18,12.57,70080,58604,41000,340,0.82
+B737,,Boeing,737-700 IGW,airplane,turbofan,2,M,D,34.32,32.18,12.57,77564,60781,41000,340,0.82
+B737,,Boeing,737-700C,airplane,turbofan,2,M,D,34.32,32.18,12.57,77564,60781,41000,340,0.82
+B737,,"Boeing Defense, Space & Security",C-40 Clipper,airplane,turbofan,2,M,D,34.32,32.18,12.57,57153,60781,41000,340,0.82
+B738,,Boeing,737-800,airplane,turbofan,2,M,D,34.32,39.5,12.57,79015,66360,41000,340,0.82
+B739,,Boeing,737-900,airplane,turbofan,2,M,D,34.32,42.1,12.57,79015,66814,41000,340,0.82
+B739,,Boeing,737-900ER,airplane,turbofan,2,M,D,34.32,42.11,12.57,85139,71350,41000,340,0.82
+B741,,Boeing,747-100,airplane,turbofan,4,H,,59.6,70.6,19.3,333400,265350,45100,375,0.92
+B741,,Boeing,747-100B,airplane,turbofan,4,,,59.6,70.6,19.3,,,45100,375,0.92
+B741,,Boeing,747-100B SUD,airplane,turbofan,4,,,59.6,70.6,19.3,,,45100,375,0.92
+B742,,Boeing,747-200B,airplane,turbofan,4,H,,59.6,70.6,19.3,377842,285762,45100,375,0.92
+B742,,Boeing,747-200C,airplane,turbofan,4,H,,59.6,70.6,19.3,377842,285762,45100,375,0.92
+B742,,Boeing,747-200F,airplane,turbofan,4,H,,59.6,70.6,19.3,377842,285762,45100,375,0.92
+B742,,"Boeing Defense, Space & Security",E-4 Nightwatch,airplane,turbofan,4,,,59.6,70.6,19.3,,,,,
+B742,,"Boeing Defense, Space & Security",VC-25,airplane,turbofan,4,H,,59.6,70.6,19.3,377842,285762,45100,375,0.92
+B743,,Boeing,747-300,airplane,turbofan,4,H,,59.6,70.6,13.9,377842,285762,45100,375,0.92
+B744,,Boeing,747-400,airplane,turbofan,4,H,B,64.44,70.6,19.4,396893,285762,45100,375,0.92
+B744,,Boeing,747-400D,airplane,turbofan,4,H,B,59.6,70.6,19.4,396893,285762,45100,375,0.92
+B744,,Boeing,747-400F,airplane,turbofan,4,H,B,64.44,70.66,19.33,396894,302092,45100,375,0.92
+B748,,Boeing,747-8,airplane,turbofan,4,H,B,68.5,76.3,19.4,447696,312072,43100,365,0.9
+B748,,Boeing,747-8F,airplane,turbofan,4,H,B,68.5,76.3,19.4,447695,350626,42100,365,0.9
+B74R,,Boeing,747SR,airplane,turbofan,4,H,,59.6,70.6,19.3,333400,265350,45100,375,0.92
+B74S,,Boeing,747SP,airplane,turbofan,4,H,,59.6,56.25,20.2,315700,215465,45100,375,0.92
+B752,,Boeing,757-200,airplane,turbofan,2,M,C,38.02,47.32,13.74,108862,90000,42000,350,0.86
+B752,,Boeing,757-200CB,airplane,turbofan,2,M,C,38.02,47.32,13.74,115893,95254,42000,350,0.86
+B752,,Boeing,757-200PF,airplane,turbofan,2,M,C,38.02,47.32,13.74,115892,95254,42000,350,0.86
+B752,,"Boeing Defense, Space & Security",C-32,airplane,turbofan,2,M,C,38.02,47.32,13.74,108862,90000,42000,350,0.86
+B753,,Boeing,757-300,airplane,turbofan,2,M,C,38.02,54.4,13.6,123830,101605,42000,350,0.86
+B762,,Boeing,767-200,airplane,turbofan,2,H,C,47.57,48.51,15.85,179169,136078,43100,360,0.86
+B762,,"Boeing Defense, Space & Security",KC-46 Pegasus,airplane,turbofan,2,H,C,,48.51,15.85,,,40100,360,0.86
+B763,,Boeing,767-300,airplane,turbofan,2,H,C,47.57,54.94,15.85,186880,145149,43100,360,0.86
+B763,,Boeing,767-300F,airplane,turbofan,2,H,C,47.57,54.94,15.85,187333,147871,43100,360,0.86
+B764,,Boeing,767-400ER,airplane,turbofan,2,H,C,61.4,51.9,16.8,204116,158757,43100,360,0.86
+B772,,Boeing,777-200,airplane,turbofan,2,H,B,60.9,63.7,18.4,297556,213188,43100,330,0.87
+B773,,Boeing,777-300,airplane,turbofan,2,H,B,60.9,73.8,18.5,299370,237682,43100,330,0.89
+B778,,Boeing,777-8,airplane,turbofan,2,,,,,,,,,,
+B779,,Boeing,777-9,airplane,turbofan,2,,,,,,,,,,
+B77L,,Boeing,777-200LR,airplane,turbofan,2,H,B,64.8,63.7,18.5,340194,223167,43100,330,0.89
+B77L,,Boeing,777F,airplane,turbofan,2,H,B,64.8,63.7,18.5,347814,260815,43100,330,0.89
+B77W,,Boeing,777-300ER,airplane,turbofan,2,H,B,64.8,73.8,18.5,340194,251290,43100,330,0.89
+B788,,Boeing,787-8 Dreamliner,airplane,turbofan,2,H,B,60.12,,,227930,172365,43100,350,0.9
+B789,,Boeing,787-9 Dreamliner,airplane,turbofan,2,H,B,60.12,,,254011,192776,43100,350,0.9
+B78X,,Boeing,787-10 Dreamliner,airplane,turbofan,2,H,B,60.12,,,254011,201848,41100,350,0.9
+BA11,,British Aircraft Corporation,1-11 200,airplane,turbofan,2,M,,,,,36287,32205,40000,327,0.785
+BA11,,British Aircraft Corporation,1-11 300,airplane,turbofan,2,M,,,,,39463,35380,35000,340,0.785
+BA11,,British Aircraft Corporation,1-11 400,airplane,turbofan,2,M,,,,,39463,35380,40000,345,0.78
+BASS,,Beagle,B.206 Basset,airplane,piston,2,L,,,,,3402,3402,,,
+BCS1,221,Airbus,A220-100,airplane,turbofan,2,M,D,35.1,34.9,11.18,63730,54658,41000,300,0.82
+BCS3,223,Airbus,A220-300,airplane,turbofan,2,M,D,35.1,38.7,11.5,70896,58740,41000,300,0.82
+BE10,,Beechcraft,100 King Air,airplane,turboprop,2,L,,,,,5352,5085,31000,223,
+BE10,,Beechcraft,U-21F Ute,airplane,turboprop,2,L,,,,,5216,5085,31000,226,
+BE12,,Beriev,Be-12,amphibious,turboprop,2,,,,,,,,,,
+BE17,,Beechcraft,17 Staggerwing,airplane,piston,1,L,,,,,1928,1928,,,
+BE17,,Beechcraft,GB Traveler,airplane,piston,1,L,,,,,1928,1928,,,
+BE17,,Beechcraft,UC-43 Traveler,airplane,piston,1,L,,,,,1928,1928,,,
+BE18,,Beechcraft,18 Twin Beech,airplane,piston,2,L,,,,,4491,4309,,,
+BE18,,Beechcraft,AT-11 Kansan,airplane,piston,2,L,F,14.52,10.41,2.94,3561,3561,20000,,
+BE18,,Beechcraft,AT-7 Navigator,airplane,piston,2,,,,,,,,,,
+BE18,,Beechcraft,C-45 Expeditor,airplane,piston,2,L,,,,,3856,3856,,,
+BE18,,Beechcraft,F-2,airplane,piston,2,L,,,,,3402,3402,11000,,
+BE18,,Beechcraft,SNB Kansan,airplane,piston,2,L,F,14.52,10.41,2.94,3561,3561,20000,,
+BE19,,Beechcraft,19 Musketeer Sport,airplane,piston,1,L,,,,,975,975,,,
+BE20,,Beechcraft,1300 Commuter,airplane,turboprop,2,L,F,16.61,13.36,4.52,5670,5670,31000,270,0.48
+BE20,,Beechcraft,200 Super King Air,airplane,turboprop,2,L,F,16.61,13.36,4.52,5670,5670,31000,270,0.48
+BE20,,Beechcraft,C-12 Huron,airplane,turboprop,2,L,,,,,5670,5670,31000,270,0.48
+BE22,,Beechcraft,220 Denali,airplane,turboprop,1,,,16.54,14.86,4.65,,,31000,,
+BE23,,Beechcraft,23 Musketeer,airplane,piston,1,L,,,,,1111,1111,,,
+BE24,,Beechcraft,24 Sierra,airplane,piston,1,L,,,,,1247,1247,,,
+BE30,,Beechcraft,300 Super King Air,airplane,turboprop,1,L,,,,,6350,6350,35000,259,0.58
+BE33,,Beechcraft,33 Debonair / Bonanza,airplane,piston,1,L,,,,,1497,1497,,,
+BE35,,Beechcraft,35 Bonanza,airplane,piston,1,L,,,,,1542,1542,,,
+BE36,,Beechcraft,36 Bonanza,airplane,piston,1,L,F,10.2,8.4,2.63,1656,1656,18500,,
+BE40,,Beechcraft,400 Beechjet,airplane,turbofan,2,M,F,,,,7158,6450,41000,264,0.785
+BE40,,Beechcraft,T-1 Jayhawk,airplane,turbofan,2,M,F,,,,7303,7121,41000,330,0.78
+BE4W,,Hawker Beechcraft,Hawker 400XPR,airplane,turbofan,2,,,,,,,,,,
+BE50,,Beechcraft,50 Twin Bonanza,airplane,piston,2,L,,,,,3311,3175,,,
+BE50,,Beechcraft,L-23 / U-8 Seminole,airplane,piston,2,L,,,,,3175,3175,,,
+BE55,,Beechcraft,55 Baron,airplane,piston,2,L,,,,,2404,2404,,,
+BE55,,Beechcraft,T-42 Cochise,airplane,piston,2,L,,,,,2313,2313,,,
+BE56,,Beechcraft,56TC Turbo Baron,airplane,piston,2,L,,,,,2717,2717,,,
+BE58,,Beechcraft,58 Baron,airplane,piston,2,L,F,11.53,9.09,2.97,2495,2268,20688,,
+BE60,,Beechcraft,60 Duke,airplane,piston,2,L,,,,,3073,3073,,,
+BE65,,Beechcraft,65 Queen Air,airplane,piston,2,L,,,,,3493,3493,,,
+BE65,,Beechcraft,U-8F Seminole,airplane,piston,2,L,,,,,3493,3334,,,
+BE70,,Beechcraft,70 Queen Air,airplane,piston,2,L,,,,,3493,3493,,,
+BE76,,Beechcraft,76 Duchess,airplane,piston,2,L,,,,,1769,1769,,,
+BE77,,Beechcraft,77 Skipper,airplane,piston,1,L,,,,,760,760,,,
+BE80,,Beechcraft,80 Queen Air,airplane,piston,2,L,,,,,3992,3992,,,
+BE88,,Beechcraft,88 Queen Air,airplane,piston,2,L,,,,,3992,3992,,,
+BE95,,Beechcraft,95 Travel Air,airplane,piston,2,L,,,,,1905,1905,,,
+BE99,,Beechcraft,99 Airliner,airplane,turboprop,2,L,,,,,5126,5126,25000,,
+BE9L,,Beechcraft,90 King Air,airplane,turboprop,2,L,F,15.32,10.82,4.34,4377,4159,30000,208,
+BE9L,,Beechcraft,T-44 Pegasus,airplane,turboprop,2,L,,,,,4627,4400,31000,226,
+BE9T,,Beechcraft,F90 King Air,airplane,turboprop,2,L,,,,,4967,4967,31000,235,0.48
+BER2,,Beriev,Be-200,amphibious,turbofan,2,M,,,,,42000,35000,26500,286,0.64
+BK17,,MBB-Kawasaki,BK117,helicopter,turboshaft,2,L,,,9.98,3.36,3350,3350,18000,,
+BL17,,Bellanca,17 Viking,airplane,piston,1,L,,,,,1451,1451,24000,,
+BL8,,American Champion,8GCBC Scout,airplane,piston,1,L,,,,,975,975,,,
+BL8,,American Champion,8KCAB Decathlon,airplane,piston,1,L,,,,,816,816,,,
+BLCF,,Boeing,747-400 LCF Dreamlifter,airplane,turbofan,4,,,,,,,,43100,,
+BN2P,,Britten-Norman,BN-2 Islander,airplane,piston,2,L,,,,,2885,2885,,,
+BN2T,,Britten-Norman,BN-2T Turbine Islander,airplane,turboprop,2,L,,,,,3856,3856,,151,
+BO40,,Boeing,40,airplane,piston,1,,,,,,,,,,
+BR23,,BRM Aero,Bristell B23,airplane,piston,1,L,F,9.27,6.58,2.36,750,750,18000,,
+BS60,,Beechcraft-SFERMA,60 Marquis,airplane,turboprop,2,,,,,,,,,,
+BT36,,Beechcraft,36TC Bonanza,airplane,piston,1,L,,,,,1656,1656,,,
+BT7,,Boeing–Saab,T-7 Red Hawk,airplane,turbofan,1,,,,,,,,,,
+BU31,,Bücker,Bü 131 Jungmann,airplane,piston,1,L,F,7.4,6.6,,670,670,,,
+BU81,,Zlín,Z-181,airplane,piston,1,L,F,10.6,8.1,2.1,800,800,,,
+C02T,,Cessna,402 Turboprop,airplane,turboprop,2,,,,,,,,,,
+C04T,,Cessna,404 Titan Turboprop,airplane,turboprop,2,,,,,,,,,,
+C06T,,Cessna,206 Stationair Turboprop,airplane,turboprop,1,L,F,10.97,9.25,3.1,1633,1633,20000,150,
+C07T,,Cessna,207 Stationair Turboprop,airplane,turboprop,1,,,,,,,,,,
+C10T,,Cessna,P210 Pressurized Centurion Turboprop,airplane,turboprop,1,L,F,,,,,,,,
+C120,,Cessna,120,airplane,piston,1,L,F,10,6.55,1.91,658,658,15500,,
+C130,,Lockheed,L-382 Hercules,airplane,turboprop,4,M,,,,,70307,61235,32600,,
+C135,,"Boeing Defense, Space & Security",C-135 Stratolifter,airplane,turbofan,4,,,,,,,,,,
+C135,,"Boeing Defense, Space & Security",NC-135,airplane,turbofan,4,,,,,,,,,,
+C135,,"Boeing Defense, Space & Security",OC-135 Open Skies,airplane,turbofan,4,,,,,,,,,,
+C135,,"Boeing Defense, Space & Security",WC-135 Constant Phoenix,airplane,turbofan,4,,,,,,,,,,
+C140,,Cessna,140,airplane,piston,1,L,F,10,6.4,1.91,658,658,,,
+C14T,,Cessna,414 Chancellor Turboprop,airplane,turboprop,2,,,,,,,,,,
+C15,,McDonnell-Douglas,YC-15,airplane,turbofan,4,,,,,,,,,,
+C150,,Cessna,150,airplane,piston,1,L,F,9.98,7.15,2.74,726,726,,,
+C150,,Cessna,T-51,airplane,piston,1,,,,,,,,,,
+C152,,Cessna,152,airplane,piston,1,L,,,,,757,757,,,
+C160,,Transall,C-160,airplane,turboprop,2,,,,,,,,,,
+C162,,Cessna,162 Skycatcher,airplane,piston,1,,,9.1,6.9,2.6,,,,,
+C17,,"Boeing Defense, Space & Security",C-17 Globemaster III,airplane,turbofan,4,H,C,51.77,53.04,16.79,265352,265352,45000,,
+C170,,Cessna,170,airplane,piston,1,L,F,10.97,7.6,2,998,998,,,
+C172,,Cessna,172 Skyhawk,airplane,piston,1,L,F,11,8.21,2.36,1157,1157,,,
+C172,,Cessna,T-41 Mescalero,airplane,piston,1,L,,,,,1043,1043,,,
+C175,,Cessna,175 Skylark,airplane,piston,1,L,,,,,1111,1111,,,
+C177,,Cessna,177 Cardinal,airplane,piston,1,L,,,,,1134,1134,,,
+C180,,Cessna,180 Skywagon,airplane,piston,1,L,F,11.04,7.85,2.34,1270,1270,,,
+C180,,Cessna,U-17C Skywagon,airplane,piston,1,L,,,,,1270,1270,,,
+C182,,Cessna,182 Skylane,airplane,piston,1,L,,,,,1406,1338,,,
+C185,,Cessna,185 Skywagon,airplane,piston,1,L,F,11.04,7.85,2.34,1497,1497,,,
+C185,,Cessna,U-17 Skywagon,airplane,piston,1,L,,,,,1497,1497,,,
+C188,,Cessna,188 AgWagon,airplane,piston,1,L,,,,,1497,1497,,,
+C190,,Cessna,190,airplane,piston,1,L,F,11.04,8.26,2.16,1520,1520,,,
+C195,,Cessna,195,airplane,piston,1,L,F,11.04,8.26,2.16,1520,1520,,,
+C195,,Cessna,LC-126,airplane,piston,1,L,,,,,1520,1520,,,
+C205,,Cessna,205 (210-5) Stationair,airplane,piston,1,L,,,,,1497,1497,,,
+C206,,Cessna,206 Stationair,airplane,piston,1,L,F,10.97,8.52,2.55,1633,1633,15700,,
+C207,,Cessna,207 Stationair,airplane,piston,1,L,,,,,1724,1724,,,
+C207,,Cessna,T207 Turbo Stationair,airplane,piston,1,L,,,,,1724,1724,,,
+C208,,Cessna,208 Caravan,airplane,turboprop,1,L,F,15.87,12.67,4.71,3969,3856,25000,175,
+C208,,Cessna,C-98 Caravan,airplane,turboprop,1,L,F,15.87,12.67,4.71,3969,3856,25000,175,
+C208,,Cessna,U-27 Caravan,airplane,turboprop,1,L,F,15.87,11.49,4.3,3629,3538,30000,175,
+C210,,Cessna,210 Centurion,airplane,piston,1,L,,,,,1746,1746,,,
+C212,,CASA,C-212 Aviocar,airplane,turboprop,2,M,F,20.4,16.1,6.8,7700,7450,25000,200,
+C21T,,Cessna,421 Golden Eagle Turboprop,airplane,turboprop,2,,,,,,,,,,
+C240,,Cessna,T240 Corvalis TTx,airplane,piston,1,L,F,10.9,7.68,2.74,1633,1551,25000,,
+C25A,,Cessna,525A Citation CJ2,airplane,turbofan,2,L,F,15.09,14.53,4.32,5670,5228,45000,260,0.737
+C25B,,Cessna,525B Citation CJ3,airplane,turbofan,2,L,F,16.13,15.29,4.62,6291,5783,45000,260,0.737
+C25C,,Cessna,525C Citation CJ4,airplane,turbofan,2,M,F,15.37,16.26,4.67,7761,7103,45000,260,0.77
+C25M,,Cessna,525 Citation M2,airplane,turbofan,2,L,F,14.33,12.98,4.27,4853,4491,41000,263,0.71
+C27J,,Alenia Aeronautica,C-27J Spartan,airplane,turboprop,2,M,E,28.7,22.7,9.65,30500,27500,30000,260,0.55
+C295,,CASA,C-295,airplane,turboprop,2,M,E,25.81,24.5,8.66,21000,20700,25000,245,
+C303,,Cessna,T303 Crusader,airplane,piston,2,,,,,,,,,,
+C30J,,Lockheed,L-382J Hercules II,airplane,turboprop,4,M,,,,,74389,64864,32200,,
+C310,,Cessna,310,airplane,piston,2,L,,,,,2495,2268,,,
+C310,,Cessna,T310,airplane,piston,2,L,,,,,2495,2449,,,
+C310,,Cessna,U-3 Blue Canoe,airplane,piston,2,L,,,,,2263,2155,,,
+C320,,Cessna,320 Skyknight,airplane,piston,2,L,,,,,2404,2404,,,
+C335,,Cessna,335,airplane,piston,2,L,,,,,2717,2717,,,
+C336,,Cessna,336 Skymaster,airplane,piston,2,L,,,,,1769,1769,,,
+C337,,Cessna,337 Super Skymaster,airplane,piston,2,L,,,,,2100,1996,,,
+C337,,Cessna,O-2 Super Skymaster,airplane,piston,2,L,,,,,1905,1905,,,
+C337,,Cessna,T337 Turbo Super Skymaster,airplane,piston,2,L,,,,,2100,1996,,,
+C340,,Cessna,340,airplane,piston,2,L,,,,,2717,2717,,,
+C402,,Cessna,401,airplane,piston,2,L,,,,,2858,2812,,,
+C402,,Cessna,402,airplane,piston,2,L,,,,,3107,3107,,,
+C404,,Cessna,404 Titan,airplane,piston,2,L,,,,,3810,3674,30000,,
+C408,,Cessna,408 SkyCourier,airplane,turboprop,2,M,,,,,8618,8437,25000,210,240
+C411,,Cessna,411,airplane,piston,2,L,,,,,2948,2948,,,
+C414,,Cessna,414 Chancellor,airplane,piston,2,L,,,,,3062,3062,,,
+C42,,Comco Ikarus,Ikarus C42,airplane,piston,1,L,F,8.71,6.38,2.2,560,560,,,
+C421,,Cessna,421 Golden Eagle,airplane,piston,2,L,,,,,3379,3266,,,
+C425,,Cessna,425 Corsair / Conquest I,airplane,turboprop,2,L,,,,,3901,3629,30000,230,0.52
+C441,,Cessna,441 Conquest II,airplane,turboprop,2,L,,,,,4468,4246,33000,245,0.55
+C500,,Cessna,500 Citation I,airplane,turbofan,2,L,F,14.35,13.35,4.39,5375,5148,41000,260,0.7
+C501,,Cessna,501 Citation I/SP,airplane,turbofan,2,L,F,,,,5375,5148,41000,260,0.7
+C510,,Cessna,510 Citation Mustang,airplane,turbofan,2,L,F,13.16,12.37,4.09,3921,3629,41000,250,0.63
+C525,,Cessna,525 Citation CJ1,airplane,turbofan,2,L,F,14.2,12.98,4.19,4853,4491,41000,263,0.71
+C550,,Cessna,550 Citation II,airplane,turbofan,2,L,F,15.9,14.39,4.57,6033,5761,43000,260,0.7
+C550,,Cessna,T-47,airplane,turbofan,2,L,F,,,,7041,6486,43000,335,0.75
+C551,,Cessna,551 Citation II/SP,airplane,turbofan,2,L,,,,,5670,5443,43000,260,0.7
+C55B,,Cessna,550B Citation Bravo,airplane,turbofan,2,L,F,15.9,14.39,4.57,6713,6123,43000,260,0.7
+C560,,Cessna,560 Citation V,airplane,turbofan,2,M,F,31.83,14.9,4.57,7394,6895,45000,260,0.75
+C560,,Cessna,UC-35,airplane,turbofan,2,M,F,31.83,14.9,4.57,7394,6895,45000,260,0.75
+C56X,,Cessna,560XL Citation Excel,airplane,turbofan,2,M,F,16.97,16.07,5.23,9163,8482,45000,261,0.752
+C650,,Cessna,650 Citation III,airplane,turbofan,2,M,,,,,10433,9072,51000,275,0.851
+C680,,Cessna,680 Citation Sovereign,airplane,turbofan,2,M,F,22.04,19.37,6.17,13959,12508,47000,270,0.8
+C68A,,Cessna,680A Citation Latitude,airplane,turbofan,2,M,F,22.04,18.98,6.34,13971,12508,45000,270,0.73
+C700,,Cessna,700 Citation Longitude,airplane,turbofan,2,M,E,21,22.3,5.91,17917,15195,45000,290,0.84
+C72R,,Cessna,172RG Cutlass RG,airplane,piston,1,L,,,,,1202,1202,,,
+C750,,Cessna,750 Citation X,airplane,turbofan,2,M,E,21.09,22.43,5.86,16601,14515,51000,270,0.935
+C77R,,Cessna,177RG Cardinal RG,airplane,piston,1,L,,,,,1270,1270,,,
+C82R,,Cessna,R182 Skylane RG,airplane,piston,1,L,,,,,1406,1406,,,
+C82S,,Cessna,T182 Turbo Skylane,airplane,piston,1,L,,,,,1406,1410,,,
+C82T,,Cessna,TR182 Turbo Skylane RG,airplane,piston,1,L,,,,,1406,1406,,,
+C919,,COMAC,C919,airplane,turbofan,2,M,D,35.8,38.9,11.95,78900,67800,,,
+C97,,"Boeing Defense, Space & Security",C-97 Stratofreighter,airplane,piston,4,,,,,,,,,,
+CAT,,Consolidated,PBY Catalina,amphibious,piston,2,M,,,,,12247,12247,,,
+CAW,,Cessna,AW,airplane,piston,1,L,F,12.24,7.52,2.11,1025,1025,,,
+CD2,,Dornier,CD-2 Seastar,amphibious,turboprop,2,L,F,17.74,12.7,4.83,4600,4600,,180,
+CDC6,,Cessna,DC-6,airplane,piston,1,L,,,,,1520,1520,,,
+CE43,,CERVA,CE.43 Guépard,airplane,piston,1,L,,,,,1460,1460,,,
+CH2T,,Zenair,CH 2000 Zénith,airplane,piston,1,L,F,8.78,7.01,2.1,730,730,,,
+CH60,,Zenith,CH 601,airplane,piston,1,L,F,8.23,5.79,2.08,480,480,,,
+CH65,,Zenith,CH 650,airplane,piston,1,L,F,8.23,6.1,1.98,599,599,,,
+CH70,,Zenith,CH 701,airplane,piston,1,L,F,8.23,6.38,2.6,500,500,16000,,
+CH75,,Zenith,CH 750,airplane,piston,1,L,F,9.07,6.65,2.64,600,600,14000,,
+CH7A,,Aeronca,7 Champion,airplane,piston,1,L,,,,,658,658,,,
+CH7A,,Aeronca,L-16,airplane,piston,1,L,,,,,590,590,,,
+CH7B,,American Champion,7 Citabria,airplane,piston,1,L,,,,,553,553,,,
+CH80,,Zenith,CH 801,airplane,piston,1,L,F,9.55,7.47,3.05,998,998,16000,,
+CL2P,,Canadair,CL-215 Scooper,amphibious,piston,2,M,,,,,19731,15604,20000,188,
+CL2T,,Canadair,CL-215T Scooper,amphibious,turboprop,2,M,,,,,17168,,20000,187,
+CL30,,Bombardier,Challenger 300,airplane,turbofan,2,M,E,19.4,20.9,6.2,17463,15309,45000,300,0.83
+CL35,,Bombardier,Challenger 350,airplane,turbofan,2,M,E,21.1,20.9,6.2,18416,15490,45000,300,0.83
+CL60,,Bombardier,Challenger 600,airplane,turbofan,2,M,E,,,,21591,17237,41000,300,0.85
+CLA,,CallAir,A,airplane,piston,1,L,,,,,703,703,,,
+CLB1,,IMCO,Callair B-1,airplane,piston,1,L,,,,,2041,2041,,,
+CMAS,,Cessna,Airmaster,airplane,piston,1,L,,,,,1066,1066,,,
+CN35,,CASA,CN-235,airplane,turboprop,2,M,F,25.81,21.4,8.18,14400,14200,25000,240,
+CN35,,CASA,HC-144 Ocean Sentry,airplane,turboprop,2,M,E,25.81,21.4,8.18,15800,15600,25000,250,
+CNUK,,Fleet,80 Canuck,airplane,piston,1,L,,,,,646,646,,,
+COL3,,Cessna,350 Corvalis,airplane,piston,1,L,F,10.92,7.68,2.74,1542,1465,18000,,
+COL3,,Lancair,Columbia 300,airplane,piston,1,L,F,10.92,7.68,2.74,1542,1465,18000,,
+COL4,,Cessna,400 Corvalis TT,airplane,piston,1,L,F,10.9,7.68,2.74,1633,1551,25000,,
+COL4,,Lancair,Columbia 400,airplane,piston,1,L,F,10.9,7.68,2.74,1633,1551,25000,,
+CONI,,Lockheed,C-121 Constellation,airplane,piston,4,M,,,,,46266,38329,,,
+COUR,,Helio,Courier,airplane,piston,1,L,,,,,1814,1724,,,
+COUR,,Helio,L-28 / U-10 Super Courier,airplane,piston,1,L,F,10.87,9.59,2.7,1542,1542,,,
+CP10,,Mudry,CAP 10,airplane,piston,1,L,F,8.06,7,1.76,830,830,16400,,
+CP20,,Mudry,CAP 20,airplane,piston,1,L,F,7.57,7.21,1.82,830,830,,,
+CP21,,Mudry,CAP 21,airplane,piston,1,L,F,8.08,6.46,1.8,700,700,,,
+CP23,,Mudry,CAP 230,airplane,piston,1,L,F,7.4,6.75,1.8,820,820,,,
+CP30,,Piel,CP-301 Émeraude,airplane,piston,1,L,F,8.3,6.5,2.5,650,650,,,
+CRJ1,,Bombardier,CRJ-100,airplane,turbofan,2,M,,,,,21523,20276,41000,300,0.85
+CRJ2,,Bombardier,CRJ-200,airplane,turbofan,2,M,E,,,,21523,20276,41000,300,0.85
+CRJ7,,Bombardier,CRJ-700,airplane,turbofan,2,M,E,23.2,32.3,7.6,32999,30391,41000,330,0.85
+CRJ9,,Bombardier,CRJ-900,airplane,turbofan,2,M,E,24.9,36.2,7.5,36514,33339,41000,330,0.85
+CRJX,,Bombardier,CRJ-1000,airplane,turbofan,2,M,E,26.2,39.1,7.5,40823,36968,41000,330,0.84
+CVLP,,Convair,240 Convairliner,airplane,piston,2,M,,,,,18370,17509,,,
+CVLP,,Convair,340 Convairliner,airplane,piston,2,M,,,,,21319,21092,,,
+CVLP,,Convair,440 Metropolitan,airplane,piston,2,M,,,,,21773,21614,,,
+CVLP,,Convair,C-131 Samaritan,airplane,piston,2,M,,,,,21773,21614,,,
+CVLP,,Convair,T-29,airplane,piston,2,M,,,,,18370,17509,,,
+D11,,Jodel,D.11,airplane,piston,1,L,F,8.2,6.2,2.1,617,617,,,
+D140,,Jodel,D.140 Mousquetaire,airplane,piston,1,L,F,10.3,7.8,2.1,1200,1200,,,
+D150,,Jodel,D.150 Mascaret,airplane,piston,1,L,F,8.2,6.3,1.8,720,720,,,
+D228,,Dornier,228-100,airplane,turboprop,2,L,,,,,5980,5980,15000,199,
+D228,,Dornier,228-200,airplane,turboprop,2,L,,,,,6400,6400,15000,197,
+D25,,New Standard,D-25,airplane,piston,1,L,,,,,1542,1542,,,
+D250,,Robin,DR200,airplane,piston,1,L,F,8.72,6.68,1.83,850,850,,,
+D250,,Robin,DR250 Capitaine,airplane,piston,1,L,F,8.72,6.98,1.86,960,920,,,
+D253,,Robin,DR253 Régent,airplane,piston,1,L,F,8.72,7,2.38,1100,1045,,,
+D28D,,Dornier,Do-28D Skyservant,airplane,piston,2,L,,,,,3651,3651,,,
+D28T,,Dornier,Do-28D-6 Turbo Skyservant,airplane,turboprop,2,,,,,,,,,,
+D328,,Dornier,328-100,airplane,turboprop,2,M,F,,,,13990,13230,31000,270,0.59
+DA40,,Diamond,DA40,airplane,piston,1,L,F,11.63,8.06,1.97,1280,1216,16400,,
+DA42,,Diamond,DA42,airplane,piston,2,L,F,13.42,8.56,2.49,1900,1805,18000,,
+DA50,,Diamond,DA50,airplane,piston,1,L,F,13.41,9.24,2.95,1999,1999,20000,,
+DA62,,Diamond,DA62,airplane,piston,2,L,F,14.57,9.17,2.82,2300,2300,20000,,
+DC10,,McDonnell-Douglas,DC-10,airplane,turbofan,3,H,,,,,256280,190962,42000,350,0.88
+DC10,,McDonnell-Douglas,KC-10 Extender,airplane,turbofan,3,H,,,,,256280,192323,42000,350,0.88
+DC10,,McDonnell-Douglas,MD-10,airplane,turbofan,3,H,,,,,256280,190962,42000,350,0.88
+DC2,,Douglas,DC-2,airplane,piston,2,M,,,,,8618,8165,,,
+DC3,,Douglas,C-117 Skytrooper,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3,,Douglas,C-41,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3,,Douglas,C-47 Skytrain,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3,,Douglas,C-53 Skytrooper,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3,,Douglas,DC-3,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3,,Douglas,R4D,airplane,piston,2,M,F,28.96,19.66,7.16,11431,11431,,,
+DC3S,,Douglas,C-117D Skytrooper,airplane,piston,2,M,,,,,14061,13608,,,
+DC3S,,Douglas,DC-3-S Super DC-3,airplane,piston,2,M,,,,,14470,13789,,,
+DC3T,,Douglas,DC-3 Turbo,airplane,turboprop,2,,,,,,,,,,
+DC4,,Douglas,C-54 Skymaster,airplane,piston,4,,,,,,,,,,
+DC4,,Douglas,DC-4,airplane,piston,4,M,D,35.81,28.62,8.41,33112,26399,,,
+DC6,,Douglas,C-118 Liftmaster,airplane,piston,4,M,D,35.81,32.19,8.75,48534,40007,,,
+DC6,,Douglas,DC-6,airplane,piston,4,M,D,35.81,32.19,8.75,45359,38555,,,
+DC7,,Douglas,DC-7,airplane,piston,4,M,D,38.86,34.23,9.39,58513,49442,,,
+DC85,,Douglas,DC-8-50,airplane,turbofan,4,H,,,,,142882,98430,42000,340,0.88
+DC86,,Douglas,DC-8-60,airplane,turbofan,4,H,,,,,161025,117027,42000,339,0.88
+DC87,,Douglas,DC-8-70,airplane,turbofan,4,H,,,,,161025,117027,,339,0.88
+DC91,,Douglas,DC-9-10,airplane,turbofan,2,M,E,27.25,31.82,8.4,41141,37059,,,0.86
+DC92,,Douglas,DC-9-20,airplane,turbofan,2,M,E,28.44,31.82,8.4,45359,43227,,350,0.84
+DC93,,Douglas,C-9,airplane,turbofan,2,M,E,28.44,36.36,8.4,48988,44906,,350,0.84
+DC93,,Douglas,DC-9-30,airplane,turbofan,2,M,E,28.44,36.36,8.4,47627,44906,,350,0.84
+DC94,,Douglas,DC-9-40,airplane,turbofan,2,M,E,28.44,38.28,8.5,51710,46266,,340,0.84
+DC95,,Douglas,DC-9-50,airplane,turbofan,2,M,E,28.45,40.72,8.6,54885,49895,,340,0.84
+DG15,,Howard,DGA-15,airplane,piston,1,L,,,,,1973,1973,,,
+DG15,,Howard,GH-1 / NH-1,airplane,piston,1,L,,,,,1973,1973,,,
+DG1T,,DG Aviation,DG-1000M,glider,piston,1,L,F,20,8.57,1.87,790,790,,,
+DG1T,,DG Aviation,DG-1000T,glider,piston,1,L,F,20,8.57,1.83,750,750,,,
+DG40,,Glaser-Dirks,DG-400,glider,piston,1,L,F,17,7,,460,460,,,
+DG50,,Glaser-Dirks,DG-500M,glider,piston,1,L,F,22,8.66,,825,825,,,
+DG60,,Glaser-Dirks,DG-600M,glider,piston,1,L,F,18,6.83,,440,440,,,
+DG80,,DG Aviation,DG-800,glider,piston,1,L,F,18,7.06,,525,525,,,
+DH2T,,DeHavilland Canada,DHC-2 Turbo Beaver,airplane,turboprop,1,L,,,,,2436,2313,,,
+DH3T,,DeHavilland Canada,DHC-3 Turbo Otter,airplane,turboprop,1,,,,,,,,,,
+DH4T,,DeHavilland Canada,DHC-4 Turbo Caribou,airplane,turboprop,2,,,,,,,,,,
+DH60,,DeHavilland,DH.60 Moth,airplane,piston,1,L,,,,,794,794,,,
+DH80,,DeHavilland,DH.80 Puss Moth,airplane,piston,1,L,,,,,901,901,,,
+DH82,,DeHavilland,DH.82 Tiger Moth,airplane,piston,1,L,,,,,828,828,,,
+DH83,,DeHavilland,DH.83 Fox Moth,airplane,piston,1,L,,,,,975,975,,,
+DH84,,DeHavilland,DH.84 Dragon,airplane,piston,2,,,,,,,,,,
+DH85,,DeHavilland,DH.85 Leopard Moth,airplane,piston,1,,,,,,,,,,
+DH87,,DeHavilland,DH.87 Hornet Moth,airplane,piston,1,L,,,,,907,907,,,
+DH88,,DeHavilland,DH.88 Comet,airplane,piston,2,,,,,,,,,,
+DH89,,DeHavilland,DH.89 Dragon Rapide,airplane,piston,2,L,F,14.6,10.4,3.2,2517,2517,,,
+DH8A,,DeHavilland Canada,CC-142 Dash 8,airplane,turboprop,2,M,E,25.91,23.63,7.49,19260,19260,,,
+DH8A,,DeHavilland Canada,DHC-8-100 Dash 8,airplane,turboprop,2,M,E,25.91,22.25,7.49,16466,,25000,242,
+DH8B,,DeHavilland Canada,DHC-8-200 Dash 8,airplane,turboprop,2,M,E,25.89,22.25,7.49,16466,,25000,242,
+DH8C,,DeHavilland Canada,DHC-8-300 Dash 8,airplane,turboprop,2,M,E,27.43,25.68,7.49,18643,,25000,243,
+DH8D,,DeHavilland Canada,DHC-8-400 Dash 8,airplane,turboprop,2,M,E,28.4,32.8,8.3,27987,,25000,245,
+DH90,,DeHavilland,DH.90 Dragonfly,airplane,piston,2,,,,,,,,,,
+DH94,,DeHavilland,DH.94 Moth Minor,airplane,piston,1,,,,,,,,,,
+DHC1,,DeHavilland Canada,DHC-1 Chipmunk,airplane,piston,1,L,F,10.5,7.8,2.1,953,953,,,
+DHC2,,DeHavilland Canada,DHC-2 Beaver,airplane,piston,1,L,,,,,2313,2313,,,
+DHC2,,DeHavilland Canada,U-6 Beaver,airplane,piston,1,L,,,,,2109,2109,,,
+DHC3,,DeHavilland Canada,DHC-3 Otter,airplane,piston,1,L,,,,,3447,3447,,,
+DHC3,,DeHavilland Canada,U-1 Otter,airplane,piston,1,L,,,,,3447,3447,,,
+DHC4,,DeHavilland Canada,DHC-4 Caribou,airplane,piston,2,M,,,,,12927,12927,25000,,
+DHC5,,DeHavilland Canada,CC-115 Buffalo,airplane,turboprop,2,M,,,,,18594,17732,30000,230,
+DHC5,,DeHavilland Canada,CV-7 Buffalo,airplane,turboprop,2,M,,,,,17237,16556,25000,265,
+DHC5,,DeHavilland Canada,DHC-5 Buffalo,airplane,turboprop,2,M,,,,,17237,16556,25000,265,
+DHC6,,DeHavilland Canada,CC-138 Twin Otter,airplane,turboprop,2,L,,,,,5670,5579,25000,160,
+DHC7,,DeHavilland Canada,DHC-7 Dash 7,airplane,turboprop,4,M,,,,,19958,19051,25000,235,
+DIMO,,Diamond,H36 Dimona,glider,piston,1,L,F,16.33,7.28,1.78,770,770,,,
+DISC,,Schempp-Hirth,Discus M,glider,piston,1,L,F,15,6.58,,450,450,,,
+DISC,,Schempp-Hirth,Discus T,glider,piston,1,L,F,18,6.81,,525,525,,,
+DO27,,Dornier,Do-27,airplane,piston,1,L,,,,,1851,1851,,,
+DO28,,Dornier,Do-28,airplane,piston,2,L,,,,,2722,2722,,,
+DOVE,,DeHavilland,DH.104 Devon,airplane,piston,2,,,,,,,,,,
+DOVE,,DeHavilland,DH.104 Dove,airplane,piston,2,L,,,,,4060,4060,,,
+DR10,,Jodel,DR.100,airplane,piston,1,L,,,,,780,740,,,
+DR22,,Robin,DR220,airplane,piston,1,L,F,8.72,6.8,1.9,840,840,,,
+DR30,,Robin,DR300,airplane,piston,1,L,F,8.72,7.08,2.23,1070,1020,,,
+DR40,,Robin,DR400,airplane,piston,1,L,F,8.72,6.96,2.23,1100,1045,,,
+DUOD,,Schempp-Hirth,Duo Discus T,glider,piston,1,L,F,20,8.62,,700,700,,,
+DV20,,Diamond,DA20/DV20,airplane,piston,1,L,F,10.87,7.15,2.1,800,800,,,
+E110,,Embraer,C-95 Bandeirante,airplane,turboprop,2,L,F,15.33,14.59,4.92,5700,5450,25000,230,
+E110,,Embraer,EMB-110 Bandeirante,airplane,turboprop,2,L,F,15.33,14.59,4.92,5670,5450,25000,230,
+E110,,Embraer,P-95 Bandeirulha,airplane,turboprop,2,,,15.33,14.59,4.92,,,,,
+E120,,Embraer,EMB-120 Brasilia,airplane,turboprop,2,M,F,19.78,20,6.35,11500,11250,32000,272,0.5
+E120,,Embraer,VC-97 Brasilia,airplane,turboprop,2,M,F,19.78,20,6.35,11500,11250,32000,272,0.5
+E121,,Embraer,EMB-121 Xingu,airplane,turboprop,2,L,,,,,5670,5340,30000,250,
+E135,,Embraer,EMB-135 (ERJ135 / ERJ140),airplane,turbofan,2,M,E,20.04,26.33,6.76,18990,18500,37000,320,0.78
+E135,,Embraer,VC-99C,airplane,turbofan,2,M,E,20.04,26.33,6.76,18990,18500,37000,320,0.78
+E145,,Embraer,C-99,airplane,turbofan,2,M,E,20.04,29.87,6.75,19200,18700,37000,320,0.78
+E145,,Embraer,EMB-145 (ERJ145),airplane,turbofan,2,M,E,20.04,29.87,6.75,19200,18700,37000,320,0.78
+E145,,Embraer,EMB-145 AEW&C (E-99 / P-99 / R-99),airplane,turbofan,2,M,E,,,,,,,,
+E145,,Embraer,VC-99A,airplane,turbofan,2,M,E,20.04,29.87,6.75,19200,18700,37000,320,0.78
+E170,,Embraer,ERJ 170-100 (E170),airplane,turbofan,2,M,E,26,29.9,9.82,35990,32800,41000,320,0.82
+E190,,Embraer,ERJ 190-100 (E190),airplane,turbofan,2,M,E,28.72,36.24,10.57,47790,43000,41000,320,0.82
+E195,195,Embraer,ERJ 190-200 (E195),airplane,turbofan,2,M,E,28.72,38.66,10.55,48790,45000,41000,320,0.82
+E200,,Extra,EA-200 (EA-300/200),airplane,piston,1,L,F,7.5,6.65,2.62,840,840,16000,,
+E275,,Embraer,ERJ 190-500 (E175-E2),airplane,turbofan,2,M,,,,,44600,44000,41000,,
+E290,,Embraer,ERJ 190-300 (E190-E2),airplane,turbofan,2,M,D,33.72,36.24,10.69,56400,49050,41000,320,0.82
+E295,295,Embraer,ERJ 190-400 (E195-E2),airplane,turbofan,2,M,D,35.12,41.6,10.71,62000,54000,41000,320,0.82
+E300,,Extra,EA-300,airplane,piston,1,L,F,8,7.2,2.62,950,950,10000,,
+E314,,Embraer,EMB-314 / A-29 Super Tucano,airplane,turboprop,1,,,,,,,,,,
+E350,,Cessna,E350,airplane,turboprop,1,,,,,,,,,,
+E35L,,Embraer,EMB-135BJ Legacy,airplane,turbofan,2,M,E,20.04,26.33,6.76,22500,18500,37000,320,0.8
+E35L,,Embraer,VC-99B,airplane,turbofan,2,M,E,20.04,26.33,6.76,22500,18500,37000,320,0.8
+E390,,Embraer,C-390 Millennium,airplane,turbofan,2,M,D,35.05,35.2,11.84,74400,69000,36000,300,0.8
+E3CF,,"Boeing Defense, Space & Security",E-3 Sentry CFM56,airplane,turbofan,4,,,,,,,,,,
+E3TF,,"Boeing Defense, Space & Security",E-3 Sentry TF33,airplane,turbofan,4,,,,,,,,,,
+E400,,Extra,EA-400,airplane,piston,1,L,F,11.68,9.57,3.09,1999,,25000,,
+E45X,,Embraer,EMB-145XR (ERJ145 XR),airplane,turbofan,2,M,E,21,29.87,6.75,24100,20000,37000,320,0.78
+E500,,Extra,EA-500 (EA-400/500),airplane,piston,1,L,F,11.6,10.13,3.37,2130,,25000,,
+E50P,,Embraer,EMB-500 Phenom 100,airplane,turbofan,2,L,F,12.3,12.82,4.35,4855,4535,41000,275,0.7
+E530,,Cessna,E530 Scorpion,airplane,turbofan,2,,,,,,,,,,
+E545,,Embraer,EMB-545 Legacy 450,airplane,turbofan,2,M,E,21.5,19.68,6.43,17040,15500,45000,300,0.83
+E550,,Embraer,EMB-550 Legacy 500,airplane,turbofan,2,M,E,21.5,20.74,6.44,19440,17000,45000,300,0.83
+E55P,,Embraer,EMB-505 Phenom 300,airplane,turbofan,2,M,F,15.91,15.64,5.1,8415,7835,45000,320,0.8
+E6,,"Boeing Defense, Space & Security",E-6 Mercury,airplane,turbofan,4,,,,,,,,,,
+E737,,"Boeing Defense, Space & Security",E-7 Wedgetail,airplane,turbofan,2,,,34.32,32.18,12.57,,,41000,,
+E75L,,Embraer,ERJ 170-200 (E175),airplane,turbofan,2,M,E,28.65,31.68,9.82,37500,34000,41000,320,0.82
+E75S,,Embraer,ERJ 170-200 Short Wing (E175 Short Wing),airplane,turbofan,2,M,E,26,31.68,9.82,37500,34000,41000,320,0.82
+E767,,"Boeing Defense, Space & Security",E-767,airplane,turbofan,2,,,,,,,,,,
+EAGT,,American Eagle,Eaglet,airplane,piston,1,L,,,,,499,499,,,
+EC20,,Airbus Helicopters,EC120 Colibri / H120,helicopter,turboshaft,1,L,,,9.6,3.4,1715,1715,20000,,
+EC25,,Airbus Helicopters,EC225 Super Puma / H225,helicopter,turboshaft,2,M,,,16.49,4.97,11000,11000,20000,,
+EC25,,Airbus Helicopters,EC725 Caracal / H225M,helicopter,turboshaft,2,M,,,16.79,4.6,11000,11000,,,
+EC30,,Airbus Helicopters,EC130 / H130,helicopter,turboshaft,1,L,,,10.68,3.61,2427,2427,23000,,
+EC35,,Airbus Helicopters,EC135 / H135,helicopter,turboshaft,1,L,,,5.87,3.35,2980,2980,20000,,
+EC35,,Airbus Helicopters,EC635 / H135M,helicopter,turboshaft,1,L,,,5.87,3.35,2980,2980,20000,,
+EC35,,"Boeing Defense, Space & Security",EC-135,airplane,turbofan,4,,,,,,,,,,
+EC45,,Airbus Helicopters,EC145 / H145,helicopter,turboshaft,2,L,,,11.69,3.98,3800,3800,20000,,
+EC45,,Airbus Helicopters,EC645 / H145M,helicopter,turboshaft,2,L,,,11.69,3.98,3800,3800,20000,,
+EC45,,Airbus Helicopters,UH-72 Lakota,helicopter,turboshaft,2,L,,,11.69,3.98,3800,3800,20000,,
+EC55,,Airbus Helicopters,EC155 / H155,helicopter,turboshaft,2,L,,,12.47,4.35,4800,4800,13000,,
+EC75,,Airbus Helicopters,EC175 / H175,helicopter,turboshaft,2,M,,,15.68,4.84,7500,7500,15000,,
+ECHO,,Tecnam,P92 Echo,airplane,piston,1,L,F,9.6,6.3,2.5,535,535,,,
+EFAN,,Airbus,E-Fan,airplane,electric,2,,,9.5,6.67,,,,,,
+EFOX,,Aeropro,Eurofox,airplane,piston,1,L,F,9.13,5.61,1.72,560,560,,,
+EH10,,AgustaWestland,EH101,helicopter,turboshaft,3,M,,,19.3,5.35,14600,14600,15000,,
+ELST,,Pützer,Elster,airplane,piston,1,L,F,13.2,7.1,2.5,750,750,,,
+EN28,,Enstrom,280 Shark,helicopter,piston,1,L,,,8.75,2.74,1066,1066,12000,,
+EN28,,Enstrom,F-28,helicopter,piston,1,L,,,8.56,2.74,1066,1066,12000,,
+EN48,,Enstrom,480,helicopter,turboshaft,1,L,,,9.2,3,1361,1361,13000,,
+EN48,,Enstrom,TH-28,helicopter,turboshaft,1,L,,,,,1293,1293,13000,,
+EP9,,Edgar Percival,E.P.9,airplane,piston,1,L,F,13.3,9.1,4.1,1610,1610,,,
+ERCO,,Alon,A-2 Aircoupe,airplane,piston,1,L,,,,,658,658,,,
+ERCO,,ERCO,415 Ercoupe,airplane,piston,1,L,,,,,635,635,,,
+ERCO,,Forney,F-1 Aircoupe,airplane,piston,1,L,,,,,658,658,,,
+EXNG,,Extra,NG,airplane,piston,1,L,F,8.3,7.1,2.52,950,902,10000,,
+EXPL,,MD Helicopters,MD-900 Combat Explorer,helicopter,turboshaft,2,L,,,5.56,3.33,2948,2948,,,
+EXPL,,MD Helicopters,MD-900 Explorer,helicopter,turboshaft,2,L,,,5.56,3.33,2948,2948,20000,,
+EXPL,,MD Helicopters,MH-90 Enforcer,helicopter,turboshaft,2,L,,,5.56,3.33,2948,2948,20000,,
+F100,,Fokker,100,airplane,turbojet,2,M,E,28.08,35.53,8.42,40995,39915,35000,320,0.75
+F15,,McDonnell-Douglas,F-15 Eagle,airplane,turbofan,2,,,,,,,,,,
+F18H,,McDonnell-Douglas,F/A-18 Hornet,airplane,turbofan,2,,,,,,,,,,
+F18S,,"Boeing Defense, Space & Security",EA-18 Growler,airplane,turbofan,2,,,13.69,18.35,4.88,,,,,
+F18S,,McDonnell-Douglas,F/A-18 Super Hornet,airplane,turbofan,2,,,,,,,,,,
+F260,,Leonardo,F260,airplane,piston,1,L,F,8.35,7.19,2.68,1200,1200,,,
+F26T,,Leonardo,SF260T,airplane,turboprop,1,L,F,8.35,7.4,2.41,1160,1160,20000,229,
+F27,,Fokker,F27 Friendship,airplane,turboprop,2,M,E,,,,16200,15430,25000,223,
+F28,,Fokker,F28 Fellowship,airplane,turbofan,2,M,,,,,32205,29030,25000,331,0.75
+F2TH,,Dassault,Falcon 2000,airplane,turbofan,2,M,E,19.24,20.23,7.06,18461,17373,47000,350,0.85
+F406,,Reims-Cessna,F406 Caravan II,airplane,turboprop,2,L,,,,,4246,4246,30000,229,0.52
+F50,,Fokker,50,airplane,turboprop,2,M,E,29,25.25,8.32,19950,19500,25000,224,
+F60,,Fokker,60,airplane,turboprop,2,M,,,,,22950,21750,25000,,
+F70,,Fokker,70,airplane,turbojet,2,M,E,28.08,30.91,8.51,36740,34020,35000,320,0.77
+F8L,,Aviamilano,F.8L Falco,airplane,piston,1,L,F,8,6.5,2.2,780,780,,,
+F900,,Dassault,Falcon 900,airplane,turbofan,3,M,E,19.33,20.2,7.5,21908,19051,51000,350,0.87
+FA10,,Dassault,Falcon 10,airplane,turbofan,2,M,F,13.08,13.86,4.61,8500,8000,45200,350,0.87
+FA20,,Dassault,Falcon 20,airplane,turbofan,2,M,,,,,13200,12580,42000,350,0.88
+FA24,,Fairchild,F-24,airplane,piston,1,L,F,11,7.3,2.2,1162,1162,,,
+FA24,,Fairchild,UC-61,airplane,piston,1,L,F,11,7.3,2.2,1162,1162,,,
+FA50,,Dassault,Falcon 50,airplane,turbofan,3,M,E,18.86,18.52,6.98,18008,16200,45000,350,0.86
+FA62,,Fairchild,M-62 Cornell,airplane,piston,1,L,,,,,1315,1315,,,
+FA62,,Fairchild,PT-19 Cornell,airplane,piston,1,L,,,,,1270,1270,,,
+FA62,,Fairchild,PT-23 Cornell,airplane,piston,1,L,,,,,1315,1315,,,
+FA62,,Fairchild,PT-26 Cornell,airplane,piston,1,L,,,,,1270,1270,,,
+FA7X,,Dassault,Falcon 7X,airplane,turbofan,3,M,E,26.21,23.38,7.93,31751,28304,51000,,
+FA8X,,Dassault,Falcon 8X,airplane,turbofan,3,M,E,26.28,24.46,7.93,33112,28304,51000,,
+FANT,,Rhein Flugzeugbau,Fantrainer,airplane,turboshaft,1,L,,,,,1800,1800,15000,240,
+FDCT,,Flight Design,CT,airplane,piston,1,L,F,8.6,6.6,2.34,600,600,,,
+FDF2,,Flight Design,F2,airplane,piston,1,L,F,9.87,6.86,2.68,650,650,12500,,
+FINC,,Fleet,10 Finch,airplane,piston,1,L,,,,,876,876,,,
+FINC,,Fleet,16 Finch,airplane,piston,1,L,,,,,852,852,,,
+FK12,,B&F Technik,FK 12 Comet,airplane,piston,1,L,F,6.4,5.99,2.43,520,520,,,
+FK14,,B&F Technik,FK 14 Polaris,airplane,piston,1,L,F,9.1,5.69,2.12,544,544,16000,,
+FK9,,B&F Technik,FK 9,airplane,piston,1,L,F,9.14,6.03,2.31,540,540,13000,,
+FLE2,,Fleet,2,airplane,piston,1,L,,,,,714,714,,,
+FLE7,,Fleet,7,airplane,piston,1,L,,,,,876,876,,,
+G103,,Grob,G103 Twin III SL,glider,piston,1,L,F,18,,,710,710,,,
+G109,,Grob,G109,glider,piston,1,L,F,17.4,,,850,850,,,
+G115,,Grob,G115,airplane,piston,1,L,F,10,7.54,2.4,990,990,,,
+G120,,Grob,G120,airplane,piston,1,L,F,10.19,8.12,2.66,1490,1440,18000,,
+G12T,,Grob,G120TP,airplane,turboprop,1,L,F,10.31,8.42,2.64,1515,1440,25000,235,0.45
+G159,,Grumman,G-159 Gulfstream I,airplane,turboprop,2,M,,,,,15241,14515,30000,290,0.54
+G15T,,Grob,G115T Acro,airplane,piston,1,L,F,10.19,8.07,2.75,1440,1440,,,
+G164,,Grumman,G-164 Ag-Cat,airplane,piston,1,,,,,,,,,,
+G222,,Aeritalia,G.222,airplane,turboprop,2,,,,,,,,,,
+G222,,Alenia Aeronautica,C-27 Spartan,airplane,turboprop,2,,,28.7,22.7,9.78,,,,,
+G280,,Gulfstream Aerospace,Gulfstream G280,airplane,turbofan,2,M,,,,,17962,14832,45000,300,0.85
+G2CA,,Guimbal,G-2 Cabri,helicopter,piston,1,L,,,6.31,2.37,700,700,13000,,
+G2T1,,Great Lakes,2T-1 Sport Trainer,airplane,piston,1,L,,,,,816,816,,,
+G3,,Remos,G-3,airplane,piston,1,L,F,9.8,6.47,2.28,600,600,,,
+G64T,,Grumman,G-164 Turbo Ag-Cat,airplane,turboprop,1,,,,,,,,,,
+GA10,,GippsAero,GA10 Airvan,airplane,turboprop,1,L,F,12.37,10.21,3.89,2155,2155,20000,157,
+GA20,,GippsAero,GA200 Fatman,airplane,piston,1,L,F,11.98,7.48,2.33,1524,1448,,,
+GA4C,,Gulfstream Aerospace,Gulfstream GVII-G400,airplane,turbofan,2,,,,,,,,,,
+GA5C,,Gulfstream Aerospace,Gulfstream GVII-G500,airplane,turbofan,2,M,,,,,36106,29189,51000,340,0.925
+GA6C,,Gulfstream Aerospace,Gulfstream GVII-G600,airplane,turbofan,2,M,,,,,42910,34836,51000,340,0.925
+GA7,,Grumman American,GA-7 Cougar,airplane,piston,2,L,,,,,1724,1724,,,
+GA8,,GippsAero,GA8 Airvan,airplane,piston,1,L,F,12.41,8.95,3.89,1814,114,20000,,
+GABR,,Blackshape,BS115 / BK160 Gabriél,airplane,piston,1,L,F,9,7.44,2.46,850,850,11500,,
+GALX,,Gulfstream Aerospace,Gulfstream G200,airplane,turbofan,2,M,E,,,,15808,12701,45000,310,0.85
+GALX,,Israel Aerospace Industries,1126 Galaxy,airplane,turbofan,2,M,E,,,,15808,12701,45000,310,0.85
+GAZL,,Aérospatiale,SA341 Gazelle,helicopter,turboshaft,1,L,,,,,1800,1800,19685,,
+GAZL,,Aérospatiale,SA342 Gazelle,helicopter,turboshaft,1,L,,,9.53,3.19,1900,1900,19685,,
+GC1,,Globe,GC-1 Swift,airplane,piston,1,L,,,,,776,776,,,
+GL5T,,Bombardier,Global 5000,airplane,turbofan,2,M,E,28.7,29.5,7.8,41957,35652,51000,300,0.9
+GL7T,,Bombardier,Global 7000,airplane,turbofan,2,M,E,31.7,33.8,8.2,52095,39735,,300,0.925
+GLEX,,Bombardier,Global 6000 / Global Express,airplane,turbofan,2,M,E,28.7,30.3,7.8,45132,35652,51000,300,0.9
+GLF2,,Gulfstream Aerospace,G-1159 Gulfstream II,airplane,turbofan,2,M,,,,,30935,26535,45000,340,0.85
+GLF3,,Gulfstream Aerospace,G-1159A Gulfstream III,airplane,turbofan,2,M,,,,,30935,26535,45000,340,0.85
+GLF4,,Gulfstream Aerospace,G-IV Gulfstream IV,airplane,turbofan,2,M,E,,,,33838,29937,45000,,
+GLF5,,Gulfstream Aerospace,GV Gulfstream V,airplane,turbofan,2,M,E,,,,41277,34156,51000,,
+GLF6,,Gulfstream Aerospace,GVI Gulfstream VI,airplane,turbofan,2,M,,,,,46992,37875,51000,340,0.925
+GLID,,Ahrens,Delphin,glider,none,,L,F,13,7.7,,375,375,,,
+GLID,,Akaflieg Braunschweig,SB-5 Danzig,glider,none,,L,F,16,,,350,350,,,
+GLID,,Akaflieg Darmstadt,D-34,glider,none,,L,F,12.65,6.4,,255,255,,,
+GLID,,Akaflieg München,Mü 13,glider,none,,L,F,16,,,265,265,,,
+GLID,,Akaflieg München,Mü 17 Merle,glider,none,,L,F,15,7.5,,310,310,,,
+GLID,,Akaflieg München,Mü 22,glider,none,,L,F,16.6,6.95,,400,400,,,
+GLID,,Akaflieg Stuttgart,fs23 Hidalgo,glider,none,,L,F,13,,,190,190,,,
+GLID,,Akaflieg Stuttgart,fs24 Phönix,glider,none,,L,F,16,6.9,,300,300,,,
+GLID,,Allgaier,Geier,glider,none,,L,F,17.76,,,370,370,,,
+GLID,,Bréguet,Br 905 Fauvette,glider,none,,L,F,15,6.22,1.89,275,275,,,
+GLID,,Bölkow,Phoebus,glider,none,,L,F,17,,,459,459,,,
+GLID,,Caproni,A-21 Calif,glider,none,,L,F,20.38,,,644,644,,,
+GLID,,DFS,Habicht,glider,none,,L,F,13.6,,,350,350,,,
+GLID,,DFS,Kranich,glider,none,,L,F,18,7.7,,465,465,,,
+GLID,,DFS,Olympia-Meise,glider,none,,L,F,15,7.27,,290,290,,,
+GLID,,DFS,Rhönsperber,glider,none,,L,F,15.3,,,267,267,,,
+GLID,,DFS,Weihe,glider,none,,L,F,18,,,335,335,,,
+GLID,,DG Aviation,DG-1000S,glider,none,,L,F,20,8.57,1.83,750,750,,,
+GLID,,DG Aviation,DG-800S,glider,none,,L,F,18,6.86,,600,600,,,
+GLID,,DG Aviation,LS10,glider,none,,L,F,18,6.76,,600,600,,,
+GLID,,DG Aviation,LS8,glider,none,,L,F,18,6.66,1.33,575,575,,,
+GLID,,Dittmar,Condor,glider,none,,L,F,18,8.44,,520,520,,,
+GLID,,Dittmar,HD 53 Möwe,glider,none,,L,F,12,6.4,,480,480,,,
+GLID,,Eiri Avion,PIK-20,glider,none,,L,,,,,450,450,,,
+GLID,,Embraer,EMB-400 Urupema,glider,none,,L,F,15,7.54,1.52,350,350,,,
+GLID,,Fauvel,AV-36,glider,none,,L,F,12,3.2,,225,225,,,
+GLID,,Glaser-Dirks,DG-100,glider,none,,L,F,15,7,,418,418,,,
+GLID,,Glaser-Dirks,DG-200,glider,none,,L,F,17,7,,450,450,,,
+GLID,,Glaser-Dirks,DG-300,glider,none,,L,F,15,6.8,,525,525,,,
+GLID,,Glaser-Dirks,DG-500,glider,none,,L,F,22,8.66,,750,750,,,
+GLID,,Glaser-Dirks,DG-600,glider,none,,L,F,18,6.83,,480,480,,,
+GLID,,Glasflügel,BS-1,glider,none,,L,F,18,7.5,,460,460,,,
+GLID,,Glasflügel,Club Libelle,glider,none,,L,F,15,6.4,1.4,350,350,,,
+GLID,,Glasflügel,Hornet,glider,none,,L,F,15,6.4,1.4,450,450,,,
+GLID,,Glasflügel,Kestrel,glider,none,,L,F,17,6.72,1.52,400,400,,,
+GLID,,Glasflügel,Mosquito,glider,none,,L,F,15,6.4,1.4,450,450,,,
+GLID,,Glasflügel,Standard Libelle,glider,none,,L,F,15,6.4,1.37,380,380,,,
+GLID,,Grob,G102 Astir,glider,none,,L,F,15,,,450,450,,,
+GLID,,Grob,G103 Twin Astir,glider,none,,L,F,18,,,600,600,,,
+GLID,,Grob,G104 Speed Astir,glider,none,,L,F,15,,,515,515,,,
+GLID,,Göppingen,Gö 3 Minimoa,glider,none,,L,F,17,7,,350,350,,,
+GLID,,Göppingen,Gö 4 Goevier,glider,none,,L,F,14.84,6.24,,410,410,,,
+GLID,,Hirth,Hi 25 Kria,glider,none,,L,F,11.9,6.9,,220,220,,,
+GLID,,Hütter,Hü 17,glider,none,,L,F,9.96,5.18,,210,210,,,
+GLID,,IAR Brașov,IS-28,glider,none,,L,F,17,8.45,1.87,590,590,,,
+GLID,,IAR Brașov,IS-29,glider,none,,L,F,15,7.3,1.68,360,360,,,
+GLID,,IAR Brașov,IS-30,glider,none,,L,F,17,8.45,2.27,610,610,,,
+GLID,,IAR Brașov,IS-32,glider,none,,L,F,20,8.36,1.55,590,590,,,
+GLID,,IPE,KW1 Quero Quero,glider,none,,L,,,,,280,280,,,
+GLID,,Lehtovaara,PIK-16 Vasama,glider,none,,L,F,15,6.6,,315,315,,,
+GLID,,Let,L-13 Blaník,glider,none,,L,F,16.2,8.4,2.09,510,510,,,
+GLID,,Let,L-23 Super Blaník,glider,none,,L,F,18.2,8.5,1.9,510,510,,,
+GLID,,Let,L-33 Solo,glider,none,,L,F,14.12,6.62,1.43,340,340,,,
+GLID,,M&D Flugzeugbau,JS-MD 1,glider,none,1,L,F,21,7.1,1.5,720,720,,,
+GLID,,M&D Flugzeugbau,JS-MD 3,glider,none,,L,F,18,6.94,1.22,600,600,,,
+GLID,,Neiva,B Monitor,glider,none,,L,F,15.86,7.1,1.31,412,412,,,
+GLID,,Oberlerchner,Mg 19 Steinadler,glider,none,,L,F,17.6,8.04,1.72,480,480,,,
+GLID,,Oberlerchner,Mg 23,glider,none,,L,F,16.4,7.22,1.52,360,360,,,
+GLID,,Orličan,VT-16 Orlík,glider,none,,L,F,16,7.55,1.68,345,345,,,
+GLID,,PZL Bielsko,SZD-30 Pirat,glider,none,,L,F,15,6.92,1.67,370,370,,,
+GLID,,PZL Bielsko,SZD-32 Foka 5,glider,none,,L,F,14.98,7.17,1.61,385,385,,,
+GLID,,PZL Bielsko,SZD-36 Cobra 15,glider,none,,L,F,15,7.05,1.59,385,385,,,
+GLID,,PZL Bielsko,SZD-38 Jantar 1,glider,none,,L,F,19,7.11,1.61,525,525,,,
+GLID,,PZL Bielsko,SZD-41 Jantar Standard,glider,none,,L,,,,,535,535,,,
+GLID,,PZL Bielsko,SZD-42 Jantar 2,glider,none,,L,F,20.5,7.18,1.76,649,649,,,
+GLID,,PZL Bielsko,SZD-48 Jantar Standard,glider,none,,L,F,15,6.85,1.51,540,540,,,
+GLID,,PZL Bielsko,SZD-50 Puchacz,glider,none,,L,F,16.67,8.38,2.48,570,570,,,
+GLID,,PZL Bielsko,SZD-51 Junior,glider,none,,L,F,15,6.69,,380,380,,,
+GLID,,PZL Bielsko,SZD-54 Perkoz,glider,none,,L,F,20,8.44,,615,615,,,
+GLID,,PZL Bielsko,SZD-55 Nexus,glider,none,,L,F,15,6.84,1.47,500,500,,,
+GLID,,PZL Bielsko,SZD-59 ACRO,glider,none,,L,F,15,6.85,1.58,540,540,,,
+GLID,,PZL Świdnik,PW-5 Smyk,glider,none,,L,F,13.44,6.22,1.86,300,300,,,
+GLID,,PZL Świdnik,PW-6,glider,none,,L,F,16,7.85,2.4,546,546,,,
+GLID,,Pilatus,B4,glider,none,,L,F,15,,,350,350,,,
+GLID,,Raab,Doppelraab,glider,none,,L,F,13.4,6.87,,420,420,,,
+GLID,,Reinhard,Cumulus,glider,none,,L,F,13.57,6.3,,250,250,,,
+GLID,,Rolladen-Schneider,LS1,glider,none,,L,F,15,6.6,,439,439,,,
+GLID,,Rolladen-Schneider,LS3,glider,none,,L,F,17,6.86,,370,370,,,
+GLID,,Rolladen-Schneider,LS4,glider,none,,L,F,15,6.66,,525,525,,,
+GLID,,Rolladen-Schneider,LS6,glider,none,,L,F,18,6.8,1.43,525,525,,,
+GLID,,Rolladen-Schneider,LS7,glider,none,,L,F,15,6.66,,486,486,,,
+GLID,,SZD,SZD-22 Mucha Standard,glider,none,,L,F,14.98,7,1.65,385,385,,,
+GLID,,SZD,SZD-24 Foka,glider,none,,L,F,14.98,7,1.4,385,385,,,
+GLID,,SZD,SZD-9 bis Bocian,glider,none,,L,F,17.8,,,540,540,,,
+GLID,,Scheibe,Bergfalke,glider,none,,L,F,16.6,8.2,,505,505,,,
+GLID,,Scheibe,L-10 Libelle,glider,none,,L,F,13.28,5.7,,244,244,,,
+GLID,,Scheibe,SF 26 Super Spatz,glider,none,,L,F,15,6.7,,310,310,,,
+GLID,,Scheibe,SF 27 Zugvogel,glider,none,,L,F,17,7.05,,330,330,,,
+GLID,,Scheibe,SF 30 Club Spatz,glider,none,,L,F,15,6.1,,295,259,,,
+GLID,,Scheibe,SF 34 Delphin,glider,none,,L,F,15.8,7.5,,540,540,,,
+GLID,,Scheibe,Spatz,glider,none,,L,F,15,6.25,,275,257,,,
+GLID,,Scheibe,Specht,glider,none,,L,F,13.5,7.26,,390,390,,,
+GLID,,Scheibe,Sperber,glider,none,,L,F,14.2,7.4,,400,400,,,
+GLID,,Scheibe,Zugvogel,glider,none,,L,F,15,7.1,,335,335,,,
+GLID,,Schempp-Hirth,Arcus,glider,none,,L,F,20,8.73,,750,750,,,
+GLID,,Schempp-Hirth,Cirrus,glider,none,,L,F,17.74,,,460,460,,,
+GLID,,Schempp-Hirth,Discus,glider,none,,L,F,18,6.81,,565,565,,,
+GLID,,Schempp-Hirth,Duo Discus,glider,none,,L,F,20,8.62,1.59,700,700,,,
+GLID,,Schempp-Hirth,Janus,glider,none,,L,F,20,,,700,700,,,
+GLID,,Schempp-Hirth,Mini-Nimbus,glider,none,,L,F,15,,,500,500,,,
+GLID,,Schempp-Hirth,Nimbus,glider,none,,L,F,26.5,8.62,,750,750,,,
+GLID,,Schempp-Hirth,SHK,glider,none,,L,F,17,6.3,,370,370,,,
+GLID,,Schempp-Hirth,Standard Austria,glider,none,,L,F,15,6.3,,350,350,,,
+GLID,,Schempp-Hirth,Standard Cirrus,glider,none,,L,F,15,6.36,,390,390,,,
+GLID,,Schempp-Hirth,Ventus,glider,none,,L,F,18,6.81,,565,565,,,
+GLID,,Schleicher,ASG 29 (ASW 27-18),glider,none,,L,F,18,6.5,,600,600,,,
+GLID,,Schleicher,ASG 32,glider,none,,L,F,20,9.07,1.84,850,850,,,
+GLID,,Schleicher,ASH 25,glider,none,,L,F,26,,,750,750,,,
+GLID,,Schleicher,ASH 26,glider,none,,L,F,18,7.05,1.51,525,525,,,
+GLID,,Schleicher,ASK 13,glider,none,,L,F,16,,,480,480,,,
+GLID,,Schleicher,ASK 18,glider,none,,L,F,15,7,1.7,335,335,,,
+GLID,,Schleicher,ASK 21,glider,none,,L,F,17,8.35,,600,600,,,
+GLID,,Schleicher,ASK 23,glider,none,,L,F,15,7.05,1.41,360,360,,,
+GLID,,Schleicher,ASW 12,glider,none,,L,F,18.3,7.35,1.68,430,430,,,
+GLID,,Schleicher,ASW 15,glider,none,,L,F,15,6.48,1.56,408,408,,,
+GLID,,Schleicher,ASW 17,glider,none,,L,F,20,7.55,1.85,570,570,,,
+GLID,,Schleicher,ASW 19,glider,none,,L,F,15,6.82,1.45,454,454,,,
+GLID,,Schleicher,ASW 20,glider,none,,L,F,16.59,6.82,1.45,380,380,,,
+GLID,,Schleicher,ASW 22,glider,none,,L,F,26.58,7.95,1.66,750,750,,,
+GLID,,Schleicher,ASW 24,glider,none,,L,F,15,,,500,500,,,
+GLID,,Schleicher,ASW 27,glider,none,,L,F,15,6.5,,500,500,,,
+GLID,,Schleicher,ASW 28,glider,none,,L,F,18,6.59,1.3,575,575,,,
+GLID,,Schleicher,K 10,glider,none,,L,F,15,6.64,1.65,320,320,,,
+GLID,,Schleicher,K 7 Rhönadler,glider,none,,L,F,16,8.15,1.7,480,480,,,
+GLID,,Schleicher,K 8,glider,none,,L,F,15,7,1.58,310,310,,,
+GLID,,Schleicher,Ka 1 Rhönlaus,glider,none,,L,F,10,5.39,,195,195,,,
+GLID,,Schleicher,Ka 2 Rhönschwalbe,glider,none,,L,F,16,8.15,1.6,480,480,,,
+GLID,,Schleicher,Ka 3,glider,none,,L,F,10,5.46,,195,195,,,
+GLID,,Schleicher,Ka 4 Rhönlerche II,glider,none,,L,F,13,7.3,1.5,400,400,,,
+GLID,,Schleicher,Ka 6 Rhönsegler,glider,none,,L,F,15,6.66,1.58,300,300,,,
+GLID,,Schleicher,Rhönbussard,glider,none,,L,F,14.3,,,255,255,,,
+GLID,,Schleicher,Rhönlerche I,glider,none,,L,F,13,6.87,2.25,380,380,,,
+GLID,,Schneider,ES 49,glider,none,,L,F,16,8.61,1.82,480,480,,,
+GLID,,Schneider,Grunau Baby,glider,none,,L,F,14,6.36,,420,420,,,
+GLID,,Schweizer,SGS 1-23,glider,none,,L,,,,,340,340,,,
+GLID,,Schweizer,SGS 1-26,glider,none,,L,F,12.19,6.57,2.2,318,318,,,
+GLID,,Schweizer,SGS 1-34,glider,none,,L,F,15,7.75,2.29,381,381,,,
+GLID,,Schweizer,SGS 1-35,glider,none,,L,,,,,311,311,,,
+GLID,,Schweizer,SGS 1-36,glider,none,,L,F,14.07,6.27,1.44,322,322,,,
+GLID,,Schweizer,SGS 2-32,glider,none,,L,,,,,608,608,,,
+GLID,,Schweizer,SGS 2-33,glider,none,,L,F,15.54,7.85,2.83,472,472,,,
+GLID,,Schweizer,SGS 2-8,glider,none,,L,,,,,390,390,,,
+GLID,,Schweizer,SGU 1-19,glider,none,,L,,,,,249,249,,,
+GLID,,Schweizer,SGU 2-22,glider,none,,L,F,13.11,7.84,2.74,408,408,,,
+GLID,,Slingsby,T.31 Tandem Tutor,glider,none,,L,F,13.2,,,377,377,,,
+GLID,,Slingsby,T.51 Dart,glider,none,,L,F,17,,,372,372,,,
+GLID,,Slingsby,T.53,glider,none,,L,,,,,583,583,,,
+GLID,,Slingsby,T.59 Kestrel,glider,none,,L,,,,,472,449,,,
+GLID,,Sportine Aviacija,LAK-12 Lietuva,glider,none,,L,F,20.42,7.23,1.92,650,650,,,
+GLID,,Sportine Aviacija,LAK-17,glider,none,,L,F,18,6.56,1.29,600,600,,,
+GLID,,Sportine Aviacija,LAK-19,glider,none,,L,F,18,6.53,1.29,500,500,,,
+GLID,,Vickers-Slingsby,T65 Vega,glider,none,,L,,,,,440,440,,,
+GLID,,Vogt,Lo 100,glider,none,,L,F,10,,,265,265,,,
+GLID,,Vogt,Lo 150,glider,none,,L,F,15,6.15,,310,310,,,
+GLID,,Wassmer,WA-26 Squale,glider,none,,L,F,15,7.65,,378,378,,,
+GLID,,Wassmer,WA-28 Espadon,glider,none,,L,F,15,7.65,,378,378,,,
+GLID,,Zlín,Z-25 Šohaj,glider,none,,L,F,15,,,310,310,,,
+GURI,,Aeromot,AMT-600 Guri,airplane,piston,1,L,,,,,900,900,11500,,
+GX,,Remos,GX,airplane,piston,1,L,F,9.32,6.64,2.28,600,600,15400,,
+GY80,,SOCATA,GY-80 Horizon,airplane,piston,1,L,F,9.7,6.57,2.6,1100,1100,,,
+GYRO,,AutoGyro,Calidus,autogyro,piston,1,L,,,4.78,2.77,500,500,10000,,
+GYRO,,AutoGyro,Cavalon,autogyro,piston,1,L,,,4.73,2.77,560,560,12000,,
+GYRO,,AutoGyro,MT03 / MTO,autogyro,piston,1,L,,,5.08,2.71,500,500,10000,,
+GYRO,,FD-Composites,ArrowCopter,autogyro,piston,1,L,,,5.24,2.8,560,560,,,
+GYRO,,Trixy Aviation,G 4-2,autogyro,piston,1,L,,,4.9,2.8,560,560,12000,,
+H160,,Airbus Helicopters,H160,helicopter,turboshaft,2,L,,,13.96,4.91,6050,6050,20000,,
+H21,,Vertol,CH-21 Workhorse / Shawnee,helicopter,piston,1,L,,,16.03,4.67,6123,6123,19200,,
+H25A,,Hawker Siddeley,HS.125 Series 1,airplane,turbojet,2,M,,,,,9843,8868,40000,285,0.765
+H25A,,Hawker Siddeley,HS.125 Series 1/731,airplane,turbofan,2,M,,,,,9616,8868,40000,285,0.755
+H25A,,Hawker Siddeley,HS.125 Series 3,airplane,turbojet,2,M,,,,,10297,9072,40000,260,0.765
+H25A,,Hawker Siddeley,HS.125 Series 3/731,airplane,turbofan,2,M,,,,,9843,9072,40000,285,0.755
+H25A,,Hawker Siddeley,HS.125 Series 400,airplane,turbojet,2,M,,,,,10705,9072,40000,257,0.765
+H25A,,Hawker Siddeley,HS.125 Series 400/731,airplane,turbofan,2,M,,,,,10705,9072,40000,257,0.755
+H25A,,Hawker Siddeley,HS.125 Series 600,airplane,turbojet,2,M,,,,,11340,9979,40000,280,0.755
+H25A,,Hawker Siddeley,HS.125 Series 600/731,airplane,turbojet,2,M,,,,,11249,9979,41000,280,0.78
+H25B,,British Aerospace,BAe 125-800,airplane,turbofan,2,M,F,,,,12428,10591,41000,280,0.8
+H25B,,Hawker Beechcraft,Hawker 750,airplane,turbofan,2,M,F,,,,12247,10591,41000,335,0.8
+H25B,,Hawker Beechcraft,Hawker 800,airplane,turbofan,2,M,F,,,,12701,10591,41000,280,0.8
+H25B,,Hawker Beechcraft,Hawker 850,airplane,turbofan,2,M,F,,,,12701,10591,41000,280,0.8
+H25B,,Hawker Beechcraft,Hawker 900,airplane,turbofan,2,M,F,,,,12701,10591,41000,280,0.8
+H25B,,Hawker Beechcraft,U-125,airplane,turbofan,2,M,F,,,,12701,10591,41000,280,0.8
+H25B,,Hawker Siddeley,HS.125 Series 700,airplane,turbofan,2,M,F,,,,11249,9979,41000,280,0.77
+H25C,,British Aerospace,BAe 125-1000,airplane,turbofan,2,M,F,,,,14061,11340,43000,280,0.8
+H25C,,Hawker Beechcraft,Hawker 1000,airplane,turbofan,2,M,F,,,,14061,11340,43000,280,0.8
+H269,,Schweizer,269,helicopter,piston,1,L,,,6.81,2.52,794,794,10000,,
+H40,,Hoffmann,H 40,airplane,piston,1,L,F,10.76,7.32,,850,850,13100,,
+H46,,Boeing Vertol,107,helicopter,turboshaft,2,,,,,,,,,,
+H46,,Boeing Vertol,CH-46 Sea Knight,helicopter,turboshaft,2,M,,,,,11022,11022,,,
+H46,,Boeing Vertol,UH-46 Sea Knight,helicopter,turboshaft,2,,,,,,,,,,
+H46,,Kawasaki,KV-107II,helicopter,turboshaft,2,M,,,,,8618,8618,,,
+H47,,Boeing Vertol,234,helicopter,turboshaft,2,M,,,,,22000,22000,15000,,
+H47,,Boeing Vertol,CH-47 Chinook,helicopter,turboshaft,2,M,,,,,22680,22680,,,
+H500,,Hughes,OH-6 Cayuse,helicopter,turboshaft,1,L,,,,,1089,1089,,,
+H500,,MD Helicopters,369 / MD-500,helicopter,turboshaft,1,L,,,7.28,2.64,1361,1361,16000,,
+H500,,MD Helicopters,369F / MD-530F,helicopter,turboshaft,1,L,,,7.28,2.64,1520,1520,16000,,
+H60,,Sikorsky,S-70,helicopter,turboshaft,2,M,,,,,9979,9979,,,
+H60,,Sikorsky,SH-60 Sea Hawk,helicopter,turboshaft,2,M,,,,,9926,9926,,,
+H60,,Sikorsky,UH-60 Black Hawk,helicopter,turboshaft,2,M,,,,,9979,9979,,,
+H64,,"Boeing Defense, Space & Security",AH-64 Apache,helicopter,turboshaft,2,,,,,,,,,,
+HA4T,,Hawker Beechcraft,Hawker 4000,airplane,turbofan,2,,,,,,,,,,
+HAR,,McDonnell-Douglas,AV-8 Harrier,airplane,turbofan,1,,,,,,,,,,
+HAWK,,McDonnell-Douglas,T-45 Goshawk,airplane,turbofan,1,,,,,,,,,,
+HB21,,HB Flugtechnik,HB-21,glider,piston,1,L,F,16.24,8.48,2.6,775,775,,,
+HB23,,HB Flugtechnik,HB-23,glider,piston,1,L,F,16.4,7.35,2.45,760,760,,,
+HB3,,HB Flugtechnik,HB-3,glider,piston,1,L,,,,,420,420,,,
+HDJT,,Honda,HA-420 Hondajet,airplane,turbofan,2,L,,,,,4808,4472,43000,270,0.72
+HERN,,DeHavilland,DH.114 Heron,airplane,piston,4,L,,,,,6123,5965,,,
+HI27,,Hirth,Hi 27 Acrostar,airplane,piston,1,L,,,,,750,750,,,
+HR10,,Robin,HR100,airplane,piston,1,L,F,9.08,7.59,2.71,1470,1470,,,
+HR20,,Robin,HR200,airplane,piston,1,L,,,,,800,800,,,
+HUCO,,Bell,AH-1 Cobra,helicopter,turboshaft,1,L,,,13.54,4.11,4536,4536,11400,,
+HUSK,,Aviat,A-1 Husky,airplane,piston,1,L,,,,,998,998,,,
+I103,,Ilyushin,Il-103,airplane,piston,1,L,,,,,1150,1150,,,
+I112,,Ilyushin,Il-112,airplane,turboprop,2,M,E,27.15,24.15,8.89,21000,,25000,,
+I114,,Ilyushin,Il-114,airplane,turboprop,2,M,,,,,23500,23500,25000,248,0.46
+IL62,,Ilyushin,Il-62,airplane,turbofan,4,H,,,,,165000,,39400,,
+IL76,,Ilyushin,Il-76,airplane,turbofan,4,,,50.5,46.6,14.16,,,39700,,
+IL76,,Ilyushin,Il-78,airplane,turbofan,4,H,,,,,190000,,39400,,
+IL96,,Ilyushin,Il-96,airplane,turbofan,4,H,,,,,270000,220000,43000,324,0.84
+IPAN,,Embraer,EMB-200 Ipanema,airplane,piston,1,L,,,,,1550,1550,,,
+IS28,,IAR Brașov,IS-28M,glider,piston,1,L,F,17,7.7,2.15,780,780,,,
+J2,,Piper,J-2 Cub,airplane,piston,1,L,,,,,440,440,,,
+J3,,Piper,J-3 Cub,airplane,piston,1,L,,,,,499,499,,,
+J3,,Piper,L-4 Cub,airplane,piston,1,L,,,,,499,499,,,
+J3,,Piper,NE Cub,airplane,piston,1,L,,,,,499,499,,,
+J328,,Dornier,328-300,airplane,turbofan,2,M,E,,,,15660,14390,31000,270,0.66
+J4,,Piper,J-4 Cub Coupe,airplane,piston,1,L,,,,,544,544,,,
+J4,,Piper,L-4E Cub Coupe,airplane,piston,1,L,,,,,635,635,,,
+J5,,Piper,AE Cub Cruiser,airplane,piston,1,L,,,,,703,703,,,
+J5,,Piper,J-5 Cub Cruiser,airplane,piston,1,L,,,,,703,703,,,
+J5,,Piper,L-14 Army Cruiser,airplane,piston,1,L,,,,,816,816,,,
+J5,,Piper,L-4F Cub Cruiser,airplane,piston,1,L,,,,,658,658,,,
+JAB2,,Jabiru,J160,airplane,piston,1,L,F,8.12,5.78,2.3,540,540,10000,,
+JAB2,,Jabiru,J170,airplane,piston,1,L,F,9.66,5.9,2.3,540,540,10000,,
+JAB4,,Jabiru,J200 / J400,airplane,piston,1,L,F,8.1,6.55,2.4,700,700,,,
+JAB4,,Jabiru,J230 / J430,airplane,piston,1,L,F,9.58,6.55,2.4,700,700,,,
+JAB4,,Jabiru,J250 / J450,airplane,piston,1,L,F,9.14,6.55,2.4,700,700,,,
+JABI,,Jabiru,J120,airplane,piston,1,L,F,8.03,5.73,2.13,500,500,10000,,
+JANU,,Schempp-Hirth,Janus M,glider,piston,1,L,F,20,,,700,700,,,
+JANU,,Schempp-Hirth,Janus T,glider,piston,1,L,F,20,,,700,700,,,
+JB15,,Oberlerchner,Job 15,airplane,piston,1,L,F,10.1,7.66,2.05,965,965,,,
+JS1J,,M&D Flugzeugbau,JS-MD 1 Jet,glider,turbojet,1,L,F,21,7.1,1.5,720,720,,,
+JS31,,British Aerospace,BAe-3100 Jetstream 31,airplane,turboprop,2,L,F,15.85,14.36,5.2,6600,6600,25000,230,
+JS32,,British Aerospace,BAe-3200 Jetstream 32,airplane,turboprop,2,M,F,15.85,14.36,5.2,7350,7080,25000,250,
+JS3J,,M&D Flugzeugbau,JS-MD 3 Jet,glider,turbojet,1,L,F,18,6.86,1.35,600,600,,,
+JS41,,British Aerospace,BAe-4100 Jetstream 41,airplane,turboprop,2,M,F,18.42,19.33,5.61,10433,10115,26000,250,
+JUNR,,Bölkow,Bo 208,airplane,piston,1,L,F,8.02,5.79,1.98,630,630,,,
+K100,,Quest,Kodiak 100,airplane,turboprop,1,L,F,13.72,10.42,4.48,3291,3035,25000,180,
+K226,,Kamov,Ka-226,helicopter,turboshaft,2,L,,,8.61,4.19,3600,3600,11800,,
+K35E,,"Boeing Defense, Space & Security",KC-135E Stratotanker,airplane,turbofan,4,,,,,,,,,,
+K35R,,"Boeing Defense, Space & Security",KC-135R Stratotanker,airplane,turbofan,4,,,,,,,,,,
+KA25,,Kamov,Ka-25,helicopter,turboshaft,2,M,,,,,7200,7200,14800,,
+KA27,,Kamov,Ka-32,helicopter,turboshaft,2,M,,,11.3,5.45,11000,11000,16400,,
+KA62,,Kamov,Ka-62,helicopter,turboshaft,2,L,,,15.65,3.7,6800,6800,4900,,
+KE3,,"Boeing Defense, Space & Security",KE-3,airplane,turbofan,4,,,,,,,,,,
+KL07,,Bölkow,Bo 207,airplane,piston,1,L,F,10.81,8.3,2.25,1200,1200,,,
+KL07,,Klemm,Kl 107,airplane,piston,1,L,,,,,970,970,,,
+KL25,,Klemm,L 25,airplane,piston,1,L,F,13,7.2,1.85,620,620,,,
+KMAX,,Kaman,K-1200 K-Max,helicopter,turboshaft,1,L,,,12.7,4.1,3175,3175,15000,,
+KZ3,,SAI,KZ III,airplane,piston,1,L,F,9.6,6.6,2.1,700,700,,,
+KZ8,,SAI,KZ VIII,airplane,piston,1,L,F,7.2,5.7,1.8,575,575,,,
+L10,,Lockheed,L-10 Electra,airplane,piston,2,L,,,,,4763,4763,,,
+L10,,Lockheed,UC-36,airplane,piston,2,L,,,,,4581,4581,,,
+L101,,Lockheed,L-1011 TriStar,airplane,turbofan,3,H,,,,,224982,166922,43000,350,0.9
+L12,,Lockheed,JO,airplane,piston,2,L,,,,,4173,3924,7700,,
+L12,,Lockheed,L-12 Electra Junior,airplane,piston,2,L,,,,,4173,3924,7700,,
+L12,,Lockheed,UC-40,airplane,piston,2,L,,,,,4173,3924,7700,,
+L13S,,Aerotechnik,L-13S Vivat,glider,piston,1,L,F,16.8,,,720,720,,,
+L14,,Lockheed,L-14 Super Electra,airplane,piston,2,M,,,,,7099,7099,16000,,
+L159,,Aero Vodochody,L-159,airplane,turbofan,1,,,9.54,12.72,4.87,,,43300,,
+L18,,Lockheed,L-18 Lodestar,airplane,piston,2,M,,,,,8391,7938,,,
+L188,,Lockheed,L-188 Electra,airplane,turboprop,4,M,,,,,52617,43386,30000,,
+L200,,Let,L-200 Morava,airplane,piston,2,L,F,12.33,8.67,2.22,1950,1950,,,
+L29A,,Lockheed,L-1329 JetStar,airplane,turbojet,4,M,,,,,19051,15876,43000,350,0.82
+L29B,,Lockheed,L-1329 JetStar 2,airplane,turbofan,4,M,,,,,20185,16329,43000,350,0.82
+L39,,Aero Vodochody,L-39 Albatros,airplane,turbofan,1,,,9.44,12.13,4.7,,,37700,,
+L40,,Orličan,L-40 Meta Sokol,airplane,piston,1,L,F,10.06,7.54,2.52,950,950,19700,,
+L5,,Stinson,L-5 Sentinel,airplane,piston,1,L,,,,,1021,1021,,,
+L59,,Aero Vodochody,L-59 Super Albatros,airplane,turbofan,1,,,9.34,12.2,4.78,,,40000,,
+L60,,Aero Vodochody,L-60 Brigadýr,airplane,piston,1,L,F,13.96,8.54,2.72,1560,1560,11500,,
+L8,,Luscombe,8,airplane,piston,1,L,,,,,635,635,,,
+LA4,,Lake Aircraft,LA-4 Buccaneer,amphibious,piston,1,L,,,,,1179,1179,,,
+LA60,,Aermacchi,AL-60,airplane,piston,1,L,F,12,8.6,3.3,1746,1746,,,
+LAMA,,Aérospatiale,SA315 Lama,helicopter,turboshaft,1,L,,,10.24,3.09,1950,1950,23000,,
+LJ23,,Bombardier Learjet,23,airplane,turbojet,2,L,,,,,5670,5389,41000,350,0.81
+LJ24,,Bombardier Learjet,24,airplane,turbojet,2,L,,,,,6120,5389,45000,300,0.81
+LJ25,,Bombardier Learjet,25,airplane,turbojet,2,L,,,,,6804,6033,45000,300,0.81
+LJ28,,Bombardier Learjet,28,airplane,turbojet,2,L,,,,,6804,6033,51000,,0.82
+LJ40,,Bombardier Learjet,40,airplane,turbofan,2,M,F,,,,9525,8709,51000,330,0.81
+LJ45,,Bombardier Learjet,45,airplane,turbofan,2,M,F,,,,9752,8709,51000,330,0.81
+LJ55,,Bombardier Learjet,55,airplane,turbofan,2,M,,,,,9525,8165,51000,,
+LJ60,,Bombardier Learjet,60,airplane,turbofan,2,M,F,,,,10319,8845,51000,,
+LJ70,,Bombardier Learjet,70,airplane,turbofan,2,M,,,,,9752,8709,51000,330,0.81
+LJ75,,Bombardier Learjet,75,airplane,turbofan,2,M,,,,,9752,8709,51000,330,0.81
+LK17,,Sportine Aviacija,LAK-17T,glider,piston,1,L,F,18,6.56,1.29,600,600,,,
+LK19,,Sportine Aviacija,LAK-19T,glider,piston,1,L,F,18,6.53,1.29,500,500,,,
+LK20,,Sportine Aviacija,LAK-20M,glider,piston,1,L,F,26,8.65,1.01,850,850,,,
+LK20,,Sportine Aviacija,LAK-20T,glider,piston,1,L,F,26,8.65,1.01,850,850,,,
+LK7E,,Sportine Aviacija,LAK-17 FES,glider,electric,1,L,F,18,6.56,1.29,600,600,,,
+LS10,,DG Aviation,LS10-st,glider,piston,1,L,F,18,6.76,,600,600,,,
+LS8,,DG Aviation,LS8-t,glider,piston,1,L,F,18,6.66,1.33,525,525,,,
+LS9,,DG Aviation,LS9,glider,piston,1,L,F,18,6.79,1.5,515,515,,,
+LXR,,Elixir Aircraft,Elixir,airplane,piston,1,L,F,8.48,6.06,1.8,630,630,,,
+M10,,Mooney,M-10 Cadet,airplane,piston,1,L,,,,,658,658,,,
+M17,,Myasishchev,M-17 Stratosfera,airplane,turbojet,1,M,,,,,18400,,71800,,
+M18,,PZL Mielec,M18 Dromader,airplane,piston,1,L,,,,,4200,4200,,,
+M200,,Aero Commander,200,airplane,piston,1,L,,,,,1361,1361,,,
+M20P,,Mooney,M-20,airplane,piston,1,L,,,,,1528,1451,,,
+M20T,,Mooney,M-20 Turbo,airplane,piston,1,L,,,,,1528,1451,25000,,
+M22,,Mooney,M-22 Mustang,airplane,piston,1,L,,,,,1669,1669,24000,,
+M26,,PZL Mielec,M26 Iskierka,airplane,piston,1,L,,,,,1397,1397,,,
+M28,,PZL Mielec,M28,airplane,turboprop,2,M,F,22.06,13.1,4.9,7500,7500,25000,345,
+M308,,Aermacchi,MB-308,airplane,piston,1,L,F,10,6.5,2.2,640,640,,,
+M4,,Maule,M-4,airplane,piston,1,L,,,,,1043,1043,,,
+M404,,Martin,404,airplane,piston,2,M,,,,,20366,19504,,,
+M5,,Maule,M-5,airplane,piston,1,L,,,,,1043,1043,20000,,
+M6,,Maule,M-6,airplane,piston,1,L,,,,,1134,1134,,,
+M600,,Piper,PA-46-600TP M600,airplane,turboprop,1,L,F,13.15,9.05,3.44,2722,2631,30000,250,0.55
+M7,,Maule,M-7,airplane,piston,1,L,,,,,1134,1134,,,
+M7T,,Maule,M-7 Turboprop,airplane,turboprop,1,L,,,,,1134,1134,20000,,
+MC23,,Irkut,MS-21-300,airplane,turbofan,2,M,,,,,79250,71300,40000,325,0.82
+MD11,,McDonnell-Douglas,MD-11,airplane,turbofan,3,H,C,,,,276691,207745,43200,350,0.87
+MD52,,MD Helicopters,MD-520N (MD-500N),helicopter,turboshaft,1,L,,,7.6,2.7,1520,1520,20000,,
+MD60,,MD Helicopters,MD-600N,helicopter,turboshaft,1,L,,,,,1860,1860,20000,,
+MD81,,McDonnell-Douglas,MD-81,airplane,turbofan,2,M,D,32.85,45.02,9,63504,58061,,340,0.84
+MD82,,McDonnell-Douglas,MD-82,airplane,turbofan,2,M,D,32.85,45.02,9,67812,58967,,340,0.84
+MD83,,McDonnell-Douglas,MD-83,airplane,turbofan,2,M,D,32.85,45.02,9,67812,58967,,340,0.84
+MD87,,McDonnell-Douglas,MD-87,airplane,turbofan,2,M,D,32.85,39.75,9,63503,58060,,340,0.82
+MD88,,McDonnell-Douglas,MD-88,airplane,turbofan,2,M,D,32.85,45.02,9,67812,58967,,340,0.7
+MD90,,McDonnell-Douglas,MD-90,airplane,turbofan,2,M,D,32.87,46.5,9.3,70760,64410,,340,0.84
+MG15,,Mikoyan-Gurevich,MiG-15,airplane,turbojet,1,,,,,,,,,,
+MG17,,Mikoyan-Gurevich,MiG-17,airplane,turbojet,1,,,,,,,,,,
+MG19,,Mikoyan-Gurevich,MiG-19,airplane,turbojet,1,,,,,,,,,,
+MG21,,Mikoyan-Gurevich,MiG-21,airplane,turbojet,1,,,,,,,,,,
+MG23,,Mikoyan-Gurevich,MiG-23,airplane,turbojet,1,,,,,,,,,,
+MG23,,Mikoyan-Gurevich,MiG-27,airplane,turbojet,1,,,,,,,,,,
+MG25,,Mikoyan-Gurevich,MiG-25,airplane,turbojet,2,,,,,,,,,,
+MG29,,Mikoyan-Gurevich,MiG-29,airplane,turbofan,2,,,,,,,,,,
+MG29,,Mikoyan-Gurevich,MiG-33,airplane,turbofan,2,,,,,,,,,,
+MG29,,Mikoyan-Gurevich,MiG-35,airplane,turbofan,2,,,,,,,,,,
+MG31,,Mikoyan-Gurevich,MiG-31,airplane,turbofan,2,M,,,,,41000,,67400,,
+MG44,,Mikoyan-Gurevich,MiG-1.44,airplane,turbofan,2,,,,,,,,,,
+MGAT,,Mikoyan-Gurevich,MiG-AT,airplane,turbofan,2,,,,,,,,,,
+MI2,,PZL Świdnik,Kania,helicopter,turboshaft,2,L,,,12.03,3.75,3550,3550,,,
+MI26,,Mil,Mi-26,helicopter,turboshaft,2,M,,,35.91,8.14,56000,56000,,,
+MI34,,Mil,Mi-34,helicopter,piston,1,L,,,,,1350,1350,13100,,
+MI38,,Mil,Mi-38,helicopter,turboshaft,2,M,,,20.28,5.1,15600,15600,20700,,
+MI6,,Mil,Mi-6,helicopter,turboshaft,2,M,,,,,44000,,14800,,
+MI8,,Mil,Mi-17,helicopter,turboshaft,2,M,,,18.99,4.76,13000,13000,19700,,
+MI8,,Mil,Mi-171,helicopter,turboshaft,2,M,,,19.9,4.9,13500,13500,19700,,
+MI8,,Mil,Mi-172,helicopter,turboshaft,2,M,,,,,13000,13000,,,
+MITE,,Mooney,M-18 Mite,airplane,piston,1,L,,,,,386,386,,,
+MOSQ,,DeHavilland,DH.98 Mosquito,airplane,piston,2,M,,,,,10433,9299,,,
+MS76,,Morane-Saulnier,MS.760 Paris,airplane,turbojet,2,L,,,,,3924,3157,25000,,
+MU30,,Mitsubishi,MU-300 Diamond,airplane,turbofan,2,M,,,,,7158,6450,41000,264,0.785
+NAVI,,Ryan,L-17,airplane,piston,1,L,,,,,1247,1247,,,
+NAVI,,Ryan,Navion,airplane,piston,1,L,,,,,1504,1429,,,
+NH90,,NHIndustries,NH90 Caïman,helicopter,turboshaft,2,M,,,,,10600,10600,,,
+NIMB,,Schempp-Hirth,Nimbus M,glider,piston,1,L,F,26.5,8.62,,820,820,,,
+NIMB,,Schempp-Hirth,Nimbus T,glider,piston,1,L,F,26.5,8.62,,800,800,,,
+NIPR,,Avions Fairey,Tipsy Nipper T.66,airplane,piston,1,L,F,6,4.5,1.9,300,300,,,
+O1,,Cessna,O-1 Bird Dog,airplane,piston,1,,,,,,,,,,
+OSCR,,Vulcanair,P.64 / P.66 / V1,airplane,piston,1,L,F,9.99,7.24,2.77,990,990,,,
+P06T,,Tecnam,P2006T,airplane,piston,2,L,F,11.4,8.7,2.85,1180,1180,14000,,
+P149,,Piaggio,P.149,airplane,piston,1,L,,,,,1820,1820,,,
+P180,,Piaggio,P.180 Avanti,airplane,turboprop,2,L,F,14.03,14.41,3.98,5239,4965,41000,260,0.7
+P19,,Aviamilano,P.19 Scricciolo,airplane,piston,1,L,F,10.2,7,2,785,785,,,
+P208,,Tecnam,P2008,airplane,piston,1,L,F,9,6.97,2.67,630,630,13000,,
+P210,,Cessna,P210 Pressurized Centurion,airplane,piston,1,L,,,,,1814,1723,,,
+P212,,Tecnam,P2012 Traveller,airplane,piston,2,L,F,14,11.8,4.4,3600,3600,19500,,
+P28A,,Embraer,EMB-712 Tupi,airplane,piston,1,L,,,,,1157,1157,,,
+P28A,,Piper,PA-28-100 Cherokee,airplane,piston,1,L,F,10.82,7.32,2.23,1157,1157,,,
+P28B,,Embraer,EMB-710 Carioca,airplane,piston,1,L,,,,,1361,1361,,,
+P28B,,Piper,PA-28-200 Cherokee,airplane,piston,1,L,,,,,1361,1361,,,
+P28R,,Embraer,EMB-711 Corisco,airplane,piston,1,L,,,,,1202,1202,,,
+P28R,,Piper,PA-28R-201 Arrow III,airplane,piston,1,L,,,,,1247,1247,,,
+P28S,,Piper,PA-28R-201T Turbo Arrow III,airplane,piston,1,L,,,,,1315,1315,20000,,
+P28T,,Embraer,EMB-711T Corisco II,airplane,piston,1,L,,,,,1247,1247,,,
+P28T,,Piper,PA-28RT-201 Arrow IV,airplane,piston,1,L,,,,,1247,1247,,,
+P28U,,Embraer,EMB-711ST Corisco II Turbo,airplane,piston,1,L,,,,,1315,1315,,,
+P28U,,Piper,PA-28RT-201T Turbo Arrow IV,airplane,piston,1,L,,,,,1315,1315,20000,,
+P32R,,Embraer,EMB-721 Sertanejo,airplane,piston,1,L,,,,,1633,1633,,,
+P32R,,Piper,PA-32R Lance,airplane,piston,1,L,,,,,1633,1633,,,
+P32T,,Piper,PA-32RT Lance II,airplane,piston,1,L,,,,,1633,1633,,,
+P337,,Cessna,P337 Pressurized Skymaster,airplane,piston,2,L,,,,,2132,2025,,,
+P46T,,Piper,PA-46-500TP Malibu Meridian,airplane,turboprop,1,L,F,13.11,9.02,3.44,2200,2200,30000,188,
+P51,,North American,A-36 Mustang,airplane,piston,1,L,,,,,4853,3629,,,
+P63,,Bell,P-63 Kingcobra,airplane,piston,1,L,,,,,4990,4717,,,
+P66P,,Piaggio,P.166,airplane,piston,2,L,,,,,3680,3680,28000,,
+P66T,,Piaggio,P.166 Turboprop,airplane,turboprop,2,L,,,,,4500,4275,24000,220,
+P68,,Vulcanair,P.68,airplane,piston,2,L,F,12,9.54,3.4,2084,1980,,,
+P68T,,Vulcanair,AP68TP-300 Spartacus,airplane,turboprop,2,L,F,12,9.9,3.65,2600,2470,25000,197,
+P8,,"Boeing Defense, Space & Security",P-8 Poseidon,airplane,turbofan,2,,,,,,,,,,
+PA11,,Piper,L-18B Cub Special,airplane,piston,1,L,,,,,553,553,,,
+PA11,,Piper,PA-11 Cub Special,airplane,piston,1,L,,,,,553,553,,,
+PA12,,Piper,PA-12 Super Cruiser,airplane,piston,1,L,F,10.8,6.85,2.08,794,794,,,
+PA14,,Piper,PA-14 Family Cruiser,airplane,piston,1,L,F,10.8,6.85,2.08,839,839,,,
+PA15,,Piper,PA-15 Vagabond,airplane,piston,1,L,F,10.8,6.85,2.08,499,499,,,
+PA16,,Piper,PA-16 Clipper,airplane,piston,1,L,,,,,748,748,,,
+PA17,,Piper,PA-17 Vagabond,airplane,piston,1,L,,,,,522,522,,,
+PA18,,Piper,L-18C Super Cub,airplane,piston,1,L,,,,,680,680,,,
+PA18,,Piper,L-21 / U-7 Super Cub,airplane,piston,1,L,,,,,680,680,,,
+PA18,,Piper,PA-18 Super Cub,airplane,piston,1,L,F,10.72,6.83,2.03,794,794,,,
+PA18,,Piper,PA-19 Super Cub,airplane,piston,1,L,,,,,680,680,,,
+PA20,,Piper,PA-20 Pacer,airplane,piston,1,L,F,8.9,6.2,1.91,885,885,,,
+PA22,,Piper,PA-22 Tri-Pacer,airplane,piston,1,L,,,,,907,907,,,
+PA23,,Piper,PA-23-100 Apache,airplane,piston,2,L,,,,,1724,1724,,,
+PA24,,Piper,PA-24 Comanche,airplane,piston,1,L,,,,,1451,1379,,,
+PA25,,Piper,PA-25 Pawnee,airplane,piston,1,L,,,,,1315,1315,,,
+PA27,,Piper,PA-23-200 Aztec,airplane,piston,2,L,,,,,2359,2241,,,
+PA27,,Piper,PA-23-200 Turbo Aztec,airplane,piston,2,L,,,,,2359,2241,,,
+PA27,,Piper,U-11 Aztec,airplane,piston,2,L,,,,,2177,2177,,,
+PA27,,Piper,UC-26 Aztec,airplane,piston,2,,,,,,,,,,
+PA30,,Piper,PA-30 Twin Comanche,airplane,piston,2,L,,,,,1633,1633,,,
+PA30,,Piper,PA-39 Twin Comanche C/R,airplane,piston,2,L,,,,,1633,1633,,,
+PA31,,Embraer,EMB-820 Navajo,airplane,piston,2,L,,,,,3175,3175,,,
+PA31,,Piper,PA-31 Navajo,airplane,piston,2,L,,,,,3175,3175,24000,,
+PA31,,Piper,PA-31P Pressurized Navajo,airplane,piston,2,L,,,,,3266,3175,25000,,
+PA32,,Embraer,EMB-720 Minuano,airplane,piston,1,L,,,,,1633,1633,,,
+PA32,,Piper,PA-32 Cherokee Six,airplane,piston,1,L,F,11.03,8.5,2.9,1633,1633,,,
+PA34,,Embraer,EMB-810 Seneca,airplane,piston,2,L,F,,,,2155,2047,,,
+PA34,,PZL Mielec,M20 Mewa,airplane,piston,2,L,F,,,,2070,1970,25000,,
+PA34,,Piper,PA-34 Seneca,airplane,piston,2,L,F,11.86,8.72,3.02,2155,2047,25000,,
+PA36,,Piper,PA-36 Pawnee Brave,airplane,piston,1,L,,,,,2177,2177,,117,
+PA38,,Piper,PA-38 Tomahawk,airplane,piston,1,L,,,,,757,757,,,
+PA44,,Piper,PA-44 Seminole,airplane,piston,2,L,F,11.75,8.41,2.59,1781,1724,,,
+PA46,,Piper,PA-46 Malibu,airplane,piston,1,L,F,13.11,8.81,3.44,1969,1870,25000,,
+PACE,,Bellanca,31 Pacemaker,airplane,piston,1,L,,,,,2540,2540,,,
+PACE,,Bellanca,CH-300 Pacemaker,airplane,piston,1,L,,,,,1848,1848,,,
+PACE,,Bellanca,CH-400 Skyrocket,airplane,piston,1,L,,,,,2087,2087,,,
+PAT4,,Piper,PA-31T3-500 T-1040,airplane,turboprop,2,L,,,,,4082,4082,24000,230,
+PAUL,,CAP,CAP-4 Paulistinha,airplane,piston,1,L,,,,,587,587,,,
+PAUL,,Neiva,P-56 Paulistinha,airplane,piston,1,L,,,,,660,660,,,
+PAY1,,Piper,PA-31T1-500 Cheyenne I,airplane,turboprop,2,L,,,,,3946,3946,29000,230,
+PAY2,,Piper,PA-31T-620 Cheyenne,airplane,turboprop,2,L,,,,,4082,4082,29000,246,
+PAY2,,Piper,PA-31T2-620 Cheyenne IIXL,airplane,turboprop,2,L,,,,,4297,4082,31000,246,
+PAY3,,Piper,PA-42-720 Cheyenne III,airplane,turboprop,2,L,,,,,5080,4686,33000,246,
+PAY4,,Piper,PA-42-1000 Cheyenne 400,airplane,turboprop,2,L,,,,,5466,5035,41000,246,
+PC12,,Pilatus,PC-12,airplane,turboprop,1,L,F,16.28,14.41,4.26,4740,4500,30000,240,0.49
+PC12,,Pilatus,U-28 Draco,airplane,turboprop,1,L,F,16.23,14.41,4.26,4500,4500,30000,240,0.48
+PC24,,Pilatus,PC-24,airplane,turbofan,2,M,F,17,16.8,5.4,8300,7665,45000,390,0.74
+PC6P,,Pilatus,PC-6 Porter,airplane,piston,1,L,,,,,2200,2200,25000,,
+PC6T,,Pilatus,PC-6 Turbo Porter,airplane,turboprop,1,L,,,,,2800,2660,25000,,
+PC9,,Pilatus,PC-9,airplane,turboprop,1,L,,,,,2500,2500,25000,320,0.68
+PIAT,,Pipistrel,Alpha Trainer,airplane,piston,1,L,F,10.5,6.5,2.05,450,450,,,
+PICO,,Procaer,F.15 Picchio,airplane,piston,1,L,F,9.9,7.5,2.8,1120,1120,,,
+PILL,,Piper,PA-28R-300 Pillán,airplane,piston,1,,,,,,,,,,
+PISI,,Pipistrel,Sinus,glider,piston,1,L,F,14.97,6.6,2,450,450,,,
+PIVE,,Pipistrel,Velis Electro,airplane,electric,1,L,F,6.47,10.71,1.9,600,600,12000,,
+PIVI,,Pipistrel,Virus,airplane,piston,1,L,F,6.4,10.7,1.69,600,600,18000,,
+PK20,,Eiri Avion,PIK-20E,glider,piston,1,L,F,15,6.53,,470,470,,,
+PK20,,Issoire Aviation,PIK-30,glider,piston,1,L,F,17,6.53,,460,460,,,
+PRM1,,Hawker Beechcraft,390 Premier I,airplane,turbofan,2,L,,,,,5670,5262,41000,320,0.8
+PRM1,,Hawker Beechcraft,Hawker 200,airplane,turbofan,2,,,,,,,,,,
+PSW4,,PZL Świdnik,SW-4 Puszczyk,helicopter,turboshaft,1,L,,,8.24,3.14,1800,1800,16400,,
+PT22,,Ryan,PT-22 Recruit,airplane,piston,1,L,,,,,855,855,,,
+PT22,,Ryan,ST-3KR,airplane,piston,1,L,,,,,855,855,,,
+PTS1,,Pitts,S-1 Special,airplane,piston,1,L,,,,,522,522,,,
+PTS2,,Pitts,S-2 Special,airplane,piston,1,L,,,,,771,771,22000,,
+PUMA,,Aérospatiale,SA330 Puma,helicopter,turboshaft,2,M,,,14.82,5.14,7400,7400,13500,,
+PUP,,Beagle,B.121 Pup,airplane,piston,1,L,,,,,873,873,,,
+PZ04,,PZL Warszawa-Okęcie,PZL-104 Wilga,airplane,piston,1,L,F,11.13,8.1,2.96,1300,1265,,,
+PZ06,,PZL Warszawa-Okęcie,PZL-106 Kruk,airplane,piston,1,L,F,15,9.34,3.32,3000,3000,12000,,
+PZ4M,,PZL Warszawa-Okęcie,PZL-104M Wilga 2000,airplane,piston,1,L,F,11.28,8.62,2.58,1500,1500,,,
+Q25,,"Boeing Defense, Space & Security",MQ-25 Stingray,airplane,turbofan,1,,,,,,,,,,
+R100,,Robin,R1180 Aiglon,airplane,piston,1,L,F,9.08,7.26,2.38,1150,1150,,,
+R135,,"Boeing Defense, Space & Security",RC-135,airplane,turbofan,4,,,,,,,,,,
+R135,,"Boeing Defense, Space & Security",TC-135,airplane,turbofan,4,,,,,,,,,,
+R200,,Robin,R2100,airplane,piston,1,L,,,,,900,900,,,
+R22,,Robinson,R22,helicopter,piston,1,L,,,6.24,2.37,621,621,14000,,
+R300,,Robin,R3000,airplane,piston,1,L,F,9.81,7.51,2.66,1150,1150,,,
+R44,,Robinson,R44,helicopter,piston,1,L,,,11.66,3.28,1134,1134,14000,,
+R66,,Robinson,R66,helicopter,turboshaft,1,L,,,11.66,3.48,1225,1225,14000,,
+R721,,Boeing,727-100RE Super 27,airplane,turbofan,3,,,32.92,40.59,10.44,,,42000,390,0.9
+R722,,Boeing,727-200RE Super 27,airplane,turbofan,3,,,32.92,46.68,10.65,,,42000,390,0.9
+R90R,,Ruschmeyer,R 90-230 RG,airplane,piston,1,L,,,,,1350,1350,,,
+RALL,,PZL Warszawa-Okęcie,PZL-110 Koliber,airplane,piston,1,L,F,9.75,7.37,2.8,850,850,,,
+RALL,,SOCATA,MS.880 Rallye,airplane,piston,1,L,F,9.74,7.16,2.6,840,840,,,
+RALL,,SOCATA,MS.890 Rallye Commodore,airplane,piston,1,L,F,9.74,7.1,2.8,980,980,,,
+RALL,,SOCATA,MS.892 Rallye Commodore 150,airplane,piston,1,L,F,9.74,7.1,2.8,980,980,,,
+RALL,,SOCATA,MS.893 Rallye Commodore 180,airplane,piston,1,L,F,9.74,7.1,2.8,1050,1000,,,
+RALL,,SOCATA,MS.894 Rallye Minerva 220,airplane,piston,1,L,F,9.74,7.15,2.8,1100,1050,,,
+RALL,,SOCATA,Rallye 100,airplane,piston,1,L,F,9.74,7.24,2.8,770,770,,,
+RALL,,SOCATA,Rallye 150,airplane,piston,1,L,F,9.74,7.24,2.8,870,870,,,
+RALL,,SOCATA,Rallye 180,airplane,piston,1,L,F,9.74,7.24,2.8,950,950,,,
+RALL,,SOCATA,Rallye 235,airplane,piston,1,L,F,9.74,7.28,2.8,1250,1250,,,
+RC3,,Republic,RC-3 Seabee,amphibious,piston,1,L,,,,,1429,1429,,,
+RC70,,Rockwell,Commander 700,airplane,piston,2,L,,,,,3151,2994,25000,,
+RELI,,Stinson,L-12,airplane,piston,1,L,,,,,1588,1588,,,
+RELI,,Stinson,SR Reliant,airplane,piston,1,L,,,,,1433,1433,,,
+RELI,,Stinson,SR-1 Reliant,airplane,piston,1,L,,,,,1488,1488,,,
+RELI,,Stinson,SR-10 Reliant,airplane,piston,1,L,,,,,2109,2109,,,
+RELI,,Stinson,SR-2 Reliant,airplane,piston,1,L,,,,,1433,1433,,,
+RELI,,Stinson,SR-4 Reliant,airplane,piston,1,L,,,,,1508,1508,,,
+RELI,,Stinson,SR-5 Reliant,airplane,piston,1,L,,,,,1508,1508,,,
+RELI,,Stinson,SR-6 Reliant,airplane,piston,1,L,,,,,1508,1508,,,
+RELI,,Stinson,SR-7 Reliant,airplane,piston,1,L,,,,,1633,1633,,,
+RELI,,Stinson,SR-8 Reliant,airplane,piston,1,L,,,,,1724,1724,,,
+RELI,,Stinson,SR-9 Reliant,airplane,piston,1,L,,,,,1860,1860,,,
+RELI,,Stinson,UC-81,airplane,piston,1,L,,,,,1860,1860,,,
+RELI,,Stinson,V-77 Reliant,airplane,piston,1,L,,,,,1814,1814,,,
+RF10,,Aeromot,AMT-100 Ximango,glider,piston,1,L,,,,,800,800,,,
+RF10,,Aeromot,AMT-200 Super Ximango,glider,piston,1,L,F,17.47,,,1050,1050,,,
+RF10,,Aeromot,AMT-300 Turbo Ximango,glider,piston,1,L,,,,,1000,1000,,,
+RF3,,Fournier,RF-3,glider,piston,,L,F,11.3,6,1.57,350,350,,,
+RF4,,Fournier,RF-4,glider,piston,1,L,F,11.26,6.05,1.57,390,390,,,
+RF47,,Fournier,RF-47,airplane,piston,1,L,F,10,6.44,2.22,620,620,,,
+RF5,,Fournier,RF-5,airplane,piston,1,L,F,13.74,,,650,650,,,
+RF6,,Fournier,RF-6,airplane,piston,1,L,F,10.6,7.19,2.37,750,750,,,
+RF9,,Fournier,RF-9,glider,piston,1,L,F,17.3,8,1.97,745,745,,,
+RJ1H,,British Aerospace,Avro RJ-100,airplane,turbofan,4,M,E,26.34,31,8.59,44225,40142,35000,250,0.73
+RJ70,,British Aerospace,Avro RJ-70,airplane,turbofan,4,M,E,26.34,26.19,8.61,38101,37875,35000,250,0.73
+RJ85,,British Aerospace,Avro RJ-85,airplane,turbofan,4,M,E,26.34,28.55,8.61,42184,38555,35000,250,0.73
+ROND,,Ambrosini,Rondone,airplane,piston,1,L,F,9.3,6.8,,750,750,,,
+RS18,,Sportavia-Pützer,RS-180 Sportsman,airplane,piston,1,L,,,,,1100,1100,,,
+RW3,,Rhein Flugzeugbau,RW 3 Multoplan,airplane,piston,1,L,F,15,7.3,2.5,900,900,,,
+RYST,,Ryan,ST,airplane,piston,1,L,,,,,726,726,,,
+S05F,,SIAI-Marchetti,S.205/F,airplane,piston,1,L,F,10.86,8,2.89,1250,1250,,,
+S05R,,SIAI-Marchetti,S.205/R,airplane,piston,1,L,F,10.86,8,2.89,1350,1350,,,
+S10,,Stinson,10 Voyager,airplane,piston,1,L,,,,,726,726,,,
+S10,,Stinson,105 Voyager (HW-75),airplane,piston,1,L,,,,,717,717,,,
+S108,,Stinson,108 Voyager,airplane,piston,1,L,F,10.34,7.47,2.08,1089,1089,,,
+S10S,,Stemme,S10,glider,piston,1,L,F,23,8.42,,850,850,,,
+S12S,,Stemme,S12,glider,piston,1,L,F,25,8.42,,900,900,,,
+S208,,SIAI-Marchetti,S.208,airplane,piston,1,L,F,10.86,8.1,2.89,1350,1350,,,
+S223,,SIAT,223 Flamingo,airplane,piston,1,L,F,8.28,7.43,2.7,1050,1050,,,
+S22T,,Cirrus,SR22T,airplane,piston,1,L,F,11.67,7.92,2.71,1633,1542,25000,,
+S330,,Schweizer,330,helicopter,turboshaft,1,L,,,9.42,2.61,1157,1157,13000,,
+S39,,Sikorsky,S-39,amphibious,piston,1,L,,,,,1814,1814,,,
+S51,,Sikorsky,S-51,helicopter,piston,1,L,,,,,2404,2404,,,
+S52,,Sikorsky,S-52,helicopter,piston,1,L,,,,,953,953,,,
+S58P,,Sikorsky,S-58,helicopter,piston,1,L,,,11.89,4.85,5897,5897,15000,,
+S58T,,Sikorsky,S-58T,helicopter,turboshaft,1,L,,,11.89,4.85,5900,5900,15000,,
+S6,,Stemme,S6,glider,piston,1,L,F,18,8.52,2.45,900,900,,,
+S601,,Aérospatiale,SN601 Corvette,airplane,turbofan,2,,,,,,,,,,
+S61,,Sikorsky,H-3 Sea King,helicopter,turboshaft,2,M,,,,,8664,8664,,,
+S61,,Sikorsky,S-61,helicopter,turboshaft,2,M,,,,,8618,8618,,,
+S61R,,Sikorsky,CH-3 Sea King,helicopter,turboshaft,2,M,,,,,8845,8845,,,
+S61R,,Sikorsky,S-61R,helicopter,turboshaft,2,M,,,,,8845,8845,,,
+S64,,Sikorsky,S-64 Skycrane,helicopter,turboshaft,2,M,,,27.23,7.82,21319,21319,16000,,
+S76,,Sikorsky,S-76,helicopter,turboshaft,2,L,,,13.22,3.58,5386,5386,15000,,
+S92,,Sikorsky,S-92,helicopter,turboshaft,2,M,,,17.1,4.32,12020,12020,15000,,
+SB20,,Saab,2000,airplane,turboprop,2,M,,,,,22999,22000,31000,250,
+SB29,,Saab,29,airplane,turbojet,1,,,,,,,,,,
+SB32,,Saab,32 Lansen,airplane,turbojet,1,,,,,,,,,,
+SB35,,Saab,35 Draken,airplane,turbojet,1,,,,,,,,,,
+SB37,,Saab,37 Viggen,airplane,turbofan,1,,,,,,,,,,
+SB39,,Saab,39 Gripen,airplane,turbofan,1,,,,,,,,,,
+SB91,,Saab,91 Safir,airplane,piston,1,L,F,10.6,7.8,2.2,1205,1205,,,
+SC01,,FFT,SC 01 Speed Canard,airplane,piston,1,L,,,,,715,680,,,
+SC7,,Short Brothers,SC-7 Skyvan,airplane,turboprop,2,L,F,19.79,12.22,4.6,6220,6080,,,
+SF23,,Scheibe,SF 23 Sperling,airplane,piston,1,L,F,9.87,6.2,,730,730,,,
+SF25,,Scheibe,SF 25 Falke,glider,piston,1,L,F,15.25,7.58,,630,630,,,
+SF27,,Scheibe,SF 27 M Zugvogel,glider,piston,1,L,,,,,385,385,,,
+SF28,,Scheibe,SF 28 Tandem Falke,glider,piston,1,L,F,16.3,8.15,,590,590,,,
+SF34,,Saab,340,airplane,turboprop,2,M,F,21.44,19.73,7,12930,12700,25000,250,
+SF36,,Scheibe,SF 36,glider,piston,1,L,F,16.38,7.18,,715,715,,,
+SF50,,Cirrus,SF50 Vision,airplane,turbofan,1,L,F,11.67,9.36,3.23,2722,2517,31000,250,0.53
+SG37,,Schweizer,SGM 2-37,glider,piston,1,L,,,,,839,839,,,
+SH33,,Short Brothers,330 (SD3-30),airplane,turboprop,2,M,F,22.76,17.41,4.95,9979,9843,20000,198,
+SH33,,Short Brothers,C-23 Sherpa,airplane,turboprop,2,M,F,22.76,17.41,4.95,9979,9843,20000,198,
+SH33,,Short Brothers,SD3 Sherpa,airplane,turboprop,2,M,F,22.8,17.7,4.95,11612,11385,20000,196,
+SH36,,Short Brothers,360 (SD3-60),airplane,turboprop,2,M,F,22.8,21.58,7.21,11999,11839,20000,196,
+SHIP,,American Blimp Corporation,A-1,airship,piston,2,,,,53.6,16.8,,,10000,,
+SHIP,,Luftschiffbau Zeppelin,LZ N07,airship,piston,3,,,,75.1,19.4,,,10000,,
+SHIP,,WDL Luftschiffgesellschaft,WDL-1,airship,piston,2,,,,59.9,19.2,,,,,
+SIRA,,Tecnam,P-Mentor,airplane,piston,1,L,F,9,6.74,2.5,720,720,13000,,
+SIRA,,Tecnam,P2002 Sierra,airplane,piston,1,L,F,8.6,6.6,2.4,600,600,,,
+SKAR,,Magnaghi Aeronautica,Sky Arrow,airplane,piston,1,L,F,9.68,7.6,2.56,710,710,11000,,
+SKYR,,Commonwealth,Skyranger,airplane,piston,1,L,,,,,658,658,,,
+SM60,,Stinson,SM-6000 Airliner,airplane,piston,3,L,,,,,3901,3901,,,
+SOKL,,Beneš-Mráz,M-1 Sokol,airplane,piston,1,L,F,10,7.4,2.2,800,800,,,
+SR20,,Cirrus,SR20,airplane,piston,1,L,F,11.67,7.92,2.71,1429,1429,17500,,
+SR22,,Cirrus,SR22,airplane,piston,1,L,F,11.67,7.92,2.71,1633,1542,17500,,
+SS2P,,Ayres,S-2 Thrush,airplane,piston,1,L,,,,,2722,2722,,,
+SS2T,,Ayres,S2R Turbo Thrush,airplane,turboprop,1,L,F,14.47,10.16,2.84,4763,3447,12000,,
+ST10,,SOCATA,ST-10 Diplomate,airplane,piston,1,L,,,,,1220,1220,,,
+ST3,,Stearman,C3,airplane,piston,1,L,,,,,1284,1284,,,
+ST4,,Stearman,4 Speedmail,airplane,piston,1,L,,,,,1785,1785,,,
+ST6,,Stearman,6 Cloudboy,airplane,piston,1,L,,,,,1247,1247,,,
+ST75,,Boeing-Stearman,75 Kaydet,airplane,piston,1,L,,,,,1338,1338,,,
+ST75,,Boeing-Stearman,N2S Kaydet,airplane,piston,1,L,,,,,1338,1338,,,
+ST75,,Boeing-Stearman,PT-13 Kaydet,airplane,piston,1,L,,,,,1338,1338,,,
+ST75,,Boeing-Stearman,PT-17 Kaydet,airplane,piston,1,L,,,,,1338,1138,,,
+ST75,,Boeing-Stearman,PT-18 Kaydet,airplane,piston,1,L,,,,,1338,1338,,,
+ST75,,Boeing-Stearman,PT-27 Kaydet,airplane,piston,1,L,,,,,1338,1338,,,
+STAR,,Beechcraft,2000 Starship,airplane,turboprop,2,L,,,,,6532,6205,41000,250,0.6
+STLN,,Helio,AU-24 Stallion,airplane,turboprop,1,L,,,,,2313,2313,,,
+STLN,,Helio,HST-550 Stallion,airplane,turboprop,1,L,,,,,2313,2313,,,
+SU29,,Sukhoi,Su-29,airplane,piston,1,L,,,,,1220,1220,,,
+SU31,,Sukhoi,Su-31,airplane,piston,1,L,,,,,1100,1100,,,
+SU95,,Sukhoi,RRJ-95 SuperJet 100,airplane,turbofan,2,M,E,27.8,29.94,10.28,49450,41000,40000,308,0.81
+SUBA,,Fuji,FA-200 Aero Subaru,airplane,piston,1,L,,,,,1140,1140,,,
+SW2,,Swearingen,SA26 Merlin II,airplane,turboprop,2,L,,,,,4536,4218,31000,208,
+SW3,,Fairchild,SA227 Merlin III,airplane,turboprop,2,L,,,,,5670,5670,31000,265,
+SW3,,Swearingen,SA226 Merlin III,airplane,turboprop,2,L,,,,,5670,5670,31000,265,
+SW4,,Fairchild,C-26,airplane,turboprop,2,M,,,,,7484,7110,25000,248,
+SW4,,Fairchild,SA227 Merlin IV / Metro,airplane,turboprop,2,L,,,,,6577,6350,31000,248,
+SW4,,Swearingen,SA226 Merlin IV / Metro,airplane,turboprop,2,L,,,,,5670,5670,31000,248,
+SZ45,,PZL Bielsko,SZD-45 Ogar,glider,piston,1,L,F,17.7,7.95,1.72,730,730,,,
+T134,,Tupolev,Tu-134,airplane,turbofan,2,M,,,,,52000,,39000,,
+T154,,Tupolev,Tu-154,airplane,turbofan,3,M,,,,,100000,,39000,,
+T160,,Tupolev,Tu-160 Belyy Lebed,airplane,turbofan,4,,,,,,,,,,
+T204,,Tupolev,Tu-204,airplane,turbofan,2,M,,,,,107500,88000,39700,313,0.83
+T204,,Tupolev,Tu-214,airplane,turbofan,2,M,,,,,110750,93000,39700,313,0.83
+T206,,Cessna,T206 Turbo Stationair,airplane,piston,1,L,,,,,1633,1633,,,
+T210,,Cessna,T210 Turbo Centurion,airplane,piston,1,L,,,,,1860,1769,,,
+T22M,,Tupolev,Tu-22M,airplane,turbofan,2,M,C,34.28,42.46,11.06,124000,,43700,,
+T28,,North American,T-28 Trojan,airplane,piston,1,L,,,,,3130,3130,,,
+T334,,Tupolev,Tu-334,airplane,turbofan,2,M,,,,,47900,43500,40000,313,0.8
+T34P,,Beechcraft,45 Mentor,airplane,piston,1,L,F,10.06,7.9,2.9,1338,1338,,,
+T34P,,Beechcraft,T-34 Mentor,airplane,piston,1,L,F,10.06,7.9,2.9,1338,1338,,,
+T34T,,Beechcraft,T-34C Turbo Mentor,airplane,turboprop,1,L,,,,,1950,1950,25000,195,0.43
+T50,,Cessna,AT-17 Bobcat,airplane,piston,2,,,,,,,,,,
+T50,,Cessna,T-50 Bobcat,airplane,piston,2,L,,,,,2313,2313,,,
+T6,,North American,BC-1,airplane,piston,1,L,,,,,2422,2422,,,
+T6,,North American,SNJ Texan,airplane,piston,1,L,,,,,2404,2404,,,
+T6,,North American,T-6 Texan,airplane,piston,1,L,,,,,2404,2404,,,
+TA15,,Taylorcraft,15,airplane,piston,1,L,,,,,998,998,,,
+TA20,,Taylorcraft,20,airplane,piston,1,L,,,,,1247,,,,
+TAMP,,SOCATA,TB-9 Tampico,airplane,piston,1,L,,,,,1060,1060,,,
+TAYA,,Taylorcraft,A,airplane,piston,1,L,,,,,476,476,,,
+TAYB,,Taylorcraft,B,airplane,piston,1,L,,,,,544,544,,,
+TAYD,,Taylorcraft,D,airplane,piston,1,L,,,,,590,590,,,
+TAYD,,Taylorcraft,O-57 / L-2 Grasshopper,airplane,piston,1,L,,,,,601,601,,,
+TB20,,SOCATA,TB-20 Trinidad,airplane,piston,1,L,,,,,1335,1335,,,
+TB21,,SOCATA,TB-21 Trinidad TC,airplane,piston,1,L,,,,,1400,1335,,,
+TBM7,,SOCATA,TBM 700,airplane,turboprop,1,L,F,12.68,10.65,4.36,3354,3186,31000,270,
+TBM8,,SOCATA,TBM 850 (TBM 700 N),airplane,turboprop,1,L,F,12.68,10.65,4.36,3354,3186,31000,271,
+TBM9,,SOCATA,TBM 900 (TBM 700 N),airplane,turboprop,1,L,F,12.83,10.74,4.36,3454,3225,31000,271,
+TCOU,,Helio,U-5 Twin Courier,airplane,piston,2,L,,,,,2041,2041,,,
+TERR,,Foxcon Aviation,Terrier,airplane,piston,1,L,F,8.7,6.1,2.3,600,600,,,
+TEX2,,Beechcraft,T-6 Texan II,airplane,turboprop,1,,,,,,,,,,
+TF19,,Taylorcraft,F-19 Sportsman,airplane,piston,1,L,,,,,680,680,,,
+TF21,,Taylorcraft,F-21,airplane,piston,1,L,,,,,794,794,,,
+TF22,,Taylorcraft,F-22,airplane,piston,1,L,,,,,794,794,,,
+TFK2,,Technoflug,Carat,glider,piston,1,L,F,15,6.21,,470,470,,,
+TIGR,,Airbus Helicopters,EC665 Tigre,helicopter,turboshaft,2,L,,,13.85,3.84,6600,6600,13000,,
+TOBA,,SOCATA,TB-10 Tobago,airplane,piston,1,L,,,,,1150,1092,,,
+TOBA,,SOCATA,TB-200 Tobago XL,airplane,piston,1,L,,,,,1150,1150,,,
+TPIN,,Scottish Aviation,Twin Pioneer,airplane,piston,2,L,,,,,6622,6622,21000,,
+TRIM,,Ford,Tri-Motor,airplane,piston,3,L,,,,,6350,6350,,,
+TRIS,,Britten-Norman,BN-2A Mk III Trislander,airplane,piston,3,L,,,,,4536,4536,12000,142,
+TRMA,,Stinson,A Tri-Motor,airplane,piston,3,L,,,,,4627,4627,7650,,
+TU16,,Tupolev,Tu-16,airplane,turbojet,2,,,,,,,,,,
+TU22,,Tupolev,Tu-22,airplane,turbofan,2,,,,,,,,,,
+TU95,,Tupolev,Tu-142,airplane,turboprop,4,,,,,,,,,,
+TU95,,Tupolev,Tu-95,airplane,turboprop,4,,,,,,,,,,
+TUCA,,Embraer,EMB-312 / T-27 Tucano,airplane,turboprop,1,,,,,,,,,,
+TUCA,,Embraer,EMB-312F Tucano,airplane,turboprop,1,,,,,,,,,,
+TUCA,,Short Brothers,EMB-312S Short Tucano,airplane,turboprop,1,,,,,,,,,,
+TWEN,,Tecnam,P2010 Twenty-Ten,airplane,piston,1,L,F,10.3,7.97,2.64,1160,1160,12000,,
+U21,,Beechcraft,U-21 Ute,airplane,turboprop,2,L,,,,,4377,4159,30000,208,
+U22,,Beechcraft,QU-22 Pave Eagle,airplane,piston,1,,,,,,,,,,
+UH1,,Bell,UH-1 Iroquois,airplane,turboshaft,1,L,,,,,4309,4309,,,
+UH12,,Hiller,OH-23 Raven,helicopter,piston,1,L,,,,,1247,1247,,,
+UH12,,Hiller,UH-12,helicopter,piston,1,L,,,,,1406,1406,,,
+ULAC,,Apollo,Delta Jet,trike,piston,1,L,F,10,,,430,430,,,
+ULAC,,Apollo,Racer GT,trike,piston,1,L,F,10,,,370,370,,,
+ULAC,,Comco Ikarus,Ikarus C22,airplane,piston,1,L,F,10.46,5.6,,450,450,,,
+ULAC,,HELFF,Albatros,trike,piston,1,L,,,,,358,358,,,
+ULAC,,Pioneer International Aircraft,Flightstar,trike,piston,1,L,,,,,227,227,,,
+V22,,Bell-Boeing,V-22 Osprey,tiltrotor,turboshaft,2,,,,,,,,,,
+VALI,,Vultee,BT-13 Valiant,airplane,piston,1,L,,,,,1973,1973,,,
+VALI,,Vultee,BT-15 Valiant,airplane,piston,1,L,,,,,1973,1973,,,
+VALI,,Vultee,SNV Valiant,airplane,piston,1,L,,,,,1973,1973,,,
+VENT,,Schempp-Hirth,Ventus M,glider,piston,1,L,F,18,6.78,,600,600,,,
+VENT,,Schempp-Hirth,Ventus T,glider,piston,1,L,F,18,6.63,,600,600,,,
+VNTE,,Schempp-Hirth,Ventus F,glider,electric,1,L,F,18,6.63,,600,600,,,
+VO10,,Aero Commander,100,airplane,piston,1,L,,,,,1111,1111,,,
+VTOR,,Vulcanair,AP68TP-600 A-Viator,airplane,turboprop,2,L,F,12,10.89,3.63,2850,2850,25000,200,
+VW10,,Airconcept,VoWi 10 Airbuggy,airplane,piston,1,L,,,,,430,430,,,
+W3,,PZL Świdnik,W-3 Sokół,helicopter,turboshaft,2,L,,,14.21,3.81,6400,6400,19700,,
+WA40,,Wassmer,WA-40 Super IV,airplane,piston,1,L,F,10,7.8,2.86,1200,1200,,,
+WA41,,Wassmer,WA-41 Baladou,airplane,piston,1,L,F,10,7.8,2.86,1200,1200,,,
+WA42,,Wassmer,WA-4/21 Prestige,airplane,piston,1,L,F,10,7.8,2.96,1410,1350,,,
+WA50,,Wassmer,WA-51 Pacific,airplane,piston,1,L,,,,,1040,1040,,,
+WA50,,Wassmer,WA-52 Europa,airplane,piston,1,L,,,,,1060,1060,,,
+WA50,,Wassmer,WA-54 Atlantic,airplane,piston,1,L,,,,,1130,1130,,,
+WA80,,Wassmer,WA-80 Piranha,airplane,piston,1,L,,,,,800,800,,,
+WACC,,Waco,C-6,airplane,piston,1,L,,,,,1588,1588,,,
+WACC,,Waco,C-7,airplane,piston,1,L,,,,,1588,1588,,,
+WACC,,Waco,C-8,airplane,piston,1,L,,,,,1724,1724,,,
+WACC,,Waco,S-7,airplane,piston,1,L,,,,,1474,1474,,,
+WACE,,Waco,E Aristocrat,airplane,piston,1,L,,,,,1928,1928,,,
+WACF,,Waco,F,airplane,piston,1,L,,,,,1338,1338,,,
+WILT,,ULBI,Wild Thing,airplane,piston,1,L,F,9.15,6.48,,450,450,,,
+WT10,,Aerospool,WT10 Advantic,airplane,piston,1,L,F,9.32,7.5,2.05,850,850,,,
+WT9,,Aerospool,WT9 Dynamic,airplane,piston,1,L,F,8.93,6.46,1.85,600,600,15000,,
+Y18T,,Yakovlev,Yak-18T,airplane,piston,1,L,F,11.16,8.35,3.4,1650,1650,13100,,
+YALE,,North American,BT-14 Yale,airplane,piston,1,L,,,,,2028,2028,,,
+YALE,,North American,BT-9 Yale,airplane,piston,1,L,,,,,2041,2041,,,
+YK42,,Yakovlev,Yak-42,airplane,turbofan,3,M,D,34.2,36.38,9.8,56500,50500,29900,324,0.75
+YK54,,Yakovlev,Yak-54,airplane,piston,1,L,,,,,1087,1087,9800,,
+YL15,,"Boeing Defense, Space & Security",L-15 Scout,airplane,piston,1,,,,,,,,,,
+YS11,,NAMC,YS-11,airplane,turboprop,2,M,,,,,24997,24499,20000,245,0.475
+Z26,,Zlín,Z-26 Trener,airplane,piston,1,L,F,10.6,8,2.06,975,926,,,
+Z37P,,Zlín,Z-37 Čmelák,airplane,piston,1,L,,,,,1725,1725,,,
+Z37T,,Zlín,Z-37T Agro Turbo,airplane,turboprop,1,L,F,13.63,10.46,3.51,2260,2260,18045,,
+Z42,,Zlín,Z-42,airplane,piston,1,L,F,9.34,6.94,2.95,1090,1050,14764,,
+Z43,,Zlín,Z-43,airplane,piston,1,L,F,10.14,7.58,2.91,1350,1280,13681,,
+Z50,,Zlín,Z-50,airplane,piston,1,L,F,8.58,6.96,1.99,840,800,26247,,

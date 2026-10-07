@@ -1,0 +1,793 @@
+{
+ "_uwaga": "Procedury awaryjne wyświetlane w zakładce EMERGENCY (kolejność = kolejność w menu). Punkt to tekst albo {\"text\": ..., \"items\": [...]} (podpunkty) albo {\"note\": ...} (akapit). \"assist\": true pokazuje nad procedurą przypomnienie ASSIST. Checklisty 16 scenariuszy pochodzą z EUROCONTROL HRS/TSP-004-GUI-05 (Annex B) – tekst oryginalny, po angielsku.",
+ "procedures": [
+  {
+   "id": "ASSIST",
+   "label": "ASSIST",
+   "title": "ASSIST – zasady postępowania w sytuacji awaryjnej",
+   "source": "EUROCONTROL HRS/TSP-004-GUI-05, Annex A (poster)",
+   "sections": [
+    {
+     "title": "EMERGENCY",
+     "items": [
+      {
+       "text": "A – Acknowledge",
+       "items": [
+        "Make sure you understood the nature of emergency and acknowledge accordingly."
+       ]
+      },
+      {
+       "text": "S – Separate",
+       "items": [
+        "Don't forget to establish/maintain separation!"
+       ]
+      },
+      {
+       "text": "S – Silence",
+       "items": [
+        "Impose silence on your control frequency if necessary.",
+        "Don't disturb urgent cockpit actions by unnecessary transmissions!"
+       ]
+      },
+      {
+       "text": "I – Inform",
+       "items": [
+        "Inform your supervisor and other sectors/units concerned."
+       ]
+      },
+      {
+       "text": "S – Support",
+       "items": [
+        "Give maximum support to pilot and crew."
+       ]
+      },
+      {
+       "text": "T – Time",
+       "items": [
+        "Allow pilots sufficient time to work on their problem."
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "A06",
+   "title": "A06 Emergency Descent (Zniżanie awaryjne)",
+   "sections": [
+    {
+     "title": "ACC / APP / TWR",
+     "items": [
+      "Zapewnij separację i/lub informacje o ruchu",
+      "Uwzględnij granice przestrzeni / skoordynuj skrót",
+      "Po awaryjnym zniżaniu:",
+      "Potwierdź stan statku powietrznego / intencje załogi (zmiana lotniska docelowego, obrażenia, uszkodzenia statku powietrznego)",
+      "Przyjmij, że a/c jest nadal w niebezpieczeństwie",
+      "Jeśli konieczne, nadaj informację o zniżaniu na częstotliwości ATC i częstotliwości awaryjnej",
+      "Powiadom kierownika zmiany ATM",
+      "Powiadom następny organ / sektor"
+     ]
+    },
+    {
+     "title": "Bądź przygotowany na:",
+     "items": [
+      "Zniżanie bez ostrzeżenia",
+      "Squawk 7700",
+      "Opuszczenie trasy lotu",
+      "Ostrzeżenie o ruchu",
+      "Nieczytelną transmisję"
+     ]
+    },
+    {
+     "title": "Informacje dodatkowe:",
+     "items": [
+      "Czas do rozpoczęcia zniżania to średnio 5 do 15 sekund (początkowa prędkość zniżania wynosi od 7000 ft/min do 14000 ft/min)",
+      "Squawk 7700 pojawia się z opóźnieniem lub wcale",
+      "ATC jest zazwyczaj poinformowane za późno z powodu ograniczonej zdolności załogi do działania; przy zakładaniu masek tlenowych następuje automatyczne przełączenie odbioru ze słuchawek na głośnik w kokpicie, więc mikrofon w kokpicie oraz korespondencja może być zakłócona odgłosami w tle",
+      "Z powodu gwałtownej utraty ciśnienia w kabinie ciśnienie gazów w ludzkim ciele wzrasta, powodując złe samopoczucie załogi",
+      "Czas do utraty przytomności przez załogę (pozbawioną tlenu) to od 4 do 30 sekund w zależności od poziomu lotu (tzw. czas użyteczny przytomności)"
+     ]
+    }
+   ],
+   "label": "A06"
+  },
+  {
+   "id": "ACAS",
+   "label": "ACAS/TCAS",
+   "title": "ACAS / TCAS",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "Climb or descent without prior warning",
+      "No emergency squawk",
+      "Two or more aircraft involved",
+      "Notification from pilot of 'TCAS climb' or 'TCAS descent'"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      {
+       "text": "When a pilot reports a manoeuvre induced by an RA:",
+       "items": [
+        "the controller shall not attempt to modify the aircraft flight path",
+        "the controller shall provide traffic information as appropriate",
+        "pilots very busy",
+        "TCAS II altitude data is more accurate than radar data"
+       ]
+      },
+      {
+       "note": "NB: Once an aircraft departs from its clearance in compliance with a RA, the controller ceases to be responsible for providing separation between that aircraft and any other aircraft affected as a direct consequence of the manoeuvre induced by the RA."
+      },
+      {
+       "text": "The controller shall resume responsibility for providing separation for all the affected aircraft when:",
+       "items": [
+        "1. The controller acknowledges a report from the flight crew that the aircraft has resumed the current clearance, OR",
+        "2. The controller acknowledges a report from the flight crew that the aircraft is resuming the current clearance and issues an alternative clearance which is acknowledged by the flight crew."
+       ]
+      },
+      "Following an RA event, or other significant ACAS event, pilots and controllers should complete an air traffic incident report"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BIRD",
+   "label": "BIRDSTRIKE",
+   "title": "Birdstrike",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Broken Windshield / Canopy",
+      "Engine Failure (multi-engine)",
+      "Engine Failure (single engine)",
+      "Hydraulic Problems",
+      "Precautionary Approach",
+      "Handling Difficulties",
+      "Electrical Problems",
+      "Gear Problems"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "Abandoned take-off",
+      "Immediate return to aerodrome",
+      "Landing next suitable aerodrome",
+      "Restricted visibility",
+      "Hydraulic problems"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Is pilot able to control ACFT?",
+      "Allow long final if requested",
+      "Check RWY (if birdstrike after take-off)"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Aerodrome details as soon as possible"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BOMB",
+   "label": "BOMB",
+   "title": "Bomb Warning",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "ACFT may stop climb",
+      "Request for immediate level re-clearance",
+      "Landing next suitable aerodrome",
+      "ACFT early in landing configuration",
+      "RWY in use, length, surface, elevation, ILS- and NAV-frequencies"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Clear airspace in the immediate vicinity",
+      "Ask for flying time needed",
+      "Evacuation after landing",
+      "Additional stairs required",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "Arrange parking away from buildings/other aircraft"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Aerodrome details as soon as possible"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BRAKE",
+   "label": "BRAKES",
+   "title": "Brake Problems",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "Pilots request longest RWY",
+      "Overrunning RWY threshold at far end",
+      "Burst tyre",
+      "ACFT may swerve off RWY",
+      "RWY blocked after landing"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Inform pilot about RWY length / condition",
+      "Keep safety strip clear",
+      "Towing equipment on stand-by as appropriate",
+      "Technical staff required"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "RCF",
+   "label": "COM FAIL",
+   "title": "Communication Failure",
+   "subtitle": "Radio Communication Failure (ICAO Doc 7030 – EUR Region)",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      {
+       "text": "VMC",
+       "items": [
+        "Squawk 7600",
+        "Continue in VMC",
+        "Land at nearest suitable aerodrome",
+        "Report arrival by the most expeditious means to the appropriate ATS unit"
+       ]
+      },
+      {
+       "text": "IMC",
+       "items": [
+        "Squawk 7600",
+        "Maintain last assigned speed and level for 7 mins OR minimum flight altitude, if the minimum flight altitude is higher than the last assigned level",
+        {
+         "text": "The 7-minute period commences:",
+         "items": [
+          "No compulsory reporting points OR position reports omitted: at the time the last assigned level or minimum flight altitude is reached, OR at the time of squawk 7600, whichever is LATER",
+          "Compulsory reporting points AND position reports not omitted: at the time the last assigned level or minimum flight altitude is reached, OR at the previously reported pilot estimate for the compulsory reporting point, OR at the time of a failed report over a compulsory reporting point, whichever is LATER",
+          "Thereafter, comply with the filed flight plan"
+         ]
+        },
+        "If being radar vectored, or proceeding offset according to RNAV without a specified limit, proceed in the most direct manner possible to rejoin the CPL no later than the next significant point, taking into consideration the applicable min. flight altitude",
+        "The ACFT will proceed to the designated navigational aid serving the destination aerodrome and hold until commencement of descent",
+        "Commence descent at, or as close as possible to, the EAT last received and acknowledged, OR if no EAT received and acknowledged, commence descent at, or as close as possible to, the ETA resulting from the CPL",
+        "Complete a normal instrument approach procedure as specified for the designated navigation aid",
+        "Land, if possible, within 30 minutes after the ETA specified, OR within 30 minutes of the last acknowledged expected approach time, whichever is later"
+       ]
+      }
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Failure of transmitter or receiver only",
+      "Possible relay by other stations?"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ELEC",
+   "label": "ELECTRICAL",
+   "title": "Electrical Problems",
+   "subtitle": "Loss of all generators (alternators) / battery power only – power supply reduced to emergency level",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "High stress level in the cockpit",
+      "NAV – failure, including compass",
+      "Transponder switched off (save energy)",
+      "Communication failure",
+      "Limited readbacks",
+      "Level changes to maintain VMC",
+      "Manual gear extension",
+      "Possible engine failure"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Inform landing aerodrome"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Next suitable aerodrome",
+      "Aerodrome details as soon as possible",
+      "Suitable vectors and position information",
+      "Save energy",
+      "Avoid IMC"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "DESC",
+   "label": "DESCENT",
+   "title": "Emergency Descent",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "Descent without warning",
+      "No emergency squawk",
+      "Poor or no RTF (oxygen mask)",
+      {
+       "text": "When an aircraft operated as a controlled flight experiences sudden decompression or a (similar) malfunction requiring an emergency descent, the aircraft shall, if able:",
+       "items": [
+        "Initiate a turn away from the assigned route or track before commencing the emergency descent",
+        "Advise the appropriate air traffic control unit as soon as possible of the emergency descent",
+        "Set transponder to Code 7700 and select the Emergency Mode on ADS/CPDLC system, if applicable",
+        "Turn on aircraft exterior lights",
+        "Watch for conflicting traffic both visually and by reference to ACAS (if equipped)",
+        "Coordinate its further intentions with the appropriate ATC unit"
+       ]
+      },
+      {
+       "note": "The aircraft shall not descend below the lowest published minimum altitude which will provide a minimum vertical clearance of 300 m (1000 ft) or in designated mountainous terrain 600 m (2000 ft) above all obstacles located in the area specified."
+      }
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Acknowledge emergency on RTF",
+      "Take all necessary action to safeguard all aircraft concerned",
+      "May be required to suggest a heading",
+      "May be required to state the minimum altitude",
+      "Provide separation or issue essential traffic information, as appropriate",
+      "Emergency broadcast if necessary",
+      {
+       "text": "After emergency descent, request intentions:",
+       "items": [
+        "Diversion",
+        "Injuries",
+        "ACFT damage"
+       ]
+      },
+      "Consider ACFT still to be in an emergency situation"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ENG",
+   "label": "ENGINE",
+   "title": "Engine Failure",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Abandoned Take-off",
+      "Pressurisation Problems",
+      "Fuel Dumping",
+      "Precautionary Approach"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "Heavy workload in the cockpit",
+      "Deviation from SID",
+      "Intermediate level-off",
+      "Descent",
+      "Course deviation",
+      "Pressurisation problems"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Inform landing aerodrome",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "Offer pilot extended final",
+      "Towing equipment on stand-by as appropriate",
+      "In case of forced landing, record last known position and time"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Next suitable aerodrome",
+      "Alternate aerodrome details as soon as possible",
+      "WX information of landing aerodrome"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "FIRE",
+   "label": "FIRE / APU",
+   "title": "Engine on Fire or APU on Fire",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Abandoned Take-off",
+      "Engine Failure (multi-engine)",
+      "Engine Failure (single engine)",
+      "Smoke or Fire in the Cockpit",
+      "Emergency Landing"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "Heavy workload in cockpit",
+      "Engine shutdown / fire extinguishing",
+      {
+       "text": "ACFT on the ground",
+       "items": [
+        "Hot brakes",
+        "Passenger evacuation",
+        "RWY blocked"
+       ]
+      },
+      {
+       "text": "ACFT in the air",
+       "items": [
+        "Pressurisation problems",
+        "ACFT losing altitude",
+        "Landing next suitable aerodrome",
+        "Possible diversionary or forced landing (single engine ACFT)"
+       ]
+      }
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Ask if dangerous goods on board",
+      "Ask for number of Persons On Board (POB)",
+      "Inform landing aerodrome",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "In case of diversionary or forced landing, record last known position and time"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Next suitable aerodrome",
+      "Aerodrome details as soon as possible",
+      "WX information of landing aerodrome",
+      "Observed fire and/or smoke"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "FUEL",
+   "label": "FUEL",
+   "title": "Fuel Problems – Critical Fuel Status",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Engine Failure (multi-engine)",
+      "Engine Failure (single engine)",
+      "Diversionary or Forced Landing"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "MAYDAY low on fuel – emergency with imminent danger to ACFT",
+      "PAN PAN minimum fuel – ACFT needs priority handling",
+      "Improper use of phraseology, verify actual fuel status (low on ..., minimum ... or minimum diversion fuel)"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Keep ACFT high (save fuel)",
+      "Avoid ATC-caused GO AROUND",
+      "Inform landing aerodrome",
+      "Ask if dangerous goods on board",
+      "Ask for number of Persons On Board (POB)",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "Towing equipment on standby as appropriate"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Next suitable aerodrome",
+      "Aerodrome details as soon as possible",
+      "WX information at landing aerodrome"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "GEAR",
+   "label": "GEAR",
+   "title": "Gear Problems",
+   "subtitle": "Unsafe Indication / No Gear",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Need for External Advice (engineering)"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "GO AROUND",
+      "Low pass of tower for gear inspection by specialist engineering personnel",
+      "Manual gear extension"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Prepare for LOW PASS for visual inspection",
+      "Weight reduction necessary",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "Towing equipment on stand-by as appropriate"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "ACFT configuration (having consulted with company if appropriate)"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "HYD",
+   "label": "HYDRAULIC",
+   "title": "Hydraulic Problems",
+   "subtitle": "Complete or partial failure of flight controls, gear extension, brakes, flaps, nose wheel steering",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Fuel Dumping",
+      "Gear Problems",
+      "Brake Problems",
+      "Relatively High Speed",
+      "Approach and Landing"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "Limited manoeuvrability",
+      "Limited flap setting",
+      "Limited bank angle",
+      "Manual gear extension, no retraction possible",
+      "Holding pattern for necessary checks",
+      "Extended final",
+      "Higher approach speed on final (up to 220 kt IAS on flapless approach)",
+      "Limited braking capability",
+      "Possible overrun",
+      "RWY blocked on landing"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Increase vertical and lateral separation",
+      "Ask if dangerous goods on board",
+      "Ask for number of Persons On Board (POB)",
+      "Avoid ATC-caused GO AROUND",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "Towing equipment on stand-by as appropriate"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Next suitable aerodrome",
+      "Aerodrome details as soon as possible",
+      "WX information of landing aerodrome",
+      "Fire or smoke from brakes"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ICE",
+   "label": "ICING",
+   "title": "Icing",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "Immediate change of level and/or heading",
+      "Limitation in rate of climb/descent",
+      "Higher speed"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Avoid holding",
+      "Enable continuous climb after departure",
+      "Keep safety strip clear",
+      "AIREP to other ACFT, other units and MET"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Check anti-icing and de-icing systems",
+      "Pitot heating",
+      "Stall warner heating",
+      "Carburettor heating",
+      "Propeller heating / de-icing",
+      "Wing anti-ice / de-ice",
+      "Alternate air supply",
+      "Windshield heating",
+      "Descent with higher power setting to increase bleed air supply",
+      "Higher approach/landing speed due to increase of stalling speed"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "PRESS",
+   "label": "PRESSURE",
+   "title": "Pressurisation Problems",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "May result in",
+     "items": [
+      "Emergency Descent"
+     ]
+    },
+    {
+     "title": "Expect",
+     "items": [
+      "ACFT will stop climb",
+      "Request for immediate descent",
+      "Emergency descent without warning",
+      "No emergency squawk",
+      "Possible turn off track",
+      "Poor RTF (because of oxygen mask)",
+      "Injuries to passengers or crew"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Clear airspace directly beneath the aircraft"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "SMOKE",
+   "label": "SMOKE",
+   "title": "Smoke or Fire in the Cockpit / Cabin",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "High stress level in the cockpit",
+      "Shortest high-speed vector to land – nearest suitable aerodrome",
+      "Poor RTF (oxygen mask) or loss of RTF",
+      "Passenger evacuation",
+      "RWY blocked"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Ask if dangerous goods on board",
+      "Ask for number of Persons On Board (POB)",
+      "Inform landing aerodrome",
+      "Offer out of wind landing if more expeditious",
+      "Clear RWY according to local instructions",
+      "Keep safety strip clear",
+      "APP / RWY lighting system 100%"
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Track miles to touchdown of next suitable aerodrome",
+      "Availability of automatic approach low visibility procedure",
+      "Aerodrome details as soon as possible",
+      "WX information of landing aerodrome"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "HIJACK",
+   "label": "UNLAWFUL",
+   "title": "Unlawful Interference",
+   "assist": true,
+   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
+   "sections": [
+    {
+     "title": "Expect",
+     "items": [
+      "Squawk 7500",
+      "Course / level deviations",
+      "No or unusual replies to RTF communication",
+      "No compliance with given instructions"
+     ]
+    },
+    {
+     "title": "Remember",
+     "items": [
+      "Do not initiate any further RTF referring to the hijacking unless confirmed by the pilot",
+      "Comply with pilot's requests as far as possible",
+      "Transmit pertinent information without expecting a reply",
+      "Monitor all flight manoeuvres – give room for manoeuvre",
+      "Collect any necessary information e.g. destination aerodrome, WX situation at destination, routing, etc."
+     ]
+    },
+    {
+     "title": "If needed, inform pilot about",
+     "items": [
+      "Confirm squawk",
+      "No reply here shall NOT be taken as an indication that the squawk was set by mistake",
+      "Any information requested"
+     ]
+    }
+   ]
+  }
+ ]
+}

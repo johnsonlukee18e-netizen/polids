@@ -1,0 +1,2086 @@
+{
+ "source": "vacs-project/vacs-data (dataset/EP/stations.toml, dataset/EP/positions.toml, dataset/EP/profiles/ACC_EPWW.json, sąsiednie FIR-y)",
+ "url": "https://github.com/vacs-project/vacs-data",
+ "commit": "c5aa4bdced3923ffad6226265d0aa8b280469284",
+ "commit_date": "2026-10-05",
+ "license": "CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)",
+ "changes": "Wyciąg: łańcuchy controlled_by sektorów EPWW (LOW/MID/HIGH), częstotliwości stanowisk ACC i etykiety stanowisk sąsiadów z profilu ACC_EPWW; dodano dopasowanie do stanowisk z pliku .ese.",
+ "layers": {
+  "LOW": {
+   "lower_ft": 9500,
+   "upper_ft": 33500,
+   "label": "FL095–FL335"
+  },
+  "MID": {
+   "lower_ft": 33500,
+   "upper_ft": 36500,
+   "label": "FL335–FL365"
+  },
+  "HIGH": {
+   "lower_ft": 36500,
+   "upper_ft": 66000,
+   "label": "FL365–FL660"
+  }
+ },
+ "sectors": {
+  "B": {
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "C": {
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_C_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_C_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_C_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "D": {
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_D_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_D_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_D_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "E": {
+   "HIGH": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "F": {
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_F_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_F_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_F_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "G": {
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_G_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_G_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_G_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "J": {
+   "HIGH": [
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_J_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_J_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_J_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "N": {
+   "HIGH": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "R": {
+   "HIGH": [
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  },
+  "T": {
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TM_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "MID": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "LOW": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ]
+  }
+ },
+ "acc_positions": {
+  "EPWW_N_CTR": {
+   "short": "N",
+   "frequency": "130.675",
+   "ese_id": "NWW"
+  },
+  "EPWW_ALH_CTR": {
+   "short": "ALH",
+   "frequency": "132.700",
+   "ese_id": "AH"
+  },
+  "EPWW_DBT_CTR": {
+   "short": "DBT",
+   "frequency": "127.025",
+   "ese_id": "DBT"
+  },
+  "EPWW_DBF_CTR": {
+   "short": "DBF",
+   "frequency": "133.180",
+   "ese_id": "DBFG"
+  },
+  "EPWW_ALL_CTR": {
+   "short": "ALL",
+   "frequency": "125.450",
+   "ese_id": "ALM"
+  },
+  "EPWW_DTC_CTR": {
+   "short": "DTC",
+   "frequency": "125.340",
+   "ese_id": "DTC"
+  },
+  "EPWW_S_CTR": {
+   "short": "S",
+   "frequency": "123.625",
+   "ese_id": "SWW"
+  },
+  "EPWW_E_CTR": {
+   "short": "E",
+   "frequency": "120.950",
+   "ese_id": "EWW"
+  },
+  "EPWW_TCJ_CTR": {
+   "short": "TCJ",
+   "frequency": "134.875",
+   "ese_id": "TC"
+  },
+  "EPWW_C_CTR": {
+   "short": "C",
+   "frequency": "133.475",
+   "ese_id": "CL"
+  },
+  "EPWW_DT_CTR": {
+   "short": "DT",
+   "frequency": "128.765",
+   "ese_id": "DT"
+  },
+  "EPWW_D_CTR": {
+   "short": "D",
+   "frequency": "134.225",
+   "ese_id": "DL"
+  },
+  "EPWW_NE_CTR": {
+   "short": "NE",
+   "frequency": "127.450",
+   "ese_id": "NE"
+  },
+  "EPWW_FG_CTR": {
+   "short": "FG",
+   "frequency": "124.925",
+   "ese_id": "FG"
+  },
+  "EPWW_F_CTR": {
+   "short": "F",
+   "frequency": "124.275",
+   "ese_id": "F"
+  },
+  "EPWW_G_CTR": {
+   "short": "G",
+   "frequency": "129.075",
+   "ese_id": "G"
+  },
+  "EPWW_JR_CTR": {
+   "short": "JR",
+   "frequency": "130.875",
+   "ese_id": "JR"
+  },
+  "EPWW_J_CTR": {
+   "short": "J",
+   "frequency": "124.625",
+   "ese_id": "J"
+  },
+  "EPWW_TM_CTR": {
+   "short": "TM",
+   "frequency": "130.625",
+   "ese_id": "T"
+  }
+ },
+ "stations_ep": {
+  "EPWW_FMP": [
+   "EPWW_FMP"
+  ],
+  "EPWW_C": [
+   "EPWW_C_CTR"
+  ],
+  "EPWW_D": [
+   "EPWW_D_CTR"
+  ],
+  "EPWW_DBT": [
+   "EPWW_DBT_CTR"
+  ],
+  "EPWW_DBF": [
+   "EPWW_DBF_CTR"
+  ],
+  "EPWW_DT": [
+   "EPWW_DT_CTR"
+  ],
+  "EPWW_DTC": [
+   "EPWW_DTC_CTR"
+  ],
+  "EPWW_F": [
+   "EPWW_F_CTR"
+  ],
+  "EPWW_FG": [
+   "EPWW_FG_CTR"
+  ],
+  "EPWW_G": [
+   "EPWW_G_CTR"
+  ],
+  "EPWW_J": [
+   "EPWW_J_CTR"
+  ],
+  "EPWW_JR": [
+   "EPWW_JR_CTR"
+  ],
+  "EPWW_NE": [
+   "EPWW_NE_CTR"
+  ],
+  "EPWW_TM": [
+   "EPWW_TM_CTR"
+  ],
+  "EPWW_TCJ": [
+   "EPWW_TCJ_CTR"
+  ],
+  "EPWW_ALH": [
+   "EPWW_ALH_CTR"
+  ],
+  "EPWW_ALL": [
+   "EPWW_ALL_CTR"
+  ],
+  "EPWW_E": [
+   "EPWW_E_CTR"
+  ],
+  "EPWW_N": [
+   "EPWW_N_CTR"
+  ],
+  "EPWW_S": [
+   "EPWW_S_CTR"
+  ],
+  "EPBA": [
+   "EPBA_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPBC": [
+   "EPBC_I_TWR",
+   "EPWA_I_APP",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPBK": [
+   "EPBK_R_TWR",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPBY_TWR": [
+   "EPBY_TWR",
+   "EPGD_APP",
+   "EPWW_G_CTR",
+   "EPWW_FG_CTR",
+   "EPWW_N_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPBY_TMA": [
+   "EPBY_TWR",
+   "EPGD_APP",
+   "EPWW_G_CTR",
+   "EPWW_FG_CTR",
+   "EPWW_N_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPDE_MCTR": [
+   "EPDE_TWR",
+   "EPDE_APP"
+  ],
+  "EPDE_MTMA": [
+   "EPDE_APP"
+  ],
+  "EPGD_GND": [
+   "EPGD_GND"
+  ],
+  "EPGD_TWR": [
+   "EPGD_TWR",
+   "EPGD_L_APP",
+   "EPGD_APP",
+   "EPWW_G_CTR",
+   "EPWW_FG_CTR",
+   "EPWW_N_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPGD_LTMA": [
+   "EPGD_L_APP",
+   "EPGD_APP",
+   "EPWW_G_CTR",
+   "EPWW_FG_CTR",
+   "EPWW_N_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPGD_UTMA": [
+   "EPGD_APP",
+   "EPWW_G_CTR",
+   "EPWW_FG_CTR",
+   "EPWW_N_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPGD_FIS": [
+   "EPGD_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPGD_FIS_E": [
+   "EPGD_IE_APP",
+   "EPGD_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPGL": [
+   "EPGL_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPGY": [
+   "EPGY_R_TWR",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPJA": [
+   "EPJA_R_TWR",
+   "EPGD_IE_APP",
+   "EPGD_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKA": [
+   "EPKA_R_TWR",
+   "EPKK_IE_APP",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKK_DEL": [
+   "EPKK_DEL"
+  ],
+  "EPKK_GND": [
+   "EPKK_GND"
+  ],
+  "EPKK_TWR": [
+   "EPKK_TWR",
+   "EPKK_KK_APP",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPKK_DIR": [
+   "EPKK_KK_APP",
+   "EPKK_E_APP",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPKT_DIR": [
+   "EPKK_KT_APP",
+   "EPKK_E_APP",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPKK_TMA_W": [
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPKK_TMA_E": [
+   "EPKK_E_APP",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPKK_FIS": [
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKK_FIS_E": [
+   "EPKK_IE_APP",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKI": [
+   "EPKI_R_TWR",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPKM": [
+   "EPKM_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKP": [
+   "EPKP_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKR": [
+   "EPKR_R_TWR",
+   "EPKK_IE_APP",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPKS": [
+   "EPKS_TWR"
+  ],
+  "EPKT_DEL": [
+   "EPKT_DEL"
+  ],
+  "EPKT_GND": [
+   "EPKT_GND"
+  ],
+  "EPKT_TWR": [
+   "EPKT_TWR",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPLB_TWR": [
+   "EPLB_TWR",
+   "EPWW_JR_CTR",
+   "EPWW_E_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPLB_TMA": [
+   "EPLB_TWR",
+   "EPWW_JR_CTR",
+   "EPWW_E_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPLL_DEL": [
+   "EPLL_DEL"
+  ],
+  "EPLL_TWR": [
+   "EPLL_TWR",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPLL_TMA": [
+   "EPLL_TWR",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPLR": [
+   "EPLR_R_TWR",
+   "EPWA_IE_APP",
+   "EPWA_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPML": [
+   "EPML_I_TWR",
+   "EPKK_IE_APP",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPMO_DEL": [
+   "EPMO_DEL"
+  ],
+  "EPMO_TWR": [
+   "EPMO_TWR",
+   "EPWA_N_APP",
+   "EPWA_S_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPNT": [
+   "EPNT_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPOD": [
+   "EPOD_R_TWR",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPPO_DEL": [
+   "EPPO_DEL"
+  ],
+  "EPPO_GND": [
+   "EPPO_GND"
+  ],
+  "EPPO_TWR": [
+   "EPPO_TWR",
+   "EPPO_N_APP",
+   "EPWW_D_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPPO_TMA_N": [
+   "EPPO_N_APP",
+   "EPWW_D_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPPO_TMA_S": [
+   "EPPO_S_APP",
+   "EPPO_N_APP",
+   "EPWW_TM_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPPO_FIS": [
+   "EPPO_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPPO_FIS_S": [
+   "EPPO_IS_APP",
+   "EPPO_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPPZ": [
+   "EPPZ_R_TWR",
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPRA_TWR": [
+   "EPRA_TWR",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPRA_TMA": [
+   "EPRA_TWR",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPRZ_GND": [
+   "EPRZ_GND"
+  ],
+  "EPRZ_TWR": [
+   "EPRZ_TWR",
+   "EPKK_RZ_APP",
+   "EPKK_E_APP",
+   "EPKK_APP",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPRZ_TMA": [
+   "EPKK_RZ_APP",
+   "EPKK_E_APP",
+   "EPKK_APP",
+   "EPRZ_TWR",
+   "EPWW_J_CTR",
+   "EPWW_JR_CTR",
+   "EPWW_S_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPSC_TWR": [
+   "EPSC_TWR",
+   "EPWW_DBT_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPSC_TMA": [
+   "EPSC_TWR",
+   "EPWW_DBT_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPSY_TWR": [
+   "EPSY_TWR",
+   "EPWW_NE_CTR",
+   "EPWW_N_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPSY_TMA": [
+   "EPSY_TWR",
+   "EPWW_NE_CTR",
+   "EPWW_N_CTR",
+   "EPWW_E_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_DEL": [
+   "EPWA_DEL"
+  ],
+  "EPWA_GND": [
+   "EPWA_GND"
+  ],
+  "EPWA_TWR": [
+   "EPWA_TWR",
+   "EPWA_F_APP",
+   "EPWA_APP",
+   "EPWA_N_APP",
+   "EPWA_S_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_DIR": [
+   "EPWA_F_APP",
+   "EPWA_APP",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_TMA": [
+   "EPWA_APP",
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_TMA_N": [
+   "EPWA_N_APP",
+   "EPWA_S_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_TMA_S": [
+   "EPWA_S_APP",
+   "EPWA_N_APP",
+   "EPWA_APP",
+   "EPWW_C_CTR",
+   "EPWW_NE_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPWA_FIS_C": [
+   "EPWA_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPWA_FIS_E": [
+   "EPWA_IE_APP",
+   "EPWA_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPWA_FIS_N": [
+   "EPSY_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPWA_FIS_W": [
+   "EPWA_IW_APP",
+   "EPWA_I_APP",
+   "EPWW_IE_CTR",
+   "EPWW_I_CTR"
+  ],
+  "EPWR_DEL": [
+   "EPWR_DEL"
+  ],
+  "EPWR_GND": [
+   "EPWR_GND"
+  ],
+  "EPWR_TWR": [
+   "EPWR_TWR",
+   "EPPO_S_APP",
+   "EPPO_N_APP",
+   "EPWW_TM_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPZG_TWR": [
+   "EPZG_TWR",
+   "EPPO_N_APP",
+   "EPWW_D_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPZG_TMA": [
+   "EPZG_TWR",
+   "EPPO_N_APP",
+   "EPWW_D_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALL_CTR",
+   "EPWW_ALH_CTR"
+  ],
+  "EPZP": [
+   "EPZP_R_TWR",
+   "EPPO_I_APP",
+   "EPWW_I_CTR"
+  ],
+  "EPZR": [
+   "EPZR_R_TWR",
+   "EPKK_I_APP",
+   "EPWW_I_CTR"
+  ]
+ },
+ "neighbours": [
+  {
+   "group": "FMP",
+   "label": "ESAA FMP",
+   "alt": null,
+   "station": "ESAA_FMP",
+   "controlled_by": [
+    "ESAA_FMP"
+   ],
+   "callsign": "ESAA_FMP",
+   "frequency": "126.825",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "EDUU FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "EDWW FMP",
+   "alt": null,
+   "station": "EDWW-FMP",
+   "controlled_by": [
+    "EDWW_FMP"
+   ],
+   "callsign": "EDWW_FMP",
+   "frequency": "199.998",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "EDMM FMP",
+   "alt": null,
+   "station": "EDMM-FMP",
+   "controlled_by": [
+    "EDMM_FMP"
+   ],
+   "callsign": "EDMM_FMP",
+   "frequency": "199.998",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "LKAA FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "EPWW FMP",
+   "alt": null,
+   "station": "EPWW_FMP",
+   "controlled_by": [
+    "EPWW_FMP"
+   ],
+   "callsign": "EPWW_FMP",
+   "frequency": "125.450",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "UMKK TMU",
+   "alt": null,
+   "station": "UMKK_TMU",
+   "controlled_by": [
+    "UMKK_TMU"
+   ],
+   "callsign": "UMKK_TMU",
+   "frequency": "199.999",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "EYVL FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "UMMV FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "UKR FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "FMP",
+   "label": "LZBB FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESMM 9",
+   "alt": "+365",
+   "station": "ESMM_9",
+   "controlled_by": [
+    "ESMM_9_CTR",
+    "ESMM_8_CTR",
+    "ESMM_6_CTR",
+    "ESMM_7_CTR",
+    "ESMM_Y_CTR",
+    "ESMM_2_CTR",
+    "ESAA_CTR"
+   ],
+   "callsign": "ESMM_9_CTR",
+   "frequency": "135.985",
+   "fmp": false,
+   "ese": {
+    "callsign": "ESMM_9_CTR",
+    "position_id": "ESM9",
+    "frequency": "135.985"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESMM 8",
+   "alt": "-365",
+   "station": "ESMM_8",
+   "controlled_by": [
+    "ESMM_8_CTR",
+    "ESMM_7_CTR",
+    "ESMM_6_CTR",
+    "ESMM_Y_CTR",
+    "ESMM_2_CTR",
+    "ESAA_CTR"
+   ],
+   "callsign": "ESMM_8_CTR",
+   "frequency": "128.180",
+   "fmp": false,
+   "ese": {
+    "callsign": "ESMM_8_CTR",
+    "position_id": "ESM8",
+    "frequency": "128.180"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESMM L",
+   "alt": "-195",
+   "station": "ESMM_L",
+   "controlled_by": [
+    "ESMS_APP",
+    "ESMM_K_CTR",
+    "ESMM_8_CTR",
+    "ESMM_7_CTR",
+    "ESMM_Y_CTR",
+    "ESMM_2_CTR",
+    "ESAA_CTR"
+   ],
+   "callsign": "ESMS_APP",
+   "frequency": "134.980",
+   "fmp": false,
+   "ese": {
+    "callsign": "ESMS_APP",
+    "position_id": "ESMA",
+    "frequency": "134.980"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESMM 6",
+   "alt": "+365",
+   "station": "ESMM_6",
+   "controlled_by": [
+    "ESMM_6_CTR",
+    "ESMM_7_CTR",
+    "ESMM_8_CTR",
+    "ESMM_Y_CTR",
+    "ESMM_2_CTR",
+    "ESAA_CTR"
+   ],
+   "callsign": "ESMM_6_CTR",
+   "frequency": "135.805",
+   "fmp": false,
+   "ese": {
+    "callsign": "ESMM_6_CTR",
+    "position_id": "ESM6",
+    "frequency": "135.805"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESMM 7",
+   "alt": "-365",
+   "station": "ESMM_7",
+   "controlled_by": [
+    "ESMM_7_CTR",
+    "ESMM_6_CTR",
+    "ESMM_8_CTR",
+    "ESMM_Y_CTR",
+    "ESMM_2_CTR",
+    "ESAA_CTR"
+   ],
+   "callsign": "ESMM_7_CTR",
+   "frequency": "124.155",
+   "fmp": false,
+   "ese": {
+    "callsign": "ESMM_7_CTR",
+    "position_id": "ESM7",
+    "frequency": "124.155"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "ESAA FMP",
+   "alt": null,
+   "station": "ESAA_FMP",
+   "controlled_by": [
+    "ESAA_FMP"
+   ],
+   "callsign": "ESAA_FMP",
+   "frequency": "126.825",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "EYVL FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "EYVL U",
+   "alt": "+365",
+   "station": "EYVL-U",
+   "controlled_by": [
+    "EYVL_U_CTR",
+    "EYVL_CTR"
+   ],
+   "callsign": "EYVL_U_CTR",
+   "frequency": "132.280",
+   "fmp": false,
+   "ese": {
+    "callsign": "EYVL_U_CTR",
+    "position_id": "EYVU",
+    "frequency": "132.280"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "EYVL M",
+   "alt": "335-365",
+   "station": "EYVL-M",
+   "controlled_by": [
+    "EYVL_M_CTR",
+    "EYVL_CTR"
+   ],
+   "callsign": "EYVL_M_CTR",
+   "frequency": "133.430",
+   "fmp": false,
+   "ese": {
+    "callsign": "EYVL_M_CTR",
+    "position_id": "EYVM",
+    "frequency": "133.430"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "EYVL",
+   "alt": "225-335",
+   "station": "EYVL-L",
+   "controlled_by": [
+    "EYVL_CTR"
+   ],
+   "callsign": "EYVL_CTR",
+   "frequency": "133.305",
+   "fmp": false,
+   "ese": {
+    "callsign": "EYVL_CTR",
+    "position_id": "EYVL",
+    "frequency": "133.305"
+   }
+  },
+  {
+   "group": "MALMO / VILNUS",
+   "label": "EYVL E",
+   "alt": "-225",
+   "station": "EYVL-E",
+   "controlled_by": [
+    "EYVL_E_CTR",
+    "EYVL_CTR"
+   ],
+   "callsign": "EYVL_E_CTR",
+   "frequency": "135.380",
+   "fmp": false,
+   "ese": {
+    "callsign": "EYVL_E_CTR",
+    "position_id": "EYVE",
+    "frequency": "135.380"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU OSE22",
+   "alt": "+365",
+   "station": "EDUU-OSE22",
+   "controlled_by": [
+    "EDUU_O22_CTR",
+    "EDUU_O12_CTR",
+    "EDUU_H12_CTR",
+    "EDWW_MRZ_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDUU_O22_CTR",
+   "frequency": "126.785",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDUU_O22_CTR",
+    "position_id": "EDUY",
+    "frequency": "126.785"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU OSE12",
+   "alt": "285-365",
+   "station": "EDUU-OSE12",
+   "controlled_by": [
+    "EDUU_O12_CTR",
+    "EDUU_H12_CTR",
+    "EDWW_MRZ_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDUU_O12_CTR",
+   "frequency": "133.035",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDUU_O12_CTR",
+    "position_id": "EDUO",
+    "frequency": "133.035"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU HVL22",
+   "alt": "+365",
+   "station": "EDUU-HVL22",
+   "controlled_by": [
+    "EDUU_O22_CTR",
+    "EDUU_H12_CTR",
+    "EDUU_O12_CTR",
+    "EDWW_BOR_CTR",
+    "EDWW_FLG_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDUU_O22_CTR",
+   "frequency": "126.785",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDUU_O22_CTR",
+    "position_id": "EDUY",
+    "frequency": "126.785"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU HVL12",
+   "alt": "285-365",
+   "station": "EDUU-HVL12",
+   "controlled_by": [
+    "EDUU_H12_CTR",
+    "EDUU_O12_CTR",
+    "EDWW_BOR_CTR",
+    "EDWW_FLG_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDUU_H12_CTR",
+   "frequency": "128.235",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDUU_H12_CTR",
+    "position_id": "EDUH",
+    "frequency": "128.235"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU SPE",
+   "alt": "+315",
+   "station": "EDUU-SPE",
+   "controlled_by": [
+    "EDUU_SPE_CTR",
+    "EDUU_SAL_CTR",
+    "EDUU_H12_CTR",
+    "EDMM_MEI_CTR",
+    "EDMM_GER_CTR",
+    "EDMM_HOF_CTR"
+   ],
+   "callsign": "EDUU_SPE_CTR",
+   "frequency": "133.285",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDUU_SPE_CTR",
+    "position_id": "EDUP",
+    "frequency": "133.285"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDWW MRZ",
+   "alt": null,
+   "station": "EDWW-MRZ",
+   "controlled_by": [
+    "EDWW_MRZ_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDWW_MRZ_CTR",
+   "frequency": "124.175",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDWW_MRZ_CTR",
+    "position_id": "EDWM",
+    "frequency": "124.175"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDWW MAR",
+   "alt": null,
+   "station": "EDWW-MAR",
+   "controlled_by": [
+    "EDWW_MAR_CTR",
+    "EDWW_MRZ_CTR",
+    "EDWW_BOR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDWW_MAR_CTR",
+   "frequency": "136.050",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDWW_MAR_CTR",
+    "position_id": "EDWK",
+    "frequency": "136.050"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDWW FLG",
+   "alt": null,
+   "station": "EDWW-FLG",
+   "controlled_by": [
+    "EDWW_FLG_CTR",
+    "EDWW_BOR_CTR",
+    "EDWW_MAR_CTR",
+    "EDWW_CTR"
+   ],
+   "callsign": "EDWW_FLG_CTR",
+   "frequency": "136.450",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDWW_FLG_CTR",
+    "position_id": "EDWF",
+    "frequency": "136.450"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDMM MEI",
+   "alt": null,
+   "station": "EDMM-MEI",
+   "controlled_by": [
+    "EDMM_MEI_CTR",
+    "EDMM_GER_CTR",
+    "EDMM_HOF_CTR"
+   ],
+   "callsign": "EDMM_MEI_CTR",
+   "frequency": "124.960",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDMM_MEI_CTR",
+    "position_id": "EDMM",
+    "frequency": "124.960"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDMM SAS",
+   "alt": "-165",
+   "station": "EDMM-SAS",
+   "controlled_by": [
+    "EDDC_SAS_APP",
+    "EDMM_MEI_CTR",
+    "EDDP_TRS_APP",
+    "EDMM_GER_CTR",
+    "EDMM_HOF_CTR"
+   ],
+   "callsign": "EDDC_SAS_APP",
+   "frequency": "125.875",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDDC_SAS_APP",
+    "position_id": "EDCA",
+    "frequency": "125.875"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDDB N APP",
+   "alt": "-135",
+   "station": "EDWW-DBAN",
+   "controlled_by": [
+    "EDDB_N_APP",
+    "EDDB_S_APP"
+   ],
+   "callsign": "EDDB_N_APP",
+   "frequency": "119.630",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDDB_N_APP",
+    "position_id": "EDB3",
+    "frequency": "119.630"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDDB N DEP",
+   "alt": "-165",
+   "station": "EDWW-DBDN",
+   "controlled_by": [
+    "EDDB_N_DEP",
+    "EDDB_S_DEP"
+   ],
+   "callsign": "EDDB_N_DEP",
+   "frequency": "120.340",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDDB_N_DEP",
+    "position_id": "EDB6",
+    "frequency": "120.340"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDDB S DEP",
+   "alt": "-165",
+   "station": "EDWW-DBDS",
+   "controlled_by": [
+    "EDDB_S_DEP",
+    "EDDB_N_DEP"
+   ],
+   "callsign": "EDDB_S_DEP",
+   "frequency": "120.630",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDDB_S_DEP",
+    "position_id": "EDB1",
+    "frequency": "120.630"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDDB S APP",
+   "alt": "-135",
+   "station": "EDWW-DBAS",
+   "controlled_by": [
+    "EDDB_S_APP",
+    "EDDB_N_APP"
+   ],
+   "callsign": "EDDB_S_APP",
+   "frequency": "126.425",
+   "fmp": false,
+   "ese": {
+    "callsign": "EDDB_S_APP",
+    "position_id": "EDB4",
+    "frequency": "126.425"
+   }
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDUU FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDWW FMP",
+   "alt": null,
+   "station": "EDWW-FMP",
+   "controlled_by": [
+    "EDWW_FMP"
+   ],
+   "callsign": "EDWW_FMP",
+   "frequency": "199.998",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "RHEIN / BREMEN / MUNICH",
+   "label": "EDMM FMP",
+   "alt": null,
+   "station": "EDMM-FMP",
+   "controlled_by": [
+    "EDMM_FMP"
+   ],
+   "callsign": "EDMM_FMP",
+   "frequency": "199.998",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMKK",
+   "alt": null,
+   "station": "UMKK_ACC",
+   "controlled_by": [
+    "UMKK_CTR"
+   ],
+   "callsign": "UMKK_CTR",
+   "frequency": "123.700",
+   "fmp": false,
+   "ese": {
+    "callsign": "UMKK_CTR",
+    "position_id": "UMKK",
+    "frequency": "123.700"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMKK APP",
+   "alt": "-265",
+   "station": "UMKK_APP",
+   "controlled_by": [
+    "UMKK_APP"
+   ],
+   "callsign": "UMKK_APP",
+   "frequency": "126.000",
+   "fmp": false,
+   "ese": {
+    "callsign": "UMKK_APP",
+    "position_id": "UMKA",
+    "frequency": "126.000"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMKK TMU",
+   "alt": null,
+   "station": "UMKK_TMU",
+   "controlled_by": [
+    "UMKK_TMU"
+   ],
+   "callsign": "UMKK_TMU",
+   "frequency": "199.999",
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UKLV",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UKLV_CTR"
+   ],
+   "callsign": "UKLV_CTR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UKLV_CTR",
+    "position_id": "UKLV",
+    "frequency": "134.050"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UKLU TWR",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UKLU_TWR"
+   ],
+   "callsign": "UKLU_TWR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UKLU_TWR",
+    "position_id": "UKLU",
+    "frequency": "126.900"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UKR CTR",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UKR_CTR"
+   ],
+   "callsign": "UKR_CTR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UKR_CTR",
+    "position_id": "UKR",
+    "frequency": "123.475"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UKLL APP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UKLL_APP"
+   ],
+   "callsign": "UKLL_APP",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UKLL_APP",
+    "position_id": "UKLL",
+    "frequency": "120.525"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMMV N",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UMMV_N_CTR"
+   ],
+   "callsign": "UMMV_N_CTR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UMMV_N_CTR",
+    "position_id": "UMMN",
+    "frequency": "119.125"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMMV W",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UMMV_W_CTR"
+   ],
+   "callsign": "UMMV_W_CTR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UMMV_W_CTR",
+    "position_id": "UMMW",
+    "frequency": "124.825"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMBB TWR",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UMBB_TWR"
+   ],
+   "callsign": "UMBB_TWR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UMBB_TWR",
+    "position_id": "UMBB",
+    "frequency": "127.700"
+   }
+  },
+  {
+   "group": "UMKK / MINSK / LVIV",
+   "label": "UMMV",
+   "alt": null,
+   "station": null,
+   "controlled_by": [
+    "UMMV_CTR"
+   ],
+   "callsign": "UMMV_CTR",
+   "frequency": null,
+   "fmp": false,
+   "ese": {
+    "callsign": "UMMV_CTR",
+    "position_id": "UMMV",
+    "frequency": "135.700"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKAA N",
+   "alt": "+305",
+   "station": "LKAA NU",
+   "controlled_by": [
+    "LKAA_U_CTR",
+    "LKAA_N_CTR",
+    "LKAA_NS_CTR",
+    "LKAA_CTR"
+   ],
+   "callsign": "LKAA_U_CTR",
+   "frequency": "124.775",
+   "fmp": false,
+   "ese": {
+    "callsign": "LKAA_U_CTR",
+    "position_id": "LKAU",
+    "frequency": "124.775"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKAA N",
+   "alt": "-305",
+   "station": "LKAA NL",
+   "controlled_by": [
+    "LKAA_N_CTR",
+    "LKAA_NS_CTR",
+    "LKAA_L_CTR",
+    "LKAA_CTR"
+   ],
+   "callsign": "LKAA_N_CTR",
+   "frequency": "127.825",
+   "fmp": false,
+   "ese": {
+    "callsign": "LKAA_N_CTR",
+    "position_id": "LKAN",
+    "frequency": "127.825"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LZBB U",
+   "alt": "+305",
+   "station": "LZBB_CENTER_1U",
+   "controlled_by": [
+    "LZBB_U_CTR",
+    "LZBB_CTR"
+   ],
+   "callsign": "LZBB_U_CTR",
+   "frequency": "127.425",
+   "fmp": false,
+   "ese": {
+    "callsign": "LZBB_U_CTR",
+    "position_id": "LZBU",
+    "frequency": "127.425"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LZBB",
+   "alt": "-305",
+   "station": "LZBB_CENTER_0L",
+   "controlled_by": [
+    "LZBB_CTR"
+   ],
+   "callsign": "LZBB_CTR",
+   "frequency": "134.475",
+   "fmp": false,
+   "ese": {
+    "callsign": "LZBB_CTR",
+    "position_id": "LZB",
+    "frequency": "134.475"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKAA S",
+   "alt": "+305",
+   "station": "LKAA SU",
+   "controlled_by": [
+    "LKAA_U_CTR",
+    "LKAA_S_CTR",
+    "LKAA_NS_CTR",
+    "LKAA_CTR"
+   ],
+   "callsign": "LKAA_U_CTR",
+   "frequency": "124.775",
+   "fmp": false,
+   "ese": {
+    "callsign": "LKAA_U_CTR",
+    "position_id": "LKAU",
+    "frequency": "124.775"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKAA S",
+   "alt": "-305",
+   "station": "LKAA SL",
+   "controlled_by": [
+    "LKAA_S_CTR",
+    "LKAA_NS_CTR",
+    "LKAA_L_CTR",
+    "LKAA_CTR"
+   ],
+   "callsign": "LKAA_S_CTR",
+   "frequency": "133.410",
+   "fmp": false,
+   "ese": {
+    "callsign": "LKAA_S_CTR",
+    "position_id": "LKAS",
+    "frequency": "133.410"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LZTT TWR",
+   "alt": "-135",
+   "station": "LZTT_TWR",
+   "controlled_by": [
+    "LZTT_TWR"
+   ],
+   "callsign": "LZTT_TWR",
+   "frequency": "121.350",
+   "fmp": false,
+   "ese": {
+    "callsign": "LZTT_TWR",
+    "position_id": "LZTT",
+    "frequency": "121.350"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKMT APP",
+   "alt": "-125",
+   "station": "LKAA MT",
+   "controlled_by": [
+    "LKMT_APP",
+    "LKAA_R_CTR",
+    "LKAA_N_CTR",
+    "LKAA_NS_CTR",
+    "LKAA_L_CTR",
+    "LKAA_CTR"
+   ],
+   "callsign": "LKMT_APP",
+   "frequency": "119.375",
+   "fmp": false,
+   "ese": {
+    "callsign": "LKMT_APP",
+    "position_id": "LKMT",
+    "frequency": "119.375"
+   }
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LKAA FMP",
+   "alt": null,
+   "station": "lkaa",
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  },
+  {
+   "group": "PRAHA / BRATI / SLAVA",
+   "label": "LZBB FMP",
+   "alt": null,
+   "station": null,
+   "controlled_by": [],
+   "callsign": null,
+   "frequency": null,
+   "fmp": true,
+   "ese": null
+  }
+ ]
+}

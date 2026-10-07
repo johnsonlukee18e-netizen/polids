@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "_uwaga": "Tu wklej geometrie sektorow (GeoJSON, wlasciwosci: name, frequency, callsign). Plik mozna tez wygenerowac importerem z pliku .ese EuroScope. Ponizej przykladowy, NIEPRAWDZIWY ksztalt do testow.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"name": "PRZYKŁAD", "callsign": "EPWW_CTR", "frequency": "134.875"},
+      "geometry": {"type": "Polygon", "coordinates": [[[19.0, 51.5], [22.5, 51.5], [22.5, 53.5], [19.0, 53.5], [19.0, 51.5]]]}
+    }
+  ]
+}

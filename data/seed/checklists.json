@@ -1,0 +1,99 @@
+{
+ "_uwaga": "Checklisty z zakładki CHECKLIST; 'open-position' jest też w AERODROME. Format jak w vatiris (github.com/minsulander/vatiris, frontend/src/data/checklist, GPL-3.0): punkt 'Co...AKCJA', sections = {indeks pierwszego punktu: nagłówek}. Dozwolone znaczniki: <b> <i> <tt>.",
+ "aerodrome": "open-position",
+ "checklists": [
+  {
+   "id": "open-position",
+   "label": "OPEN",
+   "title": "Open position",
+   "sections": {
+    "0": "Preparation",
+    "9": "Execution"
+   },
+   "items": [
+    "Controllers online & bookings...CHECK",
+    "Self-checkin at Core...CHECK",
+    "Overview of traffic (VATSIM Radar/VatSpy/VatGlasses)...CHECK",
+    "Weather and NOTAMs...CHECK",
+    "EuroScope, secondary, active runways...LOGIN, SETUP",
+    "Audio client...CONNECT",
+    "VACS...CONNECT",
+    "Above/below controllers: intent to open...COORDINATE",
+    "Traffic in sector...NOTE & PLAN",
+    "EuroScope active frequency...PRIME",
+    "Audio client frequency and connection...CHECK",
+    "CPDLC/DCL...CONNECT",
+    "Above/below controllers: open, ready for traffic...COORDINATE",
+    "ATC channel <tt>/online</tt>...SEND",
+    "Traffic in sector - <tt>.contactme</tt> or coordinate and transfer"
+   ]
+  },
+  {
+   "id": "close-position",
+   "label": "CLOSE",
+   "title": "Close position",
+   "preDescription": "Plan ahead and avoid overloading above controller if closing with a lot of traffic",
+   "sections": {
+    "0": "Preparation",
+    "3": "Execution"
+   },
+   "items": [
+    "Discord (optional): position available for handover...SEND",
+    "Above controller: <i>closing in 10 minutes</i>...COORDINATE",
+    "ATC channel <tt>/closing in 10</tt> and <tt>.break</tt>...SEND",
+    "Above controller: traffic handoff, location, status...COORDINATE",
+    "Pilots: contact above/downstream controller or advisory...TRANSMIT & TRANSFER",
+    "Voice & text announcement: <i>&lt;station&gt; now closed</i>...TRANSMIT",
+    "ATC channel <tt>/closed</tt>...SEND",
+    "EuroScope, audio client, VACS...DISCONNECT & CLOSE"
+   ]
+  },
+  {
+   "id": "handover-takeover",
+   "label": "HANDOVER",
+   "title": "Handover/takeover briefing",
+   "sections": {
+    "0": "<b>W</b>eather",
+    "4": "<b>E</b>quipment",
+    "8": "<b>S</b>ituation",
+    "12": "<b>T</b>raffic"
+   },
+   "items": [
+    "Runway in use",
+    "Open/closed STAR",
+    "Weather - winds, QNH, TRL, LVP, CB",
+    "Audio - XC:ed frequencies",
+    "CPDLC/DCL",
+    "vATIS - NOTAMs/APT CONDs",
+    "SELF - own AoR",
+    "OTHER - bordering positions open",
+    "Individual (non-LoA) agreements",
+    "Closures of RWYs/TWYs",
+    "Restrictions - R/D/PCA",
+    "Flow regulations/agreements",
+    "Traffic on frequency",
+    "Pending traffic",
+    "Conflicts and solutions"
+   ]
+  },
+  {
+   "id": "rwy-change",
+   "label": "RWY CHG",
+   "title": "Runway change",
+   "preDescription": "Runways changes with short notice increase the workload of both pilots and controllers and are due to safety reasons avoided as far as possible.",
+   "sections": {
+    "0": "Preparation",
+    "4": "Execution"
+   },
+   "items": [
+    "Upstream controller...COORDINATE",
+    "Last arrival...INPUT:NOTE",
+    "Last departure...INPUT:NOTE",
+    "Old runway in EuroScope lists...SET",
+    "Runway configuration EuroScope...CHANGE",
+    "ATIS...UPDATE",
+    "Amend departure clearances...TRANSMIT"
+   ]
+  }
+ ]
+}

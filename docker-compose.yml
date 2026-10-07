@@ -1,0 +1,29 @@
+# lokalnie: docker compose up --build  ->  http://localhost:1337
+# dev:      docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# serwer:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+name: polids
+
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    image: ${POLIDS_IMAGE:-polids:local}
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:${POLIDS_PORT:-1337}:1337"
+    volumes:
+      - photos:/app/data/photos
+      - state:/app/data/state  # lista dostępu (zakładka ADMIN)
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  photos:
+  state:

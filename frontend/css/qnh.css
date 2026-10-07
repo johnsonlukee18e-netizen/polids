@@ -1,0 +1,104 @@
+/* METEO › QNH: mapa QNH regionalnego jak "MAPA QNH REGIONALNEGO" w vAWOS (jasna mapa w stylu AIP) i panel boczny
+   w stylu NM UI. Napisy na mapie czytelne dzięki pełnemu tłu etykiet, bez poświaty i cieni pod tekstem.
+   Stare reguły .qnhmap/.qnhside/.qnhnum/.qnhlabel ze style.css nie są już używane. */
+.qrwrap {
+  --qr-paper: #fff;            /* podkład mapy */
+  --qr-grid: #c9ccd0;          /* siatka 1° */
+  --qr-coast: #b4bac1;
+  --qr-fir: #8c7a22;           /* granica FIR EPWW (oliwkowa) */
+  --qr-reg: #2a9147;           /* granice i numery rejonów */
+  --qr-band: #d9822b;          /* numery pasów 15–17 */
+  --qr-tma: #ddd8ee;           /* wypełnienie TMA (liliowe) */
+  --qr-tma-edge: #3c3850;
+  --qr-tma-in: #8f89a8;
+  --qr-ink: #1d1f24;           /* kody lotnisk, opisy */
+  --qr-box: #141b2b;           /* etykiety: granatowe tło */
+  --qr-box-line: #3a4664;
+  flex: 1; min-height: 0; display: flex;
+}
+.qrmapbox { flex: 1; min-width: 0; position: relative; display: flex; }
+.qrwrap .qrmap.leaflet-container { flex: 1; background: var(--qr-paper); }
+.qrwrap .leaflet-bar { border-radius: 0; }
+.qrwrap .leaflet-bar a { background: #fff; color: #222; border-bottom-color: #ccc; border-radius: 0; }
+
+/* linie mapy: kolory i grubości z CSS (Leaflet wpisuje własne atrybuty SVG, CSS je nadpisuje) */
+.qrmap path.qr-gl { stroke: var(--qr-grid); stroke-width: 1; }
+.qrmap path.qr-coast { stroke: var(--qr-coast); stroke-width: 1.2; fill: none; }
+.qrmap path.qr-rline { stroke: var(--qr-reg); stroke-width: 1.4; stroke-linejoin: round; }
+.qrmap path.qr-fir { stroke: var(--qr-fir); stroke-width: 2.6; stroke-linejoin: round; }
+.qrmap path.qr-tedge { stroke: var(--qr-tma-edge); stroke-width: 2.6; }
+.qrmap path.qr-tfill { fill: var(--qr-tma); }
+.qrmap path.qr-tin { stroke: var(--qr-tma-in); stroke-width: .8; }
+.qrmap path.qr-tline { stroke: var(--qr-tma-edge); stroke-width: 1.2; fill: none; }
+.qrmap path.qr-hl { stroke: #0b6fd1; stroke-width: 3; fill: #0b6fd1; fill-opacity: .1; }
+
+/* opisy stopni siatki przy krawędziach */
+.qr-grat { position: absolute; inset: 0; pointer-events: none; z-index: 450; overflow: hidden; }
+.qr-grat span { position: absolute; transform: translateX(-50%); padding: 0 2px; background: rgba(255,255,255,.85);
+  font: 10px/1.2 var(--mono); color: #6b7076; }
+.qr-grat span.lat { transform: translateY(-50%); }
+
+/* ikony divIcon: sam środek; etykieta wyśrodkowana w punkcie + przesunięcie (--dx, --dy z JS),
+   przy zoomie mniejszym od domyślnego przesunięcie (--qs) i etykieta (--qb) maleją razem z mapą */
+.leaflet-marker-icon.qr-icon { background: none; border: 0; }
+.qr-icon > div { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.qr-icon > .qr-pos { transform: translate(calc(-50% + var(--dx, 0px) * var(--qs, 1)), calc(-50% + var(--dy, 0px) * var(--qs, 1)))
+  scale(var(--qb, 1)); }
+
+/* numery rejonów */
+.qr-num { font: 400 30px/1 var(--ui); color: var(--qr-reg); }
+.qr-num.band { color: var(--qr-band); }
+
+/* etykiety: SEKTOR n (biały napis, QNH turkusowy) i TMA (żółta nazwa, QNH zielony) */
+.qr-lbl { display: flex; flex-direction: column; align-items: center; min-width: 64px; padding: 2px 6px 1px;
+  background: var(--qr-box); border: 1px solid var(--qr-box-line); line-height: 1.1; }
+.qr-lbl small { font: 700 8px/1.2 var(--ui); letter-spacing: .8px; text-transform: uppercase; color: #e9edf5; }
+.qr-lbl b { font: 700 14px/1.15 var(--mono); color: var(--cyan); }
+.qr-lbl.tma small { color: var(--yellow); }
+.qr-lbl.tma b { color: var(--green-hi); }
+.qr-lbl.nil b { color: #6f7787; }
+.qr-lbl.on { outline: 2px solid #0b6fd1; }
+
+/* opisy "BELOW TMA QNH FROM EPxx" jak na mapie AIP */
+.qr-cap { padding: 0 2px; background: rgba(255,255,255,.72); font: 700 8.5px/1.15 var(--ui); color: #2c2f36; text-align: center; letter-spacing: .2px; }
+
+/* lotniska: romb (bez METAR-u) albo kółko z kropką (lotnisko kontrolowane / z METAR-em) i kod ICAO */
+.qr-ad { transform: translate(-6.5px, -6.5px); display: flex; align-items: center; gap: 2px; }
+.qr-ad i { width: 7px; height: 7px; margin: 1.5px; border: 1.5px solid var(--qr-ink); background: #fff; transform: rotate(45deg); flex: none; }
+.qr-ad.ctl i { width: 9px; height: 9px; margin: 0.5px; border-radius: 50%; transform: none;
+  background: radial-gradient(circle, var(--qr-ink) 0 1.6px, #fff 2px); }
+.qr-ad span { font: 700 9px/1 var(--ui); color: var(--qr-ink); background: rgba(255,255,255,.6); padding: 0 1px; }
+.qrwrap.qr-far .qr-ad span, .qrwrap.qr-far .qr-cap { display: none; }
+.leaflet-tooltip.qr-tip { background: var(--qr-box); color: #fff; border: 1px solid var(--qr-box-line); border-radius: 0; box-shadow: none;
+  font: 700 11px var(--mono); padding: 1px 5px; }
+.leaflet-tooltip.qr-tip::before { display: none; }
+
+/* panel boczny (NM UI): pasek tytułu, przełączniki warstw, gęste tabele */
+.qrside { width: 360px; flex: none; overflow: auto; background: #050705; border-left: 1px solid var(--line); padding: 8px;
+  display: flex; flex-direction: column; gap: 8px; }
+.qr-head { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 0; }
+.qr-head b { font: 700 13px var(--sans, var(--ui)); letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+.qr-stamp { margin-left: auto; font: 12px var(--mono); color: var(--muted); }
+.qr-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 6px; border: 1px solid var(--line); background: var(--panel);
+  font: 11px var(--sans, var(--ui)); color: var(--muted); }
+.qr-tools label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: .5px; }
+.qr-tools input { accent-color: var(--green); margin: 0; }
+.qr-err { font: 12px var(--mono); color: var(--bad); }
+.qr-err:empty { display: none; }
+.qr-card { background: var(--panel); border: 1px solid var(--line); }
+.qr-card h4 { margin: 0; padding: 4px 8px; background: var(--head, var(--panel-2)); border-bottom: 1px solid var(--head-line, var(--line));
+  font: 700 11px/1.3 var(--sans, var(--ui)); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px;
+  display: flex; justify-content: space-between; gap: 8px; }
+.qr-card h4 span { font-weight: 400; color: var(--muted); letter-spacing: .3px; text-transform: none; }
+.qrside table.data th { position: static; padding: 3px 5px; font-size: 10px; }
+.qrside table.data td { padding: 2px 5px; font-size: 12px; vertical-align: top; }
+.qrside table.data td.num { font-size: 12px; white-space: nowrap; }   /* "----" bez łamania na myślnikach */
+.qrside table.data td.q { font-weight: 700; font-size: 13px; color: var(--cyan); }
+.qrside table.qr-tma td.q { color: var(--green-hi); }
+.qrside table.data td.sta { font: 11px/1.45 var(--mono); color: var(--muted); }
+.qrside td.sta .low { color: var(--text); }
+.qrside td.sta .nil { color: #555c55; }
+.qrside tr.band td { color: var(--muted); }
+.qrside tr.band td.q { color: var(--qr-band); }
+.qrside tr[data-r], .qrside tr[data-t] { cursor: default; }
+.qr-note { margin: 0; font-size: 11px; line-height: 1.4; color: var(--muted); }

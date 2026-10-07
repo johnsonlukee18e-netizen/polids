@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{NAME}}</title>
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/awos.css">
+  <link rel="stylesheet" href="/static/css/qnh.css">
+  <link rel="stylesheet" href="/static/css/viff.css">
+  <link rel="stylesheet" href="/static/css/sectors.css">
+  <link rel="stylesheet" href="/static/css/strips.css">
+  <link rel="stylesheet" href="/static/css/radio.css">
+</head>
+<body>
+  <aside class="menu">
+    <nav id="tabs">
+      <button data-tab="about">?</button>
+      <button data-tab="radio">RADIO</button>
+      <button data-tab="meteo">METEO</button>
+      <button data-tab="aerodrome">AERODROME</button>
+      <button data-tab="adciv">AD CIV</button>
+      <button data-tab="admil">AD MIL</button>
+      <button data-tab="advfr">AD VFR</button>
+      <button data-tab="callsign">CALLSIGN</button>
+      <button data-tab="aircraft">AIRCRAFT</button>
+      <button data-tab="map">MAP</button>
+      <button data-tab="inop">INOP</button>
+      <button data-tab="docs">DOCS</button>
+      <button data-tab="phraseology">PHRASEOLOGY</button>
+      <button data-tab="checklist">CHECKLIST</button>
+      <button data-tab="emergency" class="red">EMERGENCY</button>
+      <button data-tab="admin" class="admin" hidden>ADMIN</button>
+    </nav>
+    <div class="clockbox">
+      <div id="utc" class="clock"></div>
+      <div id="airac" class="hint"></div>
+    </div>
+    <div id="userbox" class="userbox" hidden></div>
+  </aside>
+  <main id="views"></main>
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
