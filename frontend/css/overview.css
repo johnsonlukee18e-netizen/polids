@@ -1,0 +1,113 @@
+/* AERODROME › OVERVIEW: cały FIR EPWW na jednym ekranie (1600x900, użyteczne na 1366x768).
+   Styl jak reszta treści – panele NM UI z paskiem tytułu, gęste tabele, płaskie przyciski, bez poświaty.
+   Każdy panel przewija się w sobie; strona nie przewija się w ogóle. */
+
+/* OVERVIEW w podmenu AERODROME: nad przyciskami lotnisk, odcięty odstępem i ciemniejszy, żeby było widać,
+   że to nie kod lotniska */
+.submenu button.ad-ov-btn { font-size: 12px; letter-spacing: .6px;
+  background: linear-gradient(#2f8a22, #1d5c14); border-color: #17470f; }
+.submenu button.ad-ov-btn:hover { background: linear-gradient(#3da22c, #27761c); }
+.submenu button.ad-ov-btn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+
+.ad-pane.ov-mode > .toolbar .ad-view { display: none; }   /* PRZEGLĄD/AWOS/RUCH dotyczą jednego lotniska */
+.ov { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ov > .toolbar.ov-bar { margin: 0 0 6px; }
+.ov-bar label.sc { gap: 6px; }
+.ov-bar select.ov-pos { font: 700 13px var(--mono); max-width: 330px; }
+.ov-bar .ov-pos-note { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-bar .ov-net { max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ov-grid { flex: 1; min-height: 0; display: grid; gap: 8px;
+  grid-template-columns: 272px minmax(400px, 1.4fr) minmax(300px, 1fr); }
+.ov-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.ov-col > .card { --cy: 6px; --cx: 10px; min-height: 0; display: flex; flex-direction: column; }
+.ov-col > .card h3 { margin-bottom: 4px; flex: none; display: flex; align-items: baseline; gap: 8px; }
+.ov-col > .card h3 .ov-h-note { margin-left: auto; color: var(--muted); font: 400 10px var(--sans); letter-spacing: 0;
+  text-transform: none; }
+.ov-col > .card.grow { flex: 1 1 0; }
+.ov-col > .card.part { flex: 0 1 auto; max-height: 44%; }
+/* tabela poziomów przejściowych bywa długa (15 lotnisk): zostawiamy miejsce na checklistę, reszta się przewija */
+.ov-col > .card.ov-tl { flex: 0 1 auto; max-height: 56%; }
+.ov-col .scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* --- wspólne drobiazgi */
+.ov .ic { font: 700 13px var(--mono); color: #fff; }
+.ov-chip { display: inline-block; flex: none; padding: 0 5px; border: 1px solid var(--line); color: var(--muted);
+  font: 700 10px/16px var(--ui); letter-spacing: .4px; white-space: nowrap; }
+.ov-chip.on { background: #14240f; border-color: var(--green-hi); color: var(--green-hi); }
+.ov-chip.warn { border-color: var(--warn); color: var(--warn); }
+.ov-chip.bad { background: #b0201a; border-color: #ff5a4a; color: #fff; }
+.ov-note { margin: 4px 0 0; padding: 2px 6px; font-size: 11px; border-left: 3px solid var(--line); }
+.ov-note.warn { color: #e8e2c8; border-left-color: var(--warn); }
+.ov-err { margin-bottom: 4px; font-size: 12px; }
+.ov .ov-src { margin-top: 6px; padding-top: 4px; border-top: 1px solid #161b16; font-size: 11px; line-height: 1.35; }
+.ov table.data.ov-tab { font-size: 12px; }
+.ov table.data.ov-tab th, .ov table.data.ov-tab td { padding: 2px 6px; }
+.ov table.data.ov-tab td.num { font-size: 12px; }
+.ov .ok { color: var(--ok); } .ov .near { color: var(--warn); } .ov .over { color: var(--bad); font-weight: 700; }
+.ov [data-tip] { position: relative; }
+.ov .sub-note { color: var(--muted); font-size: 11px; }
+
+/* --- poziom przejściowy */
+.ov-tl-big { font: 15px/1.5 var(--mono); color: var(--text); }
+.ov-tl-big b { font-size: 19px; color: #fff; }
+.ov-tl-rule { margin-bottom: 4px; line-height: 1.35; }
+.ov-tl-body table.data td.tlv { font: 700 14px var(--mono); color: #fff; }
+.ov-tl-body table.data tr.warn td.tlv { color: var(--warn); }
+
+/* --- METAR / TAF / LVP */
+.ov-ad { padding: 3px 4px; border-bottom: 1px solid #161b16; cursor: pointer; }
+.ov-ad:hover { background: var(--row-hover); }
+.ov-ad.open { background: #0f140f; }
+.ov-ad-head { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.ov-ad-head .cat { font: 700 11px var(--mono); }
+.ov-ad-head .ov-traffic { font: 12px var(--mono); color: var(--cyan); }
+.ov-ad-head .ov-obs { font: 11px var(--mono); color: var(--muted); }
+.ov-ad-head .ov-more { margin-left: auto; font: 10px var(--sans); color: var(--muted); }
+.ov .wx.ov-metar, .ov .wx.ov-taf { font: 13px/1.45 var(--mono); overflow-wrap: anywhere; }
+.ov .wx.ov-taf { color: #c9d4c9; }
+.ov .wx.ov-taf .cont { display: inline-block; padding-left: 4ch; }
+.ov-lvp-why { padding-left: 2ch; font: 11px var(--mono); color: var(--warn); }
+
+/* --- NOTAM */
+.ov-nt { padding: 3px 6px; margin-bottom: 4px; background: #111; border-left: 3px solid var(--ok); }
+.ov-nt-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ov-nt-head .id { font-size: 11px; color: var(--cyan); }
+.ov-nt-head .valid { font: 700 11px var(--mono); color: var(--ok); }
+.ov-nt-txt { font: 12px/1.4 var(--mono); color: #dfe8df; overflow-wrap: anywhere; }
+
+/* --- ECFMP / vIFF */
+.ov-sub { margin: 6px 0 3px; padding-bottom: 2px; color: var(--yellow); font: 700 11px/1.4 var(--sans);
+  text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--head-line); }
+.ov-flow-body > .ov-sub:first-child { margin-top: 0; }
+.ov-fm { padding: 3px 6px; margin-bottom: 4px; background: #111; border-left: 3px solid var(--line); }
+.ov-fm.active { border-left-color: var(--ok); }
+.ov-fm.notified { border-left-color: var(--cyan); }
+.ov-fm-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ov-fm-head b { font-size: 13px; color: #fff; }
+.ov-fm-val { font: 12px var(--sans); color: var(--text); }
+.ov-fm-time { margin-left: auto; font-size: 11px; color: var(--yellow); }
+.ov-fm-why { font: 11px/1.35 var(--sans); color: var(--muted); }
+.ov-fm-flt { display: flex; flex-wrap: wrap; gap: 2px 10px; font: 11px var(--sans); color: var(--muted); }
+.ov-fm-flt b { font-family: var(--mono); color: var(--text); }
+.ov-flow-body table.data tr.on td { background: #14240f !important; }
+
+/* --- Airport Monitor vIFF */
+.ov-mon-tab td.ic { text-align: left; }
+.ov-mon-body table.data th { font-size: 10px; }
+.ov-mon-body td.tip, .ov-mon-body [title] { cursor: help; }
+
+/* --- checklista otwarcia stanowiska */
+.ov-chk-pos { margin-bottom: 2px; font: 700 13px var(--mono); color: var(--green-hi); }
+.ov-chk-body .checklist { font-size: 12px; }
+.ov-chk-body .chk-row { padding: 1px 2px; }
+.ov-chk-body .chk-section { margin: 5px 0 2px; }
+.ov-chk-body .chk-note { width: 96px; }
+
+/* niskie albo wąskie okno (1366x768 i mniej): panele w naturalnej wysokości, ekran przewija się jak w PRZEGLĄDZIE */
+@media (max-width: 1240px), (max-height: 640px) {
+  .ad-pane.ov-mode { overflow: auto; }
+  .ov-grid { grid-template-columns: 272px minmax(0, 1.4fr); }
+  .ov-col > .card.grow, .ov-col > .card.part { flex: none; max-height: none; }
+  .ov-col .scroll { max-height: 300px; }
+}

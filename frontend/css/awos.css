@@ -85,6 +85,9 @@
 .aw-dial .mean line { stroke: var(--green-hi); stroke-width: 3; }
 .aw-dial .mean polygon { fill: var(--green-hi); }
 .aw-dial .inst { fill: #fff; stroke: #000; stroke-width: 1.5; }
+/* wskazówki obraca awos.js przez CSS wokół środka tarczy; od drugiego rysowania płynnie (odświeżenie co kilka sekund) */
+.aw-dial .mean, .aw-dial .inst { transform-box: view-box; transform-origin: 120px 120px; }
+.aw-dial.anim .mean, .aw-dial.anim .inst { transition: transform 1.2s ease-in-out; }
 .aw-dial .ctr rect { fill: #000; stroke: #4a544a; stroke-width: 1; }
 .aw-dial .ctr text { fill: #fff; font-family: var(--mono); font-weight: 700; text-anchor: middle; }
 .aw-dial .ctr .d { font-size: 20px; }
@@ -120,6 +123,8 @@ table.aw-rows td.warn, table.aw-rows .r-inst td.warn { color: var(--yellow); }
 .aw-stn { min-width: 0; overflow: hidden; font: 700 12px/1.35 var(--mono); color: var(--text); }
 .aw-stn em { font-style: normal; font-size: 18px; color: var(--cyan); }
 .aw-atistxt { flex: 1; min-height: 0; overflow: auto; padding: 6px 10px; font: 13px/1.45 var(--mono); color: var(--text); }
+/* każda linijka text_atis osobno; zawinięta dalej z wcięciem, żeby było widać, gdzie zaczyna się następna */
+.aw-atistxt .ln { padding-left: 2ch; text-indent: -2ch; overflow-wrap: anywhere; }
 .aw-atis.stack .aw-letter b { min-width: 48px; font-size: 34px; line-height: 44px; }
 
 /* nakładka METAR / TAF / NOTAM nad środkiem ekranu */
@@ -155,6 +160,9 @@ table.aw-dec td { font: 15px var(--mono); color: #fff; }
 .aw-btn b { color: var(--yellow); margin-left: 4px; }
 .aw-btn.active { background: #14240f; border-color: var(--green-hi); color: var(--green-hi); }
 
+@media (prefers-reduced-motion: reduce) {
+  .aw-dial.anim .mean, .aw-dial.anim .inst { transition: none; }
+}
 @media (max-width: 1450px) {
   .aw-box { padding: 3px 7px; }
   .aw-sunrow { font-size: 12px; gap: 0 8px; }

@@ -7,18 +7,19 @@ w stylu EUROCONTROL NM UI. Backend FastAPI + SQLite, frontend w czystym JS, cał
 
 | Zakładka | Co jest |
 |---|---|
-| RADIO | GEO: kafelki stanowisk jak w VACS i mapa zasięgu wybranych pozycji; SEKTORYZACJA LOW/MID/HIGH (kolejność przejmowania z om.plvacc.pl); listy EPWW ACC, lotnisk i FIR-ów sąsiednich, kto jest online, rezerwacje na dziś |
-| METEO | METAR/TAF, mapa QNH regionalnego, WIND z wiatrem 0 ft / 3000 ft na podejściu do każdego pasa |
-| AERODROME | przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), widok AWOS, paski EFES (RUCH) |
+| RADIO | GEO: kafelki stanowisk jak w VACS i mapa zasięgu wybranych pozycji; SEKTORYZACJA LOW/MID/HIGH (kolejność przejmowania z om.plvacc.pl); listy EPWW ACC, lotnisk i FIR-ów sąsiednich (osobno EDUU/EDYY), kto jest online, rezerwacje na dziś; u sąsiadów callsigny radiowe i nazwy sektorów (VATSIM Germany Knowledgebase, LOA) i pasek LOA z tabelami przekazań; przyciski szybkiego skoku we wszystkich listach; lotniska VFR bez ID |
+| METEO | METAR/TAF, mapa QNH regionalnego na podkładzie jak mapa rejonów QNH z AIP Polska (PAŻP), WIND z wiatrem 0 ft / 3000 ft na podejściu do każdego pasa |
+| AERODROME | OVERVIEW dla całego FIR EPWW (TL, METAR/TAF ze stanem LVP, aktywne NOTAM-y, restrykcje ECFMP i vIFF, Airport Monitor vIFF; filtr stanowiska: APP/ACC zawęża lotniska i pokazuje checklistę otwarcia, TWR przenosi do lotniska); przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), widok AWOS (wiatr co 5 s, RVR z METAR albo symulowany), paski EFES (RUCH) |
 | AD CIV / AD MIL / AD VFR | eAIP PAŻP |
 | CALLSIGN, AIRCRAFT | callsigny, typy samolotów (WTC, RECAT-EU, wymiary, zdjęcia, przyciski producentów) |
-| MAP | ruch VATSIM (odlot / przylot / tranzyt), przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF |
-| INOP, DOCS, PHRASEOLOGY | om.plvacc.pl, PDF-y z `data/docs/`, baza frazeologii EUROCONTROL |
+| MAP | ruch VATSIM (odlot / przylot / tranzyt), przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF; ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska, lista sąsiednich FIR-ów domyślnie zwinięta |
+| INOP, DOCS, PHRASEOLOGY | om.plvacc.pl, PDF-y z `data/docs/` (w tym LOA EPWW z sąsiadami), baza frazeologii EUROCONTROL |
 | CHECKLIST, EMERGENCY | checklisty stanowiska, procedury awaryjne EUROCONTROL |
 | ADMIN | lista CID-ów z dostępem i odmowy logowania (tylko admin) |
 
 Źródła danych: pliki EuroScope (sektorówka EPWW, navdata, pliki `.ese` vACC sąsiadów w `data/import/neighbours/`), VATSIM (data feed, bookings), metar.vatsim.net /
-aviationweather.gov, NOTAM z cv.plvacc.pl, [vIFF](https://api.viffsys.com/docs), OurAirports, vacs-data, VATSpy.
+aviationweather.gov, NOTAM z cv.plvacc.pl, [vIFF](https://api.viffsys.com/docs), [ECFMP](https://ecfmp.vatsim.net), OurAirports, vacs-data, VATSpy,
+[VATSIM Germany Knowledgebase](https://knowledgebase.vatsim-germany.org/shelves/centersektoren) (`data/seed/names_de.json`), LOA (`data/docs/LOA/`, wyciąg `data/seed/loa.json`).
 
 ## Uruchomienie
 
@@ -106,9 +107,16 @@ Wyposażenie pasów (ILS, RNP, VOR, NDB) czytane jest z nazw procedur w `.ese`. 
 - Parser ATIS obsługuje typowe formaty vATIS.
 - vIFF nie publikuje schematów odpowiedzi; TOBT/TSAT/TTOT są tylko, gdy ktoś prowadzi CDM na EPWA. Godziny w vIFF
   są bez daty, przejście przez północ liczone względem bieżącej godziny UTC.
-- AWOS nie ma czujników - wiatr chwilowy, średnia 2 min i min/max są symulowane z METAR (oznaczenie SYM).
+- AWOS nie ma czujników - wiatr chwilowy, średnia 2 min i min/max są symulowane z METAR (oznaczenie SYM). RVR bez grupy w METAR
+  jest symulowany z widzialności (zakładamy światła HI, więc w nocy na małych lotniskach może wyjść za wysoki).
 - QFE liczone w przybliżeniu z QNH i elewacji.
-- Rejony QNH i TMA w `qnh_regions.json` odrysowane w przybliżeniu (rejony 15-17 do potwierdzenia), progi LVP do sprawdzenia z INOP.
+- Rejony QNH 1-14 i obszary TMA/MTMA w `qnh_regions.json` odrysowane ze zrzutu mapy z AIP Polska (`data/import/qnh_pansa.png`,
+  `scripts/trace_qnh_regions.py`, ok. 0,5 km). QNH rejonu = najniższe QNH z METAR jego lotnisk (oficjalne liczy IMGW z modelu);
+  pasy 15-17 (53°N, 51°N) = najniższe QNH z lotnisk pasa. Progi LVP do sprawdzenia z INOP.
+- OVERVIEW: TL wg OM PL vACC (AIRAC 2610), TA 6500 ft niesprawdzone w eAIP. Część pól vIFF (przepustowość lotniska, przyloty
+  w godzinie) odczytana z dokumentacji i odpowiedzi API. NOTAM-y wg okresu B)-C), bez harmonogramu D). ECFMP/vIFF zawsze dla całego FIR.
+- LOA w RADIO to ręczny wyciąg z PDF-ów (obowiązuje PDF); LOA z Lwowem jest z 2022 r. Nazwy niemieckie z Knowledgebase (08.10.2026);
+  CTR bez nazwy w żadnym źródle dostaje callsign wspólny dla FIR-u (szarszy, „przyjęty”).
 - Kolejność przejmowania sektorów ACC z tabel om.plvacc.pl/docs/2610/ownerships (`data/seed/ownership.json`, wklejone 06.10.2026,
   przy nowym AIRAC trzeba wkleić ponownie); B, C, D HIGH i T MID wg pliku `.ese`. TMA/CTR: najpierw APP/TWR z `.ese`, potem ACC.
 - Sektory sąsiadów: z każdego pliku tylko FIR-y tego vACC (z ukraińskiego tylko Lwów), sektory zależne od pasa w jednym układzie
@@ -127,6 +135,10 @@ Wyposażenie pasów (ILS, RNP, VOR, NDB) czytane jest z nazw procedur w `.ese`. 
 - Leaflet (BSD-2), CARTO/OpenStreetMap (ODbL), Esri World Gray Canvas
 - ATFCM/CDM: [vIFF](https://viffsys.com) (Roger Puig), tylko odczyt
 - granice FIR: [vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0)
+- callsigny i nazwy sektorów niemieckich: [VATSIM Germany Knowledgebase](https://knowledgebase.vatsim-germany.org/shelves/centersektoren)
+  (tylko krótkie dane, przy każdym wpisie adres źródła)
+- LOA: porozumienia PL vACC z vACC sąsiadów (`data/docs/LOA/`)
+- mapa rejonów QNH: AIP Polska (PAŻP), zrzut `data/import/qnh_pansa.png`
 - sektory i stanowiska FIR-ów sąsiednich: pliki `.ese` pakietów sektorowych vACC sąsiadów (`data/import/neighbours/`)
 - łańcuchy sektorów i etykiety sąsiadów: [vacs-data](https://github.com/vacs-project/vacs-data)
   ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), commit c5aa4bd), wyciąg

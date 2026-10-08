@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import main  # noqa: E402
 from backend.app.routers import vatsim as vatsim_api  # noqa: E402
 from backend.app.services.http_cache import UpstreamError  # noqa: E402
-from backend.app.services.radio import merge_positions, position_range, sector_group, sector_kind  # noqa: E402
+from backend.app.config import settings  # noqa: E402
+from backend.app.services.radio import (merge_positions, neighbour_tab, position_range, radio_names,  # noqa: E402
+                                        sector_group, sector_kind, seed_json)
 from backend.app.services.vatsim import fir_boundaries  # noqa: E402
 
 FEED = {"general": {"update_timestamp": "2026-10-06T12:00:00Z"}, "pilots": [], "atis": [],
@@ -148,3 +150,119 @@ def test_radio_sectors(client):
     assert by[("EPWW", "EPWA_APP_N_A")]["group"] == "TMA Warszawa"
     assert by[("EPWW", "EPPO_TMA_N_A")]["group"] == "TMA Poznań N"
     assert not any(f["properties"]["name"].startswith("TECH ") for f in gj["features"])
+
+
+def test_neighbour_tab():
+    """Zakładki sąsiadów: EDUU i EDYY osobno (choć w vacs-data i plikach sąsiadów są w katalogach EDWW/EDMM),
+    dalej katalog FIR-u z vacs-data, bez niego prefiks; Polska = None, reszta = INNE."""
+    cases = {("EDUU_O12_CTR", "EDUU", "EDUU"): "EDUU", ("EDYY_BB_CTR", "EDYY", "EDWW"): "EDUU",
+             ("EDYY_MH_CTR", "EDYY", "EDWW"): "EDUU", ("EDUU_SPE_CTR", "EDUU", None): "EDUU",
+             ("EDWW_FLG_CTR", "EDWW", "EDWW"): "EDWW", ("EDDB_N_TWR", "EDDB", "EDWW"): "EDWW",
+             ("EDGG_BAD_CTR", "EDGG", "EDMM"): "EDMM", ("EDDM_TWR", "EDDM", "EDMM"): "EDMM",
+             ("EDDB_TWR", "EDDB", None): "EDWW", ("EDDP_TWR", "EDDP", None): "EDMM",
+             ("LKAA_N_CTR", "LKAA", "LK"): "LKAA", ("LZBB_CTR", "LZBB", None): "LZBB", ("UKLV_CTR", "UKLV", None): "UKLV",
+             ("UMMS_CTR", "UMMS", None): "UMMV", ("UMKK_CTR", "UMKK", "UMKK"): "UMKK", ("RU-NWC_FSS", "RU-NWC", None): "UMKK",
+             ("EYVL_CTR", "EYVL", "EY"): "EYVL", ("ESMM_6_CTR", "ESMM", "ES"): "ESAA", ("EKCH_FW_CTR", "EKDK", "EK"): "EKDK",
+             ("EURN_FSS", "EURN", None): "INNE", ("XXXX_CTR", "XXXX", "XX"): "INNE",
+             ("EPWA_APP", "EPWA", None): None, ("EPWW_C_CTR", None, None): None}
+    for (cs, pre, fir), want in cases.items():
+        assert neighbour_tab({"callsign": cs, "prefix": pre, "fir": fir}) == want, cs
+
+
+def test_radio_names_priority():
+    """Znak radiowy i sektor: baza wiedzy VATSIM Germany > LOA (strona sąsiada) > plik .ese; loginy zastępcze;
+    stanowiska ACC bez nazwy – znak pozostałych CTR z tym prefiksem (bez stanowisk informacji)."""
+    kb = {"EDWW_MRZ_CTR": {"radio": "Bremen Radar", "sector": "Müritz (MRZ)", "freq": "124.175", "url": "https://kb/x",
+                           "aliases": ["EDWW_MR1_CTR"], "limits": "GND-FL245"}}
+    loa = {"EDWW": {"title": "LOA EPWW – EDWW (Bremen)", "positions": [
+        {"callsign": "EDWW_MRZ_CTR", "radio": "", "sector": "Mueritz (MRZ)", "side": "NB", "note": ""},
+        {"callsign": "EPSC_TWR", "radio": "Szczecin Tower", "sector": "EPSC TMA", "side": "EP", "note": ""}]},
+           "LKAA": {"title": "LOA EPWW – LKAA (Praha)", "positions": [
+               {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "NU", "side": "NB", "note": "FL305-FL660"},
+               {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "SU", "side": "NB", "note": ""}]}}
+    ps = [{"callsign": "EDWW_MRZ_CTR", "prefix": "EDWW", "facility": "CTR", "name": "Bremen Radar"},
+          {"callsign": "EDWW_MR1_CTR", "prefix": "EDWW", "facility": "CTR", "name": None},
+          {"callsign": "LKAA_U_CTR", "prefix": "LKAA", "facility": "CTR", "name": None},
+          {"callsign": "LKAA_W_CTR", "prefix": "LKAA", "facility": "CTR", "name": "Praha Radar"},
+          {"callsign": "LKAA_WU_CTR", "prefix": "LKAA", "facility": "CTR", "name": None},
+          {"callsign": "LKAA_I_CTR", "prefix": "LKAA", "facility": "CTR", "name": None},
+          {"callsign": "LKAA_FIC_FSS", "prefix": "LKAA", "facility": "FSS", "name": "Praha Information"},
+          {"callsign": "LKPR_TWR", "prefix": "LKPR", "facility": "TWR", "name": None},
+          {"callsign": "EPSC_TWR", "prefix": "EPSC", "facility": "TWR", "name": "Szczecin Tower"}]
+    out = {p["callsign"]: p for p in radio_names(ps, kb, loa)}
+    mrz = out["EDWW_MRZ_CTR"]
+    assert (mrz["radio"], mrz["radio_src"], mrz["sector"], mrz["sector_src"]) == ("Bremen Radar", "kb", "Müritz (MRZ)", "kb")
+    assert mrz["kb"] == {"url": "https://kb/x", "limits": "GND-FL245"} and mrz["loa"]["titles"] == ["LOA EPWW – EDWW (Bremen)"]
+    assert out["EDWW_MR1_CTR"]["sector"] == "Müritz (MRZ)"  # login zastępczy
+    u = out["LKAA_U_CTR"]
+    assert (u["radio"], u["radio_src"], u["sector"], u["sector_src"]) == ("Praha Radar", "loa", "NU / SU", "loa")
+    assert u["loa"]["notes"] == ["FL305-FL660"]
+    assert (out["LKAA_W_CTR"]["radio"], out["LKAA_W_CTR"]["radio_src"], out["LKAA_W_CTR"]["sector"]) == ("Praha Radar", "ese", None)
+    # "Praha Information" (LKAA_FIC_FSS) nie blokuje znaku "Praha Radar" pozostałym stanowiskom LKAA
+    assert (out["LKAA_WU_CTR"]["radio"], out["LKAA_WU_CTR"]["radio_src"]) == ("Praha Radar", "prefix")
+    assert (out["LKAA_FIC_FSS"]["radio"], out["LKAA_FIC_FSS"]["radio_src"]) == ("Praha Information", "ese")
+    assert out["LKAA_I_CTR"]["radio"] is None and out["LKPR_TWR"]["radio"] is None  # informacja / lotnisko: bez zgadywania
+    ep = out["EPSC_TWR"]  # Polska: bez zmian (nazwa z pliku .ese)
+    assert ep["radio"] is None and ep["sector"] is None and ep["name"] == "Szczecin Tower"
+    # ręcznie zepsute pliki: bez wyjątku, zostaje nazwa z pliku .ese
+    junk = radio_names([{"callsign": "EDWW_FLG_CTR", "prefix": "EDWW", "facility": "CTR", "name": "Bremen Radar"}],
+                       ["x"], {"EDWW": {"positions": {"a": 1}}, "LKAA": {"positions": ["x", None]}, "X": []})
+    assert (junk[0]["radio"], junk[0]["radio_src"], junk[0]["sector"]) == ("Bremen Radar", "ese", None)
+
+
+def test_seed_json_reloads_changed_file(tmp_path):
+    f = tmp_path / "x.json"
+    f.write_text('{"a": 1}', "utf-8")
+    assert seed_json(f) == {"a": 1}
+    assert seed_json(f) is seed_json(f)  # z pamięci
+    f.write_text('{"a": 22}', "utf-8")
+    st = f.stat()
+    os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000))
+    assert seed_json(f) == {"a": 22}
+    f.unlink()
+    with pytest.raises(OSError):
+        seed_json(f)
+
+
+def test_radio_positions_names_and_tabs(client):
+    ps = {p["callsign"]: p for p in client.get("/api/radio/positions").json()}
+    flg = ps["EDWW_FLG_CTR"]
+    assert (flg["radio"], flg["sector"], flg["radio_src"], flg["nb_tab"]) == ("Bremen Radar", "Fläming (FLG)", "kb", "EDWW")
+    assert flg["kb"]["url"].startswith("https://knowledgebase.vatsim-germany.org/")
+    # EDUU i EDYY we własnej zakładce, także stanowiska z pliku .ese sąsiada (EDYY_MH_CTR) i tylko z vacs-data
+    upper = [cs for cs, p in ps.items() if cs.split("_")[0] in ("EDUU", "EDYY")]
+    assert len(upper) > 20 and all(ps[cs]["nb_tab"] == "EDUU" for cs in upper)
+    assert ps["EDYY_CL_CTR"]["radio"] == "Maastricht Radar" and ps["EDUU_SPE_CTR"]["sector"] == "Spree (SPE)"
+    assert not [cs for cs, p in ps.items() if p["nb_tab"] in ("EDWW", "EDMM") and cs.split("_")[0] in ("EDUU", "EDYY")]
+    # LOA: sektor czeski, znak radiowy z LOA albo pliku .ese
+    assert ps["LKAA_N_CTR"]["radio"] == "Praha Radar" and ps["LKAA_N_CTR"]["sector"] == "NL"
+    assert ps["LKAA_N_CTR"]["sector_src"] == "loa" and ps["LKAA_N_CTR"]["nb_tab"] == "LKAA"
+    assert (ps["LKAA_WU_CTR"]["radio"], ps["LKAA_WU_CTR"]["radio_src"]) == ("Praha Radar", "prefix")
+    assert ps["EPWA_APP"]["nb_tab"] is None and ps["EPWA_APP"]["radio"] is None
+    assert ps["EURN_FSS"]["nb_tab"] == "INNE"
+
+
+def test_radio_loa(client):
+    d = client.get("/api/radio/loa").json()
+    assert set(d["firs"]) >= {"EDWW", "EDUU", "EDMM", "LKAA", "LZBB", "UKLV", "EYVL", "ESAA"}
+    for key, f in d["firs"].items():
+        assert f["title"] and f["pdf"].startswith("/files/docs/LOA/") and f["transfers"], key
+    assert {t["dir"] for t in d["firs"]["LKAA"]["transfers"]} == {"in", "out"}
+    assert client.get(d["firs"]["EDWW"]["pdf"]).status_code == 200  # PDF przez /files/docs
+
+
+def test_radio_loa_errors(client, monkeypatch, tmp_path):
+    """Brak albo uszkodzony loa.json: czytelny błąd LOA po polsku; lista stanowisk działa dalej (bez nazw z LOA)."""
+    client.get("/api/radio/positions")  # dane z vacs-data i VATSpy już w pamięci
+    monkeypatch.setattr(settings, "seed_dir", tmp_path)
+    r = client.get("/api/radio/loa")
+    assert r.status_code == 404 and "LOA" in r.json()["detail"]
+    (tmp_path / "loa.json").write_text("{zepsuty", "utf-8")
+    (tmp_path / "names_de.json").write_text("[]", "utf-8")
+    r = client.get("/api/radio/loa")
+    assert r.status_code == 500 and "loa.json" in r.json()["detail"]
+    (tmp_path / "loa.json").write_text('{"_uwaga": "bez firs"}', "utf-8")
+    assert client.get("/api/radio/loa").status_code == 500
+    ps = {p["callsign"]: p for p in client.get("/api/radio/positions").json()}
+    assert ps["EDWW_FLG_CTR"]["nb_tab"] == "EDWW" and ps["EDWW_FLG_CTR"]["radio"] == "Bremen Radar"  # nazwa z .ese
+    assert ps["EDWW_FLG_CTR"]["radio_src"] == "ese" and ps["EDWW_FLG_CTR"]["sector"] is None

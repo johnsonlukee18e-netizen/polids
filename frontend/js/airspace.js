@@ -1,6 +1,6 @@
 // Wspólne warstwy mapy przestrzeni (RADIO i MAP): sektory EPWW z pliku .ese, granice FIR z VATSpy,
 // podświetlenie stanowisk zalogowanych w sieci VATSIM.
-import { api, esc } from "./api.js";
+import { api, atisHtml, esc } from "./api.js";
 
 const PALETTE = ["#2f8fff", "#3ecf6e", "#ffb020", "#ff5c8a", "#a970ff", "#00c2c7", "#ff7a3d", "#c3d82b", "#ff4dd2", "#6f8cff"];
 // Stałe kolory 19 stanowisk ACC EPWW (te same w MAPA, SEKTORYZACJA i RADIO). Dobrane tak, żeby najbardziej różniły się
@@ -50,11 +50,24 @@ const since = (iso) => {
 };
 const tag = (kind, letter) => `<span class="ab ab-${kind.toLowerCase()}">${letter}</span>`;
 
-function atcRows(list, kind, letter) {
-  return list.map((c) => `<tr><td>${tag(kind, letter)}</td><td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td>
+// Wiersze dymka: znak, częstotliwość, kto, od kiedy; pod ATIS jego tekst linijka po linijce (jak w VATSIM Radar).
+// info: pod kontrolerem także jego opis (controller info, też w polu text_atis feedu)
+export function atcRows(list, kind, letter, { info = false } = {}) {
+  return list.map((c) => {
+    const txt = kind === "ATIS" || info ? atisHtml(c.text_atis) : "";
+    const head = kind === "ATIS" && c.atis_code ? `<b>INFO ${esc(c.atis_code)}</b>` : "";
+    return `<tr><td>${tag(kind, letter)}</td><td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td>
     <td>${esc(c.name || "?")} <span class="muted">${esc(c.cid ?? "")}${RATINGS[c.rating] ? " · " + RATINGS[c.rating] : ""}</span></td>
-    <td class="muted">${since(c.logon_time)}</td></tr>${kind === "ATIS" && c.text_atis?.length
-      ? `<tr><td></td><td colspan="4" class="atis">${c.atis_code ? `<b>INFO ${esc(c.atis_code)}</b> ` : ""}${c.text_atis.map(esc).join(" ")}</td></tr>` : ""}`).join("");
+    <td class="muted">${since(c.logon_time)}</td></tr>${txt || head
+      ? `<tr><td></td><td colspan="4" class="${kind === "ATIS" ? "atis" : "atis ci"}">${head}${txt}</td></tr>` : ""}`;
+  }).join("");
+}
+
+// Rodzaj stanowiska ze znaku (EPWA_N_APP → APP, ESGG_GND → GND, EPWW_C_CTR → CTR) i jego wiersz w dymku
+const KIND_OF = { DEL: "DEL", GND: "GND", RMP: "GND", TWR: "TWR", APP: "APP", DEP: "APP", ATIS: "ATIS" };
+export function controllerRows(c, opts = {}) {
+  const kind = KIND_OF[String(c?.callsign || "").toUpperCase().split("_").pop()] || "CTR";
+  return atcRows([c], kind, FACILITIES.find(([k]) => k === kind)?.[1] || kind, opts);
 }
 
 // Osobne warstwy (panes) nad nazwami punktów, żeby plakietek nie przykrywały etykiety; dymki jeszcze wyżej.
@@ -70,10 +83,10 @@ export function atcTooltip(title, subtitle, rows) {
   return `<div class="atc-tip-h"><b>${esc(title)}</b> ${esc(subtitle || "")}</div><table>${rows}</table>`;
 }
 
-// Plakietka lotniska (divIcon pod punktem lotniska) z dymkiem
-export function airportBadge(ap, panes = {}) {
+// Plakietka lotniska (divIcon pod punktem lotniska) z dymkiem. cls: dodatkowa klasa (MAP: "nb" = mniejsza plakietka sąsiada)
+export function airportBadge(ap, panes = {}, { cls = "" } = {}) {
   const fac = ap.facilities;
-  const html = `<div class="atcb"><b class="ab-icao">${esc(ap.icao)}</b>${FACILITIES.filter(([k]) => fac[k])
+  const html = `<div class="atcb${cls ? " " + cls : ""}"><b class="ab-icao">${esc(ap.icao)}</b>${FACILITIES.filter(([k]) => fac[k])
     .map(([k, l]) => tag(k, l)).join("")}</div>`;
   const rows = FACILITIES.filter(([k]) => fac[k]).map(([k, l]) => atcRows(fac[k], k, l)).join("");
   return L.marker([ap.lat, ap.lon], { icon: L.divIcon({ className: "atcicon", html, iconSize: null }), pane: panes.ad || "markerPane" })

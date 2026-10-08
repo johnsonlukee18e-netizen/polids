@@ -1,20 +1,34 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
 from ..services.positions import all_positions
-from ..services.radio import Station, position_range, sector_group, sector_kind
+from ..services.radio import (Station, neighbour_tab, position_range, radio_names, sector_group, sector_kind,
+                              seed_json)
 from ..services.vatsim import bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
 router = APIRouter(prefix="/api/radio", tags=["radio"])
+log = logging.getLogger("polids.radio")
+
+
+def _seed_or_empty(name: str) -> dict:
+    """Plik z data/seed do uzupełnienia listy stanowisk; brak albo błąd pliku nie psuje listy (tylko wpis w logu)."""
+    try:
+        data = seed_json(settings.seed_dir / name)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError) as exc:
+        log.warning("RADIO: pomijam data/seed/%s (%s)", name, exc)
+        return {}
 
 
 def _coords(db: Session, icaos: set[str]) -> dict[str, tuple[float, float]]:
@@ -30,14 +44,34 @@ def positions(db: Session = Depends(get_db)):
     """Stanowiska do RADIO: plik .ese + wszystkie stanowiska sąsiednich FIR-ów z vacs-data (bez FMP/TMU).
 
     `in_ese=false`: stanowisko tylko z vacs-data (bez nazwy, pokazujemy `fir_name`). `range`: zasięg na mapie
-    (granica VATSpy, okrąg wokół lotniska albo punkt lotniska)."""
+    (granica VATSpy, okrąg wokół lotniska albo punkt lotniska). `nb_tab`: zakładka sąsiada (None = Polska).
+    `radio`, `sector`: znak radiowy i nazwa sektora sąsiada (baza wiedzy VATSIM Germany, LOA, plik .ese)."""
     merged = all_positions(db)
     coords = _coords(db, {p["callsign"].split("_")[0] for p in merged})
     firs = fir_boundaries()
     for p in merged:
         lat, lon = coords.get(p["callsign"].split("_")[0], (None, None))
         p["range"] = position_range(p["callsign"], firs, lat, lon, p.get("prefix"))
-    return merged
+        p["nb_tab"] = neighbour_tab(p)
+    return radio_names(merged, _seed_or_empty("names_de.json").get("positions") or {},
+                       _seed_or_empty("loa.json").get("firs") or {})
+
+
+@router.get("/loa")
+def loa():
+    """Wyciąg z LOA EPWW z sąsiadami (data/seed/loa.json, PDF-y w DOCS › LOA): klucz = FIR zakładki sąsiada
+    (EDWW, EDUU, EDMM, LKAA, LZBB, UKLV, EYVL, ESAA), w każdym tytuł, wersja, PDF, stanowiska, przekazania
+    (dir out = EPWW → sąsiad, in = sąsiad → EPWW) i zasady (silent, vfr, other)."""
+    try:
+        data = seed_json(settings.seed_dir / "loa.json")
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "LOA: brak pliku data/seed/loa.json") from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(500, f"LOA: nie da się odczytać pliku data/seed/loa.json ({exc})") from exc
+    firs = data.get("firs") if isinstance(data, dict) else None
+    if not isinstance(firs, dict):
+        raise HTTPException(500, "LOA: plik data/seed/loa.json nie ma sekcji firs")
+    return {"firs": {k: v for k, v in firs.items() if isinstance(v, dict)}, "source": data.get("_zrodlo", "")}
 
 
 async def _feed() -> dict:

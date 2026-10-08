@@ -1,7 +1,8 @@
-import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { api, atisHtml, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
 import { colorize, wxLines, windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "./meteo.js";
 import { mountAwos } from "../awos.js";
 import { mountStrips } from "../strips.js";
+import { mountOverview } from "../overview.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 const byType = (a, b) => TYPE_ORDER.indexOf(a.callsign.split("_").pop()) - TYPE_ORDER.indexOf(b.callsign.split("_").pop()) || a.callsign.localeCompare(b.callsign);
@@ -258,7 +259,9 @@ function value(label, v, extra = "") {
 export default {
   mount(root, ctx) {
     const MAIN = ["EPWA", "EPMO", "EPKK", "EPKT", "EPGD", "EPPO", "EPWR", "EPLL", "EPRZ", "EPLB", "EPSC", "EPBY", "EPSY", "EPZG", "EPRA"].sort();
-    const sub = h(`<nav class="submenu">${MAIN.map((i) => `<button data-ad="${i}">${i}</button>`).join("")}</nav>`);
+    // OVERVIEW = cały FIR EPWW na jednym ekranie (overview.js); niżej, po odstępie, pojedyncze lotniska
+    const sub = h(`<nav class="submenu"><button data-ad="OVERVIEW" class="ad-ov-btn">OVERVIEW</button><div class="sep"></div>
+      ${MAIN.map((i) => `<button data-ad="${i}">${i}</button>`).join("")}</nav>`);
     root.append(sub);
     sub.addEventListener("click", (e) => { const b = e.target.closest("button[data-ad]"); if (b) go(b.dataset.ad); });
     const pane = h(`<div class="pane ad-pane">
@@ -279,6 +282,9 @@ export default {
     // widok: PRZEGLĄD (siatka poniżej), AWOS (awos.js) albo RUCH (paski EFES, strips.js); AWOS i RUCH mają własne
     // zegary sprzątane przez destroy()
     let view = ["awos", "ruch"].includes(lsGet("aerodrome.view")) ? lsGet("aerodrome.view") : "overview", awos = null, strips = null;
+    // OVERVIEW: cały FIR EPWW zamiast jednego lotniska (overview.js); zapamiętane, więc powrót do AERODROME
+    // otwiera to, co było ostatnio otwarte
+    let ovMode = lsGet("aerodrome.ov") === "1", ov = null;
 
     // lista podpowiedzi ICAO; bez niej pole działa dalej (wpisany kod), błąd tylko w konsoli
     api("/api/aerodromes").then((ads) => {
@@ -401,7 +407,7 @@ export default {
       try {
         [info, st] = await Promise.all([api(`/api/aerodromes/${icao}`), api(`/api/aerodromes/${icao}/status`)]);
       } catch (e) {
-        if (view !== "overview") return;
+        if (view !== "overview" || ovMode) return;
         $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`;
         // tytuł i godzina aktualizacji po poprzednim lotnisku nie mogą zostać przy nowo wybranym
         if (!$(".title").textContent.startsWith(icao)) {
@@ -412,7 +418,7 @@ export default {
         renderRuch($(".ad-ruch-line"));
         return;
       }
-      if (view !== "overview") return; // w międzyczasie przełączono na AWOS
+      if (view !== "overview" || ovMode) return; // w międzyczasie przełączono na AWOS, RUCH albo OVERVIEW
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
       $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z";
@@ -446,15 +452,47 @@ export default {
       if (Date.now() - awAt > 300000) loadApw();
       $(".ad-taf").innerHTML = st.taf ? wxLines("taf", st.taf) : colorize(null);
       $(".atis-h").textContent = `ATIS ${st.atis ? st.atis.letter || "" : ""}`;
-      $(".ad-atis").innerHTML = st.atis ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
+      $(".ad-atis").innerHTML = st.atis ? `<div class="mono atis-text">${atisHtml(st.atis.lines)}</div>`
         : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`;
       renderFreqs($(".freqs"), info);
       renderRuch($(".ad-ruch-line"));
       if (++ticks % 10 === 0) renderNotams($(".notams"));
     };
 
+    // OVERVIEW (cały FIR): zamiast siatki jednego lotniska montujemy overview.js w tym samym miejscu
+    const showOverview = () => {
+      ovMode = true;
+      lsSet("aerodrome.ov", "1");
+      sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === "OVERVIEW"));
+      history.replaceState(null, "", "#aerodrome/OVERVIEW");
+      clearInterval(timer);
+      timer = null;
+      awos?.destroy();
+      awos = null;
+      strips?.destroy();
+      strips = null;
+      if (ov) return;                       // już otwarty: zostaje ze swoim filtrem i zaznaczeniami checklisty
+      pane.classList.add("ov-mode");
+      $(".title").textContent = "OVERVIEW · FIR EPWW";
+      $(".upd").textContent = "";
+      $(".content").innerHTML = "";
+      // wieża wybrana w filtrze: zawsze PRZEGLĄD lotniska, także gdy ostatnio był otwarty AWOS albo RUCH
+      ov = mountOverview($(".content"), { onGoto: (code) => {
+        view = "overview";
+        lsSet("aerodrome.view", view);
+        go(code);
+      } });
+    };
+
     const go = (code) => {
-      icao = (code || $(".ad").value || icao).trim().toUpperCase();
+      const want = (code || $(".ad").value || icao).trim().toUpperCase();
+      if (want === "OVERVIEW") return showOverview();
+      ovMode = false;
+      lsSet("aerodrome.ov", "0");
+      ov?.destroy();
+      ov = null;
+      pane.classList.remove("ov-mode");
+      icao = want;
       $(".ad").value = icao;
       lsSet("aerodrome.icao", icao);
       sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === icao));
@@ -510,8 +548,10 @@ export default {
     // AWOS już pokazuje to lotnisko: zostaje (wybrany pas, otwarta nakładka, wykrywanie nowej litery ATIS).
     // RUCH tego lotniska: zostaje (zaznaczony pasek, przewinięcie zatok), tylko wznawia odświeżanie co 30 s.
     return { activate: (arg) => {
-      if (strips && (arg || icao).toUpperCase() === icao) return strips.resume();
-      if (!(awos && (arg || icao).toUpperCase() === icao)) go(arg || icao);
+      const want = (arg || "").trim().toUpperCase();
+      if (want === "OVERVIEW" || (!want && ovMode)) return showOverview();
+      if (strips && (want || icao) === icao) return strips.resume();
+      if (!(awos && (want || icao) === icao)) go(want || icao);
     } };
   },
 };

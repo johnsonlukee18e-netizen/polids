@@ -2,7 +2,9 @@
 // Pomysł i układ za vAWOS (Aleksander Gadomski); kod napisany od nowa.
 // VATSIM nie ma czujników wiatru, więc wiatr chwilowy jest SYMULOWANY z METAR: co sekundę próbka z płynnego
 // błądzenia losowego wokół kierunku i prędkości z METAR, w sektorze zmienności dddVddd, z porywami do wartości G.
-// Z próbek liczymy średnią 2-minutową, zakres kierunku i maksimum 10-minutowe jak prawdziwy AWOS.
+// Z próbek liczymy średnią 2-minutową, zakres kierunku i maksimum 10-minutowe jak prawdziwy AWOS. Ekran
+// odświeżamy rzadziej (WIND_REFRESH_S), a czujnik mierzy dalej co sekundę, więc okna 2 i 10 min się nie zmieniają.
+// RVR: z METAR; bez grupy RVR przy widzialności ≥ 1500 m > 2000 m, przy mniejszej symulowany z widzialności.
 import { api, esc, vatsimAtc } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 
@@ -16,6 +18,8 @@ const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(
 // proces Ornsteina-Uhlenbecka, krok 1 s: płynne błądzenie wracające do zera (tau = czas korelacji w s, sd = rozrzut)
 const ou = (x, tau, sd) => x - x / tau + Math.sqrt(2 / tau) * sd * gauss();
 const HIST = 600; // 10 min próbek co 1 s
+const WIND_REFRESH_S = 5; // co ile sekund nowy wiatr chwilowy na ekranie (tarcza, INST, średnie, RVR)
+const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 // --- symulacja wiatru -------------------------------------------------------------------------------
 
@@ -98,6 +102,26 @@ class Sensor {
   }
 }
 
+// --- symulacja RVR ------------------------------------------------------------------------------------
+
+// Czujniki RVR jednego pasa fizycznego (np. 11/29): przy progu pierwszego kierunku, w środku i przy drugim progu
+// (TDZ pasa 29 to END pasa 11). Każda próbka to mnożnik podstawy: wspólne wolne błądzenie (ławice mgły nad
+// całym lotniskiem) × własne błądzenie i stała różnica czujnika, więc TDZ / MID / END różnią się o kilka procent.
+class RvrRunway {
+  constructor() {
+    this.x = 0;
+    this.s = [0, 1, 2].map(() => ({ off: gauss() * 0.04, x: 0, hist: [] }));
+  }
+  step() {
+    this.x = ou(this.x, 600, 0.08);
+    this.s.forEach((q) => {
+      q.x = ou(q.x, 180, 0.05);
+      q.hist.push(Math.exp(this.x + q.x + q.off));
+      if (q.hist.length > HIST) q.hist.shift();
+    });
+  }
+}
+
 // --- formatowanie -------------------------------------------------------------------------------------
 
 // wiek METAR w minutach z "DDHHMMZ": dzień z bieżącego, poprzedniego albo następnego miesiąca, najbliższy teraz
@@ -146,6 +170,67 @@ const tempText = (v) => (has(v) ? (v < 0 ? "M" + Math.abs(v) : String(v)) : "–
 function rvrText(r) {
   const one = (x) => (x.startsWith("P") ? ">" + +x.slice(1) : x.startsWith("M") ? "<" + +x.slice(1) : String(+x));
   return `${String(r.value || "").split("V").map(one).join("–")} M${{ U: " ↑", D: " ↓", N: " =" }[r.trend] || ""}`;
+}
+// oznaczenie pasa do porównań: "R29" / "29" -> "29", "6" -> "06", "11l" -> "11L"
+const rwyNorm = (d) => {
+  const m = /^R?(\d{1,2})([LCR]?)$/.exec(String(d ?? "").trim().toUpperCase());
+  return m ? pad(+m[1], 2) + m[2] : null;
+};
+// wartość liczbowa grupy RVR w metrach: P2000 -> 2000, M0050 -> 50, 0350V0600 -> 475
+const rvrNum = (v) => {
+  const xs = String(v ?? "").split("V").map((x) => parseInt(x.replace(/^[PM]/, ""), 10)).filter(Number.isFinite);
+  return xs.length ? mean(xs) : null;
+};
+// metry -> grupa RVR: w dół do skali raportów (co 25 m poniżej 400 m, co 50 m do 800 m, wyżej co 100 m),
+// poniżej 50 m M0050, powyżej 2000 m P2000
+function rvrCode(m) {
+  if (m < 50) return "M0050";
+  if (m > 2000) return "P2000";
+  const step = m < 400 ? 25 : m < 800 ? 50 : 100;
+  return pad(Math.floor(m / step) * step, 4);
+}
+// przeliczenie widzialności na RVR jak CMV przy światłach HI: dzień ×1,5, noc ×2 (świt i zmierzch pośrodku)
+const RVR_K = { "DZIEŃ": 1.5, "ŚWIT": 1.75, "ZMIERZCH": 1.75, "NOC": 2 };
+const RVR_TXT = { "DZIEŃ": "dzień", "ŚWIT": "świt, światła HI", "ZMIERZCH": "zmierzch, światła HI", "NOC": "noc, światła HI" };
+// czujnik dla kierunku pasa i miejsca: [klucz pasa fizycznego, nr czujnika 0–2 od progu kierunku pierwszego w kluczu]
+function rvrSlot(des, pos) {
+  const d = rwyNorm(des), o = rwyNorm(recip(d)) || d, ends = [d, o].sort();
+  if (!d) return [null, 0];
+  return [ends.join("/"), pos === "MID" ? 1 : (pos === "END") === (d === ends[0]) ? 2 : 0];
+}
+
+// RVR dla kierunku pasa i miejsca (TDZ / MID / END) jak w prawdziwym AWOS:
+// (a) grupa RVR z METAR dla tego pasa; (b) bez niej przy widzialności ≥ 1500 m (9999, CAVOK) P2000;
+// (c) przy mniejszej widzialności symulacja (SYM): średnia 1 min z czujnika × podstawa z widzialności
+// (albo średnia RVR innych pasów z METAR), tendencja U/D/N z różnicy średnich 5-minutowych ≥ 100 m.
+// Wynik: { src: "METAR" | "P2000" | "SYM", list: [{ runway, value, trend }], tip } albo null (brak danych).
+function rvrFor(p, des, pos, sims, phase) {
+  const d = rwyNorm(des);
+  if (!p || !d) return null;
+  const met = (p.rvr || []).filter((x) => rwyNorm(x.runway) === d);
+  if (met.length) {
+    return { src: "METAR", list: met, tip: `RVR z METAR: ${met.map((x) => `R${x.runway}/${x.value}${x.trend || ""}`).join(" ")}` };
+  }
+  if (!has(p.visibility_m)) return null;
+  if (p.cavok || p.visibility_m >= 1500) {
+    return { src: "P2000", list: [{ runway: d, value: "P2000" }],
+      tip: `RVR powyżej 2000 m (P2000): METAR bez grup RVR, ${p.cavok ? "CAVOK" : `widzialność ${p.visibility_m >= 9999 ? "10 km lub więcej" : p.visibility_m + " m"}`} (≥ 1500 m)` };
+  }
+  const [key, i] = rvrSlot(d, pos), q = sims?.get(key)?.s[i];
+  if (!q || !q.hist.length) return null;
+  const k = RVR_K[phase] || RVR_K["DZIEŃ"];
+  const others = (p.rvr || []).map((x) => rvrNum(x.value)).filter(has);
+  const base = others.length ? mean(others) : p.visibility_m * k;
+  const value = rvrCode(base * mean(q.hist.slice(-60)));
+  let trend = "";
+  if (/^\d/.test(value) && q.hist.length >= 600) {
+    const t = base * (mean(q.hist.slice(-300)) - mean(q.hist.slice(-600, -300)));
+    trend = t >= 100 ? "U" : t <= -100 ? "D" : "N";
+  }
+  const from = others.length ? `ze średniej RVR innych pasów z METAR (${Math.round(base)} m)`
+    : `z widzialności ${p.visibility_m} m × ${String(k).replace(".", ",")} (${RVR_TXT[phase] || "dzień: brak danych o słońcu"})`;
+  return { src: "SYM", list: [{ runway: d, value, trend }],
+    tip: `RVR ${pos} SYMULOWANY: METAR nie podaje RVR dla pasa ${d}; podstawa ${from}, średnia 1 min, tendencja z 10 min` };
 }
 const windStr = (dir, spd) => `${dir}/${pad(spd, 2)} KT`;
 
@@ -211,8 +296,11 @@ function arcPath(a, b, r = 80) {
 }
 
 const SYM = "wiatr chwilowy symulowany z METAR";
-const COLS_SPLIT = [{ k: "dep", title: "DEP", sel: "dep", lag: 0 }, { k: "arr", title: "ARR", sel: "arr", lag: 2 }];
-const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0 }, { k: "mid", title: "MID", sel: "rwy", lag: 1 }, { k: "end", title: "END", sel: "rwy", lag: 3 }];
+const SYM_RVR = "RVR symulowany z widzialności (METAR nie podaje RVR dla tego pasa)";
+// pos: miejsce czujnika RVR (kolumny DEP / ARR pokazują RVR strefy przyziemienia)
+const COLS_SPLIT = [{ k: "dep", title: "DEP", sel: "dep", lag: 0, pos: "TDZ" }, { k: "arr", title: "ARR", sel: "arr", lag: 2, pos: "TDZ" }];
+const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0, pos: "TDZ" }, { k: "mid", title: "MID", sel: "rwy", lag: 1, pos: "MID" },
+  { k: "end", title: "END", sel: "rwy", lag: 3, pos: "END" }];
 const ROWS = [["inst", `INST <i class="aw-sym" title="${SYM}">SYM</i>`], ["avg", "2 MIN"], ["rng", "2 MIN MIN/MAX"], ["max", "10 MIN MAX"],
   ["hw", "HW / TW"], ["xw", "XW"], ["rvr", "RVR"], ["vis", "VIS"], ["cld", "CLD"], ["t", "T / TD"]];
 
@@ -228,10 +316,19 @@ const colHtml = (c) => `<div class="aw-col" data-k="${c.k}">
   <table class="aw-rows">${ROWS.map(([k, l]) => `<tr class="r-${k}"><th>${l}</th><td></td></tr>`).join("")}</table>
 </div>`;
 
+// Tekst ATIS linijka po linijce jak w text_atis z VATSIM (element bywa też napisem z własnymi znakami nowej linii);
+// puste linijki na początku i końcu pomijamy
+function atisLines(lines) {
+  const out = (Array.isArray(lines) ? lines : [lines]).flatMap((l) => String(l ?? "").split(/\r?\n/)).map((l) => l.trimEnd());
+  while (out.length && !out[0].trim()) out.shift();
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out;
+}
+
 // Stacje ATIS lotniska z VATSIM (osobne kolumny dla EPWA_ATIS albo EPWA_A_ATIS / EPWA_D_ATIS)
 function atisStations(atc, st, icao) {
   const ad = (atc?.airports || []).find((a) => a.icao === icao);
-  const letterOf = (lines) => (/INFORMATION\s+([A-Z])\b/.exec((lines || []).join(" ")) || [])[1] || "?";
+  const letterOf = (lines) => (/INFORMATION\s+([A-Z])\b/.exec(atisLines(lines).join(" ")) || [])[1] || "?";
   let list = (ad?.facilities?.ATIS || []).map((c) => ({ callsign: c.callsign, freq: c.frequency, letter: c.atis_code || letterOf(c.text_atis), lines: c.text_atis || [] }));
   if (!list.length && st?.atis) list = [{ callsign: st.atis.callsign, freq: st.atis.frequency, letter: st.atis.letter || "?", lines: st.atis.lines || [] }];
   const rank = (cs) => (/_D_ATIS$/.test(cs) ? 1 : /_A_ATIS$/.test(cs) ? 2 : 0);
@@ -263,7 +360,8 @@ export function mountAwos(el, icao) {
       <div class="aw-err"></div>
     </div>
     <div class="aw-mid">
-      <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-simnote" title="VATSIM nie ma czujników wiatru. INST = próbka co 1 s, 2 MIN = średnia z próbek, 10 MIN MAX = największa próbka. RVR, VIS, chmury i temperatura są z METAR."><b>SYM</b> ${SYM} · INST co 1 s, średnia 2 min i maks. 10 min z próbek symulacji</div></div>
+      <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-simnote" title="VATSIM nie ma czujników wiatru ani RVR. Symulowany czujnik mierzy wiatr co 1 s, ekran odświeża się co ${WIND_REFRESH_S} s: INST = ostatni pomiar, 2 MIN = średnia z pomiarów z 2 min, 10 MIN MAX = największy pomiar z 10 min.
+RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (9999, CAVOK) >2000 M, przy mniejszej RVR symulowany z widzialności (SYM). VIS, chmury i temperatura są z METAR."><b>SYM</b> ${SYM} · INST co ${WIND_REFRESH_S} s, średnia 2 min i maks. 10 min z pomiarów co 1 s</div></div>
       <div class="aw-atis"></div>
       <div class="aw-ovl" hidden><div class="aw-h"><span class="t"></span><button class="aw-x" title="Zamknij (Esc)">ZAMKNIJ ✕</button></div><div class="aw-ovl-body"></div></div>
     </div>
@@ -278,7 +376,7 @@ export function mountAwos(el, icao) {
   // i zapytania starej instancji nie mogą go dotykać
   const root = el.querySelector(".awos"), $ = (s) => root.querySelector(s);
   let st = null, stations = [], metarRaw, modeKey = "", field = null, cols = [], manual = {}, ovl = null, notams = null;
-  let dead = false, loading = 0, lastLoad = 0, loadErr = "", lastStep = 0, lastMin = -1;
+  let dead = false, loading = 0, lastLoad = 0, loadErr = "", lastStep = 0, lastTick = 0, lastMin = -1, rvrSims = new Map();
   const letters = {}, changed = {};
 
   const defaults = () => {
@@ -288,13 +386,19 @@ export function mountAwos(el, icao) {
   const selOf = (c) => manual[c.sel] || defaults()[c.sel];
   const rwyOf = (des) => (st?.runways || []).find((r) => r.designator === des);
 
+  // jedna sekunda symulacji: wiatr (wspólne pole i czujniki kolumn) oraz czujniki RVR wszystkich pasów
+  const stepAll = () => {
+    if (field) { field.step(); cols.forEach((c) => c.sensor.step()); }
+    rvrSims.forEach((r) => r.step());
+  };
   // nowe próbki od zera (nowy METAR albo inny układ kolumn): 10 min historii liczymy od razu
   const reseed = () => {
     const b = windBasis(st?.parsed);
     field = b ? new WindField(b) : null;
     cols.forEach((c) => { c.sensor = field ? new Sensor(field, c.lag) : null; });
-    if (!field) return;
-    for (let i = 0; i < HIST; i++) { field.step(); cols.forEach((c) => c.sensor.step()); }
+    rvrSims = new Map();
+    (st?.runways || []).forEach((r) => { const [key] = rvrSlot(r.designator); if (key && !rvrSims.has(key)) rvrSims.set(key, new RvrRunway()); });
+    for (let i = 0; i < HIST; i++) stepAll();
     lastStep = Date.now();
   };
 
@@ -306,6 +410,7 @@ export function mountAwos(el, icao) {
       const q = (s) => c.el.querySelector(s);
       c.svg = q("svg"); c.stat = q(".stat"); c.arc = q(".arc"); c.mean = q(".mean"); c.inst = q(".inst"); c.d = q(".ctr .d"); c.s = q(".ctr .s");
       c.row = Object.fromEntries(ROWS.map(([k]) => [k, q(`.r-${k} td`)]));
+      c.rvrTr = q(".r-rvr"); c.rvrTh = q(".r-rvr th");
     });
   };
 
@@ -318,18 +423,25 @@ export function mountAwos(el, icao) {
       `<button data-rwy="${esc(e.designator)}" class="${e.designator === des ? "sel" : ""} ${e.designator === def ? "use" : ""}"
         title="${e.designator === def ? `pas w użyciu (${st?.runway_in_use?.source === "ATIS" ? "ATIS" : "sugestia systemu"})` : "pokaż wiatr dla tego kierunku"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
     c.stat.innerHTML = dialStatic(st?.runways || [], des);
-    const rvr = (p?.rvr || []).filter((x) => x.runway === des);
-    c.row.rvr.innerHTML = rvr.length ? rvr.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;
-    c.row.rvr.classList.toggle("warn", rvr.length > 0);
     c.row.vis.textContent = visText(p);
     c.row.cld.innerHTML = cloudList(p).map(esc).join("<br>") || "–";
     const spread = has(p?.temperature) && has(p?.dewpoint) && p.temperature - p.dewpoint <= 2;
     c.row.t.innerHTML = p ? `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C${spread ? ` <span class="warn" title="mały spread: ryzyko mgły">Δ${p.temperature - p.dewpoint}</span>` : ""}` : "–";
   };
 
-  // wartości zmieniające się co sekundę
+  // RVR kolumny (METAR, P2000 albo SYM; symulacja zmienia się razem z wiatrem)
+  const drawRvr = (c) => {
+    const r = rvrFor(st?.parsed, selOf(c), c.pos, rvrSims, st?.sun ? sunPhase(st.sun) : null);
+    c.row.rvr.innerHTML = r ? r.list.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;
+    c.row.rvr.classList.toggle("warn", !!r && r.list.some((x) => !String(x.value).startsWith("P")));
+    c.rvrTh.innerHTML = r?.src === "SYM" ? `RVR <i class="aw-sym" title="${SYM_RVR}">SYM</i>` : "RVR";
+    c.rvrTr.title = r ? r.tip : "RVR: brak danych (METAR bez widzialności albo brak pasa)";
+  };
+
+  // wartości zmieniające się co WIND_REFRESH_S sekund
   const drawColLive = (c) => {
     const s = c.sensor;
+    drawRvr(c);
     if (!s || !s.buf.length) {
       ["inst", "avg", "rng", "max", "hw", "xw"].forEach((k) => { c.row[k].textContent = "///"; });
       c.svg.setAttribute("class", "aw-dial nodata"); c.d.textContent = "///"; c.s.textContent = "";
@@ -340,7 +452,8 @@ export function mountAwos(el, icao) {
     const spd2 = Math.round(a.spd), calm = spd2 === 0, vrb = !calm && (b.vrb || a.range >= 180 || (a.spd < 3 && a.range >= 60));
     const dir2 = (Math.round(a.dir / 10) * 10) || 360;
     const gusting = !calm && a.max10 - a.spd >= 10, gustNow = cur.s - a.spd >= 5;
-    c.svg.setAttribute("class", `aw-dial${calm ? " calm" : ""}${vrb ? " vrb" : ""}${gusting ? " gst" : ""}${gustNow ? " gnow" : ""}`);
+    // "anim" od drugiego rysowania: wskazówki przesuwają się płynnie (awos.css), ale nie kręcą się od 0° po otwarciu
+    c.svg.setAttribute("class", `aw-dial${c.anim ? " anim" : ""}${calm ? " calm" : ""}${vrb ? " vrb" : ""}${gusting ? " gst" : ""}${gustNow ? " gnow" : ""}`);
     c.row.inst.textContent = cur.s === 0 ? "CALM" : windStr(pad(cur.d, 3), cur.s);
     c.row.inst.classList.toggle("warn", gustNow);
     c.row.avg.innerHTML = calm ? "CALM" : `${windStr(vrb ? "VRB" : pad(dir2, 3), spd2)}${gusting ? ` <span class="warn">G${a.max10}</span>` : ""}`;
@@ -360,8 +473,10 @@ export function mountAwos(el, icao) {
     }
     // tarcza: łuk zakresu 2 min, strzałka średniej, kropka = wiatr chwilowy
     c.arc.setAttribute("d", arcPath(a.from, a.to));
-    c.mean.setAttribute("transform", `rotate(${a.dir.toFixed(1)} ${C} ${C})`);
-    c.inst.setAttribute("transform", `rotate(${cur.d} ${C} ${C})`);
+    // obrót o najkrótszy kąt (kąt narasta dalej zamiast skoku 359° -> 1°), żeby przejście CSS nie kręciło wskazówką dookoła
+    const turn = (node, k, deg) => { c[k] = has(c[k]) ? c[k] + sdiff(deg, c[k]) : deg; node.style.transform = `rotate(${c[k].toFixed(1)}deg)`; };
+    turn(c.mean, "meanA", a.dir); turn(c.inst, "instA", cur.d);
+    c.anim = true;
     c.d.textContent = calm ? "CALM" : vrb ? "VRB" : pad(dir2, 3) + "°";
     c.s.innerHTML = calm ? "" : `${pad(spd2, 2)}${gusting ? `<tspan class="g">G${a.max10}</tspan>` : ""} KT`;
   };
@@ -376,7 +491,7 @@ export function mountAwos(el, icao) {
       const fresh = changed[a.callsign] && Date.now() - changed[a.callsign] < 180000;
       return `<div class="aw-atiscol"><div class="aw-h"><span>ATIS ${kind}</span>${fresh ? `<span class="aw-new">NOWA LITERA</span>` : ""}</div>
         <div class="aw-letter"><b>${esc(a.letter)}</b><span class="aw-stn">${a.callsign.split(" / ").map(esc).join("<br>")}<br><em>${esc(a.freq || "")}</em></span></div>
-        <div class="aw-atistxt">${a.lines.map(esc).join("<br>") || `<span class="dim">brak tekstu ATIS</span>`}</div></div>`;
+        <div class="aw-atistxt">${atisLines(a.lines).map((l) => `<div class="ln">${esc(l) || "&nbsp;"}</div>`).join("") || `<span class="dim">brak tekstu ATIS</span>`}</div></div>`;
     }).join("") : `<div class="aw-atiscol off"><div class="aw-h"><span>ATIS</span></div><div class="aw-letter"><b>–</b></div>
       <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : `Brak stacji ATIS ${esc(icao)} w sieci VATSIM.`}</span></div></div>`;
   };
@@ -417,11 +532,14 @@ export function mountAwos(el, icao) {
   };
 
   // --- nakładka METAR / TAF / NOTAM
+  // RVR bez grup w METAR: co wtedy pokazuje AWOS w kolumnach
+  const rvrNone = (p) => (!has(p.visibility_m) ? "–" : p.cavok || p.visibility_m >= 1500
+    ? "brak w METAR · widzialność ≥ 1500 m: AWOS >2000 M" : "brak w METAR · AWOS: RVR symulowany z widzialności (SYM)");
   const decoded = (p) => {
     const age = metarAge(p.time);
     const rows = [["Obserwacja", p.time ? `dzień ${p.time.slice(0, 2)}, ${p.time.slice(2, 4)}:${p.time.slice(4, 6)} UTC${age !== null ? ` (${ageText(age)} temu)` : ""}` : "–"],
       ["Wiatr", `${metarWind(p)}${has(p.wind_speed) ? ` · ${Math.round(p.wind_speed * 0.514)} m/s` : ""}`], ["Widzialność", visText(p)],
-      ["RVR", (p.rvr || []).map((x) => `R${x.runway} ${rvrText(x)}`).join(" · ") || "–"], ["Zjawiska", (p.weather || []).join(" ") || "–"],
+      ["RVR", (p.rvr || []).map((x) => `R${x.runway} ${rvrText(x)}`).join(" · ") || rvrNone(p)], ["Zjawiska", (p.weather || []).join(" ") || "–"],
       ["Chmury", cloudList(p).join(" · ")], ["Podstawa (ceiling)", has(p.ceiling_ft) ? p.ceiling_ft + " ft" : "–"],
       ["Temperatura / punkt rosy", `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C`], ["QNH / QFE", `${p.qnh ?? "–"} / ${st.qfe ?? "–"} hPa`],
       ["Trend", p.trend || "–"], ["Kategoria", p.flight_category || "–"]];
@@ -514,19 +632,25 @@ export function mountAwos(el, icao) {
   const onKey = (e) => { if (e.key === "Escape" && ovl && root.offsetParent !== null) { ovl = null; drawOvl(); } };
   document.addEventListener("keydown", onKey);
 
-  // jeden zegar co 1 s: czas UTC, próbka wiatru, rysowanie; dane co 60 s (tylko gdy widok jest na ekranie)
-  // (gdy widok jest ukryty albo przeglądarka wstrzymała kartę, nie próbkujemy; po przerwie > 10 s nowa historia)
+  // jeden zegar co 1 s: czas UTC; co WIND_REFRESH_S s tyle sekund symulacji, ile minęło, i rysowanie wiatru;
+  // dane co 60 s (tylko gdy widok jest na ekranie). Gdy widok jest ukryty albo przeglądarka wstrzymała kartę,
+  // nie próbkujemy; po przerwie > 10 s nowa historia.
   const tick = () => {
     if (root.offsetParent === null) return;
     const now = new Date();
-    if (field) {
-      if (now - lastStep > 10000) reseed();
-      else { field.step(); cols.forEach((c) => c.sensor.step()); }
+    let fresh = false;
+    if (st) {
+      if (now - lastTick > 10000) { reseed(); fresh = true; }
+      else if (now - lastStep >= WIND_REFRESH_S * 1000 - 300) {
+        for (let i = Math.min(HIST, Math.round((now - lastStep) / 1000)); i > 0; i--) stepAll();
+        lastStep = now.getTime();
+        fresh = true;
+      }
     }
-    lastStep = now.getTime();
+    lastTick = now.getTime();
     $(".aw-clock").textContent = now.toISOString().slice(11, 19);
     if (st) {
-      cols.forEach(drawColLive);
+      if (fresh) cols.forEach(drawColLive);
       if (now.getUTCMinutes() !== lastMin) { lastMin = now.getUTCMinutes(); drawAge(); drawTop(); }
     }
     if ((!loading || now - loading > 90000) && now - lastLoad >= 60000) load();
@@ -545,5 +669,5 @@ export function mountAwos(el, icao) {
   };
 }
 
-// do testów symulacji (node)
-export const awosSim = { windBasis, WindField, Sensor, metarAge };
+// do testów symulacji wiatru i RVR (node)
+export const awosSim = { windBasis, WindField, Sensor, metarAge, RvrRunway, rvrFor, rvrCode, rvrSlot, rwyNorm, rvrText, atisLines };
