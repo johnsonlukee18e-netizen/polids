@@ -14,4 +14,25 @@ Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyt
 | `GRpluginOperatorInfo.txt` | oznaczenie operatorów CARGO (`C`) i wojskowych (`Mil`) w zakładce CALLSIGN |
 | `ICAO_Aircraft.json` | typy samolotów z WTC / RECAT-EU / wymiarami (zakładka AIRCRAFT) |
 
+## neighbours/
+
+Pliki `.ese` vACC sąsiadów: z nich rysujemy sektory sąsiednich FIR-ów (MAP, RADIO › GEO). Nazwa pliku musi zawierać klucz
+pakietu; z każdego pliku bierzemy tylko FIR-y tego pakietu, nigdy sektorów EPWW:
+
+| Plik | Klucz | FIR-y | Źródło (nazwa oryginalna) |
+|------|-------|-------|---------------------------|
+| `EDWW.ese` | EDWW | EDWW (z EDYY i EDUU HVL/OSE nad nim) | EDWW-EDWW_20261002090404-261001-0002 |
+| `EDMM.ese` | EDMM | EDMM (z EDUU nad nim) | EDMM-AeroNav_20261001160608-261001-0001 |
+| `ESAA.ese` | ESAA | ESAA | ESAA-Sweden_20261001222500-261001-0003 |
+| `EKDK.ese` | EKDK | EKDK | EKDK-Copenhagen_20261002185052-261001-0001 |
+| `EYVL.ese` | EYVL | EYVL | EYVL-Installer_20261001170439-261001-0001 |
+| `LKAA.ese` | LKAA | LKAA | SF_-_LKAA.ESE |
+| `LZBB.ese` | LZBB | LZBB | LZBB-Full_20261001171141-261001-0001 |
+| `UKBV.ese` | UKBV | tylko UKLV (Lwów); polskie sektory w tym pakiecie są nieaktualne | UKBV-Ukraine-TopSky-Beta-Pack_20251129175113-251201-0002 (AIRAC 2512) |
+| `ULLL.ese` | ULLL | tylko UMKK (Kaliningrad) | ULLL-Galaxy-radar_20260614213420-260601-0001 (AIRAC 2606) |
+
+Nowszy pakiet: podmień plik (nazwa może być oryginalna, byle zawierała klucz). Usunięcie pliku usuwa sektory tego sąsiada
+przy następnym starcie, a w ich miejsce wracają kopie z naszego pliku `.ese`. Białorusi (UMMV) nie ma:
+dodanie jej wymaga pliku i wpisu w `NB_SOURCES` (`backend/app/importers/neighbours.py`).
+
 Ponowny import wszystkiego: `python -m backend.app.importers.seed --force`

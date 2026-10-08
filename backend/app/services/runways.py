@@ -14,10 +14,14 @@ from ..config import DATA_DIR, settings
 
 
 def runway_heading(designator: str, heading_true: float | None) -> float:
-    if heading_true is not None:
+    """Kurs pasa: rzeczywisty z bazy, chyba że wyraźnie nie pasuje do numeru pasa (błąd danych, np. EPKR 16/34 z kursem 16°)."""
+    m = re.match(r"\d+", designator or "")
+    by_number = ((int(m.group()) * 10) % 360 or 360) if m else None
+    if heading_true is not None and (by_number is None or abs((heading_true - by_number + 180) % 360 - 180) <= 30):
         return heading_true
-    num = int(re.match(r"\d+", designator).group())
-    return (num * 10) % 360 or 360
+    if by_number is None:
+        raise ValueError(f"Nieznany kurs pasa {designator!r}")
+    return by_number
 
 
 def wind_components(wind_dir: int | None, wind_speed: int | None, rwy_heading: float):

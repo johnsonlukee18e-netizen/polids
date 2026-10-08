@@ -1,21 +1,23 @@
-# POLIDS
+# PolIDS
 
-Information Display System dla kontrolerów VATSIM PL vACC. Układ wzorowany na PANDORZE (PAŻP), zawartość zakładek
+![PolIDS](frontend/icons/polids-logo.svg)
+
+Polish Integrated Display System dla kontrolerów VATSIM PL vACC. Układ wzorowany na PANDORZE (PAŻP), zawartość zakładek
 w stylu EUROCONTROL NM UI. Backend FastAPI + SQLite, frontend w czystym JS, całość w Dockerze.
 
 | Zakładka | Co jest |
 |---|---|
-| RADIO | częstotliwości EPWW i FIR-ów sąsiednich, kto jest online, rezerwacje na dziś |
-| METEO | METAR/TAF, mapa QNH regionalnego, Windy |
-| AERODROME | przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości), widok AWOS, paski EFES (RUCH) |
+| RADIO | GEO: kafelki stanowisk jak w VACS i mapa zasięgu wybranych pozycji; SEKTORYZACJA LOW/MID/HIGH (kolejność przejmowania z om.plvacc.pl); listy EPWW ACC, lotnisk i FIR-ów sąsiednich, kto jest online, rezerwacje na dziś |
+| METEO | METAR/TAF, mapa QNH regionalnego, WIND z wiatrem 0 ft / 3000 ft na podejściu do każdego pasa |
+| AERODROME | przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), widok AWOS, paski EFES (RUCH) |
 | AD CIV / AD MIL / AD VFR | eAIP PAŻP |
-| CALLSIGN, AIRCRAFT | callsigny, typy samolotów (WTC, RECAT-EU, wymiary, zdjęcia) |
-| MAP | ruch VATSIM, sektory EPWW (LOW/MID/HIGH wg łańcuchów VACS), TMA/CTR, przepustowość i szczegóły lotów z vIFF |
+| CALLSIGN, AIRCRAFT | callsigny, typy samolotów (WTC, RECAT-EU, wymiary, zdjęcia, przyciski producentów) |
+| MAP | ruch VATSIM (odlot / przylot / tranzyt), przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF |
 | INOP, DOCS, PHRASEOLOGY | om.plvacc.pl, PDF-y z `data/docs/`, baza frazeologii EUROCONTROL |
 | CHECKLIST, EMERGENCY | checklisty stanowiska, procedury awaryjne EUROCONTROL |
 | ADMIN | lista CID-ów z dostępem i odmowy logowania (tylko admin) |
 
-Źródła danych: pliki EuroScope (sektorówka EPWW, navdata), VATSIM (data feed, bookings), metar.vatsim.net /
+Źródła danych: pliki EuroScope (sektorówka EPWW, navdata, pliki `.ese` vACC sąsiadów w `data/import/neighbours/`), VATSIM (data feed, bookings), metar.vatsim.net /
 aviationweather.gov, NOTAM z cv.plvacc.pl, [vIFF](https://api.viffsys.com/docs), OurAirports, vacs-data, VATSpy.
 
 ## Uruchomienie
@@ -81,7 +83,8 @@ do `main`. Instrukcja: [deploy/README.md](deploy/README.md).
 - nowa sektorówka: podmienić pliki w `data/import/` i przebudować obraz (na serwerze wystarczy push)
 - OurAirports: `python scripts/fetch_ourairports.py`
 - typy samolotów: `python scripts/build_aircraft_seed.py <ścieżka do aircraft-db>`
-- ikony: `python scripts/make_icons.py`
+- logo i ikony: `frontend/icons/` (paczka logo PolIDS, opcja „FIR EPWW”)
+- sąsiedzi: nowszy plik `.ese` vACC sąsiada do `data/import/neighbours/` (lista w `data/import/README.md`)
 - bez kodu: `data/seed/qnh_regions.json`, `lvp.json`, `runway_config.json`, `checklists.json`, `emergency.json`,
   `callsigns.csv`
 
@@ -106,7 +109,11 @@ Wyposażenie pasów (ILS, RNP, VOR, NDB) czytane jest z nazw procedur w `.ese`. 
 - AWOS nie ma czujników - wiatr chwilowy, średnia 2 min i min/max są symulowane z METAR (oznaczenie SYM).
 - QFE liczone w przybliżeniu z QNH i elewacji.
 - Rejony QNH i TMA w `qnh_regions.json` odrysowane w przybliżeniu (rejony 15-17 do potwierdzenia), progi LVP do sprawdzenia z INOP.
-- Sektoryzacja wg `controlled_by` z vacs-data; w sektorze D różni się od listy OWNER w `.ese` (widok pokazuje obie).
+- Kolejność przejmowania sektorów ACC z tabel om.plvacc.pl/docs/2610/ownerships (`data/seed/ownership.json`, wklejone 06.10.2026,
+  przy nowym AIRAC trzeba wkleić ponownie); B, C, D HIGH i T MID wg pliku `.ese`. TMA/CTR: najpierw APP/TWR z `.ese`, potem ACC.
+- Sektory sąsiadów: z każdego pliku tylko FIR-y tego vACC (z ukraińskiego tylko Lwów), sektory zależne od pasa w jednym układzie
+  na lotnisko (kierunek najbliższy wiatrowi z ok. 250°), Białoruś (UMMV) z kopii w pliku EPWW. Zasięg stanowisk bez sektora
+  w żadnym pliku jest przybliżony (VATSpy albo okrąg 30/10 NM).
 - Paski EFES: CFL, TAXI/GATE, NR, PRV, LP/TG puste - tych danych nie ma w feedzie VATSIM ani w vIFF.
 - Rezerwacje VATSIM mają tylko CID; imię widać, gdy ta osoba jest online.
 - Jeden worker uvicorna (cache w pamięci). 40 osób odświeżających co 15 s to ~23 req/s przy p95 < 100 ms;
@@ -120,6 +127,7 @@ Wyposażenie pasów (ILS, RNP, VOR, NDB) czytane jest z nazw procedur w `.ese`. 
 - Leaflet (BSD-2), CARTO/OpenStreetMap (ODbL), Esri World Gray Canvas
 - ATFCM/CDM: [vIFF](https://viffsys.com) (Roger Puig), tylko odczyt
 - granice FIR: [vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0)
+- sektory i stanowiska FIR-ów sąsiednich: pliki `.ese` pakietów sektorowych vACC sąsiadów (`data/import/neighbours/`)
 - łańcuchy sektorów i etykiety sąsiadów: [vacs-data](https://github.com/vacs-project/vacs-data)
   ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), commit c5aa4bd), wyciąg
   `data/seed/vacs_epww.json` na tej samej licencji

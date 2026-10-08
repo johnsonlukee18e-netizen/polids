@@ -18,10 +18,10 @@
   --warn: #f2d21b;
   --bad: #e0302a;
   --cyan: #3ec7e0;
-  --mono: "DejaVu Sans Mono", Consolas, "Roboto Mono", monospace;
-  --ui: Verdana, "DejaVu Sans", Tahoma, sans-serif;
+  --mono: Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  --ui: Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
   /* NM UI: treść */
-  --sans: "Segoe UI", Roboto, Arial, "Liberation Sans", sans-serif;
+  --sans: Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
   --head: #111611;        /* pasek tytułu panelu */
   --head-line: #243024;
   --row: #0a0c0a;
@@ -44,13 +44,15 @@ a { color: var(--green-text); }
 }
 .menu nav button:hover, .submenu button:hover { background: linear-gradient(#52bd3c, #36992a); }
 .menu nav button.active, .submenu button.active {
-  background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; box-shadow: 0 0 10px rgba(110,255,70,.45);
+  background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06;
 }
 .menu nav button.red { background: linear-gradient(#c8372d, #9c241c); border-color: #5c120d; margin-top: 10px; }
-.menu nav button.red.active { background: linear-gradient(#ff5a4a, #e0302a); color: #fff; box-shadow: 0 0 10px rgba(255,60,40,.6); }
+.menu nav button.red.active { background: linear-gradient(#ff5a4a, #e0302a); color: #fff; }
 
 .menu { width: 150px; flex: none; background: #050605; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; }
 .menu nav { flex: 1; overflow-y: auto; }
+.menu .brand { display: block; padding: 4px 4px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.menu .brand img { display: block; width: 100%; height: auto; max-height: 40px; object-fit: contain; }
 .clockbox { text-align: center; padding: 8px 0 4px; border-top: 1px solid var(--line); }
 .clock { font: 700 20px var(--mono); color: #fff; }
 .userbox { text-align: center; padding: 6px 0 2px; border-top: 1px solid var(--line); font-size: 12px; }
@@ -72,6 +74,11 @@ main { flex: 1; min-width: 0; position: relative; }
 .pane { flex: 1; min-width: 0; overflow: auto; padding: 12px 16px; }
 .pane.fill { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 iframe.embed { flex: 1; border: 0; width: 100%; background: #fff; }
+/* pasek nad ramką (AD CIV/MIL/VFR, INOP, PHRASEOLOGY): jedna linia, adres i uwaga skracane wielokropkiem */
+.toolbar.embed-bar { flex-wrap: nowrap; }
+.embed-bar > .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.embed-bar > .hint:not(.mono) { flex-shrink: 0; }   /* skracany jest tylko adres, uwaga zostaje czytelna */
+.embed-bar > .btn { flex: none; }
 
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 /* pola i przyciski jak w NM UI: płaskie, ciemne, zielone obramowanie po zaznaczeniu */
@@ -150,6 +157,9 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .radio-group h3 { color: var(--yellow); font-variant: small-caps; margin: 0 0 6px; font-size: 15px; }
 .radio-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; position: relative; }
 .radio-row .cs { color: var(--cyan); font: 12px var(--mono); width: 120px; }
+/* AERODROME › częstotliwości: znak wywoławczy wg długości, nazwa stacji dostaje resztę wiersza */
+.freqs .radio-row .cs { width: 11ch; flex: none; }
+.freqs .radio-row .nm { flex: 1 1 auto; }
 .radio-row .nm { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .radio-row .who, .radio-row .booked-txt { white-space: nowrap; }
 .radio-row .who { color: var(--green-hi); font-size: 12px; }
@@ -210,6 +220,11 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .ad-col > .card.grow { flex: 1 1 0; }
 .ad-col > .card.part { flex: 0 1 auto; max-height: 40%; }
 .ad-col .scroll { flex: 1; min-height: 0; overflow: auto; }
+/* niskie okno (1366x657, 1280x720): tabela pasów przewija się w swojej karcie (pasy w użyciu na górze), TAF ma co najmniej
+   ok. 110 px; wąskie okno (media niżej): karty w naturalnej wysokości */
+.ad-col > .card.ad-rwy-card { flex: 0 1 auto; }
+.ad-col .ad-rwys { min-height: 0; overflow: auto; }
+.ad-col > .card.ad-taf-card { min-height: 110px; }
 .ad-wind { text-align: center; flex: none !important; }
 .ad-wind .windrose { width: 200px; height: 200px; }
 .ad-wind .big { font: 26px var(--mono); color: #fff; }
@@ -238,6 +253,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
   .ad-grid { grid-template-columns: 232px minmax(0, 1fr); }
   .ad-col > .card.grow, .ad-col > .card.part { flex: none; max-height: none; }
   .ad-col .scroll { max-height: 420px; }
+  .ad-col .ad-rwys { overflow: visible; }
 }
 .metar-head { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; margin-bottom: 12px; }
 .metar-head .wx { flex: 1; min-width: 300px; }
@@ -301,13 +317,15 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .mapwrap { flex: 1; display: flex; min-height: 0; position: relative; }
 .map { flex: 1; background: #000; }
 .leaflet-container { font: inherit; background: #000; }
+/* przyciski Leafleta (+/−, zamknięcie dymka) też w Consolas, nie w Lucida Console / Tahoma z leaflet.css */
+.leaflet-control-zoom a, .leaflet-container a.leaflet-popup-close-button { font-family: var(--mono); }
 .map.light.leaflet-container { background: #eef0f2; }
 .map.white.leaflet-container { background: #fff; }
 .leaflet-tooltip.lbl { background: rgba(0,0,0,.7); color: #fff; border: 0; box-shadow: none; font: 11px var(--mono); padding: 1px 4px; }
 .leaflet-tooltip.lbl::before, .leaflet-tooltip.rtlbl::before { display: none; }
-.leaflet-tooltip.rtlbl { background: #0b0d10; color: #fff; border: 1px solid #ff9f1a; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.6); font: 700 12px var(--mono); padding: 1px 5px; }
+.leaflet-tooltip.rtlbl { background: #0b0d10; color: #fff; border: 1px solid #ff9f1a; border-radius: 3px; box-shadow: none; font: 700 12px var(--mono); padding: 1px 5px; }
 .map.light .leaflet-tooltip.lbl { background: rgba(255,255,255,.85); color: #1b1f24; }
-.map.light .leaflet-tooltip.rtlbl { background: #fff; color: #111; border-color: #d4380d; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.map.light .leaflet-tooltip.rtlbl { background: #fff; color: #111; border-color: #d4380d; }
 .map.light .maplabel > div { color: #1b2a1b; background: rgba(255,255,255,.85); }
 .map.light .maplabel .firname { color: #5c6670; }
 .map.light .acicon svg { fill: #0b3d91; stroke: #fff; }
@@ -395,8 +413,9 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .about-info { flex: 0 1 560px; }
 .about-info dl.props { gap: 3px 16px; }
 .about-info dl.props dd { font-family: var(--sans); }
-.logo { font: 900 52px/1 var(--ui); letter-spacing: 6px; color: #fff; font-style: italic; padding-top: 6px; }
-.logo small { display: block; font: 12px var(--ui); letter-spacing: 3px; font-style: normal; color: var(--muted); margin-top: 8px; }
+.logo { padding-top: 6px; }
+.logo img { display: block; height: 96px; width: auto; }
+.logo small { display: block; font: 12px var(--ui); letter-spacing: 1.5px; font-style: normal; color: var(--muted); margin-top: 8px; }
 .about-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-bottom: 18px; }
 .about-tile { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text);
   background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 3px; font: 12px/1.4 var(--sans); }
@@ -425,7 +444,7 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .tag.mil { color: #7fd0ff; border-color: #7fd0ff; }
 
 /* AIRCRAFT: rekord w dwóch liniach, kod ICAO najważniejszy */
-.ac-rec { display: grid; grid-template-columns: 90px 1fr; column-gap: 12px; padding: 5px 8px; cursor: pointer; font: 14px/1.5 var(--mono); }
+.ac-rec { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 12px; padding: 5px 8px; cursor: pointer; font: 14px/1.5 var(--mono); }
 .ac-rec { border-bottom: 1px solid #161b16; }
 .ac-rec:nth-child(odd) { background: var(--row); }
 .ac-rec:nth-child(even) { background: var(--row-alt); }
@@ -433,15 +452,35 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .ac-rec.selected { background: var(--sel); color: #fff; box-shadow: inset 3px 0 0 var(--green-hi); }
 .ac-rec .ac-icao { grid-row: 1 / 3; align-self: center; }
 .ac-icao { font: 700 24px var(--mono); color: #fff; }
-.ac-rec .ac-l2 { color: #cfd4cf; font-size: 13px; }
+.ac-rec .ac-l2 { color: #cfd4cf; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ac-rec.selected .recat-A, .ac-rec.selected .recat-B, .ac-rec.selected .recat-C, .ac-rec.selected .recat-D,
 .ac-rec.selected .recat-E, .ac-rec.selected .recat-F { color: #fff; }
 .photo-box { margin: 6px 0 12px; }
 .ac-rec .perf { float: right; font: 12px var(--ui); color: var(--cyan); text-decoration: none; }
 .ac-rec .perf:hover { text-decoration: underline; }
-.perf-links { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
+.perf-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 8px; }
 .perf-links .btn { text-decoration: none; }
+.perf-links .hint { white-space: nowrap; }
 .photo-box img { display: block; width: 100%; max-height: 360px; object-fit: contain; background: #000; border: 1px solid var(--line); margin-bottom: 4px; }
+/* AIRCRAFT: przyciski producentów u góry (zielone jak menu PANDORY, aktywny jasnozielony, bez poświaty) */
+.ac-pane { display: flex; flex-direction: column; gap: 8px; }
+.ac-pane > .split { flex: 1; height: auto; }
+/* rekord zawsze w dwóch liniach: węższy panel szczegółów, a przy wąskiej liście (1366 px) mniejsza druga linia */
+.ac-pane > .split > .detail { flex: 1.6; }
+.ac-pane > .split > .list { container-type: inline-size; }
+@container (max-width: 700px) { .ac-rec .ac-l2 { font-size: 12px; } }
+.ac-makers { flex: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.ac-makers .gbtn { width: auto; min-width: 112px; margin: 0; padding: 6px 14px; }
+.ac-makers .gbtn:hover { background: linear-gradient(#52bd3c, #36992a); }
+.ac-makers .gbtn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+.ac-pane .toolbar .count { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-empty { padding: 8px; }
+/* widok producenta: nagłówek grupy (nazwa producenta w bazie) przyklejony u góry listy */
+.ac-gh { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 10px; padding: 4px 8px;
+  background: var(--head); border-bottom: 1px solid var(--head-line); font: 700 11px/1.3 var(--mono); letter-spacing: .8px;
+  text-transform: uppercase; color: var(--green-text); }
+.ac-gh span { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+.ac-group + .ac-group { margin-top: 6px; }
 
 /* MAP: samoloty */
 .acicon { background: none; border: 0; }
@@ -463,14 +502,14 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .atcicon > .atcb { position: absolute; transform: translate(-50%, 9px); }
 .atcicon.center > .atcb { transform: translate(-50%, -50%); }
 .atcb { display: flex; align-items: center; gap: 2px; padding: 2px; background: #0b0d10; border: 1px solid #3a4652; border-radius: 3px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.6); white-space: nowrap; cursor: pointer; }
+  box-shadow: none; white-space: nowrap; cursor: pointer; }
 .atcb .ab-icao { color: #fff; font: 700 11px/15px var(--mono); padding: 0 3px; }
 .atcb.fir { border-color: #5fd23a; }
 .atcicon:hover .atcb { border-color: #fff; }
 .leaflet-tooltip.atc-tip { background: #0b0d10; color: #e6ebef; border: 1px solid #3a4652; border-radius: 4px; padding: 6px 8px;
   box-shadow: 0 4px 14px rgba(0,0,0,.7); font: 12px var(--mono); max-width: 560px; white-space: normal; }
 .leaflet-tooltip.atc-tip::before { border-top-color: #3a4652; }
-.atc-tip-h { margin-bottom: 4px; color: #9fb0bf; font-family: Arial, sans-serif; }
+.atc-tip-h { margin-bottom: 4px; color: #9fb0bf; font-family: var(--mono); }
 .atc-tip-h b { color: #fff; font-family: var(--mono); font-size: 13px; }
 .atc-tip table { border-collapse: collapse; }
 .atc-tip td { padding: 2px 5px; vertical-align: top; white-space: nowrap; }
@@ -486,9 +525,9 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
   border: 1px solid #d5dbe1; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
 .leaflet-tooltip.ad-tip::before { border-top-color: #fff; }
 .ad-tip .adc-h { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; margin-bottom: 6px; }
-.ad-tip .adc-h b { font: 700 22px Arial, sans-serif; color: #7ab8d9; }
-.ad-tip .adc-h span { font: 700 15px Arial, sans-serif; color: #1d2329; }
-.ad-tip .adc-sec { margin: 8px 0 3px; font: 700 12px Arial, sans-serif; text-transform: uppercase; letter-spacing: .5px; color: #1d2329; }
+.ad-tip .adc-h b { font: 700 22px var(--mono); color: #7ab8d9; }
+.ad-tip .adc-h span { font: 700 15px var(--mono); color: #1d2329; }
+.ad-tip .adc-sec { margin: 8px 0 3px; font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .5px; color: #1d2329; }
 .ad-tip .adc-metar { white-space: normal; font: 13px/1.45 var(--mono); color: #1d2329; }
 .ad-tip .adc-atis { white-space: normal; font: 12px/1.45 var(--mono); color: #3d4650; }
 .ad-tip table td { padding: 1px 6px 1px 0; color: #1d2329; }
@@ -532,7 +571,7 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .vf-svg .vf-grid { stroke: #232c35; }
 .vf-svg text { fill: #aab4bd; font: 11px var(--mono); text-anchor: middle; }
 .vf-svg .vf-ax.end { text-anchor: end; } .vf-svg .vf-val { fill: #fff; font-weight: 700; }
-.vf-svg .vf-sub { fill: #8fa3b5; font: 700 10px Arial, sans-serif; letter-spacing: .5px; text-transform: uppercase; }
+.vf-svg .vf-sub { fill: #8fa3b5; font: 700 10px var(--mono); letter-spacing: .5px; text-transform: uppercase; }
 .vf-svg .vf-win { fill: #cfd8e0; font-size: 10px; }
 .vf-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 2px 0 4px; font-size: 11px; }
 .vf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
@@ -569,3 +608,10 @@ a.btn { text-decoration: none; display: inline-block; }
 .admin .actions { text-align: right; white-space: nowrap; width: 1%; }
 .admin input.note-edit { width: 100%; min-width: 180px; padding: 2px 6px; }
 .admin .msg.error { color: #ff8a80; }
+/* serwer PolIDS nie odpowiada: jeden pasek u dołu ekranu (nie zasłania paska narzędzi zakładki),
+   znika po pierwszym udanym zapytaniu (api.js) */
+.srv-off { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5000; max-width: calc(100vw - 24px);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 14px; background: #1a0605; color: var(--text);
+  border: 1px solid var(--bad); border-left-width: 4px; font: 13px/1.35 var(--mono); }
+.srv-off b { color: #ff6a5e; letter-spacing: .3px; }
+.srv-off span { color: #e8c8c4; }

@@ -8,7 +8,7 @@ export default {
     letterMenu(root, (l) => { prefix = l; load(); });
     const pane = h(`<div class="pane">
       <div class="toolbar">
-        <input type="search" class="q" placeholder="Szukaj: kod ICAO, callsign, operator, kraj…" size="40" autofocus>
+        <input type="search" class="q" placeholder="Szukaj: kod ICAO, callsign, operator, kraj…" size="46" autofocus>
         <select class="cat"><option value="">Wszystkie</option><option value="CARGO">tylko CARGO</option><option value="MIL">tylko MILITARY</option></select>
         <span class="hint count"></span>
       </div>

@@ -1,16 +1,49 @@
 // Wspólne funkcje: zapytania do API i drobne narzędzia DOM.
 
+// Serwer nie odpowiada (brak internetu, restart serwera): zamiast angielskiego "Failed to fetch" komunikat po polsku i jeden pasek
+// u dołu ekranu; znika po pierwszym udanym zapytaniu (sprawdzamy co 5 s, także gdy żadna zakładka nic nie odświeża).
+// Po powrocie serwera zdarzenie ONLINE_EVENT na window: zakładki z komunikatem błędu od razu pobierają dane ponownie.
+export const OFFLINE_MSG = "brak połączenia z serwerem PolIDS";
+export const ONLINE_EVENT = "polids:online";
+let offlineBar = null, offlineTimer = null;
+function setOffline(on) {
+  if (!on) {
+    if (!offlineBar) return;
+    clearInterval(offlineTimer);
+    offlineTimer = null;
+    offlineBar.remove();
+    offlineBar = null;
+    // po bieżącym zapytaniu, żeby zakładka nie pobierała tego samego dwa razy w jednej chwili
+    setTimeout(() => window.dispatchEvent(new Event(ONLINE_EVENT)), 0);
+    return;
+  }
+  if (offlineBar) return;
+  offlineBar = h(`<div class="srv-off" role="alert"><b>Brak połączenia z serwerem PolIDS</b>
+    <span>sprawdź internet; strona połączy się sama, gdy serwer odpowie.</span></div>`);
+  document.body.append(offlineBar);
+  offlineTimer = setInterval(() => fetch("/api/config", { cache: "no-store" }).then(() => setOffline(false), () => {}), 5000);
+}
+
 export async function api(path, options = {}) {
-  const res = await fetch(path, options);
+  let res;
+  try {
+    res = await fetch(path, options);
+  } catch (e) {
+    if (e?.name === "AbortError") throw e;   // zapytanie przerwane celowo (AbortController)
+    setOffline(true);
+    throw new Error(OFFLINE_MSG);
+  }
+  setOffline(false);
   // sesja wygasła
   if (res.status === 401) {
     location.href = "/auth/login";
     throw new Error("Wymagane logowanie");
   }
   let body = null;
-  try { body = await res.json(); } catch { /* pusta odpowiedź */ }
+  try { body = await res.json(); } catch { /* pusta odpowiedź albo nie JSON (np. strona błędu) */ }
   if (!res.ok) {
-    const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail)) : res.statusText;
+    const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
+      : `Błąd serwera PolIDS (HTTP ${res.status})`;
     throw new Error(msg);
   }
   return body;

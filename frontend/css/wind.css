@@ -1,0 +1,147 @@
+/* wind: styl dodany w rundzie 8. METEO › WIND (Windy 0 ft / 3000 ft z punktem podejścia, panel wiatru Open-Meteo),
+   AERODROME › PRZEGLĄD: karta wiatru 0 / 3000 ft na podejściu oraz kolory pasów ARR / DEP jak na paskach postępu lotu
+   (strips.css: odlot niebieski, przylot żółty) w różnych miejscach AERODROME. Bez poświaty. */
+:root {
+  --rw-arr: #ffd84a;      /* .sx-bar b.arr, pasek przylotu */
+  --rw-dep: #6db8ff;      /* .sx-bar b.dep, pasek odlotu */
+  --rw-arr-bg: #262006;
+  --rw-dep-bg: #0b1c2e;
+  --rw-arr-line: #e8b800; /* .sx-bay.arr */
+  --rw-dep-line: #3d8fe0; /* .sx-bay.dep */
+}
+
+/* --- METEO › WIND --- */
+.wnd { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wnd-bar { flex: none; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 6px 10px; background: var(--panel);
+  border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
+.wnd-bar label, .wnd-rwyl { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.wnd-rwyl[hidden] { display: none; }
+.wnd-ad { max-width: 250px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 3px; padding: 3px 6px; font: 12px var(--mono); outline: none; }
+.wnd-ad:focus { border-color: var(--green-hi); }
+.wnd-seg { display: inline-flex; border: 1px solid var(--line); }
+.wnd-seg button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 12px; cursor: pointer;
+  font: 700 12px var(--mono); letter-spacing: .5px; white-space: nowrap; }
+.wnd-seg button:last-child { border-right: 0; }
+.wnd-seg button:hover { color: var(--text); background: var(--panel-2); }
+.wnd-seg button.active { background: #14240f; color: var(--green-hi); box-shadow: inset 0 -2px 0 var(--green-hi); }
+.wnd-rwys button { min-width: 38px; padding: 4px 8px; font-size: 13px; }
+.wnd-rwys button.arr { color: var(--rw-arr); }
+.wnd-rwys button.dep { color: var(--rw-dep); }
+.wnd-rwys button.arr.dep { color: var(--rw-arr); background: linear-gradient(90deg, var(--rw-arr-bg) 50%, var(--rw-dep-bg) 50%); }
+.wnd-rwys button.active { background: #14240f; }
+.wnd-hint { flex: 1 1 260px; min-width: 0; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wnd-body { flex: 1; min-height: 0; display: flex; }
+.wnd-frame { flex: 1 1 auto; min-width: 0; height: auto; }
+.wnd-side { flex: none; width: 388px; overflow: auto; padding: 8px; background: #050605; border-left: 1px solid var(--line); }
+.wnd-card { --cy: 6px; --cx: 10px; }
+.wnd-card > h3:first-child { margin-bottom: 8px; }
+.wnd-card p { margin: 6px 0 0; }
+.wnd-card .error { font: 12px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
+.wnd-note { font: 11px/1.4 var(--mono); color: var(--muted); }
+.wnd-note a { color: var(--green-text); }
+
+/* wiatr przy ziemi (METAR, model 10 m) nad tabelą */
+.wnd-sfc, .apw-sfc { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: baseline; margin-bottom: 6px; }
+.wnd-sfc span, .apw-sfc span { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.wnd-sfc i, .apw-sfc i { font: 700 10px var(--mono); font-style: normal; letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.wnd-sfc b { font: 700 17px var(--mono); color: #fff; }
+.apw-sfc b { font: 700 15px var(--mono); color: #fff; }
+.apw-sfc b.sm { font-size: 12px; font-weight: 400; color: var(--text); }
+
+/* tabele wiatru (METEO › WIND i AERODROME) */
+table.data.wnd-tab, table.data.apw-tab { width: 100%; }
+table.data.wnd-tab th, table.data.apw-tab th { padding: 2px 4px; text-align: center; }
+table.data.wnd-tab td, table.data.apw-tab td { padding: 2px 3px; font-family: var(--mono); white-space: nowrap; text-align: center; }
+.wnd-tab tbody tr { cursor: pointer; }
+.wnd-tab td { font-size: 13px; }
+.wnd-tab td.w, .apw-tab td.w { color: #fff; font-weight: 700; }
+.wnd-tab td.pt { text-align: left; }
+.wnd-tab td.pt b { display: block; color: #fff; }
+.wnd-tab td.pt b span { font-weight: 400; font-size: 11px; color: var(--muted); }
+.wnd-tab td.rwy { text-align: left; }
+.wnd-tags { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.wnd-tags:empty { display: none; }
+.wnd-tags .wnd-tag { margin-left: 0; }
+.wnd-tab td.pt small { display: block; font-size: 10px; color: var(--muted); }
+.wnd-tab tr.sel td { background: #14240f !important; }
+.wnd-tab tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--green-hi); }
+.wnd-tab td.rwy b, .apw-tab td.rwy b { font: 700 15px var(--mono); color: #fff; }
+.wnd-tab .tw, .apw-tab .tw { color: var(--bad); }
+.wnd-tag, .apw-tag { display: inline-block; margin-left: 4px; padding: 0 3px; font: 700 9px/13px var(--mono); vertical-align: 2px; border: 1px solid; }
+
+/* --- AERODROME › PRZEGLĄD: karta wiatru 0 / 3000 ft (trzecia kolumna nieco szersza, żeby tabela mieściła się przy 1366 px) --- */
+.ad-grid { grid-template-columns: 232px minmax(420px, 1.25fr) minmax(320px, 1fr); }
+/* niskie okno (1366x657, 1280x720): karta wiatru kurczy się i przewija w środku (pasy w użyciu są na górze tabeli),
+   NOTAM zawsze ma co najmniej ok. 120 px */
+.ad-col > .card.ad-apw { flex: 0 1 auto; min-height: 0; }
+.ad-apw .apw { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.ad-col > .card.ad-notam { min-height: 120px; }
+/* wąskie okno: strona przewija się w całości (siatka w naturalnej wysokości), trzecia kolumna pod spodem na całą szerokość */
+@media (max-width: 1250px), (max-height: 640px) {
+  .ad-grid { grid-template-columns: 232px minmax(0, 1fr); }
+  .ad-pane .content, .ad-pane .ad-grid { flex: none; }
+  .ad-grid > .ad-col:nth-child(3) { grid-column: 1 / -1; }
+  .ad-col > .card.part:has(+ .ad-apw) { max-height: none; }
+  .ad-col > .card.ad-apw { flex: none; }
+  .ad-apw .apw { overflow: visible; }
+}
+.ad-apw h3 { display: flex; align-items: baseline; gap: 8px; }
+.ad-apw .apw-src { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.apw-tags { display: inline-flex; flex-direction: column; vertical-align: middle; gap: 1px; margin-left: 4px; }
+.apw-tags:empty { display: none; }
+.apw-tags .apw-tag { margin-left: 0; font-size: 8px; line-height: 9px; padding: 0 2px; }
+.ad-col > .card.part:has(+ .ad-apw) { max-height: 34%; }
+.apw-tab td { font-size: 12px; }
+.apw-tab td.rwy { text-align: left; }
+.apw-tab td.pt { font-size: 11px; color: var(--text); }
+.apw-tab td.pt.centreline { color: var(--muted); }
+.apw-err { margin-top: 3px; font: 11px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apw-note { margin-top: 3px; font-size: 10px; line-height: 1.3; }
+
+/* --- ARR / DEP w kolorach pasków postępu lotu --- */
+.wnd-tag.arr, .apw-tag.arr, .ad-pane .tag.arr { color: #1d1600; background: var(--rw-arr); border-color: var(--rw-arr); }
+.wnd-tag.dep, .apw-tag.dep, .ad-pane .tag.dep { color: #001226; background: var(--rw-dep); border-color: var(--rw-dep); }
+.ad-pane .tag.arr.sugg { color: var(--rw-arr); background: transparent; }
+.ad-pane .tag.dep.sugg { color: var(--rw-dep); background: transparent; }
+.wnd-tab tr.arr td.rwy b, .apw-tab tr.arr td.rwy b { color: var(--rw-arr); }
+.wnd-tab tr.dep td.rwy b, .apw-tab tr.dep td.rwy b { color: var(--rw-dep); }
+.apw-tab tr.arr td { background: var(--rw-arr-bg) !important; }
+.apw-tab tr.dep td { background: var(--rw-dep-bg) !important; }
+.apw-tab tr.arr td:first-child { box-shadow: inset 3px 0 0 var(--rw-arr-line); }
+.apw-tab tr.dep td:first-child { box-shadow: inset 3px 0 0 var(--rw-dep-line); }
+.apw-tab tr.arr.dep td:first-child { box-shadow: inset 3px 0 0 var(--rw-arr-line), inset 6px 0 0 var(--rw-dep-line); }
+
+/* tabela pasów: wiersz pasa w użyciu w kolorze roli (ARR żółty, DEP niebieski) */
+table.data.rwy-table tr.inuse.arr td { background: var(--rw-arr-bg) !important; }
+table.data.rwy-table tr.inuse.dep td { background: var(--rw-dep-bg) !important; }
+table.data.rwy-table tr.inuse.arr td.rwy { color: var(--rw-arr); box-shadow: inset 3px 0 0 var(--rw-arr-line); }
+table.data.rwy-table tr.inuse.dep td.rwy { color: var(--rw-dep); box-shadow: inset 3px 0 0 var(--rw-dep-line); }
+table.data.rwy-table tr.inuse.arr.dep td.rwy { color: var(--rw-arr); box-shadow: inset 3px 0 0 var(--rw-arr-line), inset 6px 0 0 var(--rw-dep-line); }
+
+/* róża wiatrów: legenda; pas w użyciu w ramce */
+.ad-pane .wr-legend .sw-arr { background: var(--rw-arr); border-color: var(--rw-arr); }
+.ad-pane .wr-legend .sw-dep { background: var(--rw-dep); border-color: var(--rw-dep); }
+.rwy-use .pair b.arr { color: var(--rw-arr); }
+.rwy-use .pair b.dep { color: var(--rw-dep); }
+
+/* AWOS: kolumny DEP i ARR (tytuł, wybrany pas na tarczy i w przełączniku) */
+.aw-col[data-k="dep"] .aw-h > span:first-child, .aw-col[data-k="dep"] .aw-h .rwy b { color: var(--rw-dep); }
+.aw-col[data-k="arr"] .aw-h > span:first-child, .aw-col[data-k="arr"] .aw-h .rwy b { color: var(--rw-arr); }
+.aw-col[data-k="dep"] .aw-h { box-shadow: inset 3px 0 0 var(--rw-dep-line); }
+.aw-col[data-k="arr"] .aw-h { box-shadow: inset 3px 0 0 var(--rw-arr-line); }
+.aw-col[data-k="dep"] .aw-rsel button.sel { color: var(--rw-dep); border-color: var(--rw-dep-line); background: var(--rw-dep-bg); }
+.aw-col[data-k="arr"] .aw-rsel button.sel { color: var(--rw-arr); border-color: var(--rw-arr-line); background: var(--rw-arr-bg); }
+.aw-col[data-k="dep"] .aw-rsel button.use { box-shadow: inset 0 -2px 0 var(--rw-dep-line); }
+.aw-col[data-k="arr"] .aw-rsel button.use { box-shadow: inset 0 -2px 0 var(--rw-arr-line); }
+.aw-col[data-k="dep"] .aw-dial .rl.sel rect { stroke: var(--rw-dep); }
+.aw-col[data-k="arr"] .aw-dial .rl.sel rect { stroke: var(--rw-arr); }
+.aw-col[data-k="dep"] .aw-dial .rl.sel text { fill: var(--rw-dep); }
+.aw-col[data-k="arr"] .aw-dial .rl.sel text { fill: var(--rw-arr); }
+
+/* RUCH: opisy DEP / ARR na pasku informacji w kolorze pasków (same numery pasów koloruje strips.css) */
+.sx-bar .kv:has(> b.dep) > i { color: var(--rw-dep); }
+.sx-bar .kv:has(> b.arr) > i { color: var(--rw-arr); }
+
+/* pas do lądowania i (sugerowany) do startu jednocześnie: tło jak ARR, pasek obu kolorów */
+.apw-tab tr.arr.dep td, table.data.rwy-table tr.inuse.arr.dep td { background: var(--rw-arr-bg) !important; }
+.wnd-tab tr.arr.dep td.rwy b, .apw-tab tr.arr.dep td.rwy b { color: var(--rw-arr); }

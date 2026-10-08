@@ -168,3 +168,33 @@ class Sector(Base):
     upper_ft: Mapped[int] = mapped_column(Integer)
     owners: Mapped[str] = mapped_column(Text)  # identyfikatory stanowisk w kolejności przejmowania, rozdzielone ":"
     geometry: Mapped[str] = mapped_column(Text)  # GeoJSON Polygon
+
+
+class NbSector(Base):
+    """Sektor FIR-u sąsiedniego z jego własnego pliku .ese (data/import/neighbours), tylko w rejonie Polski.
+
+    owners to już znaki stanowisk (identyfikatory z [POSITIONS] są ważne tylko w obrębie jednego pliku)."""
+
+    __tablename__ = "nb_sectors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(8), index=True)  # klucz pliku sąsiada: EDWW, LKAA, UKBV…
+    fir: Mapped[str] = mapped_column(String(8), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    lower_ft: Mapped[int] = mapped_column(Integer)
+    upper_ft: Mapped[int] = mapped_column(Integer)
+    owners: Mapped[str] = mapped_column(Text)  # znaki stanowisk w kolejności przejmowania, rozdzielone ":"
+    active: Mapped[str] = mapped_column(Text, default="")  # warunki ACTIVE "ICAO:pas" rozdzielone spacją
+    geometry: Mapped[str] = mapped_column(Text)  # GeoJSON Polygon
+
+
+class NbPosition(Base):
+    """Stanowisko z pliku .ese sąsiada, występujące w kolejności przejmowania jego sektorów (bez stanowisk EP**)."""
+
+    __tablename__ = "nb_positions"
+
+    source: Mapped[str] = mapped_column(String(8), primary_key=True)
+    callsign: Mapped[str] = mapped_column(String(20), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    frequency: Mapped[str] = mapped_column(String(10))
+    prefix: Mapped[str | None] = mapped_column(String(10))

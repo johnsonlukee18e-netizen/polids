@@ -1,6 +1,7 @@
 import json
 import math
 import re
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,8 +12,10 @@ from ..config import DATA_DIR, settings
 from ..database import get_db
 from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import Aerodrome, NavPoint, Sector
+from ..services import upperwind
 from ..services.http_cache import UpstreamError
 from ..services.metar import parse_metar
+from ..services.runways import wind_components
 from ..services.weather import get_metars, get_tafs
 from .nav import sct_line_groups
 
@@ -190,3 +193,59 @@ async def qnh_regions(db: Session = Depends(get_db)):
             "coast": {"type": "MultiLineString", "coordinates": [_lonlat(c) for c in _chains(coast)]} if coast else None,
             "aerodromes": [{"icao": a.icao, "lat": a.lat, "lon": a.lon, "metar": a.icao in icaos}
                            for a in sorted(ads, key=lambda a: a.icao)]}
+
+
+# --- wiatr przy ziemi i na 3000 ft na podejściu (METEO › WIND, AERODROME › PRZEGLĄD)
+
+def _components(wind: dict | None, heading: float) -> dict:
+    """Składowe wiatru względem pasa: hw (czołowy, < 0 w plecy), xw (boczny, > 0 z prawej)."""
+    if not wind or wind.get("dir") is None or wind.get("speed") is None:
+        return {"hw": None, "xw": None}
+    hw, xw = wind_components(wind["dir"], wind["speed"], heading)
+    return {"hw": hw, "xw": xw}
+
+
+@router.get("/approach-points")
+def approach_points(db: Session = Depends(get_db)):
+    """Punkty podejścia pasów lotnisk z bazy: FAF/IF z procedur .ese albo punkt na przedłużeniu osi, w którym ścieżka
+    3° osiąga 3000 ft AMSL (bez wiatru, do list wyboru). Bez pasów trawiastych, awaryjnych, krótkich i bez współrzędnych
+    progu, chyba że mają procedurę podejścia (upperwind.approach_runways)."""
+    return {"alt_ft": upperwind.ALT_FT, "aerodromes": upperwind.approach_points(db)}
+
+
+@router.get("/approach-wind/{icao}")
+async def approach_wind(icao: str, db: Session = Depends(get_db)):
+    """Wiatr lotniska: przy ziemi (METAR i model 10 m w punkcie lotniska) oraz na 3000 ft AMSL w punkcie podejścia
+    każdego pasa (Open-Meteo, bieżąca godzina), ze składowymi czołową/w plecy i boczną."""
+    found = upperwind.approach_points(db, icao)
+    if not found:
+        ad = db.get(Aerodrome, icao.upper())
+        raise HTTPException(404, f"Brak danych o pasach lotniska {ad.icao}" if ad else f"Nie znam lotniska {icao}")
+    ad = found[0]
+    metar, metar_error = None, None
+    try:
+        metar = (await get_metars([ad["icao"]])).get(ad["icao"])
+    except UpstreamError as exc:
+        metar_error = f"METAR niedostępny: {exc}"
+    p = parse_metar(metar) if metar else None
+    metar_wind = {"dir": p.wind_dir, "speed": p.wind_speed, "gust": p.wind_gust, "variable": p.wind_variable,
+                  "var_from": p.wind_var_from, "var_to": p.wind_var_to, "time": p.time} if p else None
+    model, model_error = None, None
+    try:
+        model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]])
+    except UpstreamError as exc:
+        model_error = f"Prognoza Open-Meteo niedostępna: {exc}"
+    surface_model = model[0]["surface"] if model else None
+    runways = []
+    for i, r in enumerate(ad["runways"]):
+        w = model[i + 1]["w3000"] if model else None
+        runways.append({**r, "w3000": w, "c3000": _components(w, r["heading"]),
+                        "c_metar": _components(metar_wind, r["heading"]),
+                        "c_model": _components(surface_model, r["heading"])})
+    return {"icao": ad["icao"], "name": ad["name"], "lat": ad["lat"], "lon": ad["lon"],
+            "elevation_ft": ad["elevation_ft"], "alt_ft": upperwind.ALT_FT,
+            "source": "Open-Meteo", "source_url": "https://open-meteo.com", "model": "best_match",
+            "valid": model[0]["valid"] if model else None,
+            "fetched": datetime.now(timezone.utc).strftime("%H:%MZ"),
+            "metar": metar, "metar_wind": metar_wind, "model_surface": surface_model, "runways": runways,
+            "metar_error": metar_error, "model_error": model_error}

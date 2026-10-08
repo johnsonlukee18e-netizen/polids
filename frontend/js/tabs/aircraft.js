@@ -3,6 +3,25 @@ import { api, debounce, esc, fmt, h, letterMenu } from "../api.js";
 const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
 };
+// Przyciski producentów u góry: [klucz ?maker= w backendzie (tam dopasowanie różnych zapisów nazwy), etykieta,
+// główna nazwa producenta, której grupa idzie na początek listy]
+const MAKERS = [["airbus", "AIRBUS", "airbus"], ["boeing", "BOEING", "boeing"], ["embraer", "EMBRAER", "embraer"],
+  ["mcdonnell", "MCDONNELL", "mcdonnell douglas"], ["atr", "ATR", "atr"], ["cessna", "CESSNA", "cessna"]];
+const types = (n) => `${n} ${n === 1 ? "typ" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "typy" : "typów"}`;
+const norm = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// Widok producenta: grupy wg nazwy producenta w bazie (np. Airbus, Airbus Helicopters), główna nazwa pierwsza,
+// dalej od największej grupy; w grupie kolejność z serwera (wg kodu ICAO)
+function makerGroups(list, primary) {
+  const by = new Map();
+  list.forEach((a) => {
+    const k = a.manufacturer || "–";
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(a);
+  });
+  return [...by.entries()].sort(([a, x], [b, y]) =>
+    (norm(b) === primary) - (norm(a) === primary) || y.length - x.length || a.localeCompare(b));
+}
 const searchName = (a) => `${a.manufacturer || ""} ${a.model || a.icao}`.trim();
 // EUROCONTROL Aircraft Performance Database: strona typu (details.aspx?ICAO=…) obok strony głównej z config
 let PERF = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.aspx";
@@ -23,8 +42,11 @@ export default {
   mount(root, ctx) {
     PERF = ctx.config.links?.performance_db || PERF;
     let prefix = "";
-    const letters = letterMenu(root, (l) => { prefix = l; load(); });
-    const pane = h(`<div class="pane"><div class="split">
+    let maker = ""; // aktywny przycisk producenta; litera albo ponowny klik wraca do zwykłego widoku
+    const letters = letterMenu(root, (l) => { prefix = l; setMaker(""); load(); });
+    const pane = h(`<div class="pane ac-pane">
+      <nav class="ac-makers">${MAKERS.map(([k, l]) => `<button class="gbtn" data-m="${k}" title="Wszystkie typy producenta ${l}">${l}</button>`).join("")}</nav>
+      <div class="split">
       <div class="list">
         <div class="toolbar">
           <input type="search" class="q" placeholder="Typ ICAO, model, producent…" size="32">
@@ -41,17 +63,36 @@ export default {
     let rows = [];
     let seq = 0;
 
+    // przyciski producentów: aktywny podświetlony, w podmenu liter wtedy żadna litera nie jest zaznaczona
+    const setMaker = (m) => {
+      maker = m;
+      pane.querySelectorAll(".ac-makers button").forEach((b) => b.classList.toggle("active", b.dataset.m === m));
+      if (m) root.querySelectorAll(".submenu.letters button.active").forEach((b) => b.classList.remove("active"));
+    };
     const load = async () => {
-      const qs = new URLSearchParams({ q: $(".q").value.trim(), prefix, wtc: $(".wtc").value, recat: $(".recat").value, limit: 500 });
+      const qs = new URLSearchParams({ q: $(".q").value.trim(), prefix: maker ? "" : prefix, maker, wtc: $(".wtc").value,
+        recat: $(".recat").value, limit: 500 });
       const my = ++seq;
       let data;
       try {
         data = await api(`/api/aircraft?${qs}`);
-      } catch (e) { $(".ac-list").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+      } catch (e) {
+        if (my !== seq) return;
+        $(".count").textContent = "";
+        $(".ac-list").innerHTML = `<p class="error">Nie udało się pobrać typów: ${esc(e.message)}</p>`;
+        return;
+      }
       if (my !== seq) return; // starsza odpowiedź przyszła po nowszej
-      rows = data;
-      $(".count").textContent = `${rows.length} typów${rows.length === 500 ? " (pokazano pierwsze 500)" : ""}`;
-      $(".ac-list").innerHTML = rows.map(record).join("");
+      const [, label, primary] = MAKERS.find(([k]) => k === maker) || [];
+      const groups = label ? makerGroups(data, primary) : [];
+      rows = label ? groups.flatMap(([, list]) => list) : data;
+      $(".count").textContent = `${label ? label + ": " : ""}${types(rows.length)}${groups.length > 1 ? ` w ${groups.length} grupach` : ""}`
+        + (rows.length === 500 ? " (pokazano pierwsze 500)" : "");
+      let i = 0;
+      $(".ac-list").innerHTML = !rows.length ? `<p class="hint ac-empty">Brak typów${label ? ` producenta ${label}` : ""} dla tych filtrów.</p>`
+        : !label ? rows.map(record).join("")
+          : groups.map(([name, list]) => `<div class="ac-group"><div class="ac-gh">${esc(name)}<span>${types(list.length)}</span></div>
+            ${list.map((a) => record(a, i++)).join("")}</div>`).join("");
     };
 
     const show = (a) => {
@@ -93,10 +134,18 @@ export default {
       current = rows[rec.dataset.i];
       show(current);
     });
+    pane.querySelector(".ac-makers").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-m]");
+      if (!b) return;
+      // ponowny klik: zwykły widok (wszystkie); nowy producent: wszystkie jego typy, więc bez tekstu wyszukiwania
+      if (b.dataset.m === maker) { prefix = ""; setMaker(""); letters.set(""); } else { $(".q").value = ""; setMaker(b.dataset.m); }
+      $(".list").scrollTop = 0;
+      load();
+    });
     $(".q").addEventListener("input", debounce(load));
     $(".wtc").addEventListener("change", load);
     $(".recat").addEventListener("change", load);
     load();
-    return { activate: (arg) => { if (arg) { $(".q").value = arg; prefix = ""; letters.set(""); load(); } $(".q").focus(); } };
+    return { activate: (arg) => { if (arg) { $(".q").value = arg; prefix = ""; setMaker(""); letters.set(""); load(); } $(".q").focus(); } };
   },
 };

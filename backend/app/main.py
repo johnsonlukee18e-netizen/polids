@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import access, auth
 from .config import VERSION, settings
 from .importers.seed import init_db
-from .routers import admin, aerodromes, aircraft, callsigns, docs, meteo, nav, notam, system, vatsim, viff
+from .routers import admin, aerodromes, aircraft, callsigns, docs, meteo, nav, notam, radio, system, vatsim, viff
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 # healthcheck dockera co 30 s, nie potrzebujemy tego w logu
@@ -31,7 +31,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title=f"{settings.name} API", version=VERSION, lifespan=lifespan)
 
 app.include_router(auth.router)
-for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, vatsim, viff, docs, admin):
+for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs, admin):
     app.include_router(r.router)
 
 

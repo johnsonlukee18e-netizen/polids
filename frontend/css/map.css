@@ -1,0 +1,105 @@
+/* MAP (runda 8): warstwy przestrzeni wg poziomu, listy wyboru sektorów, dymek "co jest w tym miejscu",
+   kolory samolotów wg odlot / przylot / tranzyt. Bez poświaty: etykiety na pełnym ciemnym tle, dymki bez cienia. */
+
+/* --- poziom i przełączniki przestrzeni */
+.as-card .as-lvl { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; }
+.as-card .as-lvl .sw { padding: 0; font-size: 12px; }
+.as-card .flbox input:disabled { color: var(--muted); border-color: var(--line); }
+.as-pre { display: flex; gap: 3px; margin: 0 0 6px; }
+.as-pre button { flex: 1; padding: 1px 0; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; color: #aab4aa;
+  font: 11px var(--mono); cursor: pointer; }
+.as-pre button:hover { border-color: var(--green-hi); color: #fff; }
+.as-pre button.on { background: var(--green); border-color: var(--green-hi); color: #fff; font-weight: 700; }
+.as-row { display: flex; align-items: center; gap: 6px; }
+.as-row > .sw { flex: 1; min-width: 0; }
+.pk-btn { flex: none; max-width: 104px; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; color: #aab4aa;
+  font: 11px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.pk-btn:hover { border-color: var(--green-hi); color: #fff; }
+.pk-btn.sub { color: var(--yellow); border-color: #6b5d12; }
+.pk-btn.open { background: var(--green); border-color: var(--green-hi); color: #fff; }
+
+/* --- lista wyboru sektorów (rozwijana pod przełącznikiem) */
+.pk { margin: 2px 0 6px 38px; border: 1px solid var(--line); background: #070907; }
+.pk-bar { display: flex; gap: 3px; padding: 3px; border-bottom: 1px solid var(--line); background: var(--head); }
+.pk-bar .pk-q { flex: 1; min-width: 0; padding: 1px 5px; font: 11px var(--mono); }
+.pk-bar button { flex: none; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; color: #c3cdc3;
+  font: 11px var(--mono); cursor: pointer; }
+.pk-bar button:hover { border-color: var(--green-hi); color: #fff; }
+.pk-bar .pk-q + button { margin-left: 0; }
+.pk-list { max-height: 230px; overflow: auto; }
+.pk-g, .pk-i { display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer; font: 11px/1.35 var(--mono); }
+.pk-g { position: sticky; top: 0; z-index: 1; background: var(--head); border-bottom: 1px solid var(--head-line); color: var(--green-text);
+  text-transform: uppercase; letter-spacing: .5px; }
+.pk-g b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-g small { color: var(--muted); letter-spacing: 0; }
+.pk-i { border-bottom: 1px solid #111611; color: #dbe3db; }
+.pk-i:hover { background: var(--row-hover); }
+.pk-i span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-i span i { font-style: normal; color: var(--muted); }
+.pk-i small { flex: none; color: var(--muted); }
+.pk-i.off { color: #6f786f; }
+.pk-i.off small { color: #535b53; }
+.pk input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; accent-color: var(--green-hi); cursor: pointer; }
+.pk-none { padding: 6px; color: var(--muted); font: 11px var(--mono); }
+
+/* --- próbki kolorów warstw (panel i legenda); TMA / CTA / CTR bez APP / TWR to sam kontur,
+   obsadzone: kontur i wypełnienie w kolorze stanowiska (próbka "own") */
+.swatch.idle { border: 1px solid #5c665c; }
+.mapwrap .swatch.tma, .mapwrap .swatch.ctr { background: none; }
+.swatch.own { background: rgba(15,143,176,.4); border: 2px solid #0f8fb0; }
+.swatch.fis { background: rgba(53,196,176,.12); border: 1px dashed #35c4b0; }
+.swatch.cta { border: 1.5px dashed #c9b26b; }
+.swatch.atz { background: rgba(224,138,214,.2); border: 1px solid #e08ad6; }
+.swatch.nb { border: 1px dashed #8d99a6; }
+
+/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu */
+.leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: 640px; pointer-events: none; }
+.leaflet-tooltip.as-tip::before { display: none; }
+.as-tip td { padding: 1px 5px; }
+.as-tip td.lv { color: var(--yellow); }
+.as-tip .fq { color: #9dff6e; font-weight: 700; }
+.as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 2px; font: 700 10px/14px var(--mono); text-align: center; }
+.as-k.as-acc { color: #5fd23a; } .as-k.as-tma { color: #7f95ff; } .as-k.as-ctr { color: #ff6b6b; } .as-k.as-fis { color: #35c4b0; }
+.as-k.as-cta { color: #c9b26b; } .as-k.as-atz { color: #e08ad6; } .as-k.as-nb, .as-k.as-oth { color: #aab4bd; }
+/* kolejność przejmowania TMA / CTA / CTR: jedna linia stanowisk (zawijana) pod wierszem przestrzeni */
+.as-tip tr.as-chr td { padding: 0 5px 4px; }
+.as-ch { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 3px; max-width: 600px; }
+.asc { padding: 0 4px; border: 1px solid #2f3a2f; border-radius: 2px; font: 11px/15px var(--mono); color: #c3cdc3; white-space: nowrap; }
+.asc b { font-weight: 700; }
+.asc i { font-style: normal; }
+.asc.on { color: #9dff6e; border-color: #2f6b2f; }
+.asc.off { color: #6a736a; border-color: #1f261f; }
+.asc.own { color: #062b00; background: #5fd23a; border-color: #5fd23a; }
+.asc-src { padding: 0 2px 0 4px; font: 10px/15px var(--mono); color: var(--yellow); white-space: nowrap; }
+/* podpowiedź pod liczbą przestrzeni (TMA / CTR poza wybranym poziomem) */
+.sector-info .as-note { color: var(--yellow); }
+
+/* --- plakietki ATC bez rozmytego cienia (reguła z style.css) */
+.atcb { box-shadow: none; }
+
+/* --- karta lotniska: kto wystawił ATIS */
+.ad-tip .adc-who { margin: 0 0 2px; font: 12px var(--mono); color: #1d2329; }
+
+/* --- samoloty: odlot z EP** (niebieski jak paski odlotów), przylot na EP** (żółty jak paski przylotów), tranzyt (biały) */
+.acicon.dep svg, .acsym.dep { fill: #6db8ff; }
+.acicon.arr svg, .acsym.arr { fill: #ffd84a; }
+.acicon.trn svg, .acsym.trn { fill: #f4f6f8; }
+.acicon.dep span { color: #8cc8ff; }
+.acicon.arr span { color: #ffd84a; }
+.acicon.trn span { color: #f4f6f8; }
+.acicon.sel svg, .acicon.sel.dep svg, .acicon.sel.arr svg, .acicon.sel.trn svg, .acsym.sel { fill: #ff9f1a; }
+.acicon.sel span { color: #ffb347; }
+/* jasne podkłady: ciemniejsze odcienie, biały kontur */
+.map.light .acicon.dep svg { fill: #1f5fae; stroke: #fff; }
+.map.light .acicon.arr svg { fill: #a87c00; stroke: #fff; }
+.map.light .acicon.trn svg { fill: #2a3036; stroke: #fff; }
+.map.light .acicon.dep span { color: #1f5fae; }
+.map.light .acicon.arr span { color: #7a5a00; }
+.map.light .acicon.trn span { color: #1d2329; }
+.map.light .acicon.sel svg { fill: #d4380d; }
+.map.light .acicon.sel span { color: #b02e08; }
+.ac-key { display: flex; gap: 10px; margin: -2px 0 2px 38px; font: 11px var(--mono); color: var(--muted); }
+.ac-key span { display: inline-flex; align-items: center; gap: 2px; }
+.ac-key .sym { width: 14px; height: 14px; }
+.acsym.dep, .acsym.arr, .acsym.trn, .acsym.sel { stroke: #000; }
+.as-card .flbox input { width: 58px; }

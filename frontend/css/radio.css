@@ -4,6 +4,9 @@
    Szerokość kolumny ID: najdłuższa etykieta VACS w znakach (--pid-ch) + miejsce na dopisek. */
 .radio-list.vacs .radio-group { max-width: 1180px; }
 .radio-list.single.vacs .pid { width: calc(var(--pid-ch, 16) * 1ch + 64px); flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* pozostałe listy (LOTNISKA, EPWW ACC): ID = posName (np. "PO N APP"), szerokość wg najdłuższego w liście, bez zawijania */
+.radio-list.single:not(.vacs) .pid { width: calc(var(--pid-ch, 6) * 1ch + 4px); flex: none; white-space: nowrap; }
+.radio-list.single:not(.vacs) .cs { flex: none; }
 .radio-list.vacs .pid .alt { display: inline-block; margin-left: 8px; padding: 0 5px; vertical-align: 2px; font: 700 12px/17px var(--mono);
   color: #b9c2b9; background: #121612; border: 1px solid #2f3a2f; border-radius: 2px; cursor: help; }
 /* sąsiad spoza profilu VACS: ID z pliku .ese, drugoplanowe */
@@ -16,9 +19,177 @@
 .radio-list.single.vacs .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* dziedziczenie VACS: kto przejmuje obszar, gdy główne stanowisko jest offline; kilka przejęć zawija się w wierszu */
 .radio-row .inhs { display: flex; flex-wrap: wrap; column-gap: 14px; min-width: 0; }
+/* wąski ekran: gdy w wierszu brakuje miejsca, przejęcia schodzą do drugiej linii zamiast przewijać listę w bok */
+.radio-list.single .radio-row { flex-wrap: wrap; row-gap: 2px; }
 .radio-row .inh { font-size: 14px; color: var(--muted); white-space: nowrap; cursor: help; }
 .radio-row .inh b { font: 700 14px var(--mono); color: var(--green-hi); }
 /* najechanie na etykietę VACS, dopisek albo przejęcie (własny title): bez drugiego dymka wiersza */
 .radio-row[data-tip]:has([title]:hover)::after { display: none; }
 .vacs-note { margin: -4px 0 10px; }
 .vacs-note a { color: var(--green-text); }
+
+/* ===== RADIO › GEO (runda 8): kafelki stron GEO jak w VACS, obok mapa zasięgu pozycji =====
+   Kafelki płaskie, ciemne, w stylu PANDORA/NM UI: zielone = online, pomarańczowa przerywana ramka = rezerwacja,
+   szary tekst = nieznane stanowisko, kolorowy pasek u góry = pozycja aktywna (ten sam kolor co na mapie). */
+.geo-root { flex: 1; min-height: 0; display: flex; gap: 8px; padding: 8px; overflow: hidden; }
+.geo-left { width: clamp(500px, 47%, 640px); flex: none; min-width: 0; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.geo-bar { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.geo-bar .seg { margin: 0; flex: none; }
+.geo-bar .seg button { padding: 3px 12px; white-space: nowrap; }
+.geo-simbar { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.geo-simbar .btn { padding: 2px 8px; font-size: 11px; }
+.geo-root:not(.sim) .geo-simbar .btn[data-act="clear"] { display: none; }
+.geo-status { flex: none; min-height: 17px; font-size: 11px; line-height: 1.3; }
+
+/* przełącznik stron: siatka 3 × 3 jak w VACS, miejsce po stronie FMP puste */
+.geo-pages { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+.geo-pg { min-width: 0; padding: 3px 2px; letter-spacing: -.5px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px; color: #c3cdc3;
+  font: 700 11px/1.3 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.geo-pg:hover { border-color: var(--green-hi); color: #fff; }
+.geo-pg.on { background: var(--green); border-color: var(--green-hi); color: #fff; }
+.geo-pg.empty { border: 1px dashed #1c221c; background: none; cursor: default; }
+
+/* siatka kafelków: kolumnami z góry na dół (kolejność kluczy VACS), stała szerokość = 1/8 panelu */
+.geo-grid { flex: none; }
+.geo-tiles { --gap: 3px; --tw: calc((100% - 7 * var(--gap)) / 8); display: grid; grid-auto-flow: column; gap: var(--gap);
+  grid-template-rows: repeat(var(--rows), 58px); grid-template-columns: repeat(var(--cols), var(--tw)); }
+.gt { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 3px 2px 2px;
+  background: #0f130f; border: 1px solid #2a332a; border-radius: 3px; color: #d6ded6; font: 700 11px/12px var(--mono); text-align: center;
+  cursor: pointer; overflow: hidden; }
+.gt.sp { background: none; border: 0; cursor: default; }
+.gt .gl { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.gt .gl.alt { color: #cdb85a; font-weight: 400; }
+.gt .gf { display: block; margin-top: 1px; font: 400 10px/11px var(--mono); color: #8c968c; }
+.gt .go { display: block; max-width: 100%; margin-top: 2px; white-space: nowrap; overflow: hidden; font: 400 10px/11px var(--mono); color: #fff; }
+/* sąsiad: kolor FIR-u jak w VACS (--fc) – pasek z lewej, lekko zabarwione tło i ramka, pierwsza linijka w kolorze FIR-u;
+   online (zielone) i rezerwacja (pomarańczowa przerywana ramka) nadpisują tło i ramkę, pasek FIR-u zostaje */
+.gt.fir { background: color-mix(in srgb, var(--fc) 18%, #0f130f); border-color: color-mix(in srgb, var(--fc) 45%, #1a201a); }
+.gt.fir::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--fc); }
+.gt.fir .gl:first-child { color: color-mix(in srgb, var(--fc) 55%, #fff); }
+.gt.fir.unk .gl:first-child { color: inherit; }
+.gt:hover, .gt.hl { border-color: var(--green-hi); }
+.gt.on { background: #1d5216; border-color: #5fd23a; color: #fff; }
+.gt.on .gf { color: #c9ffb3; }
+.gt.on .gl.alt { color: #ffe680; }
+.gt.fir.on .gl:first-child { color: #fff; }
+.gt.bk { border: 1px dashed #ffb020; }
+.gt.bk .gf { color: #ffd27a; }
+.gt.unk { color: #4f574f; }
+.gt.unk .gf { color: #3d443d; }
+.gt.sec { color: #9aa49a; }
+.gt.sec .gl { color: #c9d1c9; }
+.gt.sec.on .gl { color: #fff; }
+/* pozycja aktywna (online albo w symulacji): pasek w kolorze pozycji z mapy */
+.gt.act::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--pc, #fff); }
+.gt.focus { outline: 2px solid #fff; outline-offset: -2px; }
+
+/* legenda pod kafelkami: stany kafelka i kolory FIR-ów sąsiadów na tej stronie */
+.geo-legend { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 1px 10px; min-height: 15px; font: 10px/1.4 var(--mono); color: #9aa29a; }
+.geo-legend .glg { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.geo-legend .glg[title] { cursor: help; }
+.geo-legend i { flex: none; display: inline-block; width: 11px; height: 9px; border-radius: 1px; }
+.geo-legend .glg-on { background: #1d5216; border: 1px solid #5fd23a; }
+.geo-legend .glg-bk { border: 1px dashed #ffb020; }
+.geo-legend .glg-act { background: #0f130f; border: 1px solid #2a332a; border-top: 3px solid #40f5ec; }
+.geo-legend .glg-unk { height: 11px; background: #0f130f; border: 1px solid #2a332a; color: #4f574f; font: 700 9px/9px var(--mono); font-style: normal; text-align: center; }
+.geo-legend .glg-sep { color: #6c746c; }
+
+/* karta "kto co obsługuje": jedna kolumna */
+.geo-card { flex: 1; min-height: 90px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.geo-card > h3 { flex: none; display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; background: var(--head);
+  border-bottom: 1px solid var(--head-line); font: 700 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.geo-card > h3 .geo-whon { color: var(--muted); font-weight: 400; }
+.geo-card > h3 button { margin-left: auto; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px; color: #c3cdc3;
+  font: 11px var(--sans); text-transform: none; letter-spacing: 0; cursor: pointer; }
+.geo-card > h3 button:hover { border-color: var(--green-hi); color: #fff; }
+.geo-wholist { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 6px; }
+.gw-row { padding: 3px 4px; border-bottom: 1px solid #161b16; }
+.gw-row:hover, .gw-row.hl { background: var(--row-hover); }
+.gw-h { display: flex; align-items: center; gap: 8px; font: 12px var(--mono); }
+.gw-h b { color: #fff; white-space: nowrap; }
+.gw-h .fq { color: var(--muted); font-size: 11px; }
+.gw-h .who { min-width: 0; flex: 1; color: var(--green-hi); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gw-x { margin-left: auto; flex: none; width: 20px; height: 18px; padding: 0; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px;
+  color: #9aa29a; font: 11px var(--sans); cursor: pointer; }
+.gw-x:hover { border-color: var(--bad); color: #fff; }
+.geo-root .sw { flex: none; display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; }
+.geo-root .sw.free { border: 1px dashed #8a918a; }
+.gw-sec { display: flex; flex-wrap: wrap; gap: 1px 12px; padding: 1px 0 0 19px; font: 11px/1.4 var(--mono); color: #c3cdc3; }
+.gw-sec .acc { color: #fff; font-weight: 700; }
+.gw-sec .rn { color: var(--muted); font-style: italic; }
+.gw-free { display: flex; align-items: center; gap: 8px; padding: 5px 4px 2px; font: 11px var(--mono); color: #9aa29a; }
+.gw-free b { color: #c9d1c9; }
+.gw-note { padding: 4px 4px 0; font-size: 10px; }
+
+/* mapa zasięgu */
+.geo-mapcard { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 3px; overflow: hidden; }
+.geo-mh { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 4px 6px 4px 8px; background: var(--head);
+  border-bottom: 1px solid var(--head-line); }
+.geo-lv, .geo-kinds { display: inline-flex; align-items: center; gap: 3px; }
+.geo-mh button { flex: none; height: 22px; padding: 0 5px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px; color: #c3cdc3;
+  font: 700 11px var(--mono); cursor: pointer; white-space: nowrap; }
+.geo-mh button:hover { border-color: var(--green-hi); color: #fff; }
+.geo-mh button.on { background: var(--green); border-color: var(--green-hi); color: #fff; }
+.geo-kinds button.on { background: #1b2a1b; border-color: #4a7a3a; color: #dfffd0; }
+.geo-kinds button:not(.on) { color: #6c746c; text-decoration: line-through; }
+.geo-mh .flbox { margin: 0 2px; padding: 0 4px; border: 1px solid transparent; border-radius: 3px; font-size: 12px; }
+.geo-mh .flbox.on { border-color: var(--green-hi); }
+.geo-mh .flbox input { width: 54px; padding: 1px 4px; font: 12px var(--mono); }
+.geo-viewctl a { font: 15px/30px var(--sans); }
+.geo-map { flex: 1; min-height: 0; }
+.geo-map .leaflet-control-attribution { font-size: 9px; }
+.geo-info { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 4px 8px; border-top: 1px solid var(--head-line);
+  background: var(--head); font: 11px/1.35 var(--mono); color: #9aa29a; }
+.geo-info b { color: #fff; }
+.geo-info .gk-sep { color: #4a524a; }
+.geo-info .gk, .geo-info .gk-f { flex: none; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.geo-info .gk i { flex: none; display: inline-block; width: 12px; height: 9px; border-radius: 1px; }
+.geo-info .gk-own { background: rgba(64,245,236,.4); border: 1px solid #40f5ec; }
+.geo-info .gk-free { border: 1px dashed #7d857d; }
+.geo-info .gk-rng { border: 2px dashed #ff9f1a; }
+.geo-info .gk[title] { cursor: help; }
+.geo-unfocus { padding: 0 5px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px; color: #c3cdc3; font: 10px var(--sans); cursor: pointer; }
+/* etykieta pozycji na mapie: pełne ciemne pole, bez poświaty */
+.geo-maplabel > div.geo-lbl { display: flex; align-items: center; gap: 4px; padding: 1px 5px; font: 700 11px/1.3 var(--mono); color: #fff;
+  background: rgba(0,0,0,.82); }
+.geo-maplabel > div.geo-lbl.hl { outline: 1px solid #fff; }
+.geo-lbl i { display: inline-block; width: 8px; height: 8px; border-radius: 1px; }
+.geo-map.light .geo-maplabel > div.geo-lbl { background: rgba(255,255,255,.92); color: #111; }
+
+/* dymek kafelka i wycinka (position: fixed, nie jest przycinany przez kontenery) */
+.geo-float { display: none; position: fixed; z-index: 3000; pointer-events: none; width: max-content; max-width: 380px; padding: 6px 8px;
+  background: #0b0d10; border: 1px solid #3a4652; border-radius: 4px; color: #e6ebef; font: 12px/1.4 var(--sans); }
+.gtt-h { display: flex; align-items: baseline; gap: 8px; }
+.gtt-h b { font: 700 14px var(--mono); color: #fff; }
+.gtt-h span { font: 11px var(--mono); color: var(--green-text); }
+.gtt-sub { font: 11px var(--mono); color: var(--muted); }
+.gtt-own { padding: 3px 0 1px; font: 12px var(--mono); color: #e8ece8; }
+.gtt-own i, .gtt-chain i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 1px; }
+.gtt-on { font: 11px var(--mono); color: var(--green-hi); }
+.gtt-bk { font: 11px var(--mono); color: #ffb020; }
+.gtt-k { margin: 5px 0 1px; font: 700 10px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .6px; color: var(--green-text); }
+.gtt-k span { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.gtt-chain { margin: 0; padding: 0 0 0 20px; font: 11px/1.45 var(--mono); color: #6f786f; }
+.gtt-chain li.act { color: #dfe6df; }
+.gtt-chain li.own { color: #fff; font-weight: 700; }
+.gtt-chain .onl { color: var(--green-hi); font-weight: 400; font-size: 10px; }
+.gtt-chain .fq { color: #6f786f; font-weight: 400; font-size: 10px; }
+.gtt-chain li.act .fq, .gtt-chain li.own .fq { color: #9aa29a; }
+/* kafelek APP/TWR/FIS: co pozycja przejmuje (miejsce w kolejności, kto teraz obsługuje) */
+.gtt-take { margin: 0; padding: 0; list-style: none; font: 11px/1.45 var(--mono); color: #9aa29a; }
+.gtt-take b { color: #dfe6df; font-weight: 700; }
+.gtt-take .me { color: var(--green-hi); }
+.gtt-src { margin-top: 4px; font-size: 10px; color: var(--muted); }
+.gtt-hint { margin-top: 3px; font-size: 10px; color: #b9c2b9; }
+
+/* listy RADIO: kliknięcie wiersza dodaje pozycję do symulacji GEO; aktywna = znacznik w jej kolorze */
+.radio-row.pick { cursor: pointer; }
+.radio-row.pick:hover { background: var(--row-hover); }
+.radio-row .act-mark { flex: none; width: 6px; align-self: stretch; border-radius: 1px; background: transparent; }
+.radio-row.act .act-mark { background: var(--pc, #fff); }
+.radio-row .nm.fir { color: var(--muted); font-style: italic; }
+/* nagłówek grupy sąsiada: znaczek koloru FIR-u (te same kolory co kafelki GEO) */
+.radio-group h3 .fir-sw { display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 2px; vertical-align: 0; cursor: help; }
+.radio-list .pickhint { margin: -2px 0 10px; }
+.radio-list .pickhint a { color: var(--green-text); cursor: pointer; }

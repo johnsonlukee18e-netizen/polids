@@ -211,3 +211,9 @@ def test_many_concurrent_users_do_not_deadlock(client, monkeypatch):
         return [r.status_code for r in rs]
 
     assert asyncio.run(run()) == [200] * 40
+def test_ownership_chains(client):
+    d = client.get("/api/nav/ownership").json()
+    assert d["source"] in ("ese", "om")
+    assert sorted(d["sectors"]) == list("BCDEFGJNRT")
+    assert all(set(s) == {"LOW", "MID", "HIGH"} for s in d["sectors"].values())
+    assert all(cs in d["acc_positions"] for s in d["sectors"].values() for chain in s.values() for cs in chain)

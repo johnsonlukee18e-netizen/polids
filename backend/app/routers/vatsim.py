@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.http_cache import UpstreamError
+from ..services.neighbours import nb_owners
+from ..services.positions import all_positions
+from ..services.radio import Station
 from ..services.route import RouteResolver
 from ..services.vatsim import (airport_atc, airport_traffic, bookings_by_callsign, controller_info, fir_boundaries,
                                get_bookings, get_feed, match_positions, online_firs, pilot_info)
@@ -23,11 +26,16 @@ async def _feed() -> dict:
 
 @router.get("/online")
 async def online(db: Session = Depends(get_db)):
-    """Zalogowani kontrolerzy: dopasowani do stanowisk z .ese (`positions`) i wszyscy z FIR-ów wokół EPWW (`firs`)."""
+    """Zalogowani kontrolerzy: dopasowani do stanowisk (`positions`) i wszyscy z FIR-ów wokół EPWW (`firs`).
+
+    Stanowiska: najpierw plik .ese EPWW (w kolejności z pliku), potem pozostałe stanowiska sąsiadów z vacs-data
+    i z plików .ese sąsiadów (właściciele sektorów sąsiadów na mapie)."""
     data = await _feed()
     ctrls = data.get("controllers", []) + data.get("atis", [])
-    positions = db.scalars(select(AtcPosition)).all()
-    return {"positions": match_positions(ctrls, positions), "firs": online_firs(ctrls),
+    positions = list(db.scalars(select(AtcPosition)).all())
+    known = {p.callsign for p in positions}
+    positions += [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in all_positions(db) if p["callsign"] not in known]
+    return {"positions": match_positions(ctrls, positions, nb_owners(db)), "firs": online_firs(ctrls),
             "controllers": [controller_info(c) for c in ctrls if c.get("callsign", "").startswith("EP")],
             "updated": data.get("general", {}).get("update_timestamp")}
 

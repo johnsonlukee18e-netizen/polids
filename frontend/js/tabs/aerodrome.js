@@ -1,5 +1,5 @@
-import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet } from "../api.js";
-import { colorize, wxLines } from "./meteo.js";
+import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { colorize, wxLines, windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "./meteo.js";
 import { mountAwos } from "../awos.js";
 import { mountStrips } from "../strips.js";
 
@@ -26,9 +26,9 @@ function lvpBox(lvp) {
 }
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
-// Kolor = rola: ARR zielony, DEP niebieski (ten sam pas do obu: połowa na połowę).
+// Kolor = rola jak na paskach postępu lotu (strips.css): ARR żółty, DEP niebieski (ten sam pas do obu: połowa na połowę).
 // Wypełnienie pełne = pas w użyciu wg ATIS; kreskowane = pas preferowany (sugestia systemu).
-const USE_COLOR = { arr: "#5fd23a", dep: "#3ec7e0" };
+const USE_COLOR = { arr: "#ffd84a", dep: "#6db8ff" };
 const ROLE_LABEL = { arr: "ARR", dep: "DEP" };
 function roleSets(status) {
   const use = status.runway_in_use || {};
@@ -40,13 +40,30 @@ function roleSets(status) {
   if (atis) { if (s.arr === atis.arr) s.arr = null; if (s.dep === (atis.dep || atis.arr)) s.dep = null; }
   return { active: atis ? { arr: atis.arr, dep: atis.dep || atis.arr } : {}, sugg: s };
 }
+// pas główny: w użyciu, z podejściem albo twardy od 1200 m (jak upperwind.approach_runways w backendzie); trawiaste,
+// awaryjne i krótkie pasy prawie równoległe do głównego (EPRZ 08L/26R, 09ES/27ES) na róży nakładałyby się na niego,
+// więc ich nie rysujemy; krótki pas przecinający (np. EPML 17/35) zostaje
+const SOFT_SURFACE = /gras|grs|\bgre\b|grv|gravel|turf|emergency|^g$/i;
+const mainRunway = (r, inUse) => inUse || (r.equipment || []).length > 0
+  || (!/ES$/i.test(r.designator) && !SOFT_SURFACE.test((r.surface || "").trim()) && (r.length_m || 0) >= 1200);
+const axisDiff = (a, b) => { const d = Math.abs(a - b) % 180; return Math.min(d, 180 - d); };
+// drugi koniec tego samego pasa: 29R -> 11L, 09 -> 27
+const reciprocal = (d) => {
+  const m = /^(\d{1,2})([LRC]?)$/.exec(d || "");
+  return m ? String((+m[1] + 18) % 36 || 36).padStart(2, "0") + ({ L: "R", R: "L" }[m[2]] ?? m[2]) : null;
+};
+
 function windrose(status) {
   const p = status.parsed || {};
   const { active, sugg } = roleSets(status);
   const size = 280, c = size / 2, r = 112;
   const pt = (deg, d) => [c + Math.sin(deg * Math.PI / 180) * d, c - Math.cos(deg * Math.PI / 180) * d];
   const pairs = [];
-  status.runways.forEach((x) => {
+  const used = [active.arr, active.dep, sugg.arr, sugg.dep];
+  const main = status.runways.filter((x) => mainRunway(x, used.includes(x.designator)));
+  const mainIds = new Set(main.flatMap((x) => [x.designator, reciprocal(x.designator)]));
+  const shown = status.runways.filter((x) => mainIds.has(x.designator) || !main.some((m) => axisDiff(m.heading, x.heading) < 20));
+  shown.forEach((x) => {
     const key = Math.round((x.heading % 180) / 5);
     let g = pairs.find((q) => q.key === key);
     if (!g) pairs.push(g = { key, ends: [] });
@@ -88,10 +105,10 @@ function windrose(status) {
       // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa) i rola
       const [x, y] = pt(e.heading + 180, 88);
       const col = ro.length ? USE_COLOR[ro[0]] : "#c8ced4";
-      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="monospace" font-weight="700"
+      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700"
         font-size="${ro.length ? 16 : 12}" fill="${col}">${esc(e.designator)}</text>`;
       if (ro.length) {
-        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="monospace" font-weight="700" font-size="10"
+        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700" font-size="10"
           fill="${col}">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
         // szewrony wzdłuż pasa w kierunku ruchu
         marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="#fff" stroke-width="2.5" opacity="${ra.length ? 1 : 0.7}">${[48, 12, -24]
@@ -119,8 +136,9 @@ function runwayBox(st) {
   const fromAtis = u.source === "ATIS";
   const atc = st.atc_online || [];
   const title = fromAtis ? `PAS W UŻYCIU · ATIS ${esc(st.atis?.letter || "")}` : "PAS PREFEROWANY";
-  const body = !u.arr ? "–" : u.arr === u.dep ? `<b>${esc(u.arr)}</b>`
-    : `<span>ARR</span><b style="color:${USE_COLOR.arr}">${esc(u.arr)}</b><span>DEP</span><b style="color:${USE_COLOR.dep}">${esc(u.dep)}</b>`;
+  // kolory jak na paskach: ARR żółty, DEP niebieski (także gdy oba na tym samym pasie)
+  const body = !u.arr ? "–"
+    : `<span>ARR</span><b class="arr" style="color:${USE_COLOR.arr}">${esc(u.arr)}</b><span>DEP</span><b class="dep" style="color:${USE_COLOR.dep}">${esc(u.dep || u.arr)}</b>`;
   let note = fromAtis ? `${esc(st.atis.callsign)}` : esc(u.reason || "");
   if (!fromAtis && st.atis) note += `<br>ATIS ${esc(st.atis.letter || "")} online, nie udało się odczytać pasa`;
   else if (!fromAtis && atc.length) note += `<br>Kontrola online (${atc.map((c) => esc(c.callsign)).join(", ")}), brak ATIS`;
@@ -129,22 +147,58 @@ function runwayBox(st) {
 }
 
 const EQUIP_SHOW = ["ILS", "LOC", "RNP"];
+// pas do lądowania (ATIS albo sugestia) na górze tabeli, potem do startu, potem pozostałe w kolejności z bazy
+const roleOrder = (active, sugg) => (d) => (active.arr === d || sugg.arr === d ? 0 : active.dep === d || sugg.dep === d ? 1 : 2);
 function runwayTable(st) {
   const { active, sugg } = roleSets(st);
   const tags = (d) => ["arr", "dep"].map((k) => (active[k] === d ? `<span class="tag ${k}">${ROLE_LABEL[k]}</span>`
     : sugg[k] === d ? `<span class="tag ${k} sugg" title="sugestia systemu">${ROLE_LABEL[k]}?</span>` : "")).join("");
+  // pasy w użyciu na górze, potem z podejściem, na końcu pozostałe (np. trawiaste): w niskim oknie tabela przewija się
+  const order = roleOrder(active, sugg);
+  const rank = (r) => order(r.designator) * 2 + ((r.equipment || []).length ? 0 : 1);
   return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dł. m</th><th>Podejście</th><th>Czoł.</th><th>Bocz.</th></tr></thead><tbody>
-    ${st.runways.map((r) => {
+    ${[...st.runways].sort((a, b) => rank(a) - rank(b)).map((r) => {
       const tg = tags(r.designator);
       const eq = r.equipment || [];
       const tip = `${r.designator}: ${fmt(r.length_m, 0)} × ${fmt(r.width_m, 0)} m, ${r.surface || "?"}; podejścia: ${eq.join(", ") || "brak danych"}`;
-      return `<tr class="${tg ? "inuse" : ""}" title="${esc(tip)}"><td class="rwy">${esc(r.designator)}</td><td class="tags">${tg}</td>
+      const rl = ["arr", "dep"].filter((k) => active[k] === r.designator || sugg[k] === r.designator);
+      // zaokrąglenie jak w karcie wiatru (meteo.js kt): po wartości bezwzględnej, TW dopiero od 1 kt
+      const tw = r.headwind !== null && r.headwind < 0 && kt(r.headwind) > 0;
+      return `<tr class="${tg ? "inuse" : ""} ${rl.join(" ")}" title="${esc(tip)}"><td class="rwy">${esc(r.designator)}</td><td class="tags">${tg}</td>
       <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)}</td>
       <td>${eq.filter((k) => EQUIP_SHOW.includes(k)).map((k) => `<span class="eq ${k === "ILS" ? "ils" : ""}">${k}</span>`).join("")}</td>
-      <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0) + " kt"}</td>
-      <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + " kt" + (r.crosswind > 0 ? " R" : r.crosswind < 0 ? " L" : "")}</td></tr>`;
+      <td class="num" style="color:${tw ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (tw ? "TW " : "") + kt(r.headwind) + " kt"}</td>
+      <td class="num">${r.crosswind === null ? "–" : kt(r.crosswind) + " kt" + (!kt(r.crosswind) ? "" : r.crosswind > 0 ? " R" : " L")}</td></tr>`;
     }).join("")}
   </tbody></table><div class="hint">TW = wiatr w plecy · ARR? / DEP? = sugestia systemu · najedź na pas: szerokość, nawierzchnia, podejścia</div>`;
+}
+
+// Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak METEO › WIND, bez mapy): METAR i model 10 m
+// (Open-Meteo) w punkcie lotniska, 3000 ft AMSL w punkcie FAF/IF z procedury albo na przedłużeniu osi (3°)
+function approachWind(aw, st, err) {
+  if (!aw) return `<span class="${err ? "error" : "hint"}">${esc(err || "Ładowanie prognozy…")}</span>`;
+  const { active, sugg } = roleSets(st || {});
+  const rolesOf = (d) => ["arr", "dep"].filter((k) => active[k] === d || sugg[k] === d);
+  const isSugg = (k, d) => active[k] !== d;
+  const pair = (c) => (c.hw === null && c.xw === null ? "–" : `${hwTxt(c.hw)} ${xwTxt(c.xw)}`);
+  // pasy w użyciu (ARR, potem DEP) na górze jak w tabeli pasów, żeby przy niskim oknie (karta przewija się) zostały widoczne
+  const order = roleOrder(active, sugg);
+  const rows = [...aw.runways].sort((a, b) => order(a.designator) - order(b.designator)).map((r) => {
+    const rl = rolesOf(r.designator);
+    return `<tr class="${rl.join(" ")}" title="${esc(pointTip(r))}"><td class="rwy"><b>${esc(r.designator)}</b><span class="apw-tags">${rl.map((k) =>
+      `<span class="apw-tag ${k}">${ROLE_LABEL[k]}${isSugg(k, r.designator) ? "?" : ""}</span>`).join("")}</span></td>
+      <td class="num">${pair(r.c_metar)}</td><td class="num">${pair(r.c_model)}</td>
+      <td class="num w">${windVec(r.w3000)}</td><td class="num">${pair(r.c3000)}</td>
+      <td class="pt ${r.method}">${esc(r.fix || "oś 3°")}</td></tr>`;
+  }).join("");
+  const errs = [aw.model_error, aw.metar_error].filter(Boolean);
+  return `<div class="apw-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
+    <table class="data apw-tab"><thead><tr><th rowspan="2">Pas</th><th colspan="2">0 ft · H/T XW</th><th colspan="2">3000 ft</th><th rowspan="2">Punkt</th></tr>
+      <tr><th>METAR</th><th>10 m</th><th>wiatr</th><th>H/T XW</th></tr></thead><tbody>${rows}</tbody></table>
+    ${errs.length ? `<div class="error apw-err" title="${esc(errs.join("\n"))}">${errs.map(esc).join(" · ")}</div>` : ""}
+    <div class="hint apw-note" title="Punkt podejścia: nazwa = FAF/IF z procedury STAR (.ese), oś 3° = punkt na przedłużeniu osi pasa, w którym ścieżka 3° osiąga 3000 ft AMSL.
+H = wiatr czołowy, T = w plecy, L/R = boczny z lewej/prawej, kt. Wiatr 0 ft z modelu: 10 m nad lotniskiem.
+${esc(aw.source)} (model ${esc(aw.model)}), prognoza na ${validTxt(aw.valid)}, pobrano ${esc(aw.fetched)}.">punkt: nazwa = FAF z procedury, oś 3° = na przedłużeniu osi, 3° · H/T L/R kt</div>`;
 }
 
 // NOTAM: okres ważności względem teraz
@@ -226,9 +280,10 @@ export default {
     // zegary sprzątane przez destroy()
     let view = ["awos", "ruch"].includes(lsGet("aerodrome.view")) ? lsGet("aerodrome.view") : "overview", awos = null, strips = null;
 
+    // lista podpowiedzi ICAO; bez niej pole działa dalej (wpisany kod), błąd tylko w konsoli
     api("/api/aerodromes").then((ads) => {
       $("#ad-list").innerHTML = ads.map((a) => `<option value="${a.icao}">${esc(a.name)}</option>`).join("");
-    });
+    }).catch((e) => console.warn("Lista lotnisk:", e.message));
 
     const renderRuch = async (el) => {
       try {
@@ -272,7 +327,7 @@ export default {
           const cls = on ? "on" : books.length ? "booked" : "";
           const tip = positionTip(on, books);
           return `<div class="radio-row ${cls}" ${tip ? `data-tip="${esc(tip)}"` : ""}><span class="freq ${cls}">${esc(p.frequency)}</span>
-            <span class="cs">${esc(p.callsign)}</span><span class="nm">${esc(p.name)}</span>
+            <span class="cs">${esc(p.callsign)}</span><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
             ${on ? `<b class="who">${esc(on.name || "")}</b>` : books.length ? `<span class="booked-txt">${hhmm(books[0].start)}–${hhmm(books[0].end)}</span>` : ""}</div>`;
         }).join("") || info.frequencies.map((x) => `<div class="radio-row"><span class="freq">${esc(x.mhz)}</span><span class="nm">${esc(x.kind)} ${esc(x.description)}</span></div>`).join("")
           || `<span class="hint">Brak danych</span>`)
@@ -300,17 +355,44 @@ export default {
           </div>
           <div class="ad-col">
             <div class="values compact"></div>
-            <div class="card"><h3>Pasy</h3><div class="ad-rwys"></div></div>
-            <div class="card grow"><h3>TAF</h3><div class="scroll ad-taf wx"></div></div>
+            <div class="card ad-rwy-card"><h3>Pasy</h3><div class="ad-rwys"></div></div>
+            <div class="card grow ad-taf-card"><h3>TAF</h3><div class="scroll ad-taf wx"></div></div>
             <div class="card ad-ruch" title="Pokaż paski postępu lotu (widok RUCH)"><h3>Ruch VATSIM<span class="ruch-go">paski ›</span></h3><div class="ad-ruch-line"><span class="hint">Ładowanie…</span></div></div>
           </div>
           <div class="ad-col">
             <div class="card part"><h3>Częstotliwości · online · rezerwacje</h3><div class="scroll freqs"></div></div>
-            <div class="card grow"><h3>NOTAM</h3><div class="scroll notams"></div></div>
+            <div class="card ad-apw" title="Wiatr przy ziemi i na 3000 ft AMSL w punkcie podejścia każdego pasa (Open-Meteo); METEO › WIND pokazuje to samo na mapie Windy">
+              <h3>Wiatr 0 / 3000 ft · podejście<span class="apw-src"></span></h3><div class="apw"></div></div>
+            <div class="card grow ad-notam"><h3>NOTAM</h3><div class="scroll notams"></div></div>
           </div>
         </div>`;
       $(".ad-ruch").addEventListener("click", () => setView("ruch"));
+      drawApw();
       renderNotams($(".notams"));
+    };
+
+    // wiatr na podejściu: prognoza zmienia się co godzinę (backend trzyma ją 10 min), pobieramy co 5 min
+    let aw = null, awErr = "", awAt = 0, awFor = null, lastSt = null;
+    const drawApw = () => {
+      const el = $(".apw");
+      if (!el) return;
+      el.innerHTML = approachWind(aw, lastSt, awErr);
+      // godzina prognozy (dzień w dymku karty)
+      $(".apw-src").textContent = aw?.valid ? `${aw.source} ${aw.valid.slice(11, 13)}Z` : aw ? aw.source : "";
+    };
+    const loadApw = async () => {
+      const code = icao;
+      awAt = Date.now();
+      try {
+        const d = await api(`/api/meteo/approach-wind/${code}`);
+        if (code !== icao) return;
+        aw = d;
+        awErr = "";
+      } catch (e) {
+        if (code !== icao) return;
+        awErr = e.message;
+      }
+      if (view === "overview") drawApw();
     };
 
     let ticks = 0;
@@ -318,7 +400,18 @@ export default {
       let info, st;
       try {
         [info, st] = await Promise.all([api(`/api/aerodromes/${icao}`), api(`/api/aerodromes/${icao}/status`)]);
-      } catch (e) { if (view === "overview") $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+      } catch (e) {
+        if (view !== "overview") return;
+        $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`;
+        // tytuł i godzina aktualizacji po poprzednim lotnisku nie mogą zostać przy nowo wybranym
+        if (!$(".title").textContent.startsWith(icao)) {
+          $(".title").textContent = icao;
+          $(".upd").textContent = "";
+        }
+        // RUCH nie zależy od statusu lotniska: własne zapytanie, przy braku serwera błąd zamiast "Ładowanie…"
+        renderRuch($(".ad-ruch-line"));
+        return;
+      }
       if (view !== "overview") return; // w międzyczasie przełączono na AWOS
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
@@ -348,6 +441,9 @@ export default {
               ${value("Zjawiska", `<span class="sm">${esc((p.weather || []).join(" ") || "–")}</span>`)}
               ${value("Kategoria", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<span class="hint mono">${esc(p.trend)}</span>` : "")}`;
       $(".ad-rwys").innerHTML = runwayTable(st);
+      lastSt = st;
+      drawApw();
+      if (Date.now() - awAt > 300000) loadApw();
       $(".ad-taf").innerHTML = st.taf ? wxLines("taf", st.taf) : colorize(null);
       $(".atis-h").textContent = `ATIS ${st.atis ? st.atis.letter || "" : ""}`;
       $(".ad-atis").innerHTML = st.atis ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
@@ -364,6 +460,7 @@ export default {
       sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === icao));
       history.replaceState(null, "", "#aerodrome/" + icao);
       ticks = 0;
+      if (awFor !== icao) { aw = null; awErr = ""; awAt = 0; awFor = icao; lastSt = null; }
       clearInterval(timer);
       awos?.destroy();
       awos = null;
@@ -385,9 +482,18 @@ export default {
         return;
       }
       build();
+      if (Date.now() - awAt > 300000) loadApw();   // niezależnie od /status (błąd statusu nie blokuje karty wiatru)
       load();
       timer = setInterval(load, 60000);
     };
+    // serwer wrócił (okno run.bat uruchomione ponownie): PRZEGLĄD od razu zamiast komunikatów błędu, nie po minucie
+    // (NOTAM i wiatr na podejściu odświeżają się rzadziej, więc pobieramy je ponownie tylko po błędzie)
+    window.addEventListener(ONLINE_EVENT, () => {
+      if (view !== "overview" || !$(".notams")) return;
+      load();
+      if (awErr) loadApw();
+      if ($(".notams .error")) renderNotams($(".notams"));
+    });
     $(".go").addEventListener("click", () => go());
     const setView = (v) => {
       if (v === view) return;

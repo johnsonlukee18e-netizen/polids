@@ -6,6 +6,7 @@ Dokumentacja API: https://vatsim.dev/services/apis"""
 import json
 import math
 import re
+from collections.abc import Collection
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
@@ -55,22 +56,42 @@ def controller_info(c: dict) -> dict:
             "text_atis": c.get("text_atis"), "atis_code": c.get("atis_code")}
 
 
-def match_positions(controllers: list[dict], positions: list) -> dict[str, dict]:
+def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
-    Najpierw dokładny callsign, potem jak w EuroScope: prefiks, typ (końcówka) i częstotliwość."""
+    Najpierw dokładny callsign, potem jak w EuroScope: prefiks, typ (końcówka) i częstotliwość.
+    prefer: stanowiska z kolejności przejmowania sektorów sąsiadów. Kontroler dopasowany do innego stanowiska
+    (np. EKDK_CTR z vacs-data) jest też wpisany pod stanowiskiem z `prefer` o tym samym prefiksie, typie
+    i częstotliwości (EKDK_UN_CTR 136.555 w pliku Danii), z polem `alias_of`: tak rozpozna go EuroScope sąsiada."""
     by_cs = {p.callsign: p for p in positions}
+    # indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu całej listy
+    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
+    for i, p in enumerate(positions):
+        if p.prefix:
+            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
     online: dict[str, dict] = {}
+    alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
     for c in controllers:
         cs, freq = c.get("callsign", ""), c.get("frequency", "")
+        parts = cs.split("_")
+        cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
+                 if freq[:7] == (ip[1].frequency or "")[:7]]
         if cs in by_cs:
+            hit = cs
             online[cs] = controller_info(c)
+        elif cands:
+            hit = min(cands, key=lambda ip: ip[0])[1].callsign
+            online.setdefault(hit, controller_info(c))
+        else:
             continue
-        for p in positions:
-            if (p.prefix and cs.startswith(p.prefix + "_") and cs.split("_")[-1] == p.callsign.split("_")[-1]
-                    and freq[:7] == p.frequency[:7]):
-                online.setdefault(p.callsign, controller_info(c))
-                break
+        twins = [ip for ip in cands if ip[1].callsign in prefer]
+        if hit not in prefer and twins:
+            alias.setdefault(min(twins, key=lambda ip: ip[0])[1].callsign, controller_info(c) | {"alias_of": hit})
+    for cs, info in alias.items():
+        if online.get(info["alias_of"], {}).get("callsign") != info["callsign"]:
+            # stanowisko `hit` zajął inny kontroler: ten jest tylko pod znakiem sąsiada, bez alias_of
+            info = {k: v for k, v in info.items() if k != "alias_of"}
+        online.setdefault(cs, info)
     return online
 
 
