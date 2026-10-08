@@ -103,3 +103,85 @@ Bez danych klienta VATSIM albo z za krótkim `POLIDS_SECRET_KEY` aplikacja nie w
 - nowy AIRAC: pliki w `data/import/` + linki `POLIDS_AIP_*_URL` w `.env`
 - backup: `.env` i wolumeny `polids_state` (lista dostępu!), `polids_photos`, `polids_caddy_data`
   (główna baza jest budowana z repo)
+
+## Wariant: własny nginx + Cloudflare, build na serwerze (polids.pl)
+
+Bez Caddy, GHCR i CI - kod z gita, obraz budowany na VPS, TLS kończy Cloudflare, nginx przekazuje na `127.0.0.1:1337`.
+Pliki: `docker-compose.nginx.yml`, `deploy/nginx/`, `deploy/update.sh`.
+
+### 0. Łączność VPS
+
+Build potrzebuje github.com (kod), Docker Hub (`python:3.12-slim`) i PyPI. GitHub nie ma IPv6, Docker Hub tylko częściowo:
+
+```bash
+curl -4 -sS -o /dev/null -w '%{http_code}\n' https://github.com
+curl -6 -sS -o /dev/null -w '%{http_code}\n' https://github.com
+```
+
+Jeśli działa tylko `-6`, potrzebny jest NAT64/DNS64 albo WARP (albo kopiowanie kodu na serwer przez scp/rsync).
+
+### 1. Cloudflare
+
+- DNS: `AAAA polids.pl -> <IPv6 VPS>` z proxy (pomarańczowa chmurka), `CNAME www -> polids.pl` też z proxy
+- SSL/TLS -> Overview: **Full (strict)**
+- SSL/TLS -> Origin Server -> Create Certificate (`polids.pl`, `*.polids.pl`), na VPS:
+
+```bash
+sudo mkdir -p /etc/ssl/cloudflare
+sudo nano /etc/ssl/cloudflare/polids.pl.pem   # Origin Certificate
+sudo nano /etc/ssl/cloudflare/polids.pl.key   # Private Key
+sudo chmod 600 /etc/ssl/cloudflare/polids.pl.key
+```
+
+### 2. Kod i aplikacja
+
+Repo jest prywatne - klon przez deploy key (GitHub -> repo -> Settings -> Deploy keys, tylko odczyt):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/polids_deploy -N ""
+cat ~/.ssh/polids_deploy.pub          # wkleić jako deploy key
+printf 'Host github.com\n  IdentityFile ~/.ssh/polids_deploy\n' >> ~/.ssh/config
+sudo mkdir -p /opt/polids && sudo chown $USER /opt/polids
+git clone git@github.com:johnsonlukee18e-netizen/polids.git /opt/polids
+cd /opt/polids
+```
+
+`/opt/polids/.env` (`cp .env.example .env` i podmienić):
+
+```bash
+DOMAIN=polids.pl
+POLIDS_SECRET_KEY=<openssl rand -hex 32>
+POLIDS_VATSIM_CLIENT_ID=<z auth.vatsim.net>
+POLIDS_VATSIM_CLIENT_SECRET=<z auth.vatsim.net>
+POLIDS_AUTH_ADMIN_CIDS=1424541
+```
+
+`POLIDS_AUTH_MODE` i `POLIDS_PUBLIC_URL` ustawia `docker-compose.nginx.yml`, więc te linie w `.env` mogą zostać jak są.
+
+```bash
+chmod 600 .env
+sh deploy/update.sh       # git pull, build, up -d, sprawdzenie /healthz
+```
+
+Pierwszy build trwa kilka minut. W kliencie VATSIM Connect redirect URI: `https://polids.pl/auth/callback`.
+
+### 3. nginx
+
+```bash
+sudo cp deploy/nginx/polids.pl.conf /etc/nginx/sites-available/polids.pl
+sudo ln -s /etc/nginx/sites-available/polids.pl /etc/nginx/sites-enabled/
+sudo sh deploy/nginx/cloudflare-update.sh     # snippets/cloudflare.conf + nginx -t + reload
+echo '0 4 * * 1 root sh /opt/polids/deploy/nginx/cloudflare-update.sh' | sudo tee /etc/cron.d/cloudflare-ips
+```
+
+Snippet wpuszcza tylko adresy Cloudflare, wejście bezpośrednio na IP serwera dostaje 403.
+Test z zewnątrz: `curl -s https://polids.pl/healthz`.
+
+### 4. Aktualizacja
+
+```bash
+cd /opt/polids && sh deploy/update.sh
+```
+
+Lista dostępu (wolumen `polids_state`) i zdjęcia zostają między buildami. Rollback: `git checkout <commit>` i
+`docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d --build`.

@@ -1,0 +1,8 @@
+# VPS z własnym nginx (np. za Cloudflare): aplikacja budowana na serwerze, słucha na 127.0.0.1:1337.
+#   docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d --build
+# Wymagane w .env: DOMAIN, POLIDS_SECRET_KEY, POLIDS_VATSIM_CLIENT_ID, POLIDS_VATSIM_CLIENT_SECRET.
+services:
+  app:
+    environment:
+      POLIDS_AUTH_MODE: vatsim
+      POLIDS_PUBLIC_URL: https://${DOMAIN:?brak DOMAIN w .env}
