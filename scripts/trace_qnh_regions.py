@@ -11,9 +11,13 @@ która na zrzucie pokrywa się z granicą FIR z mapy PAŻP (także nad Bałtykie
 Pasy 15–17 (wartości awaryjne podawane, gdy nie działa model IMGW) = FIR podzielony równoleżnikami 53°N i 51°N.
 Z --image także obszary "BELOW TMA/MTMA QNH FROM EPxx" (liliowe wypełnienie zrzutu dzielone pogrubionymi liniami,
 funkcja trace_tma) zapisywane jako 'aip' przy TMA; bez --image dotychczasowe 'aip' zostają w pliku.
+Układ napisów mapy jest ręczny i skrypt przenosi go bez zmian z dotychczasowego pliku: 'label' rejonów (ramka SEKTOR n),
+całe "tmas" (poza 'aip': 'box', 'short', 'cap', 'join' itd.) i "chart_labels" (szare oznaczenia TMA/CTR z mapy PAŻP).
 
 Użycie (z katalogu głównego repozytorium):
     python scripts/trace_qnh_regions.py                          # zapis rejonów i FIR do data/seed/qnh_regions.json
+    python scripts/trace_qnh_regions.py --out /tmp/qnh.json      # zapis do innego pliku (kontrola: diff z plikiem
+                                                                 # w data/seed - bez zmian w skrypcie identyczny)
     python scripts/trace_qnh_regions.py --image data/import/qnh_pansa.png --overlay kontrola.png
                                                                  # jak wyżej + obszary TMA "BELOW … QNH FROM" ze zrzutu
                                                                  # ('aip' w "tmas") i nakładka granic na zrzucie
@@ -76,16 +80,11 @@ LINES = {
     "12/14": ["J11-12-13-14", "F12-14"],
     "13/14": ["J11-12-13-14", (2200.5, 1890.6), (2282.1, 1858.8), "F13-14"],
 }
-# środki numerów rejonów (piksele zrzutu: zielone 1–14, pomarańczowe 15–17); jak na mapie PAŻP, kilka lekko przesuniętych,
-# żeby w aplikacji nie nachodziły na etykiety i opisy BELOW (każdy numer musi leżeć w swoim rejonie)
-NUM = {1: (1483, 578), 2: (1507, 369), 3: (1606, 744), 4: (1228, 1041), 5: (1730, 1500), 6: (1421, 1696),
-       7: (2568, 730), 8: (2388, 1052), 9: (2194, 1303), 10: (2703, 1302), 11: (1695, 1800), 12: (2041, 2011),
-       13: (2274, 1766), 14: (2336, 1980), 15: (2745, 812), 16: (2653, 1040), 17: (2745, 1723)}
-# etykieta "SEKTOR n" z QNH rejonu (piksele zrzutu; miejsca dobrane na mapie aplikacji 1600x900 tak, żeby nie zasłaniały
-# lotnisk, numerów ani opisów BELOW); pasy 15–17 bez etykiet
-LABEL = {1: (1371, 568), 2: (1507, 291), 3: (1572, 822), 4: (1150, 1177), 5: (1423, 1364), 6: (1367, 1774),
-         7: (2456, 740), 8: (2500, 1038), 9: (1993, 1168), 10: (2557, 1307), 11: (2065, 1790), 12: (2080, 1934),
-         13: (2342, 1688), 14: (2541, 2025)}
+# środki numerów rejonów (piksele zrzutu: zielone 1–14, pomarańczowe 15–17) jak na mapie PAŻP (środek cyfr); ramki
+# SEKTOR n i TMA stoją obok numerów, a nie na nich ('label' w pliku), więc numerów nie przesuwamy
+NUM = {1: (1478, 582.5), 2: (1506, 368.5), 3: (1606, 743.5), 4: (1228, 1045.5), 5: (1730, 1499.5), 6: (1421, 1701),
+       7: (2455.5, 691.5), 8: (2392.5, 1051), 9: (2193.5, 1297.5), 10: (2706.5, 1302), 11: (1699.5, 1794.5),
+       12: (2039, 2016), 13: (2276.5, 1722), 14: (2330, 1979.5), 15: (2662, 719.5), 16: (2656.5, 1040.5), 17: (2748, 1728)}
 # lotniska z METAR-em, z których bierzemy najniższe QNH rejonu: leżące w rejonie, a leżące na granicy (EPLY, EPLK, EPBC
 # w wierzchołkach linii) we wszystkich stykających się rejonach; rejony 6, 12 i 14 nie mają własnego lotniska
 # z METAR-em, więc biorą najbliższe (EPWR, EPKK, EPRZ); pasy 15–17 = wszystkie lotniska z METAR-em leżące w pasie
@@ -139,15 +138,22 @@ NOTE = ("QNH rejonu = najniższe aktualne QNH z lotnisk rejonu (METAR); oficjaln
 UWAGA = ("Rejony 1-14 odrysowane z mapy rejonów QNH z AIP Polska (zrzut mapy PAŻP dostarczony przez Marka 2026-10-08) "
          "skryptem scripts/trace_qnh_regions.py (wierzchołki w pikselach zrzutu, odwzorowanie Lamberta dopasowane do "
          "siatki mapy), granica zewnętrzna 'fir' = FIR EPWW z pliku sektorowego (pokrywa się z mapą PAŻP). Plik "
-         "generuje skrypt: zmiany granic, numerów, etykiet i list lotnisk rejonów wprowadzać w skrypcie. Rejony 15-17 "
+         "generuje skrypt: zmiany granic, numerów i list lotnisk rejonów wprowadzać w skrypcie. Rejony 15-17 "
          "(band) = pasy awaryjne: FIR podzielony równoleżnikami 53°N i 51°N (pomarańczowe linie na mapie PAŻP), QNH = "
          "najniższe z lotnisk z METAR-em w pasie. QNH rejonu = najniższe aktualne QNH z lotnisk w 'airports'. TMA: QNH z "
          "METAR-u lotniska 'icao' (pod TMA obowiązuje QNH tego lotniska); obszar 'aip' = obszar BELOW ... QNH FROM odrysowany "
          "z tego samego zrzutu (skrypt z --image), cienkie linie w środku = dolne warstwy .ese ('ese'), bez nich linie .sct "
-         "('sct'). 'cap' = środek opisu BELOW (z ramką QNH lotniska) w pikselach względem lotniska przy zoomie domyślnym "
-         "(jak na mapie PAŻP, kilka przesuniętych, żeby nie nachodziły na kody lotnisk), 'join' = lotniska dopisane do "
-         "wspólnego opisu (EPKT w opisie EPKK). 'label'/'num' rejonów = [lon, lat] etykiety SEKTOR n i numeru. 'note' = "
-         "objaśnienie pod tabelami.")
+         "('sct'). 'num' rejonu = [lon, lat] numeru jak na mapie PAŻP (ze skryptu). Układ pozostałych napisów (wszystko "
+         "[lon, lat], środek napisu) poprawiać ręcznie w tym pliku - skrypt go przenosi: "
+         "'label' rejonu = ramka SEKTOR n z QNH rejonu, 'box' TMA = ramka z nazwą "
+         "('short' = krótka nazwa w ramce, jak w vAWOS) i QNH lotniska, 'cap' = opis BELOW ... QNH FROM jak na mapie PAŻP, "
+         "'join' = lotniska dopisane do wspólnego opisu (EPKT w opisie EPKK; Katowice mają własną ramkę), 'chart_labels' = "
+         "szare oznaczenia TMA/CTR z mapy PAŻP ('lines' = wiersze). Ramki: miejsca z vAWOS przesunięte o tyle, żeby przy "
+         "1600x900 nie zasłaniały lotnisk z mapy PAŻP, lotnisk z METAR-em, opisów BELOW, numerów rejonów ani siebie "
+         "nawzajem (co najmniej 4 px odstępu); mogą zasłaniać lądowiska spoza mapy PAŻP i, gdzie brak miejsca, szare "
+         "oznaczenia. SEKTOR 6 stoi jak w vAWOS za granicą FIR (rejon 6 jest za wąski). Nakładanie ramek na siebie i na "
+         "numery przy 1600x900 i 1366x768 sprawdza test_box_layout w backend/tests/test_qnh.py. 'note' = objaśnienie pod "
+         "tabelami.")
 
 
 def _t(phi: float) -> float:
@@ -202,7 +208,8 @@ def vertex(v, ads) -> tuple[float, float]:
     return to_lonlat(*v)
 
 
-def build(fir: list) -> tuple[list[dict], dict]:
+def build(fir: list, labels: dict | None = None) -> tuple[list[dict], dict]:
+    """Rejony z podziału FIR liniami LINES; labels = 'label' rejonów (ramki SEKTOR n) z dotychczasowego pliku."""
     from shapely.geometry import LineString, Point, Polygon, box
     from shapely.ops import polygonize, unary_union
 
@@ -245,7 +252,11 @@ def build(fir: list) -> tuple[list[dict], dict]:
             if len(hit) != 1:
                 sys.exit(f"Rejon {rid}: numer w {len(hit)} obszarach")
             geom = hit[0]
-            reg.update({"airports": AIRPORTS[rid], "label": _r(to_lonlat(*LABEL[rid]), 3)})
+            reg["airports"] = AIRPORTS[rid]
+            if (labels or {}).get(rid):
+                reg["label"] = labels[rid]
+            else:
+                print(f"Rejon {rid}: brak 'label' (ramki SEKTOR n) w pliku - do uzupełnienia ręcznie")
         reg["num"] = _r((lon, lat), 3)
         if geom.geom_type == "MultiPolygon":   # pas 17: także "worek turoszowski" na zachód od Bogatyni
             parts = sorted(geom.geoms, key=lambda q: -q.area)
@@ -299,10 +310,28 @@ def check(regions: list[dict], fir: dict) -> None:
               f"{'; spoza rejonu: ' + ' '.join(out) if out else ''}")
 
 
-def overlay(image: str, out: str, regions: list[dict], tma: dict | None = None) -> None:
+# ramki na mapie aplikacji przy zoomie domyślnym (qnh.css: SEKTOR n 72x27 px, TMA 88x27 px albo szersza przy długiej
+# nazwie, ok. 6 px na znak + 10 px) w pikselach zrzutu (1 px aplikacji przy zoomie 7,5 = ok. 2,43 px zrzutu); opis BELOW
+# ok. 165x37 px zrzutu jak na mapie PAŻP
+APP_PX = 2.43
+BOX_PX = {"sektor": (72 * APP_PX, 27 * APP_PX), "cap": (165, 37)}
+
+
+def tma_box_px(t: dict) -> tuple[float, float]:
+    """Rozmiar ramki TMA w pikselach zrzutu: szerokość jak w qnh.css (min. 88 px, dłuższa nazwa poszerza ramkę)."""
+    return max(88, 6 * len(t.get("short", t["name"])) + 10) * APP_PX, 27 * APP_PX
+
+
+def overlay(image: str, out: str, regions: list[dict], tma: dict | None = None, cfg: dict | None = None) -> None:
     """Granice z pliku narysowane z powrotem na zrzucie (rejony magenta, pasy pomarańczowe, obszary TMA niebieskie,
-    numery w kółkach, etykiety w prostokątach) – do kontroli wzrokowej."""
+    numery w kółkach, ramki SEKTOR n niebieskie, ramki TMA czerwone, opisy BELOW zielone, szare oznaczenia TMA/CTR
+    krzyżykami) – do kontroli wzrokowej."""
     from PIL import Image, ImageDraw
+
+    def rect(c, size, colour):
+        x, y = to_px(*c)
+        w, h = size[0] / 2, size[1] / 2
+        d.rectangle((x - w, y - h, x + w, y + h), outline=colour, width=2)
 
     im = Image.open(image).convert("RGB")
     d = ImageDraw.Draw(im)
@@ -317,9 +346,17 @@ def overlay(image: str, out: str, regions: list[dict], tma: dict | None = None) 
     for r in regions:
         x, y = to_px(*r["num"])
         d.ellipse((x - 6, y - 6, x + 6, y + 6), outline=(0, 0, 255), width=2)
-        if "label" in r:   # etykieta SEKTOR n (ok. 68x30 px w aplikacji przy zoomie domyślnym = 165x73 px zrzutu)
-            x, y = to_px(*r["label"])
-            d.rectangle((x - 82, y - 36, x + 82, y + 36), outline=(0, 0, 255), width=2)
+        if "label" in r:
+            rect(r["label"], BOX_PX["sektor"], (0, 0, 255))
+    for t in (cfg or {}).get("tmas", []):
+        if t.get("box"):
+            rect(t["box"], tma_box_px(t), (220, 0, 0))
+        if t.get("cap"):
+            rect(t["cap"], BOX_PX["cap"], (0, 150, 0))
+    for c in (cfg or {}).get("chart_labels", []):
+        x, y = to_px(*c["lonlat"])
+        d.line((x - 8, y, x + 8, y), fill=(120, 120, 120), width=2)
+        d.line((x, y - 8, x, y + 8), fill=(120, 120, 120), width=2)
     im.save(out)
     print(f"nakładka: {out}")
 
@@ -451,6 +488,8 @@ def main() -> None:
     ap.add_argument("--overlay", help="zapisz nakładkę granic na zrzucie do tego pliku PNG")
     ap.add_argument("--fit", action="store_true", help="dopasuj odwzorowanie do siatki zrzutu i wypisz parametry")
     ap.add_argument("--dry-run", action="store_true", help="bez zapisu pliku JSON")
+    ap.add_argument("--out", default=str(OUT), help="plik wynikowy (domyślnie data/seed/qnh_regions.json); "
+                    "TMA, napisy i ramki zawsze z data/seed/qnh_regions.json")
     args = ap.parse_args()
     if args.fit:
         if not args.image:
@@ -459,30 +498,31 @@ def main() -> None:
         return
     if args.overlay and not args.image:
         sys.exit("--overlay wymaga --image")
-    regions, fir = build(fir_ring())
+    # dotychczasowy plik: TMA i ręczny układ napisów (ramki SEKTOR n, ramki TMA, opisy BELOW, szare oznaczenia)
+    cfg = json.loads(OUT.read_text("utf-8"))
+    regions, fir = build(fir_ring(), {r["id"]: r["label"] for r in cfg.get("regions", []) if r.get("label")})
     check(regions, fir)
     tma = trace_tma(args.image) if args.image else None
     if args.overlay:
-        overlay(args.image, args.overlay, regions, tma)
+        overlay(args.image, args.overlay, regions, tma, cfg)
     if args.dry_run:
         return
-    cfg = json.loads(OUT.read_text("utf-8"))
     cfg.update({"_uwaga": UWAGA, "note": NOTE, "fir": fir, "regions": regions})
     for t in cfg.get("tmas", []) if tma else []:
         if t["icao"] in tma:
             t["aip"] = tma[t["icao"]]
-    order = ["_uwaga", "note", "regions", "tmas", "fir"]
+    order = ["_uwaga", "note", "regions", "tmas", "chart_labels", "fir"]
     cfg = {k: cfg[k] for k in order + [k for k in cfg if k not in order] if k in cfg}
-    # jeden rejon / jedna TMA w wierszu, jak w ręcznie pisanym pliku
+    # jeden rejon / jedna TMA / jeden napis w wierszu, jak w ręcznie pisanym pliku
     def dump(k, v):
-        sep = (", ", ": ") if k == "tmas" else (",", ":")
+        sep = (", ", ": ") if k in ("tmas", "chart_labels") else (",", ":")
         if isinstance(v, list):
             return "[\n" + ",\n".join(json.dumps(x, ensure_ascii=False, separators=sep) for x in v) + "\n]"
         return json.dumps(v, ensure_ascii=False, separators=(", ", ": ") if isinstance(v, str) else sep)
 
     body = ",\n".join(f'"{k}": {dump(k, v)}' for k, v in cfg.items())
-    OUT.write_text("{" + body + "}\n", "utf-8")
-    print(f"zapisano {OUT.relative_to(ROOT)}")
+    Path(args.out).write_text("{" + body + "}\n", "utf-8")
+    print(f"zapisano {args.out}")
 
 
 if __name__ == "__main__":

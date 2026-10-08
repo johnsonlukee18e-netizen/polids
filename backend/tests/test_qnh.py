@@ -1,6 +1,7 @@
 """Mapa QNH regionalnego: plik data/seed/qnh_regions.json i endpoint /api/meteo/qnh-regions."""
 import csv
 import json
+import math
 import os
 import tempfile
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ CFG = json.loads((settings.seed_dir / "qnh_regions.json").read_text("utf-8"))
 TMA_ICAOS = {"EPGD", "EPSN", "EPSC", "EPMI", "EPBY", "EPSY", "EPPO", "EPPW", "EPZG", "EPWA", "EPMM", "EPLL", "EPLK",
              "EPRA", "EPLB", "EPWR", "EPKT", "EPKK", "EPRZ", "EPMB", "EPDE"}
 BANDS = {15: (53, 90), 16: (51, 53), 17: (-90, 51)}   # pasy awaryjne: FIR podzielony równoleżnikami 53°N i 51°N
+BOX_KM = 30   # ramka TMA najwyżej tyle km od swojego obszaru (gdy w obszarze nie ma miejsca)
 
 
 def fake_qnh(icao: str) -> int:
@@ -54,25 +56,110 @@ def test_json_valid():
         for ring in _rings(r["geometry"]):
             assert len(ring) >= 4 and ring[0] == ring[-1]
             assert all(13 < lon < 26 and 48 < lat < 56 for lon, lat in ring)
-        # numer i etykieta leżą w swoim rejonie
-        for pt in [r["num"]] + ([r["label"]] if "label" in r else []):
+        # numer i etykieta leżą w swoim rejonie; rejon 6 (Kłodzko) jest za wąski na ramkę, więc SEKTOR 6 stoi jak
+        # w vAWOS za granicą FIR, tuż obok rejonu
+        for pt in [r["num"]] + ([r["label"]] if "label" in r and r["id"] != 6 else []):
             assert any(_inside(*pt, ring) for ring in _rings(r["geometry"])), (r["id"], pt)
+        if r["id"] == 6:
+            assert not _inside(*r["label"], CFG["fir"]["coordinates"][0]), r["label"]
+            assert _km_to_area(r["label"], r["geometry"]) < 30, r["label"]
     assert CFG["fir"]["type"] == "Polygon" and len(CFG["fir"]["coordinates"][0]) > 100
     assert {t["icao"] for t in tmas} == TMA_ICAOS and len(tmas) == len(TMA_ICAOS)
     joined = {i for t in tmas for i in t.get("join", [])}
     assert joined <= TMA_ICAOS
     for t in tmas:
         assert t["name"].startswith(("TMA ", "MTMA ")) and t["below"] in ("TMA", "MTMA", "TMA/MTMA")
-        assert not {"off", "box", "short"} & set(t)   # etykiety TMA zastąpione ramką QNH w opisie BELOW
-        # opis BELOW ... QNH FROM własny albo wspólny z innym lotniskiem ("join"), nigdy oba
-        assert ("cap" in t) != (t["icao"] in joined)
-        assert "cap" not in t or (len(t["cap"]) == 2 and all(isinstance(v, int) and abs(v) <= 160 for v in t["cap"]))
+        # nazwa w ramce (krótka "short" jak w vAWOS, gdy pełna jest za długa) mieści się w ramce
+        assert "short" not in t or t["short"].split()[0] == t["name"].split()[0], t["icao"]
+        assert len(t.get("short", t["name"])) <= 14, t["icao"]
+        # opis BELOW ... QNH FROM własny albo wspólny z innym lotniskiem ("join"), nigdy oba; pozycja [lon, lat]
+        assert ("cap" in t) != (t["icao"] in joined), t["icao"]
+        assert "cap" not in t or _lonlat(t["cap"]), (t["icao"], t["cap"])
         # obszar odrysowany z mapy AIP: wielokąty w Polsce
         assert t["aip"]["type"] == "MultiPolygon"
         for ring in _rings(t["aip"]):
             assert len(ring) >= 4 and ring[0] == ring[-1] and all(14 < lon < 24.2 and 49 < lat < 55 for lon, lat in ring)
+        # ramka TMA + QNH (każda TMA ma własną, także Katowice ze wspólnym opisem BELOW) w swoim obszarze albo tuż
+        # obok, gdy w obszarze nie ma miejsca; MTMA Malbork i Dęblin (bez ramki w vAWOS) - w swoim obszarze
+        assert _lonlat(t["box"]), (t["icao"], t["box"])
+        km = _km_to_area(t["box"], t["aip"])
+        assert km == 0 if t["icao"] in ("EPMB", "EPDE") else km < BOX_KM, (t["icao"], km)
+    # szare oznaczenia TMA/CTR z mapy AIP: 1-3 wiersze tekstu w punkcie [lon, lat]
+    labels = CFG["chart_labels"]
+    assert len(labels) > 30
+    for c in labels:
+        assert set(c) == {"lines", "lonlat"} and _lonlat(c["lonlat"]), c
+        assert 1 <= len(c["lines"]) <= 3 and all(isinstance(s, str) and s.strip() for s in c["lines"])
+    assert {"TMA EPWA", "CTR EPKK"} <= {" ".join(c["lines"]) for c in labels}
     # objaśnienie dla użytkownika bez nazw kluczy JSON (te są w "_uwaga")
     assert CFG["note"] and "'" not in CFG["note"]
+
+
+# układ ramek na mapie METEO › QNH (meteo.js, qnh.css): odwzorowanie stożkowe Lamberta jak lccCrs() (kula R, stała
+# stożka 0,798, południk 19°E, r0 na 52°N), piksele przy zoomie domyślnym okna 1600x900 (7,5) i 1366x768 (7,2: ramki
+# zmniejszone do 85%, numery do 86%). Ramka SEKTOR n 72x27 px, ramka TMA 88x27 px albo szersza przy długiej nazwie
+# (do 6 px na znak w zastępczej czcionce bez Consolas), cyfry numeru rejonu 16,5 px na cyfrę x 20 px, środek 1,5 px
+# nad punktem (zmierzone w przeglądarce w tej samej czcionce; Consolas jest węższa, więc odstępy tylko rosną).
+LCC_R, LCC_N = 6378137, 0.798
+# zoom, skala ramek, skala numerów, odstęp ramka-ramka i ramka-numer w px
+LAYOUT = {"1600x900": (7.5, 1.0, 1.0, 4, 1), "1366x768": (7.2, 0.85, 0.86, 2, 0)}
+
+
+def _px(lon, lat, zoom):
+    d = math.pi / 180
+    tn = lambda phi: math.tan(math.pi / 4 + phi / 2) ** LCC_N   # noqa: E731
+    f = math.cos(math.asin(LCC_N)) * tn(math.asin(LCC_N)) / LCC_N
+    r, t = LCC_R * f / tn(lat * d), LCC_N * (lon - 19) * d
+    s = 0.5 / (math.pi * LCC_R) * 256 * 2 ** zoom
+    return r * math.sin(t) * s, -(LCC_R * f / tn(52 * d) - r * math.cos(t)) * s
+
+
+def _rect(p, w, h, zoom, k, dy=0.0):
+    x, y = _px(*p, zoom)
+    return (x - w * k / 2, y + dy * k - h * k / 2, x + w * k / 2, y + dy * k + h * k / 2)
+
+
+def _hit(a, b, gap):
+    """Prostokąty nachodzą na siebie albo są bliżej niż gap px."""
+    return min(a[2], b[2]) - max(a[0], b[0]) > -gap and min(a[3], b[3]) - max(a[1], b[1]) > -gap
+
+
+@pytest.mark.parametrize("view", LAYOUT)
+def test_box_layout(view):
+    """Ramki SEKTOR n i TMA nie nachodzą na siebie (przy 1600x900 co najmniej 4 px odstępu) ani na numery rejonów,
+    w obu domyślnych widokach. Miejsca ramek poprawia się ręcznie w qnh_regions.json; ten test pilnuje układu."""
+    zoom, kb, kn, gap, gap_num = LAYOUT[view]
+    boxes = [(f"SEKTOR {r['id']}", _rect(r["label"], 72, 27, zoom, kb)) for r in CFG["regions"] if "label" in r]
+    boxes += [(t["icao"], _rect(t["box"], max(88, 6 * len(t.get("short", t["name"])) + 10), 27, zoom, kb))
+              for t in CFG["tmas"]]
+    nums = [(f"numer {r['id']}", _rect(r["num"], 16.5 * len(str(r["id"])), 20, zoom, kn, -1.5)) for r in CFG["regions"]]
+    for i, (a, ra) in enumerate(boxes):
+        for b, rb in boxes[i + 1:]:
+            assert not _hit(ra, rb, gap), (view, a, b)
+        for b, rb in nums:
+            assert not _hit(ra, rb, gap_num), (view, a, b)
+
+
+def _lonlat(p):
+    """[lon, lat] w okolicy Polski (liczby, także całkowite wpisane ręcznie)."""
+    return (len(p) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in p)
+            and 13 < p[0] < 26 and 48 < p[1] < 56)
+
+
+def _km_to_area(p, g):
+    """Odległość punktu od obszaru w km (0 w środku); lokalnie płaskie odwzorowanie wokół punktu."""
+    if any(_inside(*p, ring) for ring in _rings(g)):
+        return 0.0
+    kx, ky = 111.2 * math.cos(math.radians(p[1])), 111.2
+    best = math.inf
+    for ring in _rings(g):
+        for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+            ax, ay = (x1 - p[0]) * kx, (y1 - p[1]) * ky
+            bx, by = (x2 - p[0]) * kx, (y2 - p[1]) * ky
+            dx, dy = bx - ax, by - ay
+            u = max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy or 1)))
+            best = min(best, math.hypot(ax + u * dx, ay + u * dy))
+    return best
 
 
 def _inside(lon, lat, ring):
@@ -176,6 +263,14 @@ def test_endpoint_regions_and_tmas(client, monkeypatch):
     tma = {t["icao"]: t for t in q["tmas"]}
     assert tma["EPWA"]["lat"] == pytest.approx(52.17, abs=0.05)
     assert tma["EPKK"]["join"] == ["EPKT"] and "cap" not in tma["EPKT"]
+    # układ napisów z pliku rejonów: ramki SEKTOR n i TMA, krótkie nazwy, opisy BELOW, szare oznaczenia AIP
+    cfg_tma = {t["icao"]: t for t in CFG["tmas"]}
+    for i, t in tma.items():
+        assert t["box"] == cfg_tma[i]["box"] and t.get("short") == cfg_tma[i].get("short")
+        assert t.get("cap") == cfg_tma[i].get("cap")
+    assert tma["EPMI"]["short"] == "MTMA MIROSŁAW." and tma["EPKT"]["box"]
+    assert [r.get("label") for r in q["regions"]] == [r.get("label") for r in CFG["regions"]]
+    assert q["chart_labels"] == CFG["chart_labels"] and q["chart_labels"]
     for ring in _rings(tma["EPWA"]["area"]):
         assert all(19 < lon < 23 and 51 < lat < 53.5 for lon, lat in ring)
     # Katowice: własny obszar (zachodnia część TMA Kraków na mapie AIP)

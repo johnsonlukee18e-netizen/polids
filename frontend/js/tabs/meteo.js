@@ -69,15 +69,19 @@ function wxList(kind, defaults, key) {
   };
 }
 
-// Mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP): jasny podkład bez kafelków w odwzorowaniu stożkowym
-// (południki zbiegają się ku północy jak na mapie AIP), siatka co 1° z kreskami co 10′ i opisami stopni, granica FIR EPWW,
-// rejony 1–14 (zielone granice i numery), pasy awaryjne 15–17 (pomarańczowe linie 53°N i 51°N), TMA/MTMA (liliowe)
-// z opisami "BELOW TMA QNH FROM" i ramką z QNH lotniska, lotniska (romby, kody ICAO), etykiety "SEKTOR n" z QNH rejonu.
+// Mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP) z ramkami QNH jak w vAWOS ("MAPA QNH REGIONALNEGO"):
+// jasny podkład bez kafelków w odwzorowaniu stożkowym (południki zbiegają się ku północy jak na mapie AIP), siatka co 1°
+// z kreskami co 10′ i opisami stopni, granica FIR EPWW, rejony 1–14 (zielone granice i numery), pasy awaryjne 15–17
+// (pomarańczowe linie 53°N i 51°N), TMA/MTMA (liliowe) z czarnymi opisami "BELOW TMA QNH FROM EPxx" i szarymi
+// oznaczeniami przestrzeni (TMA EPGD, MCTR EPOK…) jak na mapie AIP, lotniska (romby, kody ICAO) oraz granatowe ramki:
+// TMA/MTMA (nazwa i QNH lotniska) i "SEKTOR n" (QNH rejonu). Wszystkie napisy w miejscach [lon, lat] z pliku rejonów.
 // Obok tabela rejonów (hPa, mmHg, inHg) i tabela TMA.
-const QR_LAYERS = [["tma", "TMA/MTMA"], ["ad", "lotniska"], ["cap", "opisy BELOW + QNH"]];
-// zoom, dla którego dobrano przesunięcia etykiet z JSON-a (mapa 960x900 przy oknie 1600x900, cały FIR); poniżej QR_FAR
-// bez kodów lotnisk i napisów BELOW (ramki z QNH zostają)
-const QR_ZOOM = 7.5, QR_FAR = 7.0;
+const QR_LAYERS = [["tma", "TMA/MTMA"], ["ad", "lotniska"], ["cap", "opisy BELOW"], ["box", "ramki QNH"],
+  ["des", "oznaczenia TMA/CTR"]];
+// zoom, dla którego dobrano miejsca ramek z JSON-a (mapa 960x900 przy oknie 1600x900, cały FIR): przy mniejszym napisy
+// maleją razem z mapą (--qs w CSS); poniżej QR_FAR (już jedno "−" od widoku 1600x900 albo jeden ząbek kółka od
+// domyślnego widoku 1366x768 z zoomem 7,2) bez kodów lotnisk, opisów BELOW i szarych oznaczeń, a ramki mniejsze
+const QR_ZOOM = 7.5, QR_FAR = 7.15;
 
 // odwzorowanie stożkowe wiernokątne Lamberta (kula) jak na mapie AIP: południk środkowy 19°E, stała stożka 0,798
 // (styczne na ok. 53°N, wartość dopasowana do siatki mapy PAŻP); skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
@@ -114,23 +118,23 @@ function qnhMap(pane) {
     </div></div>`);
   pane.append(wrap);
   const $ = (s) => wrap.querySelector(s);
-  // minZoom: dalej FIR to kilka pikseli, a etykiety (nie mniejsze niż 86%) zlewają się w jeden stos
+  // minZoom: dalej FIR to kilka pikseli, a napisy (nie mniejsze niż 86%, ramki 70%) zlewają się w jeden stos
   const map = L.map($(".qrmap"), { crs: lccCrs(), minZoom: 5.5, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 120,
     attributionControl: false });
-  // kolejność warstw jak na mapie AIP: siatka, TMA, pasy 15–17, granice rejonów, FIR, numery, lotniska, opisy, etykiety
-  [["qgrid", 330], ["qtma", 340], ["qband", 345], ["qreg", 350], ["qfir", 360], ["qnum", 560], ["qad", 600], ["qcap", 620], ["qlbl", 640]]
-    .forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
+  // kolejność warstw jak na mapie AIP: siatka, TMA, pasy 15–17, granice rejonów, FIR, numery, szare oznaczenia,
+  // lotniska, opisy BELOW, na wierzchu ramki SEKTOR n i TMA
+  [["qgrid", 330], ["qtma", 340], ["qband", 345], ["qreg", 350], ["qfir", 360], ["qnum", 560], ["qdes", 580], ["qad", 600],
+    ["qcap", 620], ["qlbl", 640]].forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
   const grid = L.layerGroup().addTo(map);   // siatka nie zależy od danych, draw() jej nie czyści
-  const layers = { base: L.layerGroup().addTo(map), tma: L.layerGroup().addTo(map), ad: L.layerGroup().addTo(map),
-    cap: L.layerGroup().addTo(map), lbl: L.layerGroup().addTo(map), hl: L.layerGroup().addTo(map) };
+  const layers = Object.fromEntries(["base", "tma", "ad", "cap", "des", "box", "hl"].map((k) => [k, L.layerGroup().addTo(map)]));
   const mmhg = (q) => Math.round(q * 0.750062);
   const inhg = (q) => (q * 0.0295300).toFixed(2);
   const q4 = (q) => (q ? String(q) : "----");
-  // ikona: div wyśrodkowany w punkcie i przesunięty o (dx, dy) px; przy mniejszym zoomie przesunięcie i etykieta
-  // maleją razem z mapą (--qs, --qb w CSS), żeby układ dobrany dla zoomu domyślnego nie nachodził na siebie
-  const div = (cls, html, [dx, dy] = [0, 0], attr = "") => L.divIcon({ className: "qr-icon", iconSize: null,
-    html: `<div class="qr-pos ${cls}"${attr} style="--dx:${dx}px;--dy:${dy}px">${html}</div>` });
-  const mark = (lat, lon, icon, pane, layer) => L.marker([lat, lon], { icon, pane, interactive: false, keyboard: false }).addTo(layer);
+  // napis wyśrodkowany w punkcie [lon, lat] z pliku; przy zoomie mniejszym od domyślnego maleje razem z mapą
+  // (--qs w CSS), żeby układ dobrany dla zoomu domyślnego nie nachodził na siebie
+  const div = (cls, html, attr = "") => L.divIcon({ className: "qr-icon", iconSize: null,
+    html: `<div class="qr-pos ${cls}"${attr}>${html}</div>` });
+  const mark = ([lon, lat], icon, pane, layer) => L.marker([lat, lon], { icon, pane, interactive: false, keyboard: false }).addTo(layer);
 
   // siatka co 1° (południki proste, równoleżniki łukami) z kreskami co 10′ jak na mapie AIP
   const GL = { pane: "qgrid", className: "qr-gl", interactive: false };
@@ -165,9 +169,8 @@ function qnhMap(pane) {
   };
   map.on("move zoom resize", grat);
   map.on("zoomend", () => {
-    const z = map.getZoom(), s = Math.min(1, 2 ** (z - QR_ZOOM));
-    wrap.style.setProperty("--qs", Math.max(0.6, s).toFixed(3));
-    wrap.style.setProperty("--qb", Math.max(0.86, s).toFixed(3));
+    const z = map.getZoom();
+    wrap.style.setProperty("--qs", Math.min(1, 2 ** (z - QR_ZOOM)).toFixed(3));
     wrap.classList.toggle("qr-far", z < QR_FAR);
   });
 
@@ -204,11 +207,11 @@ function qnhMap(pane) {
     if (par.length) L.polyline(par, { pane: "qband", interactive: false, className: "qr-bline" }).addTo(layers.base);
     if (data.fir) L.geoJSON(data.fir, { pane: "qfir", interactive: false, style: { className: "qr-fir", fill: false } }).addTo(layers.base);
 
-    // numery rejonów (15–17 pomarańczowe jak na mapie AIP) i etykiety SEKTOR n
+    // numery rejonów (15–17 pomarańczowe jak na mapie AIP) i ramki SEKTOR n z QNH rejonu (obok numeru, jak w vAWOS)
     data.regions.forEach((r) => {
-      mark(r.num[1], r.num[0], div("qr-num" + (r.band ? " band" : ""), r.id), "qnum", layers.base);
-      if (r.label) mark(r.label[1], r.label[0], div("qr-lbl sek" + (r.qnh ? "" : " nil"), `<small>SEKTOR ${r.id}</small><b>${q4(r.qnh)}</b>`,
-        undefined, ` data-r="${r.id}"`), "qlbl", layers.lbl);
+      mark(r.num, div("qr-num" + (r.band ? " band" : ""), esc(r.id)), "qnum", layers.base);
+      if (r.label) mark(r.label, div("qr-lbl" + (r.qnh ? "" : " nil"), `<small>SEKTOR ${esc(r.id)}</small><b>${q4(r.qnh)}</b>`,
+        ` data-r="${esc(r.id)}"`), "qlbl", layers.box);
     });
     // lotniska: kółko z kropką = lotnisko z METAR-em/TMA, romb = pozostałe
     const qnhOf = {};
@@ -223,17 +226,20 @@ function qnhMap(pane) {
         .bindTooltip(`${esc(a.icao)}${qnhOf[a.icao] ? " Q" + qnhOf[a.icao] : ""}`, { direction: "top", offset: [0, -6], className: "qr-tip" })
         .addTo(layers.ad);
     });
-    // TMA/MTMA: opis "BELOW TMA QNH FROM EPxx" w miejscu z mapy AIP (przesunięcie "cap" w px względem lotniska) z ramką
-    // QNH lotniska obok; "join" = lotniska ze wspólnego opisu (EPKT i EPKK: jeden napis nad oboma kodami)
-    const tma = Object.fromEntries(data.tmas.map((t) => [t.icao, t]));
-    const qbox = (t) => `<b class="${t.qnh ? "" : "nil"}" data-t="${esc(t.icao)}">${q4(t.qnh)}</b>`;
-    data.tmas.filter((t) => t.lat != null && t.cap).forEach((t) => {
-      const list = [...(t.join || []).map((i) => tma[i]).filter(Boolean), t];
-      const html = list.length > 1
-        ? `<span class="t">BELOW ${esc(t.below)}<br>QNH FROM</span><span class="m">${list.map((x) => `<span>${esc(x.icao)}${qbox(x)}</span>`).join("")}</span>`
-        : `<span class="t">BELOW ${esc(t.below)}<br>QNH FROM ${esc(t.icao)}</span>${qbox(t)}`;
-      mark(t.lat, t.lon, div("qr-cap" + (list.length > 1 ? " multi" : ""), html, t.cap), "qcap", layers.cap);
+    // TMA/MTMA: czarny opis "BELOW TMA / QNH FROM EPxx" w miejscu z mapy AIP ("cap"); "join" = lotniska dopisane do
+    // wspólnego opisu (EPKT i EPKK: kody obu lotnisk pod "QNH FROM", jak na mapie AIP)
+    data.tmas.filter((t) => t.cap).forEach((t) => {
+      const codes = [...(t.join || []), t.icao].map(esc);
+      const from = codes.length > 1 ? `<span>QNH FROM</span><span class="m">${codes.map((c) => `<span>${c}</span>`).join("")}</span>`
+        : `<span>QNH FROM ${codes[0]}</span>`;
+      mark(t.cap, div("qr-cap", `<span>BELOW ${esc(t.below)}</span>${from}`), "qcap", layers.cap);
     });
+    // szare oznaczenia przestrzeni z mapy AIP: rodzaj nad kodem (TMA / EPGD, MCTR / EPOK, TMA / EPPO NORTH)
+    (data.chart_labels || []).forEach((c) => mark(c.lonlat, div("qr-des", c.lines.map((l) => `<span>${esc(l)}</span>`).join("")),
+      "qdes", layers.des));
+    // ramki TMA/MTMA jak w vAWOS ("box"): skrócona nazwa ("short") i QNH lotniska, którego QNH obowiązuje pod TMA
+    data.tmas.filter((t) => t.box).forEach((t) => mark(t.box, div("qr-box" + (t.qnh ? "" : " nil"),
+      `<small>${esc(t.short || t.name)}</small><b>${q4(t.qnh)}</b>`, ` data-t="${esc(t.icao)}"`), "qlbl", layers.box));
     show();
   };
 
@@ -249,7 +255,7 @@ function qnhMap(pane) {
     const t = tr.dataset.t && data.tmas.find((x) => x.icao === tr.dataset.t);
     const g = r ? r.geometry : t && (t.area || t.outline);
     if (g) L.geoJSON(g, { pane: "qfir", interactive: false, style: { className: "qr-hl" } }).addTo(layers.hl);
-    wrap.querySelector(r ? `.qr-lbl[data-r="${r.id}"]` : `.qr-cap b[data-t="${CSS.escape(tr.dataset.t)}"]`)?.classList.add("on");
+    wrap.querySelector(r ? `.qr-lbl[data-r="${CSS.escape(tr.dataset.r)}"]` : `.qr-box[data-t="${CSS.escape(tr.dataset.t)}"]`)?.classList.add("on");
   };
   const side = $(".qrside");
   side.addEventListener("mouseover", (e) => highlight(e.target.closest("tr[data-r], tr[data-t]")));
@@ -264,8 +270,8 @@ function qnhMap(pane) {
         <span class="nil">z ${r.stations.length} lotn.</span>`);
     hot = null;
     $(".qr-reg").innerHTML = `<thead><tr><th>Sek.</th><th>QNH</th><th>mmHg</th><th>inHg</th><th>Lotniska</th></tr></thead><tbody>${data.regions.map((r) =>
-      `<tr data-r="${r.id}"${r.band ? ` class="band" title="Rejon ${r.id}: pas awaryjny ${BAND[r.id] || ""}, QNH podawane tylko przy awarii modelu IMGW; tu najniższe QNH z ${r.stations.length} lotnisk pasa"` : ""}>
-      <td class="num">${r.id}</td><td class="num q">${q4(r.qnh)}</td><td class="num">${r.qnh ? mmhg(r.qnh) : ""}</td>
+      `<tr data-r="${esc(r.id)}"${r.band ? ` class="band" title="Rejon ${esc(r.id)}: pas awaryjny ${BAND[r.id] || ""}, QNH podawane tylko przy awarii modelu IMGW; tu najniższe QNH z ${r.stations.length} lotnisk pasa"` : ""}>
+      <td class="num">${esc(r.id)}</td><td class="num q">${q4(r.qnh)}</td><td class="num">${r.qnh ? mmhg(r.qnh) : ""}</td>
       <td class="num">${r.qnh ? inhg(r.qnh) : ""}</td><td class="sta">${sta(r)}</td></tr>`).join("")}</tbody>`;
     $(".qr-tma").innerHTML = `<thead><tr><th>TMA / MTMA</th><th>Lotn.</th><th>QNH</th><th>mmHg</th></tr></thead><tbody>${data.tmas.map((t) =>
       `<tr data-t="${esc(t.icao)}"><td>${esc(t.name)}</td><td class="mono">${esc(t.icao)}</td><td class="num q">${q4(t.qnh)}</td>

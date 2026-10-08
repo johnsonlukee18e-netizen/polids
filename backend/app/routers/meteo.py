@@ -167,7 +167,9 @@ async def qnh_regions(db: Session = Depends(get_db)):
 
     QNH rejonu = najniższe QNH z lotnisk rejonu ("airports"; w pasach awaryjnych 15–17 wszystkie lotniska pasa),
     QNH TMA = QNH z METAR-u lotniska "icao" (pod TMA obowiązuje QNH tego lotniska). Do mapy: granica FIR EPWW,
-    linia brzegowa, obszary TMA z mapy AIP z warstwami z plików sektorowych i wszystkie lotniska EP."""
+    linia brzegowa, obszary TMA z mapy AIP z warstwami z plików sektorowych, wszystkie lotniska EP i układ napisów
+    z pliku rejonów: ramki SEKTOR n ("label" rejonu), ramki TMA ("box", "short"), opisy BELOW ("cap", "join")
+    i szare oznaczenia TMA/CTR z mapy AIP ("chart_labels")."""
     cfg = json.loads((settings.seed_dir / "qnh_regions.json").read_text("utf-8"))
     tmas = cfg.get("tmas", [])
     icaos = sorted({a for r in cfg["regions"] for a in r["airports"]} | {t["icao"] for t in tmas})
@@ -195,6 +197,7 @@ async def qnh_regions(db: Session = Depends(get_db)):
     coast = _coast()
     # granica FIR z pliku rejonów (z pliku sektorowego, jak na mapie AIP), bez niej z VATSpy
     return {"note": cfg.get("note"), "regions": regions, "tmas": out_tmas, "error": error, "fir": cfg.get("fir") or _fir_epww(),
+            "chart_labels": cfg.get("chart_labels", []),
             "coast": {"type": "MultiLineString", "coordinates": [_lonlat(c) for c in _chains(coast)]} if coast else None,
             "aerodromes": [{"icao": a.icao, "lat": a.lat, "lon": a.lon, "metar": a.icao in icaos}
                            for a in sorted(ads, key=lambda a: a.icao)]}
