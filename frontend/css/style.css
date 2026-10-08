@@ -169,7 +169,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .radio-group h3 small { color: var(--muted); font-variant: normal; font-size: 13px; margin-left: 6px; }
 /* LOTNISKA i sąsiednie FIR-y: jedna kolumna, wyeksponowane ID pozycji, nazwa i częstotliwość */
 .radio-list.single .radio-group { display: block; margin: 0 0 18px; max-width: 980px; }
-/* LOTNISKA: pasek szybkiego skoku do lotniska, przyklejony u góry listy */
+/* LOTNISKA, sąsiedzi i INNE: pasek szybkiego skoku do grupy, przyklejony u góry listy */
 .ad-jump { position: sticky; top: -12px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
   margin: -12px -16px 8px; padding: 8px 16px; background: #000; border-bottom: 1px solid var(--head-line); }
 .ad-jump .aj-kind { margin: 0 4px 0 10px; font: 700 11px var(--sans); letter-spacing: .8px; color: var(--muted); }

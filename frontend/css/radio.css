@@ -193,3 +193,66 @@
 .radio-group h3 .fir-sw { display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 2px; vertical-align: 0; cursor: help; }
 .radio-list .pickhint { margin: -2px 0 10px; }
 .radio-list .pickhint a { color: var(--green-text); cursor: pointer; }
+
+/* ===== RADIO (runda 9): znak radiowy i sektor sąsiada, pasek skoku u sąsiadów, LOA ===== */
+/* kolumna nazwy u sąsiadów: znak radiowy ("Bremen Radar") i drobniej nazwa sektora ("Fläming (FLG)"), jedna linia */
+.radio-list.single.vacs .radio-group { max-width: 1280px; }
+.radio-list.single.vacs .nm { width: clamp(150px, 100cqw - 700px, 430px); }
+.radio-row .nm .sec { margin-left: 9px; font: 13px var(--mono); color: var(--muted); }
+/* znak radiowy przyjęty jak u pozostałych stanowisk ACC z tym prefiksem (nie z bazy wiedzy, LOA ani pliku .ese) */
+.radio-row .nm.der { color: #b9c2b9; }
+
+/* panel LOA (jak panel NM UI): pasek tytułu w jednej linii, po rozwinięciu tabele przewijane we własnym polu */
+.loa { max-width: 1280px; margin: -2px 0 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.loa.none { display: flex; align-items: center; gap: 10px; padding: 4px 10px; font: 12px var(--mono); }
+.loa-h { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 4px 10px; background: var(--head); cursor: pointer;
+  font: 12px/1.5 var(--mono); white-space: nowrap; user-select: none; }
+.loa-h:hover { background: var(--row-hover); }
+.loa-h:focus-visible { outline: 1px solid var(--green-hi); outline-offset: -1px; }
+.loa.open .loa-h { border-bottom: 1px solid var(--head-line); }
+.loa-tw { flex: none; width: 10px; color: var(--green-text); transition: transform .12s; }
+.loa.open .loa-tw { transform: rotate(90deg); }
+.loa-tag { flex: none; padding: 0 6px; border: 1px solid var(--green); border-radius: 2px; color: var(--green-hi); font: 700 11px/16px var(--mono);
+  letter-spacing: .8px; }
+.loa-t { flex: none; color: #fff; font-weight: 700; }
+.loa-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.loa-n { flex: none; color: #b9c2b9; }
+.loa-pdf { flex: none; margin-left: auto; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 3px; color: #c3cdc3;
+  font: 700 11px/18px var(--mono); text-decoration: none; }
+.loa-pdf:hover { border-color: var(--green-hi); color: #fff; }
+.loa-b { display: none; max-height: min(46vh, 440px); overflow: auto; padding: 0 10px 8px; }
+.loa.open .loa-b { display: block; }
+.loa-tools { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; height: 32px; background: var(--panel); }
+.loa-q { width: 300px; padding: 2px 6px; background: #050605; border: 1px solid #2f3a2f; border-radius: 2px; font: 12px var(--mono); }
+.loa-q:focus { outline: none; border-color: var(--green-hi); }
+.loa-tools .hint { font-size: 11px; }
+.loa-sec[hidden], .loa [data-f][hidden] { display: none; }
+.loa h4 { margin: 8px 0 3px; font: 700 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.loa h4 small { margin-left: 6px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+/* gęste tabele przekazań: ruch, COP, poziom, sektory, warunki */
+.loa-tab { width: 100%; border-collapse: collapse; font: 12px/1.35 var(--mono); }
+.loa-tab th { position: sticky; top: 32px; z-index: 1; padding: 2px 8px 2px 4px; background: #111611; border-bottom: 1px solid var(--head-line);
+  color: var(--muted); font-weight: 400; text-align: left; white-space: nowrap; }
+.loa-tab td { padding: 2px 8px 2px 4px; border-bottom: 1px solid #161b16; vertical-align: top; color: #d6ded6; }
+.loa-tab tbody tr:nth-child(even) td { background: var(--row-alt); }
+.loa-tab tbody tr:hover td { background: var(--row-hover); }
+.loa-tab .trf { width: 220px; color: var(--cyan); }
+.loa-tab .cop { width: 90px; color: #fff; font-weight: 700; }
+.loa-tab .lvl { width: 150px; color: var(--yellow); white-space: nowrap; }
+/* długi opis poziomu (ESAA: "FL260 lub cruise level, jeśli niższy") zawija się zamiast poszerzać kolumnę */
+.loa-tab .lvl.wrap { min-width: 150px; white-space: normal; }
+.loa-tab .cond { color: #aab3aa; }
+/* sektory przekazania (Z / Do) */
+.loa-tab:not(.pos) td:nth-child(4):not(.cond), .loa-tab:not(.pos) td:nth-child(5):not(.cond) { width: 110px; white-space: nowrap; }
+.loa-tab.pos td:first-child { width: 70px; }
+.loa-tab.pos .pcs { width: 120px; color: var(--cyan); }
+.loa-tab.pos td:nth-child(3) { white-space: nowrap; }
+.loa-tab.pos .cop { width: 240px; }
+.loa-tab.pos .lvl { width: 70px; }
+.loa-tab .ep { color: var(--muted); }
+.loa-tab .nb { color: #fff; }
+/* zasady: trzy kolumny obok siebie (przekazanie, VFR, inne) */
+.loa-rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 18px; }
+.loa ul { margin: 0; padding: 0 0 0 16px; font: 12px/1.4 var(--mono); color: #d6ded6; }
+.loa li { margin: 0 0 3px; }
+.loa li::marker { color: var(--green-text); }

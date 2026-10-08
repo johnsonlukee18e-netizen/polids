@@ -1,7 +1,7 @@
-import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
+import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel } from "../viffchart.js";
-import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, colorFor, drawFirs, fl, loadFirs, loadVacs, sliceOwner,
-  symbolFor, symbolSvg, vacsLayer } from "../airspace.js";
+import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, colorFor, controllerRows, drawFirs, fl,
+  loadFirs, loadVacs, sliceOwner, symbolFor, symbolSvg, vacsLayer } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint } from "../coverage.js";
 import { displayName, loadDisplayNames } from "../posname.js";
@@ -82,7 +82,9 @@ const LEGEND = [
     lg(`<i data-sym="vfr"></i>`, "punkt VFR"), lg(`<i data-sym="fix"></i>`, "punkt FIX"), lg(`<span class="swatch awy"></span>`, "droga lotnicza")].join("")],
   ["atc", "ATC", (ctx) => `${FACILITIES.map(([k, l, n]) => lg(`<span class="ab ab-${k.toLowerCase()}">${l}</span>`, n)).join("")}
     ${lg(`<span class="ab ab-ctr">CTR</span>`, "kontrola obszaru (FIR)")}
-    <p class="lgx-note">Najedź na plakietkę, żeby zobaczyć, kto jest online (także kto wystawił ATIS). Oficjalna mapa sektorów:
+    ${lg(`<span class="atcb nb"><b class="ab-icao">ESGG</b><span class="ab ab-gnd">G</span></span>`, "lotnisko sąsiada z kontrolerem", "w")}
+    <p class="lgx-note">Najedź na plakietkę, żeby zobaczyć, kto jest online (także kto wystawił ATIS, tekst linijka po linijce).
+      Najedź na etykietę stanowiska z częstotliwością (sektor, TMA, sąsiad): dane kontrolera. Oficjalna mapa sektorów:
       <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>`],
   ["viff", "vIFF", () => [
     lg(`<span class="swatch viff"></span>`, "obszar TV z wykresu"), lg(`<span class="vs-chip on">AKTYWNY</span>`, "scenariusz / TV aktywny"),
@@ -150,7 +152,7 @@ function mainMap(ctx) {
         ${sw("traffic", "samoloty", true, PLANE_SVG)}
         <div class="ac-key" title="kolor samolotu: odlot z lotniska EP**, przylot na EP**, tranzyt"><span>${plane("dep")}odlot</span><span>${plane("arr")}przylot</span><span>${plane("trn")}tranzyt</span></div>
         ${sw("traffic-detail", "etykiety z FL, typem i GS")}
-        ${sw("atc", "kontrolerzy online: plakietki (FIR EPWW, u sąsiadów tylko APP)", true, `<span class="ab ab-twr">T</span>`)}
+        ${sw("atc", "kontrolerzy online: plakietki lotnisk (u sąsiadów mniejsze)", true, `<span class="ab ab-twr">T</span>`)}
         <div class="atc-info hint"></div>
         <div class="traffic-info hint"></div>
       </section>
@@ -316,16 +318,34 @@ function mainMap(ctx) {
         : '<div class="muted">brak zalogowanego kontrolera</div>'}
       ${atis.map((a) => `<div class="adc-sec">ATIS ${esc(a.atis_code || "")} <span class="muted">${esc(a.callsign)} ${esc(a.frequency)}</span></div>
         <div class="adc-who">wystawił: ${who(a)} · od ${hhmm(a.logon_time)}</div>
-        <div class="adc-atis">${(a.text_atis || []).map(esc).join(" ")}</div>`).join("")}`;
+        <div class="adc-atis">${atisHtml(a.text_atis)}</div>`).join("")}`;
+  };
+  // Karta nad lotniskiem, a gdy nad nim się nie mieści (lotnisko przy górnej krawędzi mapy, długi ATIS linijka po linijce):
+  // pod plakietką. W poziomie przesunięta w granice mapy (z lewej panel boczny), wtedy bez strzałki.
+  // Po doładowaniu METAR-u karta rośnie, więc liczymy od nowa.
+  const placeCard = (m) => {
+    const tt = m.getTooltip(), el = tt?.getElement();
+    if (!el || !m.isTooltipOpen()) return;
+    const p = map.latLngToContainerPoint(m.getLatLng()), { x: W, y: H } = map.getSize(), w = el.offsetWidth, hh = el.offsetHeight;
+    const down = p.y - hh - 16 < 0 && H - p.y > p.y;
+    // z lewej nie pod przyciskami zoomu (+/−), które przykrywały nazwę lotniska w karcie (ESGG przy górnej krawędzi)
+    const zc = map.zoomControl?.getContainer(), x0 = zc ? zc.offsetLeft + zc.offsetWidth + 4 : 4;
+    const dx = Math.round(Math.max(x0 - (p.x - w / 2), Math.min(0, W - 4 - (p.x + w / 2))));
+    const dir = down ? "bottom" : "top", off = [dx, down ? 30 : -8];
+    el.classList.toggle("adc-shift", dx !== 0);
+    if (tt.options.direction === dir && String(tt.options.offset) === String(off)) return;
+    Object.assign(tt.options, { direction: dir, offset: off });
+    tt.update();
   };
   // Dymek podpinamy do markera; METAR doładowuje się przy pierwszym najechaniu
   const bindAdCard = (m, icao, name) => {
     m.bindTooltip(() => adCard(icao, name, metarCache[icao]?.v), { direction: "top", offset: [0, -8], className: "atc-tip ad-tip", opacity: 1, pane: panes.tip });
     m.on("tooltipopen", async () => {
       hideTip();
+      placeCard(m);
       const v = await metarFor(icao);
       if (metarCache[icao]) metarCache[icao].v = v;
-      if (m.isTooltipOpen()) m.setTooltipContent(adCard(icao, name, v));
+      if (m.isTooltipOpen()) { m.setTooltipContent(adCard(icao, name, v)); placeCard(m); }
     });
     return m;
   };
@@ -477,9 +497,12 @@ function mainMap(ctx) {
   const fillPane = map.createPane("asFill");
   fillPane.style.zIndex = 399;
   fillPane.style.pointerEvents = "none";
-  // shift: etykieta stanowiska (APP / TWR na TMA, CTA, sąsiad), rozsuwana przez declutter; prio: większy wycinek zostaje na środku
-  const lbl = (at, html, shift = 0) => L.marker(at, { interactive: false, pane: "asLbl", shift,
-    icon: L.divIcon({ className: "maplabel", iconSize: null, html: `<div>${html}</div>` }) }).addTo(layers.airLbl);
+  // shift: etykieta stanowiska (APP / TWR na TMA, CTA, sąsiad), rozsuwana przez declutter; prio: większy wycinek zostaje na środku.
+  // c: kontroler online obsługujący przestrzeń: po najechaniu na etykietę jego dane zamiast listy przestrzeni (hoverAt)
+  let lblCtl = [];
+  const lbl = (at, html, shift = 0, c = null) => L.marker(at, { interactive: false, pane: "asLbl", shift,
+    icon: L.divIcon({ className: "maplabel", iconSize: null, html: `<div${c ? ` class="ctl" data-ctl="${lblCtl.push(c) - 1}"` : ""}>${html}</div>` }) })
+    .addTo(layers.airLbl);
   // Etykiety stanowisk nachodzące na wcześniejsze (np. WA APP i WA DIR na środku TMA Warszawa) przesuwamy w pionie
   // (w dół, w górę, coraz dalej); etykiety sektorów ACC zostają na miejscu. W pikselach, więc od nowa po zoomie.
   const declutter = () => {
@@ -510,6 +533,7 @@ function mainMap(ctx) {
     layers.airLbl.clearLayers();
     hideTip();
     vis = [];
+    lblCtl = [];
     if (!slices) { renderInfo(level()); return; }
     const lv = level(), all = lv === null;
     net.useOnline = $(".online").checked && !!net.online;
@@ -549,11 +573,11 @@ function mainMap(ctx) {
       const pr = v.pr, c = v.own.c;
       if (pr.kind === "acc") {
         const fq = net.useOnline ? c?.frequency : pr.frequency;
-        lbl(center(v.f), `<small>${esc(pr.name)}</small>${fq ? `<br><span class="freq${c ? " on" : ""}">${esc(fq)}</span>` : ""}`);
+        lbl(center(v.f), `<small>${esc(pr.name)}</small>${fq ? `<br><span class="freq${c ? " on" : ""}">${esc(fq)}</span>` : ""}`, 0, c);
       } else {
         // sąsiad: punkt wewnątrz wielokąta (środek ramki wypada poza wklęsłe sektory)
         const at = (pr.kind === "nb" && (labelPoint(v.f, NEAR) || labelPoint(v.f))?.at) || center(v.f);
-        lbl(at, `<small>${esc(displayName(c.callsign))}</small><br><span class="freq on">${esc(c.frequency)}</span>`, area(v.f.bb));
+        lbl(at, `<small>${esc(displayName(c.callsign))}</small><br><span class="freq on">${esc(c.frequency)}</span>`, area(v.f.bb), c);
       }
     });
     declutter();
@@ -588,8 +612,10 @@ function mainMap(ctx) {
       const cs = ch?.chain[0] || pr.callsign;
       return cs ? `<span class="muted">${esc(displayName(cs))} ${esc((ch ? freqOf(cs) : "") || pr.frequency || "")} (podział pełny)</span>` : "";
     }
-    if (c) return `<span class="fq">${esc(c.frequency)}</span> <b>${esc(displayName(c.callsign))}</b> <span class="muted">${esc(c.name || "")}</span>`;
-    if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> <span class="muted">${esc(top.name || "")}</span>`;
+    // kto i od kiedy online (pełne dane kontrolera: najechanie na etykietę stanowiska albo plakietkę lotniska)
+    const nm = (x) => `<span class="muted">${esc(x.name || "")}${x.logon_time ? ` · od ${hhmm(x.logon_time)}` : ""}</span>`;
+    if (c) return `<span class="fq">${esc(c.frequency)}</span> <b>${esc(displayName(c.callsign))}</b> ${nm(c)}`;
+    if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> ${nm(top)}`;
     return `<span class="muted">brak kontrolera</span>`;
   };
   // TMA / CTA / CTR: wszystkie stanowiska w kolejności przejmowania (chains.js, jak w RADIO) z częstotliwością,
@@ -636,9 +662,21 @@ function mainMap(ctx) {
       <table>${rows.map((r) => `<tr><td><span class="as-k as-${r.pr.kind}">${KIND_TAG[r.pr.kind]}</span></td><td>${nm(r)}</td>
         <td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>${r.chs.length ? `<tr class="as-chr"><td></td><td colspan="3">${chainHtml(r)}</td></tr>` : ""}`).join("")}</table>`;
   };
+  // Dymek etykiety stanowiska: kontroler (znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy, opis) i ATIS
+  // lotniska z prefiksu znaku (ESGG_GND → ATIS ESGG), każda linijka ATIS osobno
+  const ctlCard = (c) => {
+    const icao = String(c.callsign || "").split("_")[0];
+    const ap = atcData.airports.find((a) => a.icao === icao);
+    const atis = (ap?.facilities?.ATIS || []).filter((a) => a.callsign !== c.callsign);
+    return atcTooltip(displayName(c.callsign), ap ? ads.find((a) => a.icao === icao)?.city || ap.name : "",
+      controllerRows(c, { info: true }) + atcRows(atis, "ATIS", "A"));
+  };
   const hoverAt = () => {
     raf = 0;
     const e = lastEv;
+    // etykieta stanowiska online (np. ESGG GND 121.705 u sąsiada, sektor ACC, APP na TMA): dane kontrolera
+    const lab = e && !e.buttons && e.target.closest?.(".maplabel .ctl");
+    if (lab && lblCtl[+lab.dataset.ctl]) { showTip(map.mouseEventToContainerPoint(e), ctlCard(lblCtl[+lab.dataset.ctl])); return; }
     // nad plakietką, samolotem, dymkiem, panelem albo symbolem lotniska (kanwa z kursorem "interactive") dymka nie pokazujemy
     if (!e || !vis.length || e.buttons || e.target.closest?.(".leaflet-marker-icon, .leaflet-tooltip, .leaflet-control, .leaflet-popup")
       || mapEl.querySelector("canvas.leaflet-interactive")) { hideTip(); return; }
@@ -654,11 +692,13 @@ function mainMap(ctx) {
   // --- listy wyboru sektorów (zamiast wszystkich ACC / TMA / CTR / sąsiadów)
   const itemsOf = (id) => {
     const m = new Map(), lv = level();
+    // sąsiedzi: kto obsadza wycinek (pierwszy zalogowany z listy OWNER, jak kolor na mapie)
+    const onl = id === "nb" && $(".online").checked ? net.online?.positions : null;
     (slices?.features || []).filter((f) => f.properties.pick === id).forEach((f) => {
       const pr = f.properties;
       let it = m.get(pr.key);
       if (!it) {
-        it = { key: pr.key, lo: pr.lower_ft, hi: pr.upper_ft, here: false,
+        it = { key: pr.key, lo: pr.lower_ft, hi: pr.upper_ft, here: false, on: new Set(), who: "",
           head: id === "nb" ? pr.group_label : id === "oth" ? OTH_HEAD[pr.kind] : "",
           label: id === "nb" ? pr.label : pr.group_label, sub: ["tma", "ctr"].includes(id) ? pr.group : "" };
         m.set(pr.key, it);
@@ -666,6 +706,9 @@ function mainMap(ctx) {
       it.lo = Math.min(it.lo, pr.lower_ft);
       it.hi = Math.max(it.hi, pr.upper_ft);
       it.here ||= atLevel(pr, lv);
+      const cs = onl && (pr.owner_callsigns || []).find((x) => onl[x]);
+      // who: imię i nazwisko kontrolera, tylko do wyszukiwania na liście
+      if (cs) { it.on.add(displayName(onl[cs].callsign)); it.who += ` ${onl[cs].name || ""}`; }
     });
     return [...m.values()].sort((a, b) => a.head.localeCompare(b.head, "pl") || a.label.localeCompare(b.label, "pl", { numeric: true }));
   };
@@ -676,6 +719,19 @@ function mainMap(ctx) {
     b.textContent = `${!sel ? "wszystkie" : !k ? "żaden" : `${k} z ${n}`} ▾`;
     b.classList.toggle("sub", !!sel);
   };
+  // Lista sąsiednich FIR-ów domyślnie zwinięta: same nazwy FIR-ów (wybór, kto online), kliknięcie rozwija sektory FIR-u.
+  // Rozwinięte FIR-y pamiętamy tylko do końca sesji przeglądarki (sessionStorage); przy wyszukiwaniu pasujące są rozwinięte.
+  const FOLD = ["nb"];
+  const folds = (() => {
+    try { const f = JSON.parse(sessionStorage.getItem("map.pk.open")); return f && typeof f === "object" && !Array.isArray(f) ? f : {}; } catch { return {}; }
+  })();
+  const isOpen = (id, head) => Array.isArray(folds[id]) && folds[id].includes(head);
+  const toggleFold = (id, head) => {
+    const s = new Set(Array.isArray(folds[id]) ? folds[id] : []);
+    if (!s.delete(head)) s.add(head);
+    folds[id] = [...s];
+    try { sessionStorage.setItem("map.pk.open", JSON.stringify(folds)); } catch { /* tryb prywatny */ }
+  };
   function renderPicker(id) {
     const el = pane.querySelector(`.pk[data-air="${id}"]`);
     const items = itemsOf(id), sel = pick[id], q = (el.querySelector(".pk-q")?.value || "").trim().toLowerCase();
@@ -684,16 +740,23 @@ function mainMap(ctx) {
     const groups = new Map();
     items.forEach((it) => { if (!groups.has(it.head)) groups.set(it.head, []); groups.get(it.head).push(it); });
     const scroll = el.querySelector(".pk-list")?.scrollTop || 0;
+    const fold = FOLD.includes(id);
     el.innerHTML = `<div class="pk-bar">${items.length > 12 ? `<input class="field pk-q" placeholder="szukaj…" value="${esc(q)}">` : ""}
         <button data-pk="all">wszystkie</button><button data-pk="none">żaden</button></div>
       <div class="pk-list">${!items.length ? `<div class="pk-none">${sliceErr ? esc(sliceErr) : "brak sektorów w pliku .ese"}</div>` : [...groups].map(([head, its]) => {
-        const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head}`.toLowerCase().includes(q));
+        const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head} ${[...it.on].join(" ")}${it.who}`.toLowerCase().includes(q));
         if (!vis2.length) return "";
         const n = its.filter((it) => has(it.key)).length;
-        return `${head ? `<label class="pk-g"><input type="checkbox" data-g="${esc(head)}" ${n === its.length ? "checked" : ""} ${n && n < its.length ? 'data-mixed="1"' : ""}>
-            <b>${esc(head)}</b><small>${n}/${its.length}</small></label>` : ""}
-          ${vis2.map((it) => `<label class="pk-i${it.here ? "" : " off"}"${it.here ? "" : ` title="nie ma go na ${lv === null ? "" : fl(lv)}"`}>
-            <input type="checkbox" data-k="${esc(it.key)}" ${has(it.key) ? "checked" : ""}><span>${esc(it.label)}${it.sub ? ` <i>${esc(it.sub)}</i>` : ""}</span>
+        const box = `<input type="checkbox" data-g="${esc(head)}" ${n === its.length ? "checked" : ""} ${n && n < its.length ? 'data-mixed="1"' : ""}>`;
+        const open = !fold || !!q || isOpen(id, head);
+        const on = [...new Set(its.flatMap((it) => [...it.on]))];
+        const row = !head ? "" : !fold ? `<label class="pk-g">${box}<b>${esc(head)}</b><small>${n}/${its.length}</small></label>`
+          : `<div class="pk-g fold${open ? " open" : ""}" data-fold="${esc(head)}" title="${q ? "" : open ? "Zwiń sektory FIR-u" : "Rozwiń sektory FIR-u"}">
+            <span class="pk-car">${open ? "▾" : "▸"}</span>${box}<b>${esc(head)}</b>${on.length
+              ? `<span class="pk-on" title="online: ${esc(on.join(", "))}">● ${on.length}</span>` : ""}<small>${n}/${its.length}</small></div>`;
+        return `${row}${!open ? "" : vis2.map((it) => `<label class="pk-i${it.here ? "" : " off"}"${it.here ? "" : ` title="nie ma go na ${lv === null ? "" : fl(lv)}"`}>
+            <input type="checkbox" data-k="${esc(it.key)}" ${has(it.key) ? "checked" : ""}><span>${esc(it.label)}${it.sub ? ` <i>${esc(it.sub)}</i>` : ""}${it.on.size
+              ? ` <i class="pk-who">${esc([...it.on].join(", "))}</i>` : ""}</span>
             <small>${range(it.lo, it.hi)}</small></label>`).join("")}`;
       }).join("")}</div>`;
     el.querySelectorAll("input[data-mixed]").forEach((i) => { i.indeterminate = true; });
@@ -728,6 +791,9 @@ function mainMap(ctx) {
     el.addEventListener("click", (e) => {
       const b = e.target.closest("button[data-pk]");
       if (b) setPick(id, b.dataset.pk === "all" ? null : new Set());
+      // nagłówek FIR-u (poza polem wyboru): rozwiń / zwiń jego sektory
+      const g = e.target.closest(".pk-g[data-fold]");
+      if (g && !e.target.matches("input") && !(el.querySelector(".pk-q")?.value || "").trim()) { toggleFold(id, g.dataset.fold); renderPicker(id); }
     });
   });
   pane.querySelectorAll(".pk-btn").forEach((b) => b.addEventListener("click", () => {
@@ -943,8 +1009,12 @@ function mainMap(ctx) {
   every(60000, () => $(".viff").checked && loadViff());
 
   // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
-  // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami, u sąsiadów tylko APP (koordynacja zbliżania).
-  const badgeFacilities = (ap) => (ap.icao.startsWith("EP") ? ap.facilities : ap.facilities.APP ? { APP: ap.facilities.APP } : null);
+  // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami; u sąsiadów mniejsza, szara plakietka (np. "ESGG G"),
+  // gdy jest tam kontroler (DEL / GND / TWR / APP): sam ATIS bez kontrolera pomijamy, żeby nie zaśmiecać mapy.
+  // Sąsiedzi tylko w obszarze wokół Polski (ten sam co samoloty), a nie z całego świata.
+  const isEp = (icao) => icao.startsWith("EP");
+  const nearPl = (ap) => ap.lat >= 44 && ap.lat <= 60 && ap.lon >= 5 && ap.lon <= 35;
+  const badgeFacilities = (ap) => (isEp(ap.icao) || (nearPl(ap) && FACILITIES.some(([k]) => k !== "ATIS" && ap.facilities[k])) ? ap.facilities : null);
   const loadAtc = async () => {
     layers.atc.clearLayers();
     try {
@@ -961,10 +1031,10 @@ function mainMap(ctx) {
     shown.forEach((ap) => {
       // lotniska spoza listy (zagraniczne) dostają sam symbol pod plakietką
       if (!known.has(ap.icao)) pointMarker({ ident: ap.icao, kind: "AD", lat: ap.lat, lon: ap.lon, name: ap.name }, { label: false, tooltip: false, scale: 1.6 }).addTo(layers.atc);
-      const m = airportBadge(ap, panes).addTo(layers.atc);
+      const m = airportBadge(ap, panes, { cls: isEp(ap.icao) ? "" : "nb" }).addTo(layers.atc);
       m.unbindTooltip();
       bindAdCard(m, ap.icao, ads.find((a) => a.icao === ap.icao)?.city || ap.name);
-      if (ap.icao.startsWith("EP")) m.on("click", () => ctx.open("aerodrome", ap.icao));
+      if (isEp(ap.icao)) m.on("click", () => ctx.open("aerodrome", ap.icao));
     });
     $(".atc-info").textContent = $(".atc").checked ? `${plural(shown.length, "lotnisko", "lotniska", "lotnisk")} z kontrolerem · ${hhmm(new Date().toISOString())}` : "";
     drawAds();

@@ -54,7 +54,7 @@ async def taf(ids: str = Query(...)):
     return [{"icao": i, "raw": raw.get(i)} for i in icaos]
 
 
-# --- mapa QNH regionalnego (jak "MAPA QNH REGIONALNEGO" w vAWOS) ---
+# --- mapa QNH regionalnego (jak mapa rejonów QNH z AIP Polska) ---
 _Seg = list[list[float]]
 
 
@@ -141,29 +141,35 @@ def _fir_epww() -> dict | None:
 
 
 def _tma_geometry(t: dict, low: list[Sector]) -> dict:
-    """Obszar TMA jak na mapie AIP: dolne warstwy (poniżej FL95) z pliku .ese, sektory o nazwach zaczynających się
-    od "ese". Bez nich: obszar zamknięty liniami grup "sct" z pliku .sct, a gdy linie się nie zamykają, same linie."""
-    area: list = []
+    """Obszar TMA jak na mapie AIP: "area" = obszar "BELOW ... QNH FROM" odrysowany z mapy AIP ("aip" w pliku rejonów),
+    "layers" = dolne warstwy (poniżej FL95) z pliku .ese, sektory o nazwach zaczynających się od "ese" (cienkie linie
+    podziału w środku obszaru). Bez "aip" obszarem są warstwy .ese, bez nich obszar zamknięty liniami grup "sct"
+    z pliku .sct, a gdy linie się nie zamykają, same linie ("outline")."""
+    layers: list = []
     for s in low:
         if t.get("ese") and s.name.startswith(tuple(t["ese"])):
             g = json.loads(s.geometry)
             for poly in [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]:
-                area.append([[[round(x, 4), round(y, 4)] for x, y in ring] for ring in poly])
+                layers.append([[[round(x, 4), round(y, 4)] for x, y in ring] for ring in poly])
     segs = [s for n in t.get("sct", []) for s in sct_line_groups().get(n, [])]
-    if not area:
-        area = [[_lonlat(r)] for r in _faces(segs)]
-    return {"area": {"type": "MultiPolygon", "coordinates": area} if area else None,
-            "outline": {"type": "MultiLineString", "coordinates": [_lonlat(c) for c in _chains(segs)]}
-            if segs and not area else None}
+    if not layers:
+        layers = [[_lonlat(r)] for r in _faces(segs)]
+    multi = lambda c: {"type": "MultiPolygon", "coordinates": c} if c else None  # noqa: E731
+    outline = {"type": "MultiLineString", "coordinates": [_lonlat(c) for c in _chains(segs)]} if segs and not layers else None
+    if t.get("aip"):
+        return {"area": t["aip"], "layers": multi(layers), "outline": outline}
+    return {"area": multi(layers), "layers": None, "outline": outline}
 
 
 @router.get("/qnh-regions")
 async def qnh_regions(db: Session = Depends(get_db)):
     """Rejony QNH i TMA/MTMA (data/seed/qnh_regions.json).
 
-    QNH rejonu = najniższe QNH z lotnisk rejonu ("airports"), QNH TMA = QNH z METAR-u lotniska "icao" (pod TMA
-    obowiązuje QNH tego lotniska). Do mapy: granica FIR EPWW, linia brzegowa, granice TMA z plików sektorowych
-    i wszystkie lotniska EP."""
+    QNH rejonu = najniższe QNH z lotnisk rejonu ("airports"; w pasach awaryjnych 15–17 wszystkie lotniska pasa),
+    QNH TMA = QNH z METAR-u lotniska "icao" (pod TMA obowiązuje QNH tego lotniska). Do mapy: granica FIR EPWW,
+    linia brzegowa, obszary TMA z mapy AIP z warstwami z plików sektorowych, wszystkie lotniska EP i układ napisów
+    z pliku rejonów: ramki SEKTOR n ("label" rejonu), ramki TMA ("box", "short"), opisy BELOW ("cap", "join")
+    i szare oznaczenia TMA/CTR z mapy AIP ("chart_labels")."""
     cfg = json.loads((settings.seed_dir / "qnh_regions.json").read_text("utf-8"))
     tmas = cfg.get("tmas", [])
     icaos = sorted({a for r in cfg["regions"] for a in r["airports"]} | {t["icao"] for t in tmas})
@@ -186,10 +192,12 @@ async def qnh_regions(db: Session = Depends(get_db)):
         regions.append({**r, "qnh": min(vals) if vals else None, "max": max(vals) if vals else None,
                         "stations": [{"icao": a, "qnh": qnh.get(a), **at(a)} for a in r["airports"]]})
     low = db.scalars(select(Sector).where(Sector.fir == "EPWW", Sector.lower_ft < 9500).order_by(Sector.name)).all()
-    out_tmas = [{**{k: v for k, v in t.items() if k not in ("sct", "ese")}, "qnh": qnh.get(t["icao"]), **at(t["icao"]),
+    out_tmas = [{**{k: v for k, v in t.items() if k not in ("sct", "ese", "aip")}, "qnh": qnh.get(t["icao"]), **at(t["icao"]),
                  **_tma_geometry(t, low)} for t in tmas]
     coast = _coast()
-    return {"note": cfg.get("note"), "regions": regions, "tmas": out_tmas, "error": error, "fir": _fir_epww(),
+    # granica FIR z pliku rejonów (z pliku sektorowego, jak na mapie AIP), bez niej z VATSpy
+    return {"note": cfg.get("note"), "regions": regions, "tmas": out_tmas, "error": error, "fir": cfg.get("fir") or _fir_epww(),
+            "chart_labels": cfg.get("chart_labels", []),
             "coast": {"type": "MultiLineString", "coordinates": [_lonlat(c) for c in _chains(coast)]} if coast else None,
             "aerodromes": [{"icao": a.icao, "lat": a.lat, "lon": a.lon, "metar": a.icao in icaos}
                            for a in sorted(ads, key=lambda a: a.icao)]}

@@ -61,6 +61,10 @@ export const loadVacsData = loadVacsJson;
 let secP = null;
 export const loadSectors = () => (secP ||= api("/api/radio/sectors").catch((e) => { secP = null; throw e; }));
 
+// --- wyciąg z LOA EPWW z sąsiadami (data/seed/loa.json), raz na sesję; po błędzie kolejne wywołanie próbuje znowu
+let loaP = null;
+export const loadLoa = () => (loaP ||= api("/api/radio/loa").catch((e) => { loaP = null; throw e; }));
+
 // --- stan sieci (cache 25 s, wspólny dla podzakładek)
 let netP = null, netT = 0;
 export function refreshNet(force = false) {

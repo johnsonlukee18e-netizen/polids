@@ -41,6 +41,14 @@
 .pk-i.off small { color: #535b53; }
 .pk input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; accent-color: var(--green-hi); cursor: pointer; }
 .pk-none { padding: 6px; color: var(--muted); font: 11px var(--mono); }
+/* sąsiednie FIR-y: domyślnie same nazwy FIR-ów, kliknięcie rozwija sektory; ● = ilu kontrolerów obsadza sektory FIR-u */
+.pk-g.fold { position: static; border-bottom-color: #1b241b; }
+.pk-g.fold:hover { background: var(--row-hover); }
+.pk-g.fold:hover b { color: #fff; }
+.pk-g.fold.open { position: sticky; border-bottom-color: var(--head-line); }
+.pk-car { flex: none; width: 9px; color: var(--muted); }
+.pk-on { flex: none; color: #9dff6e; letter-spacing: 0; }
+.pk-i .pk-who { color: #9dff6e; }
 
 /* --- próbki kolorów warstw (panel i legenda); TMA / CTA / CTR bez APP / TWR to sam kontur,
    obsadzone: kontur i wypełnienie w kolorze stanowiska (próbka "own") */
@@ -76,6 +84,24 @@
 
 /* --- plakietki ATC bez rozmytego cienia (reguła z style.css) */
 .atcb { box-shadow: none; }
+/* lotnisko sąsiada z kontrolerem: mniejsza plakietka, ICAO szare (w FIR EPWW pełna) */
+.atcb.nb { gap: 1px; padding: 1px; border-color: #2c353e; }
+.atcb.nb .ab-icao { padding: 0 2px; color: #aab4bd; font-size: 10px; line-height: 13px; }
+.atcb.nb .ab { min-width: 12px; padding: 0 2px; font-size: 10px; line-height: 13px; }
+.lgx-s .atcb { display: inline-flex; cursor: default; }
+
+/* --- etykieta stanowiska online (sektor ACC, APP na TMA, sąsiad): po najechaniu dane kontrolera */
+.maplabel > div.ctl { pointer-events: auto; cursor: help; }
+.maplabel > div.ctl:hover { outline: 1px solid #fff; }
+
+/* --- ATIS linijka po linijce (element text_atis = linijka), dłuższa zawinięta z wcięciem */
+.atl { padding-left: 2ch; text-indent: -2ch; overflow-wrap: anywhere; }
+/* opis kontrolera (controller info) pod jego wierszem w dymku */
+.atc-tip td.atis.ci { color: #aab8c4; }
+
+/* --- karta lotniska pod plakietką (lotnisko przy górnej krawędzi mapy): strzałka tylko u góry */
+.leaflet-tooltip-bottom.ad-tip::before { border-top-color: transparent; }
+.leaflet-tooltip.ad-tip.adc-shift::before { display: none; }
 
 /* --- karta lotniska: kto wystawił ATIS */
 .ad-tip .adc-who { margin: 0 0 2px; font: 12px var(--mono); color: #1d2329; }

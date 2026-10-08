@@ -1,8 +1,11 @@
 """RADIO: wspólna lista stanowisk (plik .ese + wszystkie stanowiska sąsiednich FIR-ów z vacs-data), zasięg stanowiska
-na mapie (granica z VATSpy albo przybliżony okrąg wokół lotniska) i rodzaje wycinków sektorów z pliku .ese."""
+na mapie (granica z VATSpy albo przybliżony okrąg wokół lotniska), rodzaje wycinków sektorów z pliku .ese,
+zakładki sąsiadów oraz znaki radiowe i nazwy sektorów stanowisk sąsiadów (baza wiedzy VATSIM Germany, LOA)."""
 
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 TYPES = ("CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "RMP", "ATIS", "FMP", "TMU", "OBS")
 # Przybliżony zasięg stanowiska lotniskowego bez wycinków sektorów i bez granicy w VATSpy (NM)
@@ -175,3 +178,135 @@ def sector_group(fir: str, name: str, kind: str | None = None) -> str:
     # TMA Poznań dzieli się na N i S z osobną kolejnością przejmowania (tma_topdown w ownership.json)
     part = m.group(1) if kind == "tma" and (m := re.match(r"^EP[A-Z]{2}_TMA_([NS])_", n)) else ""
     return f"{kind.upper()} {EP_CITY.get(icao, icao)} {part}".rstrip()
+
+
+# --- dane z data/seed (loa.json, names_de.json): z pamięci, dopóki plik się nie zmieni
+_SEED: dict[Path, tuple[tuple[int, int], object]] = {}
+
+
+def seed_json(path: Path):
+    """JSON z pliku, trzymany w pamięci do zmiany pliku (czas modyfikacji i rozmiar): poprawiony ręcznie loa.json
+    widać bez restartu serwera. Brak pliku: OSError, uszkodzony JSON: ValueError."""
+    st = path.stat()
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _SEED.get(path)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    data = json.loads(path.read_text("utf-8"))
+    _SEED[path] = (stamp, data)
+    return data
+
+
+# --- zakładki sąsiadów w RADIO (klucz = FIR zakładki, ten sam co w loa.json; EDUU = zakładka "EDUU/EDYY")
+# katalog FIR-u w vacs-data (pole fir stanowiska) → zakładka
+TAB_BY_DIR = {"EDWW": "EDWW", "EDMM": "EDMM", "EDUU": "EDUU", "LK": "LKAA", "LZ": "LZBB", "UMKK": "UMKK", "EY": "EYVL",
+              "ES": "ESAA", "EK": "EKDK"}
+# organy przestrzeni górnej nad Niemcami (Rhein Radar / Karlsruhe UAC, Maastricht UAC): własna zakładka, choć w vacs-data
+# i w plikach .ese sąsiadów są w katalogach EDWW (EDYY, EDUU OSE/HVL) i EDMM (EDUU SPE)
+UPPER_DE = {"EDUU", "EDYY"}
+EDWW_PREFIXES = {"EDWW", "EDDB", "EDAH"}
+TAB_BY_PREFIX = (("LK", "LKAA"), ("LZ", "LZBB"), ("UK", "UKLV"), ("UM", "UMMV"), ("EY", "EYVL"), ("ES", "ESAA"),
+                 ("EK", "EKDK"))
+
+
+def neighbour_tab(p: dict) -> str | None:
+    """Zakładka sąsiada: EDWW, EDMM, EDUU (EDUU/EDYY), LKAA, LZBB, UKLV, UMMV, UMKK, EYVL, ESAA, EKDK albo INNE;
+    None = stanowisko polskie (EP**). Najpierw EDUU/EDYY (prefiks, katalog vacs-data albo początek znaku), potem
+    katalog FIR-u z vacs-data, bez niego prefiks stanowiska."""
+    cs = (p.get("callsign") or "").upper()
+    head = cs.split("_")[0]
+    pre = (p.get("prefix") or head).upper()
+    if pre.startswith("EP") or (not p.get("prefix") and head.startswith("EP")):
+        return None
+    fir = p.get("fir")
+    if UPPER_DE & {pre, head, fir}:
+        return "EDUU"
+    if fir:
+        return TAB_BY_DIR.get(fir, "INNE")
+    if pre.startswith("ED"):
+        return "EDWW" if pre in EDWW_PREFIXES else "EDMM"
+    if pre == "UMKK" or pre.startswith("RU-"):
+        return "UMKK"
+    return next((tab for start, tab in TAB_BY_PREFIX if pre.startswith(start)), "INNE")
+
+
+# --- znaki radiowe i nazwy sektorów stanowisk sąsiadów
+# środek znaku stanowiska informacji (EKDK_I_CTR, LKAA_FIC_FSS): bez znaku "… Control" i nie wyznacza go innym
+INFO_MID = {"I", "FIS", "FIC", "IN", "INFO"}
+
+
+def _kb_index(names_de: dict) -> dict[str, dict]:
+    """names_de.json (positions): login → wpis, także loginy zastępcze (aliases: EDWW_MR1_CTR → EDWW_MRZ_CTR)."""
+    out: dict[str, dict] = {}
+    for cs, e in (names_de.items() if isinstance(names_de, dict) else ()):
+        if isinstance(e, dict):
+            out[cs.upper()] = e
+    for e in list(out.values()):
+        for a in e.get("aliases") or []:
+            out.setdefault(str(a).upper(), e)
+    return out
+
+
+def _loa_index(loa_firs: dict) -> dict[str, dict]:
+    """Stanowiska sąsiadów wymienione w LOA (strona NB): znak → znak radiowy, sektory, uwagi i tytuły LOA.
+    Jedno stanowisko bywa kilka razy (LKAA_U_CTR: sektory NU i SU) – sektory łączymy."""
+    out: dict[str, dict] = {}
+    for f in (loa_firs.values() if isinstance(loa_firs, dict) else ()):
+        if not isinstance(f, dict) or not isinstance(f.get("positions"), list):
+            continue
+        for lp in f["positions"]:
+            cs = str(lp.get("callsign") or "").upper() if isinstance(lp, dict) else ""
+            if not cs or lp.get("side") != "NB":
+                continue
+            e = out.setdefault(cs, {"radio": "", "sectors": [], "notes": [], "titles": []})
+            e["radio"] = e["radio"] or str(lp.get("radio") or "")
+            for key, val in (("sectors", lp.get("sector")), ("notes", lp.get("note")), ("titles", f.get("title"))):
+                if val and val not in e[key]:
+                    e[key].append(str(val))
+    return out
+
+
+def _nb_acc(p: dict) -> bool:
+    """Stanowisko ACC sąsiada (CTR/FSS) bez stanowisk informacji."""
+    cs = p["callsign"].upper()
+    return p.get("facility") in ("CTR", "FSS") and not cs.startswith("EP") and not INFO_MID & set(cs.split("_")[1:-1])
+
+
+def radio_names(positions: list[dict], names_de: dict, loa_firs: dict) -> list[dict]:
+    """Znak radiowy (`radio`) i nazwa sektora (`sector`) stanowisk sąsiadów, z pierwszeństwem: baza wiedzy VATSIM
+    Germany (names_de.json), LOA (loa.json, stanowiska sąsiada), nazwa z pliku .ese (tylko znak radiowy).
+    Stanowisko ACC (CTR/FSS) bez żadnej nazwy dostaje znak radiowy pozostałych stanowisk CTR/FSS z tym samym prefiksem,
+    gdy wszystkie mają ten sam (ESOS_7_CTR → Sweden Control). Stanowiska informacji (_I_, _FIS_, _FIC_, _IN_, _INFO_)
+    w tym nie biorą udziału: ani nie dostają znaku, ani ich "… Information" nie blokuje znaku pozostałym (LKAA_WU_CTR).
+    `radio_src` / `sector_src`: kb | loa | ese | prefix | None; `kb` i `loa`: szczegóły do dymku (zakres, uwagi).
+    Stanowiska polskie (EP**) zostają z nazwą z pliku .ese (pola puste)."""
+    kb, loa = _kb_index(names_de), _loa_index(loa_firs)
+    for p in positions:
+        cs = p["callsign"].upper()
+        p.update({"radio": None, "radio_src": None, "sector": None, "sector_src": None, "kb": None, "loa": None})
+        if cs.startswith("EP"):
+            continue
+        k, lo = kb.get(cs) or {}, loa.get(cs)
+        if k.get("radio"):
+            p.update(radio=k["radio"], radio_src="kb")
+        elif lo and lo["radio"]:
+            p.update(radio=lo["radio"], radio_src="loa")
+        elif p.get("name"):
+            p.update(radio=p["name"], radio_src="ese")
+        if k.get("sector"):
+            p.update(sector=k["sector"], sector_src="kb")
+        elif lo and lo["sectors"]:
+            p.update(sector=" / ".join(lo["sectors"]), sector_src="loa")
+        if k:
+            p["kb"] = {f: k[f] for f in ("url", "limits", "covers", "uwaga") if k.get(f)}
+        if lo:
+            p["loa"] = {"titles": lo["titles"], "notes": lo["notes"]}
+    same: dict[str | None, set[str]] = {}
+    for p in positions:
+        if _nb_acc(p) and p["radio"]:
+            same.setdefault(p.get("prefix"), set()).add(p["radio"])
+    for p in positions:
+        names = same.get(p.get("prefix")) or set()
+        if _nb_acc(p) and not p["radio"] and len(names) == 1:
+            p.update(radio=next(iter(names)), radio_src="prefix")
+    return positions

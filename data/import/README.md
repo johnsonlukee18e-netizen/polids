@@ -13,6 +13,7 @@ Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyt
 | `ICAO_Airlines.txt` | baza callsignów (zakładka CALLSIGN) |
 | `GRpluginOperatorInfo.txt` | oznaczenie operatorów CARGO (`C`) i wojskowych (`Mil`) w zakładce CALLSIGN |
 | `ICAO_Aircraft.json` | typy samolotów z WTC / RECAT-EU / wymiarami (zakładka AIRCRAFT) |
+| `qnh_pansa.png` | zrzut mapy rejonów QNH z AIP Polska (PAŻP): wzór dla `scripts/trace_qnh_regions.py --image` (aplikacja go nie czyta) |
 
 ## neighbours/
 

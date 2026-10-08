@@ -173,6 +173,15 @@ export function positionTip(on, books = []) {
   return lines.join("\n");
 }
 
+// ATIS z VATSIM (text_atis): każdy element tablicy w osobnej linijce, jak w VATSIM Radar, a nie jeden ciągły tekst.
+// Element bywa też napisem z własnymi znakami nowej linii; puste linijki pomijamy. null (ATIS bez tekstu) → [].
+export function splitAtis(lines) {
+  if (lines === null || lines === undefined) return [];
+  return (Array.isArray(lines) ? lines : [lines]).flatMap((l) => String(l ?? "").split(/\r?\n/)).map((l) => l.trim()).filter(Boolean);
+}
+// ATIS do HTML: każda linijka osobno (esc), dłuższa zawija się z wcięciem, żeby było widać początek następnej (.atl w map.css)
+export const atisHtml = (lines) => splitAtis(lines).map((l) => `<div class="atl">${esc(l)}</div>`).join("");
+
 // TAF: każda grupa zmian (BECMG, TEMPO, PROB, FM) w osobnej linii.
 export function splitTaf(raw) {
   if (!raw) return [];
