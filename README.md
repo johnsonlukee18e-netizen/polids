@@ -9,7 +9,7 @@ w stylu EUROCONTROL NM UI. Backend FastAPI + SQLite, frontend w czystym JS, cał
 |---|---|
 | RADIO | GEO: kafelki stanowisk jak w VACS i mapa zasięgu wybranych pozycji; SEKTORYZACJA LOW/MID/HIGH (kolejność przejmowania z om.plvacc.pl); listy EPWW ACC, lotnisk i FIR-ów sąsiednich (osobno EDUU/EDYY), kto jest online, rezerwacje na dziś; u sąsiadów callsigny radiowe i nazwy sektorów (VATSIM Germany Knowledgebase, LOA) i pasek LOA z tabelami przekazań; przyciski szybkiego skoku we wszystkich listach; lotniska VFR bez ID |
 | METEO | METAR/TAF, mapa QNH regionalnego na podkładzie jak mapa rejonów QNH z AIP Polska (PAŻP), WIND z wiatrem 0 ft / 3000 ft na podejściu do każdego pasa |
-| AERODROME | OVERVIEW dla całego FIR EPWW (TL, METAR/TAF ze stanem LVP, aktywne NOTAM-y, restrykcje ECFMP i vIFF, Airport Monitor vIFF; filtr stanowiska: APP/ACC zawęża lotniska i pokazuje checklistę otwarcia, TWR przenosi do lotniska); przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), widok AWOS (wiatr co 5 s, RVR z METAR albo symulowany), paski EFES (RUCH) |
+| AERODROME | OVERVIEW dla całego FIR EPWW (jeden TL dla kraju: FL080, a FL090 gdy na którymkolwiek lotnisku QNH ≤ 995 hPa; METAR/TAF ze stanem LVP, aktywne NOTAM-y, restrykcje ECFMP i vIFF, Airport Monitor vIFF; filtr stanowiska: APP/ACC zawęża lotniska i pokazuje checklistę otwarcia, TWR przenosi do lotniska); przegląd lotniska (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), widok AWOS (wiatr co 5 s, RVR z METAR albo symulowany), paski EFES (RUCH) |
 | AD CIV / AD MIL / AD VFR | eAIP PAŻP |
 | CALLSIGN, AIRCRAFT | callsigny, typy samolotów (WTC, RECAT-EU, wymiary, zdjęcia, przyciski producentów) |
 | MAP | ruch VATSIM (odlot / przylot / tranzyt), przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF; ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska, lista sąsiednich FIR-ów domyślnie zwinięta |
@@ -113,7 +113,8 @@ Wyposażenie pasów (ILS, RNP, VOR, NDB) czytane jest z nazw procedur w `.ese`. 
 - Rejony QNH 1-14 i obszary TMA/MTMA w `qnh_regions.json` odrysowane ze zrzutu mapy z AIP Polska (`data/import/qnh_pansa.png`,
   `scripts/trace_qnh_regions.py`, ok. 0,5 km). QNH rejonu = najniższe QNH z METAR jego lotnisk (oficjalne liczy IMGW z modelu);
   pasy 15-17 (53°N, 51°N) = najniższe QNH z lotnisk pasa. Progi LVP do sprawdzenia z INOP.
-- OVERVIEW: TL wg OM PL vACC (AIRAC 2610), TA 6500 ft niesprawdzone w eAIP. Część pól vIFF (przepustowość lotniska, przyloty
+- OVERVIEW: TL liczony z QNH 15 kontrolowanych lotnisk z METAR (lotnisko bez METAR nie jest liczone); próg 995 hPa
+  włącznie (OM PL vACC pisze „poniżej 995”). TA 6500 ft niesprawdzone w eAIP. Część pól vIFF (przepustowość lotniska, przyloty
   w godzinie) odczytana z dokumentacji i odpowiedzi API. NOTAM-y wg okresu B)-C), bez harmonogramu D). ECFMP/vIFF zawsze dla całego FIR.
 - LOA w RADIO to ręczny wyciąg z PDF-ów (obowiązuje PDF); LOA z Lwowem jest z 2022 r. Nazwy niemieckie z Knowledgebase (08.10.2026);
   CTR bez nazwy w żadnym źródle dostaje callsign wspólny dla FIR-u (szarszy, „przyjęty”).

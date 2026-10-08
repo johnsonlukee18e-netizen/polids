@@ -1,6 +1,6 @@
 // AERODROME › OVERVIEW: jeden ekran dla całego FIR EPWW, coś jak self-checkin przed otwarciem stanowiska.
 // Panele (dane z /api/overview, każdy z własnym komunikatem błędu):
-//   1. poziom przejściowy (TL) z ATIS albo wyliczony z QNH (zasada OM PL vACC),
+//   1. poziom przejściowy (TL): jeden dla całego kraju, FL080, a FL090 gdy gdziekolwiek QNH ≤ 995 hPa,
 //   2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP, kolory jak w METEO,
 //   3. NOTAM-y obowiązujące teraz,
 //   4. restrykcje ECFMP dla FIR EPWW i regulacje vIFF na sektorach EP,
@@ -25,24 +25,18 @@ const n0 = (v) => (v === null || v === undefined ? "–" : esc(v));
 // odmiana: 1 lotnisko, 2–4 lotniska (też 22–24 …), 5–21 lotnisk
 const lotnisk = (n) => (n === 1 ? "lotnisko" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "lotniska" : "lotnisk");
 
-// --- 1. poziom przejściowy -------------------------------------------------------------------------------------
+// --- 1. poziom przejściowy: jeden dla całego kraju, bez osobnego TL przy lotniskach ------------------------------
 function tlPanel(d) {
-  const fir = d.tl?.fir || {};
-  const rows = d.airports.map((i) => {
-    const t = d.tl?.aerodromes?.[i] || {};
-    return `<tr class="${t.differs ? "warn" : ""}"><td class="ic">${esc(i)}</td>
-      <td class="num tlv">${t.fl ? "FL" + t.fl : "–"}</td>
-      <td><span class="ov-chip ${t.source === "ATIS" ? "on" : ""}">${esc(t.source || "–")}</span></td>
-      <td class="num">${n0(t.qnh)}</td></tr>`;
-  }).join("");
-  const differs = d.airports.filter((i) => d.tl?.aerodromes?.[i]?.differs);
-  return `<div class="ov-tl-big">TA <b>${n0(fir.ta_ft)} ft</b> · TL w FIR <b>${fir.fl ? "FL" + fir.fl : "–"}</b></div>
-    <div class="hint ov-tl-rule">${esc(fir.rule || "")}</div>
-    <table class="data ov-tab"><thead><tr><th>Lotn.</th><th>TL</th><th>Źródło</th><th>QNH</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    ${differs.length ? `<div class="ov-note warn">ATIS podaje inny poziom niż zasada z QNH: ${differs.map(esc).join(", ")}</div>` : ""}
-    <div class="hint ov-src">Źródło zasady: <a href="${esc(fir.source_url || "")}" target="_blank" rel="noopener">${esc(fir.source || "")}</a>.
-      TL z ATIS, gdy lotnisko nadaje ATIS w sieci VATSIM.</div>`;
+  const t = d.tl || {};
+  const low = t.low || [];
+  return `<div class="ov-tl-big">TL <b>${esc(t.text || "–")}</b> w całym kraju</div>
+    <div class="hint ov-tl-rule">${esc(t.rule || "")}</div>
+    ${t.qnh_icao ? `<div class="ov-tl-min">najniższe QNH: <b class="ic">${esc(t.qnh_icao)}</b> ${n0(t.qnh_min)} hPa</div>` : ""}
+    ${low.length ? `<div class="ov-note warn">QNH ≤ 995 hPa: ${low.map(esc).join(", ")}</div>` : ""}
+    ${(t.missing || []).length ? `<div class="hint">bez METAR (nie liczone): ${t.missing.map(esc).join(", ")}</div>` : ""}
+    <div class="hint ov-src">FL080, a gdy na którymkolwiek z ${n0((t.stations || 0) + (t.missing || []).length)} kontrolowanych lotnisk
+      QNH ≤ 995 hPa, w całym kraju FL090. TA ${n0(t.ta_ft)} ft.
+      <a href="${esc(t.source_url || "")}" target="_blank" rel="noopener">${esc(t.source || "")}</a></div>`;
 }
 
 // --- 2. METAR / TAF / LVP --------------------------------------------------------------------------------------
@@ -59,7 +53,6 @@ function lvpChip(lvp) {
 
 function wxRow(a, open) {
   const p = a.parsed || {};
-  const tl = a.tl || {};
   const t = a.traffic || {};
   const obs = p.time ? `${esc(p.time.slice(2, 4))}:${esc(p.time.slice(4, 6))}Z` : "";
   return `<div class="ov-ad${open ? " open" : ""}" data-ad="${esc(a.icao)}">
@@ -67,7 +60,6 @@ function wxRow(a, open) {
       <b class="ic">${esc(a.icao)}</b>
       <span class="cat cat-${esc(p.flight_category || "")}">${esc(p.flight_category || "–")}</span>
       ${lvpChip(a.lvp)}
-      <span class="ov-chip ${tl.source === "ATIS" ? "on" : ""}" data-tip="Poziom przejściowy (${esc(tl.source || "–")})">${tl.fl ? "TL" + tl.fl : "TL –"}</span>
       ${a.atis ? `<span class="ov-chip on" data-tip="${esc(a.atis.callsign)}">ATIS ${esc(a.atis.letter || "")}</span>` : ""}
       ${(a.atc || []).length ? `<span class="ov-chip on" data-tip="${esc(a.atc.map((c) => `${c.callsign} ${c.frequency} ${c.name || ""}`).join("\n"))}">ATC ${a.atc.length}</span>` : ""}
       <span class="ov-traffic" data-tip="Loty w sieci VATSIM z planem z/do tego lotniska">↑${t.departures ?? 0} ↓${t.arrivals ?? 0}${t.prefiles ? ` ✎${t.prefiles}` : ""}</span>

@@ -26,7 +26,7 @@
   text-transform: none; }
 .ov-col > .card.grow { flex: 1 1 0; }
 .ov-col > .card.part { flex: 0 1 auto; max-height: 44%; }
-/* tabela poziomów przejściowych bywa długa (15 lotnisk): zostawiamy miejsce na checklistę, reszta się przewija */
+/* karta TL jest krótka (jeden poziom dla kraju): resztę kolumny dostaje checklista */
 .ov-col > .card.ov-tl { flex: 0 1 auto; max-height: 56%; }
 .ov-col .scroll { flex: 1; min-height: 0; overflow: auto; }
 
@@ -52,8 +52,7 @@
 .ov-tl-big { font: 15px/1.5 var(--mono); color: var(--text); }
 .ov-tl-big b { font-size: 19px; color: #fff; }
 .ov-tl-rule { margin-bottom: 4px; line-height: 1.35; }
-.ov-tl-body table.data td.tlv { font: 700 14px var(--mono); color: #fff; }
-.ov-tl-body table.data tr.warn td.tlv { color: var(--warn); }
+.ov-tl-min { font: 13px/1.5 var(--mono); color: var(--text); margin-bottom: 4px; }
 
 /* --- METAR / TAF / LVP */
 .ov-ad { padding: 3px 4px; border-bottom: 1px solid #161b16; cursor: pointer; }

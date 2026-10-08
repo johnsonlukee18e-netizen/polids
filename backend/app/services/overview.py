@@ -1,7 +1,7 @@
 """AERODROME › OVERVIEW: jeden ekran dla całego FIR EPWW (coś jak self-checkin przed otwarciem stanowiska).
 
 Składamy w jednym zapytaniu to, co kontroler sprawdza przed objęciem stanowiska:
-1. poziom przejściowy (services/tl.py) – z ATIS, a gdy lotnisko nie nadaje, wyliczony z QNH,
+1. poziom przejściowy (services/tl.py) – jeden dla całego kraju, z najniższego QNH kontrolowanych lotnisk,
 2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP (services/lvp.py),
 3. NOTAM-y obowiązujące teraz (services/notam.py, pola B)/C) ),
 4. restrykcje ECFMP dla FIR EPWW (services/ecfmp.py) i regulacje vIFF na sektorach EP,
@@ -330,8 +330,7 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     info = feed_info(feed["feed"], AERODROMES)
     parsed = {i: parse_metar(m) for i, m in metars.items() if m}
     qnhs = {i: (p.qnh if p else None) for i, p in parsed.items()}
-    tl = tl_service.levels({i: qnhs.get(i) for i in AERODROMES},
-                           {i: (info[i]["atis"] or {}).get("lines") for i in AERODROMES})
+    tl = tl_service.fir_level({i: qnhs.get(i) for i in AERODROMES})
     aerodromes = []
     for icao in shown:
         p = parsed.get(icao)
@@ -339,7 +338,7 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
         aerodromes.append({
             "icao": icao, "name": names.get(icao, icao),
             "metar": metars.get(icao), "parsed": p.to_dict() if p else None, "taf": tafs.get(icao),
-            "lvp": evaluate_lvp(p, icao), "tl": tl["aerodromes"].get(icao),
+            "lvp": evaluate_lvp(p, icao),
             "atis": {"callsign": atis["callsign"], "letter": atis["letter"], "lines": atis["lines"]} if atis else None,
             "atc": info.get(icao, {}).get("atc", []),
             "traffic": {k: info.get(icao, {}).get(k, 0) for k in ("departures", "arrivals", "prefiles")},

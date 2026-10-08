@@ -22,40 +22,31 @@ NOW = datetime(2026, 10, 8, 15, 30, tzinfo=timezone.utc)
 
 # --- poziom przejściowy -----------------------------------------------------------------------------------------
 
-def test_tl_from_atis():
-    assert tl.from_atis(["WARSAW CHOPIN INFORMATION K", "TRANSITION LEVEL 80"]) == 80
-    assert tl.from_atis(["RWY IN USE 22L", "TRL 65"]) == 65
-    assert tl.from_atis(["TL70 QNH 1001"]) == 70
-    assert tl.from_atis(["TRANSITION LEVEL FL 90"]) == 90
-    assert tl.from_atis("TRANSITION LEVEL IS 100") == 100
-    # ATIS bez poziomu i brak ATIS; "TL1200" z TAF-a (grupa czasu) nie jest poziomem
-    assert tl.from_atis(["RWY 29 IN USE, QNH 1013"]) is None
-    assert tl.from_atis(None) is None and tl.from_atis([]) is None
-    assert tl.from_atis(["BECMG TL1200 27010KT"]) is None
-
-
 def test_tl_from_qnh_table():
-    """Zasada OM PL vACC: poniżej 995 hPa FL90, od 995 hPa FL80."""
-    assert tl.from_qnh(1013)["fl"] == 80 and tl.from_qnh(995)["fl"] == 80
-    assert tl.from_qnh(994)["fl"] == 90 and tl.from_qnh(980)["fl"] == 90
-    assert tl.from_qnh(None)["fl"] is None
-    assert not tl.from_qnh(1013)["computed"]
-    # skrajnie niskie ciśnienie: FL90 nie daje już 1000 ft nad TA 6500 ft, więc podnosimy poziom
-    low = tl.from_qnh(950)
-    assert low["fl"] == 95 and low["computed"] and "FL95" in low["rule"]
-    assert tl.altitude_ft(80, 1013.25) == pytest.approx(8000)
+    """Zasada (Marek, 08.10.2026): 995 hPa i mniej na którymkolwiek lotnisku → FL090, inaczej FL080. Nic więcej."""
+    assert tl.from_qnh(1013)["fl"] == 80 and tl.from_qnh(996)["fl"] == 80 and tl.from_qnh(995.5)["fl"] == 80
+    assert tl.from_qnh(995)["fl"] == 90 and tl.from_qnh(994)["fl"] == 90
+    # także przy skrajnie niskim ciśnieniu zostaje FL090 (bez podnoszenia poziomu)
+    assert tl.from_qnh(950)["fl"] == 90 and tl.from_qnh(930)["fl"] == 90
+    assert tl.from_qnh(None)["fl"] is None and "brak QNH" in tl.from_qnh(None)["rule"]
+    assert "FL090" in tl.from_qnh(995)["rule"] and "FL080" in tl.from_qnh(1013)["rule"]
+    assert (tl.fl_text(80), tl.fl_text(90), tl.fl_text(None)) == ("FL080", "FL090", "–")
 
 
-def test_tl_fir_and_aerodromes():
-    qnhs = {"EPWA": 1009, "EPKK": 993, "EPGD": 1012, "EPSC": None}
+def test_tl_fir_level():
+    qnhs = {"EPWA": 1009, "EPKK": 995, "EPGD": 1012, "EPRZ": 994, "EPSC": None}
     fir = tl.fir_level(qnhs)
-    assert (fir["fl"], fir["qnh_min"], fir["qnh_icao"], fir["stations"]) == (90, 993, "EPKK", 3)
+    assert (fir["fl"], fir["text"], fir["qnh_min"], fir["qnh_icao"]) == (90, "FL090", 994, "EPRZ")
+    assert fir["low"] == ["EPKK", "EPRZ"] and fir["stations"] == 4 and fir["missing"] == ["EPSC"]
     assert fir["ta_ft"] == 6500 and "om.plvacc.pl" in fir["source_url"]
-    out = tl.levels(qnhs, {"EPWA": ["TRANSITION LEVEL 80"], "EPKK": None, "EPGD": None, "EPSC": None})
-    # ATIS EPWA mówi FL80, a z QNH wychodzi FL90 (gdzieś w FIR jest niskie ciśnienie): pokazujemy ATIS i oznaczamy różnicę
-    assert out["aerodromes"]["EPWA"] == {"fl": 80, "source": "ATIS", "qnh": 1009, "fir_fl": 90, "differs": True}
-    assert out["aerodromes"]["EPKK"]["fl"] == 90 and out["aerodromes"]["EPKK"]["source"] == "QNH"
-    assert out["aerodromes"]["EPSC"]["fl"] == 90 and not out["aerodromes"]["EPSC"]["differs"]
+    ok = tl.fir_level({"EPWA": 1009, "EPKK": 996})
+    assert (ok["fl"], ok["text"], ok["low"], ok["missing"]) == (80, "FL080", [], [])
+    # równe minimum: wybór stały (alfabetycznie), żeby opis nie skakał między odświeżeniami
+    assert tl.fir_level({"EPWA": 1001, "EPKK": 1001})["qnh_icao"] == "EPKK"
+    none = tl.fir_level({"EPWA": None})
+    assert none["fl"] is None and none["text"] == "–" and none["qnh_icao"] is None and none["missing"] == ["EPWA"]
+    # nie ma już osobnego TL dla lotnisk ani poziomu z ATIS
+    assert not hasattr(tl, "levels") and not hasattr(tl, "from_atis")
 
 
 # --- ECFMP ------------------------------------------------------------------------------------------------------
@@ -273,10 +264,11 @@ def test_positions_grupy_i_lotniska(client):
 def test_overview_bez_filtra(client):
     d = client.get("/api/overview").json()
     assert d["airports"] == overview.AERODROMES and d["position"] is None
-    assert d["tl"]["fir"]["fl"] == 80 and d["tl"]["fir"]["ta_ft"] == 6500
+    assert (d["tl"]["fl"], d["tl"]["text"], d["tl"]["ta_ft"]) == (80, "FL080", 6500)
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
     assert wa["lvp"]["state"] == "LVP" and wa["parsed"]["qnh"] == 1009
-    assert wa["tl"] == {"fl": 80, "source": "ATIS", "qnh": 1009, "fir_fl": 80, "differs": False}
+    # jeden TL dla kraju: lotniska nie mają własnego
+    assert all("tl" not in a for a in d["aerodromes"])
     assert wa["atis"]["letter"] == "K" and wa["atis"]["lines"] == ATIS_LINES
     assert wa["traffic"]["departures"] == 1 and wa["monitor"]["cdm"] and wa["monitor"]["rate"] == 34
     assert wa["monitor"]["regulated"][0]["delay"] == 12 and wa["monitor"]["avg_delay"] == 12
@@ -292,11 +284,11 @@ def test_overview_filtr_stanowiska(client):
     assert d["airports"] == ["EPLL", "EPMO", "EPRA", "EPWA"] and d["position"]["kind"] == "APP"
     assert [a["icao"] for a in d["aerodromes"]] == ["EPLL", "EPMO", "EPRA", "EPWA"]
     # poziom przejściowy liczymy z QNH wszystkich lotnisk FIR-u, nie tylko pokazanych
-    assert d["tl"]["fir"]["stations"] == 2 and set(d["tl"]["aerodromes"]) == set(overview.AERODROMES)
+    assert d["tl"]["stations"] + len(d["tl"]["missing"]) == len(overview.AERODROMES) and d["tl"]["stations"] == 2
     # filtr bez METAR-ów (EPKK, EPKT, EPRZ): poziom przejściowy i tak z QNH EPWA/EPMO spoza filtra
     kk = client.get("/api/overview?position=EPKK_APP").json()
     assert kk["airports"] == ["EPKK", "EPKT", "EPRZ"]
-    assert (kk["tl"]["fir"]["fl"], kk["tl"]["fir"]["qnh_icao"], kk["tl"]["fir"]["stations"]) == (80, "EPWA", 2)
+    assert (kk["tl"]["fl"], kk["tl"]["qnh_icao"], kk["tl"]["stations"]) == (80, "EPWA", 2)
     # wieża: zamiast filtra podpowiedź skoku do PRZEGLĄDU lotniska
     twr = client.get("/api/overview?position=EPKK_TWR").json()
     assert twr["position"]["goto"] == "EPKK" and twr["airports"] == ["EPKK"]
@@ -304,6 +296,19 @@ def test_overview_filtr_stanowiska(client):
     other = client.get("/api/overview?position=EPXX_APP").json()
     assert other["airports"] == overview.AERODROMES and other["position"]["known"] is False
     assert client.get("/api/overview?position=zły znak").status_code == 400
+
+
+def test_overview_tl_niskie_qnh_poza_filtrem(client, monkeypatch):
+    """QNH 995 hPa na jednym lotnisku (EPRZ, poza filtrem EPWA_APP) daje FL090 w całym kraju, także w widoku EPWA APP."""
+    async def metars(icaos):
+        low = {**METARS, "EPRZ": "EPRZ 081530Z 24008KT 9999 FEW030 12/05 Q0995"}
+        return {i: low[i] for i in icaos if i in low}
+
+    monkeypatch.setattr(overview, "get_metars", metars)
+    d = client.get("/api/overview?position=EPWA_APP").json()
+    assert "EPRZ" not in d["airports"]
+    assert (d["tl"]["fl"], d["tl"]["text"], d["tl"]["qnh_icao"], d["tl"]["low"]) == (90, "FL090", "EPRZ", ["EPRZ"])
+    assert d["tl"]["stations"] == 3 and "995" in d["tl"]["rule"]
 
 
 def test_overview_awaria_zrodel(client, monkeypatch):
@@ -324,10 +329,11 @@ def test_overview_awaria_zrodel(client, monkeypatch):
     assert "METAR" in d["wx_error"] and "vIFF" in d["monitor_error"]
     assert "ECFMP niedostępny" in d["flow"]["error"] and d["flow"]["measures"] == []
     assert "vIFF" in d["flow"]["viff_error"]
-    assert d["tl"]["fir"]["fl"] is None and "brak QNH" in d["tl"]["fir"]["rule"]
-    # NOTAM-y i ATIS (poziom przejściowy z ATIS) działają dalej
+    # bez METAR-ów nie ma poziomu przejściowego (ATIS go nie zastępuje)
+    assert d["tl"]["fl"] is None and "brak QNH" in d["tl"]["rule"] and d["tl"]["text"] == "–"
+    # NOTAM-y i ATIS działają dalej
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
-    assert wa["tl"]["source"] == "ATIS" and wa["tl"]["fl"] == 80
+    assert wa["atis"]["letter"] == "K"
     assert [n["id"] for n in d["notams"]] == ["A1234/26"]
 
 
@@ -352,7 +358,7 @@ def test_overview_awaria_notam_vatsim_taf(client, monkeypatch):
     assert d["notams"] == [] and d["notam_error"] == "Serwer NOTAM: EPLL, EPMO, EPRA, EPWA: timeout"
     assert "VATSIM" in d["network_error"] and "TAF" in d["wx_error"]
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
-    assert wa["atis"] is None and wa["tl"]["source"] == "QNH" and wa["metar"] and wa["taf"] is None
+    assert wa["atis"] is None and wa["metar"] and wa["taf"] is None and d["tl"]["fl"] == 80
 
 
 def test_overview_viff_inny_ksztalt(client, monkeypatch):
