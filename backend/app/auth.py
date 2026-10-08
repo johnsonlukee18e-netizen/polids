@@ -148,8 +148,6 @@ def _login_page(error: str = "", nxt: str = "/") -> HTMLResponse:
     nxt_q = html.escape(urlencode({"next": _safe_next(nxt)}))
     if settings.auth_mode == "vatsim":
         body = f'<a class="btn" href="/auth/vatsim?{nxt_q}">Zaloguj przez VATSIM</a>'
-        if "auth-dev." in settings.vatsim_auth_url:
-            body += '<p class="hint">Sandbox VATSIM: konta 10000000-10000010, hasło = CID.</p>'
     else:
         options = "".join(f'<option value="{k}"{" selected" if k == 2 else ""}>{v}</option>'
                           for k, v in RATINGS.items() if k >= 0)
