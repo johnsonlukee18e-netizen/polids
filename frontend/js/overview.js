@@ -1,6 +1,6 @@
 // AERODROME › OVERVIEW: jeden ekran dla całego FIR EPWW, coś jak self-checkin przed otwarciem stanowiska.
 // Panele (dane z /api/overview, każdy z własnym komunikatem błędu):
-//   1. poziom przejściowy (TL): jeden dla całego kraju, FL080, a FL090 gdy gdziekolwiek QNH ≤ 995 hPa,
+//   1. poziom przejściowy (TL): jeden dla całego kraju, FL080, a FL090, gdy gdziekolwiek QNH ≤ 995 hPa,
 //   2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP, kolory jak w METEO,
 //   3. NOTAM-y obowiązujące teraz,
 //   4. restrykcje ECFMP dla FIR EPWW i regulacje vIFF na sektorach EP,
@@ -29,13 +29,17 @@ const lotnisk = (n) => (n === 1 ? "lotnisko" : [2, 3, 4].includes(n % 10) && ![1
 function tlPanel(d) {
   const t = d.tl || {};
   const low = t.low || [];
-  return `<div class="ov-tl-big">TL <b>${esc(t.text || "–")}</b> w całym kraju</div>
+  const miss = t.missing || [];
+  const thr = `QNH ≤ ${n0(t.threshold_hpa)} hPa`;
+  const head = t.fl ? `TL <b>${esc(t.text)}</b> w całym kraju` : "TL <b>–</b> (brak QNH)";
+  return `<div class="ov-tl-big">${head}</div>
     <div class="hint ov-tl-rule">${esc(t.rule || "")}</div>
     ${t.qnh_icao ? `<div class="ov-tl-min">najniższe QNH: <b class="ic">${esc(t.qnh_icao)}</b> ${n0(t.qnh_min)} hPa</div>` : ""}
-    ${low.length ? `<div class="ov-note warn">QNH ≤ 995 hPa: ${low.map(esc).join(", ")}</div>` : ""}
-    ${(t.missing || []).length ? `<div class="hint">bez METAR (nie liczone): ${t.missing.map(esc).join(", ")}</div>` : ""}
-    <div class="hint ov-src">FL080, a gdy na którymkolwiek z ${n0((t.stations || 0) + (t.missing || []).length)} kontrolowanych lotnisk
-      QNH ≤ 995 hPa, w całym kraju FL090. TA ${n0(t.ta_ft)} ft.
+    ${low.length ? `<div class="ov-note warn">${thr}: ${low.map(esc).join(", ")}</div>` : ""}
+    ${miss.length ? `<div class="${t.uncertain ? "ov-note warn" : "hint"}">bez QNH z METAR-u (nieuwzględnione): ${miss.map(esc).join(", ")}${
+      t.uncertain ? ` – jeśli tam ${thr}, TL to ${esc(t.raised)}` : ""}</div>` : ""}
+    <div class="hint ov-src">${esc(t.normal || "")}, a gdy na którymkolwiek z ${n0((t.stations || 0) + miss.length)} kontrolowanych lotnisk
+      ${thr}, w całym kraju ${esc(t.raised || "")}. TA ${n0(t.ta_ft)} ft.
       <a href="${esc(t.source_url || "")}" target="_blank" rel="noopener">${esc(t.source || "")}</a></div>`;
 }
 

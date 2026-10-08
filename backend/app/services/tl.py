@@ -30,21 +30,28 @@ def from_qnh(qnh: float | None) -> dict:
     if qnh is None:
         return {"fl": None, "rule": "brak QNH z METAR-ów – nie można wyznaczyć poziomu przejściowego"}
     if qnh <= LOW_QNH_HPA:
-        return {"fl": FL_LOW_QNH, "rule": f"najniższe QNH {qnh:g} hPa ≤ {LOW_QNH_HPA} hPa → {fl_text(FL_LOW_QNH)} w całym kraju"}
-    return {"fl": FL_NORMAL, "rule": f"QNH na wszystkich lotniskach > {LOW_QNH_HPA} hPa (najniższe {qnh:g}) → "
-                                     f"{fl_text(FL_NORMAL)} w całym kraju"}
+        return {"fl": FL_LOW_QNH, "rule": f"QNH ≤ {LOW_QNH_HPA} hPa na co najmniej jednym lotnisku → {fl_text(FL_LOW_QNH)}"}
+    return {"fl": FL_NORMAL, "rule": f"QNH na wszystkich lotniskach > {LOW_QNH_HPA} hPa → {fl_text(FL_NORMAL)}"}
 
 
 def fir_level(qnhs: dict[str, float | None]) -> dict:
     """Jeden poziom przejściowy dla FIR EPWW z QNH kontrolowanych lotnisk.
 
     Zwraca {"fl", "text", "rule", "qnh_min", "qnh_icao", "low" (lotniska z QNH ≤ 995), "stations", "missing",
-    "ta_ft", "source", "source_url"}."""
+    "uncertain" (FL080, ale części QNH brakuje), "threshold_hpa", "normal", "raised", "ta_ft", "source",
+    "source_url"}."""
     have = {i: q for i, q in qnhs.items() if q is not None}
+    missing = sorted(i for i, q in qnhs.items() if q is None)
     icao = min(have, key=lambda i: (have[i], i)) if have else None
     qnh = have[icao] if icao else None
     level = from_qnh(qnh)
+    # FL080 jest pewne tylko wtedy, gdy znamy QNH wszystkich lotnisk: brakujące mogło być ≤ 995 hPa
+    uncertain = level["fl"] == FL_NORMAL and bool(missing)
+    if uncertain:
+        level["rule"] = (f"QNH > {LOW_QNH_HPA} hPa na {len(have)} z {len(qnhs)} lotnisk "
+                         f"(brak QNH: {', '.join(missing)}) → {fl_text(FL_NORMAL)}")
     return {**level, "text": fl_text(level["fl"]), "qnh_min": qnh, "qnh_icao": icao,
             "low": sorted(i for i, q in have.items() if q <= LOW_QNH_HPA),
-            "stations": len(have), "missing": sorted(i for i, q in qnhs.items() if q is None),
+            "stations": len(have), "missing": missing, "uncertain": uncertain,
+            "threshold_hpa": LOW_QNH_HPA, "normal": fl_text(FL_NORMAL), "raised": fl_text(FL_LOW_QNH),
             "ta_ft": TA_FT, "source": SOURCE, "source_url": SOURCE_URL}

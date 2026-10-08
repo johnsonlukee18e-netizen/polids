@@ -40,7 +40,14 @@ def test_tl_fir_level():
     assert fir["low"] == ["EPKK", "EPRZ"] and fir["stations"] == 4 and fir["missing"] == ["EPSC"]
     assert fir["ta_ft"] == 6500 and "om.plvacc.pl" in fir["source_url"]
     ok = tl.fir_level({"EPWA": 1009, "EPKK": 996})
-    assert (ok["fl"], ok["text"], ok["low"], ok["missing"]) == (80, "FL080", [], [])
+    assert (ok["fl"], ok["text"], ok["low"], ok["missing"], ok["uncertain"]) == (80, "FL080", [], [], False)
+    assert (ok["threshold_hpa"], ok["normal"], ok["raised"]) == (995, "FL080", "FL090")
+    # FL080 przy brakującym QNH nie jest pewne: opis mówi, ilu lotnisk brakuje
+    part = tl.fir_level({"EPWA": 1009, "EPKK": None, "EPRZ": None})
+    assert part["fl"] == 80 and part["uncertain"] and part["missing"] == ["EPKK", "EPRZ"]
+    assert "1 z 3" in part["rule"] and "EPKK, EPRZ" in part["rule"]
+    # FL090 jest pewne bez względu na brakujące QNH
+    assert tl.fir_level({"EPWA": 990, "EPKK": None})["uncertain"] is False
     # równe minimum: wybór stały (alfabetycznie), żeby opis nie skakał między odświeżeniami
     assert tl.fir_level({"EPWA": 1001, "EPKK": 1001})["qnh_icao"] == "EPKK"
     none = tl.fir_level({"EPWA": None})
@@ -241,6 +248,9 @@ def client(monkeypatch_module):
     monkeypatch_module.setattr(vatsim_api, "get_feed", feed)
     monkeypatch_module.setattr(viff, "_get", viff_get)
     monkeypatch_module.setattr(ecfmp, "fetch_text", ecfmp_fetch)
+    # zegar stały: dane testowe (NOTAM-y, środki ECFMP) mają daty z 08.10.2026, a router woła overview() bez now
+    real = overview.overview
+    monkeypatch_module.setattr(overview, "overview", lambda db, position=None, now=None: real(db, position, now or NOW))
     with TestClient(main.app) as c:
         yield c
 
