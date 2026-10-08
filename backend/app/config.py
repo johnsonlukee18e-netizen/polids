@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
-VERSION = "0.9.0"
+VERSION = "0.10.1"
 
 
 def csv_set(value: str) -> set[str]:
@@ -21,8 +21,8 @@ def csv_set(value: str) -> set[str]:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POLIDS_", env_file=ROOT_DIR / ".env", extra="ignore")
 
-    name: str = "POLIDS"
-    tagline: str = "Information Display System · VATSIM PL vACC"
+    name: str = "PolIDS"
+    tagline: str = "Polish Integrated Display System · VATSIM PL vACC"
     public_url: str = "http://localhost:1337"  # bez / na końcu; z tego jest redirect_uri dla VATSIM Connect
 
     # none | dev (formularz testowy, tylko localhost) | vatsim

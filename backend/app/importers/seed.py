@@ -10,21 +10,24 @@ import csv
 import logging
 import sys
 import time
+from pathlib import Path
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..config import DATA_DIR, settings
 from ..database import SCHEMA_VERSION, Base, SessionLocal, engine
-from ..models import AircraftType, Aerodrome, Callsign, Document, Frequency, ImportLog, NavPoint, Runway
+from ..models import AircraftType, Aerodrome, Callsign, Document, Frequency, ImportLog, NavPoint, NbPosition, NbSector, Runway
 from .aircraft_json import import_aircraft_json
 from .callsigns import import_gr_operator_info, import_icao_airlines
 from .ese import import_ese
+from .neighbours import import_nb_ese, source_key
 from .navdata import import_airways, import_icao_airports, import_isec
 from .sct import import_sct
 
 log = logging.getLogger("polids.seed")
 IMPORT_DIR = DATA_DIR / "import"
+NB_DIR = IMPORT_DIR / "neighbours"  # pliki .ese FIR-ów sąsiednich (osobny import, nie nadpisują EPWW)
 
 # (dopasowanie końcówki nazwy pliku, funkcja importu); kolejność ma znaczenie
 IMPORTERS = [
@@ -123,6 +126,40 @@ def register_docs(db: Session):
     db.commit()
 
 
+def _import_file(db: Session, p: Path, fn, name: str, force: bool) -> dict | None:
+    """Import jednego pliku, jeśli zmienił się od ostatniego razu (ImportLog wg nazwy `name`)."""
+    mtime = p.stat().st_mtime
+    logged = db.get(ImportLog, name)
+    if logged and logged.mtime == mtime and not force:
+        return None
+    t0 = time.time()
+    try:
+        res = fn(db, p)
+    except Exception as exc:  # jeden zły plik nie może zablokować startu aplikacji
+        db.rollback()
+        log.exception("Import %s nieudany", name)
+        res = {"error": str(exc)}
+    log.info("Import %s: %s (%.1fs)", name, res, time.time() - t0)
+    # nieudany import zapisujemy z mtime=0, żeby przy kolejnym starcie spróbować ponownie
+    db.merge(ImportLog(filename=name, mtime=0 if "error" in res else mtime, result=str(res)))
+    db.commit()
+    return {"file": name, **res}
+
+
+def import_neighbours(db: Session, force: bool = False) -> list[dict]:
+    """Pliki .ese sąsiadów z data/import/neighbours/; sektory pakietów, których pliku już nie ma, usuwamy."""
+    files = sorted(p for p in NB_DIR.iterdir() if p.is_file() and p.suffix.lower() == ".ese") if NB_DIR.is_dir() else []
+    results = [r for p in files if (r := _import_file(db, p, import_nb_ese, f"neighbours/{p.name}", force))]
+    keys = {k for p in files if (k := source_key(p))}
+    db.execute(delete(NbSector).where(NbSector.source.not_in(keys)))
+    db.execute(delete(NbPosition).where(NbPosition.source.not_in(keys)))
+    # zapomnij usunięte pliki: przywrócony plik (z tą samą datą modyfikacji) wczyta się ponownie
+    db.execute(delete(ImportLog).where(ImportLog.filename.like("neighbours/%"),
+                                       ImportLog.filename.not_in([f"neighbours/{p.name}" for p in files])))
+    db.commit()
+    return results
+
+
 def import_user_files(db: Session, force: bool = False) -> list[dict]:
     IMPORT_DIR.mkdir(parents=True, exist_ok=True)
     results = []
@@ -133,23 +170,10 @@ def import_user_files(db: Session, force: bool = False) -> list[dict]:
                 continue
             if suffix == ".sct" and p.name.lower().endswith(".sct2"):
                 continue
-            mtime = p.stat().st_mtime
-            logged = db.get(ImportLog, p.name)
-            if logged and logged.mtime == mtime and not force:
-                continue
-            t0 = time.time()
-            try:
-                res = fn(db, p)
-            except Exception as exc:  # jeden zły plik nie może zablokować startu aplikacji
-                db.rollback()
-                log.exception("Import %s nieudany", p.name)
-                res = {"error": str(exc)}
-            log.info("Import %s: %s (%.1fs)", p.name, res, time.time() - t0)
-            # nieudany import zapisujemy z mtime=0, żeby przy kolejnym starcie spróbować ponownie
-            db.merge(ImportLog(filename=p.name, mtime=0 if "error" in res else mtime, result=str(res)))
-            db.commit()
-            results.append({"file": p.name, **res})
-    return results
+            if res := _import_file(db, p, fn, p.name, force):
+                results.append(res)
+    # sąsiedzi po lotniskach i navdata (współrzędne okręgów CIRCLE_SECTORLINE)
+    return results + import_neighbours(db, force)
 
 
 def _check_schema():

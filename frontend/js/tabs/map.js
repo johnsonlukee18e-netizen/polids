@@ -1,45 +1,88 @@
-import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, lsGet, lsSet, subtabs, vatsimAtc, vatsimOnline } from "../api.js";
+import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel } from "../viffchart.js";
-import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, loadVacs, sectorOwners, symbolFor, symbolSvg,
-  vacsLayer } from "../airspace.js";
-import { sectorSplit } from "../sectorsplit.js";
+import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, colorFor, drawFirs, fl, loadFirs, loadVacs, sliceOwner,
+  symbolFor, symbolSvg, vacsLayer } from "../airspace.js";
+import { airspaceChain } from "../chains.js";
+import { labelPoint } from "../coverage.js";
+import { displayName, loadDisplayNames } from "../posname.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
 const THEME = {
   dark: { ad: "#c8ced4", vor: "#3ecf6e", ndb: "#c58cff", fix: "#8c969e", vfr: "#ffb020", route: "#ff4dd2", flight: "#ff9f1a", halo: "#000", airway: "#5f6b78",
-    tma: "#7f95ff", ctr: "#ff6b6b" },
+    tma: "#7f95ff", ctr: "#ff6b6b", fis: "#35c4b0", cta: "#c9b26b", atz: "#e08ad6", nb: "#8d99a6", idle: "#5c665c" },
   light: { ad: "#33393f", vor: "#0a7a36", ndb: "#7b2cbf", fix: "#5c656c", vfr: "#c26a00", route: "#b0007c", flight: "#d4380d", halo: "#fff", airway: "#8b96a0",
-    tma: "#3550c8", ctr: "#d62828" },
+    tma: "#3550c8", ctr: "#d62828", fis: "#0b8a78", cta: "#8a7426", atz: "#a03a96", nb: "#56616c", idle: "#8f989f" },
 };
 const KIND_COLOR = { aerodrome: "ad", vor: "vor", ndb: "ndb", fix: "fix", vfr: "vfr" };
 const sw = (cls, label, checked = false, sym = "") => `<label class="sw"><input type="checkbox" class="${cls}" ${checked ? "checked" : ""}>
   <span class="sw-sym">${sym}</span><span>${label}</span></label>`;
-const PLANE_SVG = `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="${PLANE_PATH}" class="acsym"/></svg>`;
-// localStorage bywa niedostępny (tryb prywatny): odczyt i zapis zawsze w try
+const plane = (cls = "") => `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="${PLANE_PATH}" class="acsym ${cls}"/></svg>`;
+const PLANE_SVG = plane();
+// localStorage przez lsGet/lsSet (tryb prywatny: bez zapisu). Odczyt tylko wartości tego samego typu co domyślna
+// (obiekt, tablica, liczba, tekst…; przy domyślnym null także tekst): uszkodzony wpis (np. null w map.air) nie psuje MAP.
+const typeOf = (x) => (x === null ? "null" : Array.isArray(x) ? "array" : typeof x);
 const store = {
-  get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* tryb prywatny */ } },
+  get: (k, d) => {
+    let v;
+    try { v = JSON.parse(lsGet(k)); } catch { return d; }
+    return typeOf(v) === typeOf(d) || (d === null && typeof v === "string") ? v : d;
+  },
+  set: (k, v) => lsSet(k, JSON.stringify(v)),
 };
 // liczebnik z rzeczownikiem po polsku: 1 punkt, 2 punkty, 5 punktów
 const plural = (n, one, few, many) => `${n} ${n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many}`;
 const lg = (sym, label, cls = "") => `<div class="lgx-i ${cls}"><span class="lgx-s">${sym}</span><span>${label}</span></div>`;
+
+// Warstwy przestrzeni (wycinki sektorów z pliku .ese, /api/nav/slices): przełącznik i lista wyboru na każdy rodzaj.
+// kinds = rodzaje wycinków z backendu; head = nagłówek grupy na liście wyboru.
+// CTA osobno i domyślnie włączone: CTA 02 (FL225–FL245 nad TMA Warszawa, WA APP) zamyka dziurę nad TMA.
+const AIR = [
+  { id: "acc", label: "ACC EPWW", kinds: ["acc"], on: true, sym: `<span class="swatch sec"></span>` },
+  { id: "tma", label: "TMA", kinds: ["tma"], on: true, sym: `<span class="swatch tma"></span>` },
+  { id: "cta", label: "CTA", kinds: ["cta"], on: true, sym: `<span class="swatch cta"></span>` },
+  { id: "ctr", label: "CTR", kinds: ["ctr"], on: true, sym: `<span class="swatch ctr"></span>` },
+  { id: "oth", label: "FIS, ATZ/TRA", kinds: ["fis", "atz", "oth"], on: false, sym: `<span class="swatch fis"></span>` },
+  { id: "nb", label: "sąsiednie FIR", kinds: ["nb"], on: true, sym: `<span class="swatch nb"></span>` },
+];
+const AIR_TAG = { acc: "ACC", tma: "TMA", cta: "CTA", ctr: "CTR", oth: "FIS/ATZ", nb: "sąsiedzi" };
+const PICK_OF = Object.fromEntries(AIR.flatMap((a) => a.kinds.map((k) => [k, a.id])));
+// kolejność w dymku (z góry): ACC, TMA, CTR, CTA, FIS, ATZ, sąsiedzi
+const KIND_ORDER = ["acc", "tma", "ctr", "cta", "fis", "atz", "oth", "nb"];
+const KIND_TAG = { acc: "ACC", tma: "TMA", ctr: "CTR", fis: "FIS", cta: "CTA", atz: "ATZ", oth: "INNE", nb: "FIR" };
+const OTH_HEAD = { fis: "FIS", atz: "ATZ / TRA", oth: "inne" };
+// przestrzenie z kolejnością przejmowania z chains.js (APP/TWR z .ese, potem ACC): w dymku cała kolejność
+const CHAIN_KINDS = ["tma", "cta", "ctr"];
+const LEVELS = [15, 50, 100, 200, 300, 370];
+
 // Legenda w zakładkach (zwinięta domyślnie razem z całą sekcją)
 const LEGEND = [
   ["air", "Przestrzeń", () => [
-    lg(`<span class="swatch sec"></span>`, "sektor EPWW (kontur)"), lg(`<span class="swatch on"></span>`, "sektor obsadzony (online)"),
-    lg(`<span class="swatch unicom"></span>`, "sektor bez kontrolera (UNICOM 122.800)"), lg(`<span class="lg-freq">133.475</span>`, "częstotliwość sektora"),
-    lg(`<span class="swatch tma"></span>`, "TMA (wypełniona, gdy APP online)"), lg(`<span class="swatch ctr"></span>`, "CTR (wypełniona, gdy TWR online)"),
-    lg(`<span class="swatch fir"></span>`, "granica FIR sąsiedniego"),
-    `<p class="lgx-note">Właściciel sektora ACC: pierwsze stanowisko online z łańcucha VACS w warstwie wybranego poziomu
-      (LOW do FL335, MID do FL365, HIGH wyżej). TMA i CTR: lista OWNER z pliku .ese. Mapy warstw: MAP → SEKTORYZACJA.</p>`].join("")],
+    lg(`<span class="swatch sec"></span>`, "sektor ACC obsadzony (kolor stanowiska)"), lg(`<span class="swatch idle"></span>`, "sektor bez kontrolera (sam kontur)"),
+    lg(`<span class="swatch own"></span>`, "TMA, CTA, CTR obsadzona (kolor APP, TWR albo ACC)"),
+    lg(`<span class="swatch tma"></span>`, "TMA bez kontrolera (sam kontur)"), lg(`<span class="swatch cta"></span>`, "CTA bez kontrolera (sam kontur)"),
+    lg(`<span class="swatch ctr"></span>`, "CTR bez kontrolera (sam kontur)"),
+    lg(`<span class="swatch fis"></span>`, "FIS (wypełniony, gdy online)"),
+    lg(`<span class="swatch atz"></span>`, "ATZ / TRA"), lg(`<span class="swatch nb"></span>`, "sektor FIR-u sąsiedniego"),
+    lg(`<span class="swatch fir"></span>`, "granica FIR (VATSpy)"), lg(`<span class="lg-freq">133.475</span>`, "częstotliwość obsługującego", "w"),
+    `<p class="lgx-note">Przestrzenie i ich granice pionowe z pliku .ese: na mapie tylko te, które obejmują wybrany poziom
+      (dolna ≤ FL &lt; górna), albo wszystkie przy „wszystkie poziomy". Najedź na mapę: lista wszystkich widocznych przestrzeni w tym miejscu.
+      Sektor ACC: pierwsze stanowisko online z kolejności przejmowania (<span class="own-src">…</span>) w warstwie LOW (do FL335), MID (do FL365)
+      albo HIGH. TMA, CTA i CTR: najpierw APP / TWR z listy OWNER pliku .ese, potem ACC (TMA: top-down z tabeli om.plvacc.pl,
+      reszta: lista OWNER .ese). W dymku cała kolejność z częstotliwościami: obsługujący na zielonym tle, zalogowani na zielono,
+      niezalogowani szarzy. FIS i ATZ: lista OWNER z pliku .ese. Sąsiedzi: sektory i listy OWNER z plików .ese
+      sąsiednich vACC (data/import/neighbours; sektory zależne od pasa w konfiguracji zachodniej), UMMV (Białoruś) z pliku EPWW.</p>`].join("")],
+  ["traffic", "Ruch", () => [
+    lg(plane("dep"), "odlot z lotniska EP**"), lg(plane("arr"), "przylot na lotnisko EP**"),
+    lg(plane("trn"), "tranzyt / bez planu lotu"), lg(plane("sel"), "wybrany lot"),
+    lg(`<span class="lg-line lg-flight"></span>`, "trasa wybranego samolotu"), lg(`<span class="lg-line lg-route"></span>`, "trasa wpisana ręcznie"),
+    `<p class="lgx-note">Lot krajowy (EP → EP) jest odlotem na ziemi przy lotnisku startu, do 40 NM od niego i przy wznoszeniu,
+      a przylotem przy zniżaniu i na drugiej połowie trasy (wznoszenie / zniżanie z porównania z poprzednim odczytem sprzed 30 s).</p>`].join("")],
   ["pts", "Punkty", () => [
     lg(`<i data-sym="aerodrome"></i>`, "lotnisko"), lg(`<i data-sym="vor"></i>`, "VOR / DME"), lg(`<i data-sym="ndb"></i>`, "NDB"),
-    lg(`<i data-sym="vfr"></i>`, "punkt VFR"), lg(`<i data-sym="fix"></i>`, "punkt FIX"), lg(`<span class="swatch awy"></span>`, "droga lotnicza"),
-    lg(PLANE_SVG, "samolot VATSIM"), lg(`<span class="lg-line lg-flight"></span>`, "trasa wybranego samolotu"),
-    lg(`<span class="lg-line lg-route"></span>`, "trasa wpisana ręcznie")].join("")],
-  ["atc", "Kontrolerzy", (ctx) => `${FACILITIES.map(([k, l, n]) => lg(`<span class="ab ab-${k.toLowerCase()}">${l}</span>`, n)).join("")}
-    ${lg(`<span class="ab ab-ctr">CTR</span>`, "Control (FIR)")}
-    <p class="lgx-note">Najedź na plakietkę, żeby zobaczyć, kto jest online. Oficjalna mapa sektorów:
+    lg(`<i data-sym="vfr"></i>`, "punkt VFR"), lg(`<i data-sym="fix"></i>`, "punkt FIX"), lg(`<span class="swatch awy"></span>`, "droga lotnicza")].join("")],
+  ["atc", "ATC", (ctx) => `${FACILITIES.map(([k, l, n]) => lg(`<span class="ab ab-${k.toLowerCase()}">${l}</span>`, n)).join("")}
+    ${lg(`<span class="ab ab-ctr">CTR</span>`, "kontrola obszaru (FIR)")}
+    <p class="lgx-note">Najedź na plakietkę, żeby zobaczyć, kto jest online (także kto wystawił ATIS). Oficjalna mapa sektorów:
       <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>`],
   ["viff", "vIFF", () => [
     lg(`<span class="swatch viff"></span>`, "obszar TV z wykresu"), lg(`<span class="vs-chip on">AKTYWNY</span>`, "scenariusz / TV aktywny"),
@@ -51,8 +94,53 @@ const LEGEND = [
   ].join("")],
 ];
 
-// Widok MAPA: duża mapa z panelem bocznym. Element budowany raz i przepinany między podzakładkami (stan mapy zostaje).
+// --- geometria: prostokąt otaczający i punkt w wielokącie (GeoJSON Polygon / MultiPolygon, współrzędne lon/lat)
+const bboxOf = (g) => {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  const polys = g.type === "MultiPolygon" ? g.coordinates : [g.coordinates];
+  polys.forEach((p) => p[0].forEach(([x, y]) => { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }));
+  return b;
+};
+const inRing = (x, y, ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+const inGeom = (x, y, g) => (g.type === "MultiPolygon" ? g.coordinates : [g.coordinates])
+  .some((p) => inRing(x, y, p[0]) && !p.slice(1).some((hole) => inRing(x, y, hole)));
+const distNm = (la1, lo1, la2, lo2) => {
+  const r = Math.PI / 180, a = Math.sin((la2 - la1) * r / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin((lo2 - lo1) * r / 2) ** 2;
+  return 3440.065 * 2 * Math.asin(Math.sqrt(a));
+};
+const range = (lo, hi) => `${altLabel(lo)}–${altLabel(hi)}`;
+
+// Lot względem FIR EPWW (kolor ikony): dep = odlot z lotniska EP** (niebieski jak paski odlotów w AERODROME),
+// arr = przylot na EP** (żółty jak paski przylotów), trn = tranzyt albo bez planu (biały).
+// Lot krajowy EP → EP: odlot na ziemi przy lotnisku startu, do 40 NM od niego i przy wznoszeniu; przylot przy zniżaniu
+// i na drugiej połowie trasy. vs = zmiana wysokości od poprzedniego odczytu (ok. 30 s).
+const EP_AD = /^EP[A-Z]{2}$/;
+function relation(p, adIdx) {
+  const dep = EP_AD.test(p.departure || ""), arr = EP_AD.test(p.arrival || "");
+  if (!dep || !arr) return dep ? "dep" : arr ? "arr" : "trn";
+  if (p.departure === p.arrival) return "dep";  // krąg, lot lokalny
+  const a = adIdx.get(p.departure), b = adIdx.get(p.arrival);
+  const da = a ? distNm(p.lat, p.lon, a.lat, a.lon) : null, db = b ? distNm(p.lat, p.lon, b.lat, b.lon) : null;
+  const half = da !== null && db !== null ? (da <= db ? "dep" : "arr") : "dep";
+  if ((p.groundspeed || 0) < 50) return half;
+  if (da !== null && da <= 40 && !(p.vs <= -300)) return "dep";
+  if (p.vs >= 300) return "dep";
+  if (p.vs <= -300) return "arr";
+  return half;
+}
+const REL_TEXT = { dep: (p) => `odlot z ${p.departure}`, arr: (p) => `przylot na ${p.arrival}`, trn: () => "tranzyt" };
+
+// Widok MAP: duża mapa z panelem bocznym
 function mainMap(ctx) {
+  const AIRST = store.get("map.air", {});  // przełączniki przestrzeni, poziom
+  const airOn = (id, d) => (typeOf(AIRST[id]) === typeOf(d) ? AIRST[id] : d);
   const pane = h(`<div class="pane fill"><div class="mapwrap">
     <div class="mapside">
       <div class="ms-head"><b>MAPA</b><span class="hint">AIRAC ${esc(ctx.config.airac?.ident || "")}</span>
@@ -60,26 +148,31 @@ function mainMap(ctx) {
       <section class="ms-card" data-sec="traffic">
         <h4>Ruch VATSIM</h4>
         ${sw("traffic", "samoloty", true, PLANE_SVG)}
+        <div class="ac-key" title="kolor samolotu: odlot z lotniska EP**, przylot na EP**, tranzyt"><span>${plane("dep")}odlot</span><span>${plane("arr")}przylot</span><span>${plane("trn")}tranzyt</span></div>
         ${sw("traffic-detail", "etykiety z FL, typem i GS")}
         ${sw("atc", "kontrolerzy online: plakietki (FIR EPWW, u sąsiadów tylko APP)", true, `<span class="ab ab-twr">T</span>`)}
         <div class="atc-info hint"></div>
         <div class="traffic-info hint"></div>
+      </section>
+      <section class="ms-card as-card" data-sec="air">
+        <h4>Przestrzeń</h4>
+        <div class="as-lvl">
+          <span class="flbox">FL<input type="number" class="field fl" value="${esc(airOn("fl", 300))}" min="0" max="660" step="5"></span>
+          <label class="sw"><input type="checkbox" class="allfl" ${airOn("all", false) ? "checked" : ""}><span>wszystkie poziomy</span></label>
+        </div>
+        <div class="as-pre">${LEVELS.map((v) => `<button data-fl="${v}" title="FL${String(v).padStart(3, "0")}">${String(v).padStart(3, "0")}</button>`).join("")}</div>
+        ${AIR.map((a) => `<div class="as-row">${sw("air-" + a.id, a.label, airOn(a.id, a.on), a.sym)}
+          <button class="pk-btn" data-air="${a.id}" title="Wybierz sektory do pokazania">wszystkie ▾</button></div>
+          <div class="pk" data-air="${a.id}" hidden></div>`).join("")}
+        ${sw("online", "obsada wg kontrolerów online", airOn("online", true), `<span class="swatch on"></span>`)}
+        ${sw("firs", "granice FIR-ów (VATSpy)", airOn("firs", true), `<span class="swatch fir"></span>`)}
+        <div class="sector-info hint"></div>
       </section>
       <section class="ms-card" data-sec="route">
         <h4>Trasa</h4>
         <textarea class="field route" rows="3" placeholder="np. EPKK OKENO N871 POLON L980 VAMPU EPGD"></textarea>
         <div class="ms-row"><button class="btn primary show-route">Pokaż trasę</button><button class="btn clear-route">Wyczyść</button></div>
         <div class="route-info hint"></div>
-      </section>
-      <section class="ms-card" data-sec="air">
-        <h4>Przestrzeń</h4>
-        <div class="ms-row"><label class="hint">Poziom</label><span class="flbox">FL<input type="number" class="field fl" value="300" min="0" max="660" step="5"></span></div>
-        ${sw("sectors", "sektory EPWW", true, `<span class="swatch sec"></span>`)}
-        ${sw("online", "aktualna sektoryzacja (kto jest online)", true, `<span class="swatch on"></span>`)}
-        ${sw("tma", "TMA", true, `<span class="swatch tma"></span>`)}
-        ${sw("ctrs", "CTR (wypełnione, gdy TWR online)", true, `<span class="swatch ctr"></span>`)}
-        ${sw("firs", "granice FIR-ów sąsiednich (VATSpy)", true, `<span class="swatch fir"></span>`)}
-        <div class="sector-info hint"></div>
       </section>
       <section class="ms-card vf-card" data-sec="viff">
         <h4>Przepustowość sektorów (vIFF)</h4>
@@ -117,30 +210,35 @@ function mainMap(ctx) {
   </div></div>`);
   const $ = (s) => pane.querySelector(s);
   const mapEl = $(".map");
-  const map = L.map(mapEl, { preferCanvas: true, zoomSnap: 0.5 }).setView([52.0, 19.3], 6);
+  const map = L.map(mapEl, { preferCanvas: true, zoomSnap: 0.5 }).setView([52.0, 19.3], 6, { animate: false });
   const key = ctx.config.carto_api_key;
-  let baseName = lsGet("map.base") || "dark";  // wspólny z widokiem SEKTORYZACJA
+  let baseName = lsGet("map.base") || "dark";  // wspólny z mapą sektoryzacji w RADIO
   let base = null;
   let theme = THEME.dark;
   const layers = {
-    firs: L.layerGroup().addTo(map), sectors: L.layerGroup().addTo(map), airways: L.layerGroup(),
-    airOn: L.layerGroup().addTo(map), tma: L.layerGroup().addTo(map), ctrs: L.layerGroup().addTo(map),
+    firs: L.layerGroup().addTo(map), air: L.layerGroup().addTo(map), airways: L.layerGroup(), airLbl: L.layerGroup().addTo(map),
     ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
     traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map), viff: L.layerGroup().addTo(map),
   };
   let openaip = null;
   const panes = atcPanes(map);
+  const timers = [];
+  // odświeżanie w tle tylko, gdy zakładka MAP jest widoczna (powrót do zakładki odświeża zaległe dane)
+  const live = () => document.body.contains(pane) && pane.offsetParent !== null;
+  const every = (ms, fn) => timers.push(setInterval(() => live() && fn(), ms));
 
   const paintLegend = () => pane.querySelectorAll("i[data-sym]").forEach((i) => {
     i.outerHTML = `<i data-sym="${i.dataset.sym}">${symbolSvg(i.dataset.sym, THEME.dark[KIND_COLOR[i.dataset.sym]])}</i>`;
   });
   paintLegend();
+  loadVacs().then((v) => pane.querySelectorAll(".own-src").forEach((el) => { el.textContent = v?.source_label || v?.source || "?"; }))
+    .catch(() => pane.querySelectorAll(".own-src").forEach((el) => { el.textContent = "niedostępna, lista OWNER z .ese"; }));
 
   // Sekcje panelu zwijane kliknięciem w nagłówek (stan w localStorage); legenda domyślnie zwinięta
   const secs = store.get("map.sections", {});
   pane.querySelectorAll(".ms-card[data-sec]").forEach((c) => {
     const k = c.dataset.sec;
-    c.classList.toggle("shut", secs[k] ?? k === "legend");
+    c.classList.toggle("shut", typeof secs[k] === "boolean" ? secs[k] : k === "legend");
     const h4 = c.querySelector("h4");
     h4.classList.add("ms-tog");
     h4.title = "Zwiń / rozwiń";
@@ -165,7 +263,7 @@ function mainMap(ctx) {
     mapEl.classList.toggle("light", light);
     mapEl.classList.toggle("white", baseName === "white");
     pane.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.base === baseName));
-    drawAds(); loadVisible(); redrawFlight(); redrawRoute(); drawAirspace(); loadSectors();
+    drawAds(); loadVisible(); redrawFlight(); redrawRoute(); drawAirspace();
   };
   $(".seg").addEventListener("click", (e) => { const b = e.target.closest("button[data-base]"); if (b) setBase(b.dataset.base); });
   $(".openaip").addEventListener("change", (e) => {
@@ -204,23 +302,27 @@ function mainMap(ctx) {
     metarCache[icao] = { t: Date.now(), p };
     return p;
   };
+  const who = (c) => `${esc(c.name || "?")} <span class="muted">CID ${esc(c.cid ?? "?")}</span>`;
   const adCard = (icao, name, metar) => {
     const ap = atcData.airports.find((a) => a.icao === icao);
     const fac = ap?.facilities || {};
-    const ctrls = FACILITIES.filter(([k]) => k !== "ATIS" && fac[k]).flatMap(([k, l]) => fac[k].map((c) => ({ ...c, k, l })));
+    // ATIS też w tabeli kontroli: kto go wystawił (imię i nazwisko, CID, od kiedy)
+    const ctrls = FACILITIES.filter(([k]) => fac[k]).flatMap(([k, l]) => fac[k].map((c) => ({ ...c, k, l })));
     const atis = fac.ATIS || [];
     return `<div class="adc-h"><b>${esc(icao)}</b><span>${esc(name || "")}</span></div>
       <div class="adc-sec">METAR</div><div class="adc-metar">${metar === undefined ? '<span class="muted">ładowanie…</span>' : metar ? esc(metar) : '<span class="muted">brak</span>'}</div>
       <div class="adc-sec">Kontrola</div>${ctrls.length ? `<table>${ctrls.map((c) => `<tr><td><span class="ab ab-${c.k.toLowerCase()}">${c.l}</span></td>
-        <td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td><td>${esc(c.name || "")}</td><td class="muted">od ${hhmm(c.logon_time)}</td></tr>`).join("")}</table>`
-        : '<div class="muted">nikt nie jest zalogowany (UNICOM 122.800)</div>'}
+        <td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td><td>${who(c)}</td><td class="muted">od ${hhmm(c.logon_time)}</td></tr>`).join("")}</table>`
+        : '<div class="muted">brak zalogowanego kontrolera</div>'}
       ${atis.map((a) => `<div class="adc-sec">ATIS ${esc(a.atis_code || "")} <span class="muted">${esc(a.callsign)} ${esc(a.frequency)}</span></div>
+        <div class="adc-who">wystawił: ${who(a)} · od ${hhmm(a.logon_time)}</div>
         <div class="adc-atis">${(a.text_atis || []).map(esc).join(" ")}</div>`).join("")}`;
   };
   // Dymek podpinamy do markera; METAR doładowuje się przy pierwszym najechaniu
   const bindAdCard = (m, icao, name) => {
     m.bindTooltip(() => adCard(icao, name, metarCache[icao]?.v), { direction: "top", offset: [0, -8], className: "atc-tip ad-tip", opacity: 1, pane: panes.tip });
     m.on("tooltipopen", async () => {
+      hideTip();
       const v = await metarFor(icao);
       if (metarCache[icao]) metarCache[icao].v = v;
       if (m.isTooltipOpen()) m.setTooltipContent(adCard(icao, name, v));
@@ -230,6 +332,7 @@ function mainMap(ctx) {
 
   // --- lotniska (lotnisko z plakietką ATC nie dostaje osobnej nazwy: ICAO jest na plakietce)
   let ads = [];
+  let adIdx = new Map();  // wszystkie lotniska wg ICAO (odlot / przylot samolotów)
   let atcAds = new Set();
   const drawAds = () => {
     layers.ads.clearLayers();
@@ -249,84 +352,478 @@ function mainMap(ctx) {
     });
   };
   api("/api/aerodromes").then((list) => {
+    adIdx = new Map(list.map((a) => [a.icao, a]));
     ads = list.filter((a) => a.kind !== "small_airport" || a.icao.startsWith("EP"));
     loadAtc();
-  });
+    drawTraffic();
+    trafficInfo();
+  }).catch(() => loadAtc());
   $(".ads").addEventListener("change", (e) => (e.target.checked ? layers.ads.addTo(map) : map.removeLayer(layers.ads)));
 
-  // --- TMA i CTR: kontury z pliku .sct (jak w EuroScope), wypełnienie z sektorów .ese, gdy obsadzone:
-  // CTR, gdy właścicielem jest TWR; TMA, gdy APP
-  const airspaceLines = { tma: api("/api/nav/airspace?kind=tma").catch(() => null), ctr: api("/api/nav/airspace?kind=ctr").catch(() => null) };
-  const drawAirspace = async () => {
-    const [tma, ctr] = await Promise.all([airspaceLines.tma, airspaceLines.ctr]);
-    layers.tma.clearLayers();
-    layers.ctrs.clearLayers();
-    if (tma && $(".tma").checked) {
-      L.geoJSON(tma, { interactive: false, style: (f) => (f.properties.inner
-        ? { color: theme.tma, weight: 1, opacity: 0.55, dashArray: "4 4" } : { color: theme.tma, weight: 1.6, opacity: 0.95 }) }).addTo(layers.tma);
-    }
-    if (ctr && $(".ctrs").checked) {
-      L.geoJSON(ctr, { interactive: false, style: { color: theme.ctr, weight: 1.4, opacity: 0.9, dashArray: "6 3" } }).addTo(layers.ctrs);
-    }
-  };
-  let allSectors = null;
-  const isCtr = (n) => /^EP[A-Z]{2}_M?CTR\d*$/.test(n);
-  const isTma = (n) => /^EP[A-Z]{2}_M?TMA/.test(n);
-  function drawAirspaceFills(gj, positions, online) {
-    layers.airOn.clearLayers();
-    if (!gj || !online) return;
-    const want = (n) => ($(".ctrs").checked && isCtr(n)) || ($(".tma").checked && isTma(n));
-    const feats = gj.features.filter((f) => want(f.properties.name));
-    const owners = sectorOwners({ features: feats }, positions, online).sector_owner;
-    const seen = new Set();
-    feats.forEach((f) => {
-      const n = f.properties.name, own = owners[n];
-      const ctr = isCtr(n);
-      if (!own || !own.callsign.endsWith(ctr ? "_TWR" : "_APP")) return;
-      const key = ctr ? n.split("_")[0] : n;
-      if (seen.has(key)) return;  // EPKK_CTR07 / CTR25 to ta sama strefa w dwóch konfiguracjach
-      seen.add(key);
-      const color = ctr ? theme.ctr : theme.tma;
-      L.geoJSON(f, { style: { stroke: false, fillColor: color, fillOpacity: ctr ? 0.24 : 0.13 } })
-        .bindTooltip(`<b>${esc(ctr ? key + " CTR" : n)}</b> ${fl(f.properties.lower_ft)}–${fl(f.properties.upper_ft)}<br>${esc(own.callsign)} ${esc(own.frequency)} · ${esc(own.name || "")}`, { sticky: true })
-        .addTo(layers.airOn);
+  // --- Przestrzeń: wszystkie wycinki sektorów z pliku .ese (ACC EPWW, TMA, CTR, FIS/CTA/ATZ, sąsiedzi) z granicami pionowymi.
+  // Na mapie tylko wycinki obejmujące wybrany poziom (albo wszystkie), z wybranych list; obsada wg kontrolerów online.
+  // Granice pionowe z .ese: eAIP PANSA nie był osiągalny przy pisaniu tego kodu, więc nie został z nim uzgodniony.
+  let slicesP = null, slices = null, sliceErr = null;
+  const loadSlices = () => (slicesP ||= api("/api/nav/slices").then((gj) => {
+    gj.features.forEach((f) => {
+      const pr = f.properties;
+      pr.pick = PICK_OF[pr.kind] || "oth";
+      // klucz na liście wyboru: litera sektora ACC, nazwa TMA (TMA Poznań N i S osobno), ICAO lotniska (CTR), numer CTA,
+      // rodzaj:grupa (FIS…), FIR/nazwa (sąsiedzi)
+      pr.key = pr.kind === "nb" ? `${pr.fir}/${pr.name}` : pr.kind === "tma" ? pr.group_label
+        : ["acc", "ctr", "cta"].includes(pr.kind) ? pr.group : `${pr.kind}:${pr.group}`;
+      f.bb = bboxOf(f.geometry);
+      f.gk = `${pr.fir}|${pr.name}|${JSON.stringify(f.geometry.coordinates)}`;  // ten sam kształt na kilku poziomach
     });
-  }
-  ["tma", "ctrs"].forEach((c) => $("." + c).addEventListener("change", () => { drawAirspace(); loadSectors(); }));
+    return gj;
+  }).catch((e) => { slicesP = null; throw e; }));
+  const air = Object.fromEntries(AIR.map((a) => [a.id, airOn(a.id, a.on)]));
+  // wybór na listach: null = wszystkie (także nowe po aktualizacji pliku .ese), inaczej zbiór kluczy
+  const pickSaved = store.get("map.pick", {});
+  const pick = Object.fromEntries(AIR.map((a) => [a.id, Array.isArray(pickSaved[a.id]) ? new Set(pickSaved[a.id]) : null]));
+  // wybór TMA zapisany przed rundą 8b (klucz = ICAO lotniska): dopisz nazwy TMA tego lotniska (EPPO → TMA Poznań, N, S)
+  const migratePick = () => {
+    if (!slices?.features.length) return;  // bez wycinków (błąd sieci, brak .ese) nie ruszamy zapisanego wyboru
+    const tma = slices.features.filter((f) => f.properties.pick === "tma").map((f) => f.properties);
+    const known = new Set(tma.map((pr) => pr.key));
+    [...(pick.tma || [])].filter((k) => !known.has(k)).forEach((k) => {
+      tma.filter((pr) => pr.group === k).forEach((pr) => pick.tma.add(pr.key));
+      pick.tma.delete(k);
+    });
+  };
+  const saveAir = () => {
+    store.set("map.air", { ...air, fl: parseInt($(".fl").value || "0", 10), all: $(".allfl").checked, online: $(".online").checked, firs: $(".firs").checked });
+    store.set("map.pick", Object.fromEntries(AIR.map((a) => [a.id, pick[a.id] ? [...pick[a.id]] : null])));
+  };
+  const level = () => ($(".allfl").checked ? null : Math.max(0, Math.min(660, parseInt($(".fl").value || "0", 10))) * 100);
+  const atLevel = (pr, lv) => lv === null || (pr.lower_ft <= lv && pr.upper_ft > lv);
 
-  // --- sektory EPWW i FIR-y sąsiednie, podświetlone wg zalogowanych kontrolerów
+  // stan sieci do rysowania (odświeżany co minutę)
+  const net = { online: null, err: null, positions: [], posBy: {}, vacs: null, firs: null, firsAll: null, ctxo: null };
+  // zalogowani spoza stanowisk .ese (np. EPWA_W_APP na innej częstotliwości): APP/DEP i TWR wg ICAO lotniska
+  const unmatched = (o) => {
+    const used = new Set(Object.values(o?.positions || {}).map((c) => c.callsign));
+    const out = {};
+    (o?.controllers || []).forEach((c) => {
+      const parts = String(c.callsign || "").toUpperCase().split("_"), type = parts[parts.length - 1];
+      if (used.has(c.callsign) || parts.length < 2 || (parts.length > 2 && /^I[A-Z]?$/.test(parts[1]))) return;  // Information = FIS
+      const k = type === "APP" || type === "DEP" ? "APP" : type === "TWR" ? "TWR" : null;
+      if (k) ((out[parts[0]] ||= {})[k] ||= []).push(c);
+    });
+    return out;
+  };
+  // stanowisko z kolejności przejmowania → zalogowany kontroler (klucze online to znaki z pliku .ese; ACC też przez ese_id)
+  const onlOf = (cs, { byId, onl, vacs }) => onl[cs] || onl[byId[vacs?.acc_positions?.[cs]?.ese_id]?.callsign] || null;
+  // częstotliwość stanowiska z kolejności: z pliku .ese, dla ACC z tabeli kolejności przejmowania
+  const freqOf = (cs) => net.posBy[cs]?.frequency || net.vacs?.acc_positions?.[cs]?.frequency || "";
+
+  // Właściciel jednego wycinka. Wynik: {c: obsługujący (w TMA / CTA / CTR tylko APP, TWR…: etykieta), top: ACC top-down,
+  // key: znak do koloru, who: znak obsługującego z kolejności (kolor TMA / CTA / CTR), ext: obsługujący spoza stanowisk .ese,
+  // ch: kolejność z chains.js (TMA, CTA, CTR) – ta sama co w RADIO › GEO i SEKTORYZACJA}
+  const ownerOf = (pr, ctxo) => {
+    const ch = CHAIN_KINDS.includes(pr.kind) ? airspaceChain(pr.name, pr.owner_callsigns, net.vacs) : null;
+    if (!ctxo) return { c: null, top: null, key: null, who: ch?.chain[0] || null, ch };
+    const { byId, onl, vacs, extra } = ctxo;
+    if (ch) {
+      // TMA, CTA i CTR: pierwsze zalogowane APP / TWR z kolejności (każde APP TMA Warszawa: WA APP, N, S, F…);
+      // potem zalogowany spoza stanowisk .ese (np. EPWA_W_APP na innej częstotliwości); na końcu ACC top-down
+      const on = (cs) => onlOf(cs, ctxo);
+      const loc = ch.local.find(on);
+      if (loc) return { c: on(loc), top: null, key: loc, who: loc, ch };
+      const icao = (ch.local[0] || pr.name).slice(0, 4);
+      const x = (pr.kind === "ctr" ? ["TWR", "APP"] : ["APP"]).map((t) => extra[icao]?.[t]?.[0]).find(Boolean);
+      if (x) return { c: x, top: null, key: x.callsign, who: x.callsign, ext: true, ch };
+      const acc = ch.acc.find(on);
+      return { c: null, top: acc ? on(acc) : null, key: null, who: acc || null, ch };
+    }
+    // sąsiedzi: pierwsze zalogowane stanowisko z listy OWNER (znaki; z plików .ese sąsiadów albo z pliku EPWW)
+    if (pr.kind === "nb") {
+      const nb = (pr.owner_callsigns || []).find((x) => onl[x]);
+      return { c: nb ? onl[nb] : null, top: null, key: nb || null };
+    }
+    const o = sliceOwner(pr, byId, onl, vacs);
+    const cs = o.c?.callsign || "";
+    if (pr.kind === "atz" && !pr.group.startsWith("EPTR") && o.c && !cs.startsWith(pr.group + "_")) return { c: null, top: o.c, key: null };
+    return { c: o.c, top: null, key: o.key };
+  };
+  const styleOf = (pr, own, all) => {
+    const k = pr.kind, t = theme, f = all ? 0.6 : 1;  // wszystkie poziomy: nakładające się wypełnienia słabiej
+    if (k === "acc") {
+      if (!net.useOnline) { const c = colorFor(pr.callsign || pr.name); return { color: c, weight: 1.1, fillColor: c, fillOpacity: 0.12 * f }; }
+      if (!own.c) return { color: t.idle, weight: 1, opacity: 0.9, fill: false };
+      const c = colorFor(own.key || own.c.callsign);
+      return { color: c, weight: 1.3, fillColor: c, fillOpacity: 0.17 * f };
+    }
+    if (k === "nb") {
+      if (!own.c) return { color: t.nb, weight: 1, opacity: 0.75, dashArray: "3 4", fill: false };
+      const c = colorFor(own.key || own.c.callsign);
+      return { color: c, weight: 1.2, fillColor: c, fillOpacity: 0.15 * f };
+    }
+    const col = t[k] || t.cta;
+    const base = { tma: { weight: 1.4, opacity: 0.95 }, ctr: { weight: 1.4, opacity: 0.95, dashArray: "6 3" }, fis: { weight: 1, opacity: 0.8, dashArray: "2 4" },
+      cta: { weight: 1.2, opacity: 0.9, dashArray: "8 4" }, atz: { weight: 1.1, opacity: 0.9 } }[k] || { weight: 1, opacity: 0.8 };
+    // obsadzona TMA / CTA / CTR (APP / TWR albo ACC top-down, jak w RADIO): kontur w kolorze obsługującego stanowiska
+    // (ACC: stały kolor z POSITION_COLORS, ten sam co sektora ACC obok), wypełnienie (own) w osobnej warstwie asFill
+    if (own.who && (own.c || own.top) && CHAIN_KINDS.includes(k)) return { ...base, color: colorFor(own.who), weight: 1.8, opacity: 1, fill: false, own: true };
+    const fillOpacity = { atz: 0.2 }[k] || 0.1;
+    return { color: col, ...base, fillColor: col, fill: !!own.c && !CHAIN_KINDS.includes(k), fillOpacity: fillOpacity * f };
+  };
+
+  let vis = [];  // widoczne wycinki do dymka po najechaniu: {f, pr, own}
+  // etykiety przestrzeni pod samolotami i plakietkami (własna warstwa poniżej markerPane), żeby nie zasłaniały znaków lotów
+  map.createPane("asLbl").style.zIndex = 590;
+  // Wypełnienia obsadzonych TMA / CTA / CTR: pełne kolory na własnej kanwie pod resztą przestrzeni (overlayPane = 400),
+  // przezroczystość całej warstwy. Nakładające się wycinki (konfiguracje pasów EPWA_DIR*, wszystkie poziomy) się nie sumują.
+  const fillPane = map.createPane("asFill");
+  fillPane.style.zIndex = 399;
+  fillPane.style.pointerEvents = "none";
+  // shift: etykieta stanowiska (APP / TWR na TMA, CTA, sąsiad), rozsuwana przez declutter; prio: większy wycinek zostaje na środku
+  const lbl = (at, html, shift = 0) => L.marker(at, { interactive: false, pane: "asLbl", shift,
+    icon: L.divIcon({ className: "maplabel", iconSize: null, html: `<div>${html}</div>` }) }).addTo(layers.airLbl);
+  // Etykiety stanowisk nachodzące na wcześniejsze (np. WA APP i WA DIR na środku TMA Warszawa) przesuwamy w pionie
+  // (w dół, w górę, coraz dalej); etykiety sektorów ACC zostają na miejscu. W pikselach, więc od nowa po zoomie.
+  const declutter = () => {
+    const boxes = [], ms = [];
+    layers.airLbl.eachLayer((m) => ms.push(m));
+    ms.sort((a, b) => !!a.options.shift - !!b.options.shift || (b.options.shift || 0) - (a.options.shift || 0)).forEach((m) => {
+      const el = m.getElement()?.firstElementChild;
+      if (!el) return;
+      el.style.marginTop = "";
+      const p = map.latLngToLayerPoint(m.getLatLng()), w = el.offsetWidth, hh = el.offsetHeight;
+      if (!w) return;  // mapa ukryta (inna zakładka): przeliczy activate
+      const hit = (dy) => boxes.some((b) => Math.abs(b.x - p.x) < (b.w + w) / 2 + 2 && Math.abs(b.y - p.y - dy) < (b.h + hh) / 2 + 2);
+      let dy = 0;
+      for (let i = 1; m.options.shift && hit(dy) && i <= 8; i++) dy = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (hh + 2);
+      if (hit(dy)) dy = 0;
+      if (dy) el.style.marginTop = `${dy}px`;
+      boxes.push({ x: p.x, y: p.y + dy, w, h: hh });
+    });
+  };
+  map.on("zoomend", declutter);
+  const area = (bb) => (bb[2] - bb[0]) * (bb[3] - bb[1]);
+  const center = (f) => L.latLngBounds([f.bb[1], f.bb[0]], [f.bb[3], f.bb[2]]).getCenter();
+  // sąsiedzi: etykieta stanowiska na wycinku z największą częścią w pobliżu Polski (sektory ESMM sięgają daleko na północ)
+  const NEAR = [13, 48.5, 25.5, 56];
+  const nearArea = (bb) => Math.max(0, Math.min(bb[2], NEAR[2]) - Math.max(bb[0], NEAR[0])) * Math.max(0, Math.min(bb[3], NEAR[3]) - Math.max(bb[1], NEAR[1]));
+  function drawAirspace() {
+    layers.air.clearLayers();
+    layers.airLbl.clearLayers();
+    hideTip();
+    vis = [];
+    if (!slices) { renderInfo(level()); return; }
+    const lv = level(), all = lv === null;
+    net.useOnline = $(".online").checked && !!net.online;
+    const onl = net.useOnline ? net.online.positions : null;
+    const ctxo = onl ? { byId: Object.fromEntries(net.positions.map((p) => [p.position_id, p])), onl, vacs: net.vacs, extra: unmatched(net.online) } : null;
+    net.ctxo = ctxo;
+    const shown = slices.features.filter((f) => {
+      const pr = f.properties;
+      return air[pr.pick] && (!pick[pr.pick] || pick[pr.pick].has(pr.key)) && atLevel(pr, lv);
+    });
+    shown.forEach((f) => vis.push({ f, pr: f.properties, own: ownerOf(f.properties, ctxo) }));
+    // rysowanie od spodu: FIS, ATZ, sąsiedzi, ACC, CTA, TMA, CTR; ten sam kształt na kilku poziomach tylko raz (obsadzony wygrywa)
+    const order = { fis: 0, atz: 1, oth: 0, nb: 2, acc: 3, cta: 4, tma: 4, ctr: 5 };
+    const drawn = new Map();
+    // CTR w dwóch konfiguracjach pasów (EPKK_CTR07 / CTR25) rysujemy raz, żeby wypełnienie się nie dublowało
+    [...vis].sort((a, b) => order[a.pr.kind] - order[b.pr.kind] || !!(a.own.c || a.own.top) - !!(b.own.c || b.own.top))
+      .forEach((v) => drawn.set(v.pr.kind === "ctr" && /CTR\d+$/.test(v.pr.name) ? "ctr|" + v.pr.group : v.f.gk, v));
+    fillPane.style.opacity = (all ? 0.68 : 1) * (theme === THEME.light ? 0.42 : 0.32);  // jasny podkład: mocniej
+    drawn.forEach((v) => {
+      const st = styleOf(v.pr, v.own, all);
+      L.geoJSON(v.f, { interactive: false, style: st }).addTo(layers.air);
+      if (st.own) L.geoJSON(v.f, { interactive: false, pane: "asFill", style: { stroke: false, fill: true, fillColor: st.color, fillOpacity: 1 } }).addTo(layers.air);
+    });
+    // etykiety: sektor ACC (nazwa + częstotliwość obsługującego), obsadzona TMA / CTA i sektor sąsiada (stanowisko + częstotliwość;
+    // jedna na stanowisko APP: na największym wycinku TMA, a bez TMA na tym poziomie na CTA, np. WA APP na CTA 02 na FL230;
+    // u sąsiada jedna na stanowisko w FIR-ze)
+    const best = new Map(), rank = (v) => (v.pr.kind === "cta" ? 0 : 1);
+    vis.forEach((v) => {
+      const pr = v.pr, c = v.own.c;
+      const k = pr.kind === "acc" ? "acc:" + pr.name : (pr.kind === "tma" || pr.kind === "cta") && c ? "app:" + c.callsign
+        : pr.kind === "nb" && c ? `nb:${pr.group}:${c.callsign}` : null;
+      const b = k && best.get(k);
+      const size = (x) => (x.pr.kind === "nb" ? nearArea(x.f.bb) || area(x.f.bb) / 1e3 : area(x.f.bb));
+      if (k && (!b || rank(v) > rank(b) || (rank(v) === rank(b) && size(v) > size(b)))) best.set(k, v);
+    });
+    best.forEach((v) => {
+      const pr = v.pr, c = v.own.c;
+      if (pr.kind === "acc") {
+        const fq = net.useOnline ? c?.frequency : pr.frequency;
+        lbl(center(v.f), `<small>${esc(pr.name)}</small>${fq ? `<br><span class="freq${c ? " on" : ""}">${esc(fq)}</span>` : ""}`);
+      } else {
+        // sąsiad: punkt wewnątrz wielokąta (środek ramki wypada poza wklęsłe sektory)
+        const at = (pr.kind === "nb" && (labelPoint(v.f, NEAR) || labelPoint(v.f))?.at) || center(v.f);
+        lbl(at, `<small>${esc(displayName(c.callsign))}</small><br><span class="freq on">${esc(c.frequency)}</span>`, area(v.f.bb));
+      }
+    });
+    declutter();
+    renderInfo(lv);
+    pane.querySelectorAll(".pk:not([hidden])").forEach((el) => renderPicker(el.dataset.air));
+  }
+
+  // --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu (Leaflet podaje zdarzenia tylko górnej warstwie,
+  // więc szukamy wycinków zawierających punkt kursora)
+  // Własny element w kontenerze mapy zamiast L.tooltip: szeroki dymek Leafleta ("auto") wychodził poza mapę pod panel boczny.
+  // Obok kursora (z prawej, a gdy się nie mieści, z lewej), a gdy na bok za szeroki: pod albo nad kursorem; zawsze w granicach mapy.
+  const tipEl = L.DomUtil.create("div", "leaflet-tooltip atc-tip as-tip", mapEl);
+  tipEl.hidden = true;
+  let tipOn = false, raf = 0, lastEv = null;
+  function hideTip() { if (tipOn) { tipEl.hidden = true; tipOn = false; } }
+  const showTip = (pt, html) => {
+    tipEl.innerHTML = html;
+    tipEl.hidden = false;
+    tipOn = true;
+    const { x: W, y: H } = map.getSize(), w = tipEl.offsetWidth, th = tipEl.offsetHeight, g = 16, m = 4;
+    let x = pt.x + g <= W - m - w ? pt.x + g : pt.x - g - w >= m ? pt.x - g - w : null, y;
+    if (x !== null) y = Math.max(m, Math.min(pt.y - th / 2, H - m - th));
+    else {
+      x = Math.max(m, Math.min(pt.x - w / 2, W - m - w));
+      y = pt.y + g + th <= H - m ? pt.y + g : Math.max(m, pt.y - g - th);
+    }
+    tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  };
+  const whoHtml = (v) => {
+    const { c, top, ch } = v.own, pr = v.pr;
+    if (!net.useOnline) {
+      const cs = ch?.chain[0] || pr.callsign;
+      return cs ? `<span class="muted">${esc(displayName(cs))} ${esc((ch ? freqOf(cs) : "") || pr.frequency || "")} (podział pełny)</span>` : "";
+    }
+    if (c) return `<span class="fq">${esc(c.frequency)}</span> <b>${esc(displayName(c.callsign))}</b> <span class="muted">${esc(c.name || "")}</span>`;
+    if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> <span class="muted">${esc(top.name || "")}</span>`;
+    return `<span class="muted">brak kontrolera</span>`;
+  };
+  // TMA / CTA / CTR: wszystkie stanowiska w kolejności przejmowania (chains.js, jak w RADIO) z częstotliwością,
+  // a zalogowane z nazwiskiem kontrolera. Obsługujący na zielonym tle, zalogowani na zielono, niezalogowani szarzy;
+  // przed częścią ACC skąd jest jej kolejność (om = tabela top-down om.plvacc.pl, .ese = lista OWNER pliku sektorowego).
+  const uniq = (xs) => xs.filter((x, i) => xs.indexOf(x) === i);
+  const chainHtml = (r) => {
+    const local = uniq(r.chs.flatMap((ch) => ch.local)), acc = uniq(r.chs.flatMap((ch) => ch.acc)).filter((cs) => !local.includes(cs));
+    // wiersz z kilku wycinków może mieć oba źródła (np. EPWA_DIR* bez prefiksu w tabeli om): "om (TMA Warszawa) / .ese"
+    const tma = r.chs.find((ch) => ch.tma)?.tma;
+    const src = uniq(r.chs.map((ch) => ch.src)).sort().reverse().map((x) => (x === "om" ? `om${tma ? ` (${tma})` : ""}` : ".ese")).join(" / ");
+    const who = r.own.who;
+    const chip = (cs, c) => {
+      const st = cs === who ? " own" : !net.useOnline ? "" : c ? " on" : " off";
+      return `<span class="asc${st}"><b>${esc(displayName(cs))}</b> ${esc(c?.frequency || freqOf(cs))}${c ? ` <i>${esc(c.name || "")}</i>` : ""}</span>`;
+    };
+    const on = (cs) => (net.useOnline && net.ctxo ? onlOf(cs, net.ctxo) : null);
+    return `<div class="as-ch">${local.map((cs) => chip(cs, on(cs))).join("")}${r.own.ext ? chip(who, r.own.c) : ""}${acc.length
+      ? `<span class="asc-src">ACC wg ${esc(src)}:</span>${acc.map((cs) => chip(cs, on(cs))).join("")}` : ""}</div>`;
+  };
+  const hoverHtml = (hits, lv) => {
+    // TMA / CTA / CTR: wycinki tej samej przestrzeni z tym samym obsługującym (np. konfiguracje pasów EPWA_DIR11_A, DIR15_A…)
+    // w jednym wierszu z łącznym zakresem pionowym; reszta: sąsiednie pasma tego samego wycinka z tym samym obsługującym.
+    // Sortowanie także wg obsługującego: wycinki innego stanowiska (np. EPWA_APP_S_D między EPWA_DIR11_D i DIR11_A) nie rozbijają wiersza.
+    const rows = [], nk = (pr) => (CHAIN_KINDS.includes(pr.kind) ? `${pr.kind}:${pr.key}` : pr.kind + ":" + pr.name);
+    hits.map((v) => ({ ...v, w: whoHtml(v) }))
+      .sort((a, b) => KIND_ORDER.indexOf(a.pr.kind) - KIND_ORDER.indexOf(b.pr.kind) || nk(a.pr).localeCompare(nk(b.pr)) || a.w.localeCompare(b.w)
+        || a.pr.lower_ft - b.pr.lower_ft)
+      .forEach((v) => {
+        const w = v.w, last = rows[rows.length - 1];
+        if (last && nk(last.pr) === nk(v.pr) && last.w === w && v.pr.lower_ft <= last.hi) {
+          last.hi = Math.max(last.hi, v.pr.upper_ft);
+          if (!last.names.includes(v.pr.name)) last.names.push(v.pr.name);
+          if (v.own.ch) last.chs.push(v.own.ch);
+          return;
+        }
+        rows.push({ pr: v.pr, own: v.own, w, lo: v.pr.lower_ft, hi: v.pr.upper_ft, names: [v.pr.name], chs: v.own.ch ? [v.own.ch] : [] });
+      });
+    // jak przekrój pionowy: od najwyższej przestrzeni do najniższej
+    rows.sort((a, b) => b.hi - a.hi || b.lo - a.lo || KIND_ORDER.indexOf(a.pr.kind) - KIND_ORDER.indexOf(b.pr.kind));
+    const names = (r) => esc(r.names.length > 2 ? `${r.names[0]} +${r.names.length - 1}` : r.names.join(", "));
+    const nm = (r) => (r.pr.kind === "nb" ? `<b>${esc(r.pr.label)}</b>` : `<b>${esc(r.pr.group_label)}</b> <span class="muted">${names(r)}</span>`);
+    return `<div class="atc-tip-h"><b>${lv === null ? "wszystkie poziomy" : fl(lv)}</b> ${plural(rows.length, "przestrzeń", "przestrzenie", "przestrzeni")} w tym miejscu</div>
+      <table>${rows.map((r) => `<tr><td><span class="as-k as-${r.pr.kind}">${KIND_TAG[r.pr.kind]}</span></td><td>${nm(r)}</td>
+        <td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>${r.chs.length ? `<tr class="as-chr"><td></td><td colspan="3">${chainHtml(r)}</td></tr>` : ""}`).join("")}</table>`;
+  };
+  const hoverAt = () => {
+    raf = 0;
+    const e = lastEv;
+    // nad plakietką, samolotem, dymkiem, panelem albo symbolem lotniska (kanwa z kursorem "interactive") dymka nie pokazujemy
+    if (!e || !vis.length || e.buttons || e.target.closest?.(".leaflet-marker-icon, .leaflet-tooltip, .leaflet-control, .leaflet-popup")
+      || mapEl.querySelector("canvas.leaflet-interactive")) { hideTip(); return; }
+    const ll = map.mouseEventToLatLng(e), x = ll.lng, y = ll.lat;
+    const hits = vis.filter((v) => x >= v.f.bb[0] && x <= v.f.bb[2] && y >= v.f.bb[1] && y <= v.f.bb[3] && inGeom(x, y, v.f.geometry));
+    if (!hits.length) { hideTip(); return; }
+    showTip(map.mouseEventToContainerPoint(e), hoverHtml(hits, level()));
+  };
+  mapEl.addEventListener("mousemove", (e) => { lastEv = e; if (!raf) raf = requestAnimationFrame(hoverAt); });
+  mapEl.addEventListener("mouseleave", () => { lastEv = null; hideTip(); });
+  map.on("movestart zoomstart", hideTip);
+
+  // --- listy wyboru sektorów (zamiast wszystkich ACC / TMA / CTR / sąsiadów)
+  const itemsOf = (id) => {
+    const m = new Map(), lv = level();
+    (slices?.features || []).filter((f) => f.properties.pick === id).forEach((f) => {
+      const pr = f.properties;
+      let it = m.get(pr.key);
+      if (!it) {
+        it = { key: pr.key, lo: pr.lower_ft, hi: pr.upper_ft, here: false,
+          head: id === "nb" ? pr.group_label : id === "oth" ? OTH_HEAD[pr.kind] : "",
+          label: id === "nb" ? pr.label : pr.group_label, sub: ["tma", "ctr"].includes(id) ? pr.group : "" };
+        m.set(pr.key, it);
+      }
+      it.lo = Math.min(it.lo, pr.lower_ft);
+      it.hi = Math.max(it.hi, pr.upper_ft);
+      it.here ||= atLevel(pr, lv);
+    });
+    return [...m.values()].sort((a, b) => a.head.localeCompare(b.head, "pl") || a.label.localeCompare(b.label, "pl", { numeric: true }));
+  };
+  const pickBtn = (id) => {
+    const items = itemsOf(id), n = items.length, sel = pick[id];
+    const b = pane.querySelector(`.pk-btn[data-air="${id}"]`);
+    const k = sel ? items.filter((it) => sel.has(it.key)).length : n;
+    b.textContent = `${!sel ? "wszystkie" : !k ? "żaden" : `${k} z ${n}`} ▾`;
+    b.classList.toggle("sub", !!sel);
+  };
+  function renderPicker(id) {
+    const el = pane.querySelector(`.pk[data-air="${id}"]`);
+    const items = itemsOf(id), sel = pick[id], q = (el.querySelector(".pk-q")?.value || "").trim().toLowerCase();
+    const has = (k) => !sel || sel.has(k);
+    const lv = level();
+    const groups = new Map();
+    items.forEach((it) => { if (!groups.has(it.head)) groups.set(it.head, []); groups.get(it.head).push(it); });
+    const scroll = el.querySelector(".pk-list")?.scrollTop || 0;
+    el.innerHTML = `<div class="pk-bar">${items.length > 12 ? `<input class="field pk-q" placeholder="szukaj…" value="${esc(q)}">` : ""}
+        <button data-pk="all">wszystkie</button><button data-pk="none">żaden</button></div>
+      <div class="pk-list">${!items.length ? `<div class="pk-none">${sliceErr ? esc(sliceErr) : "brak sektorów w pliku .ese"}</div>` : [...groups].map(([head, its]) => {
+        const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head}`.toLowerCase().includes(q));
+        if (!vis2.length) return "";
+        const n = its.filter((it) => has(it.key)).length;
+        return `${head ? `<label class="pk-g"><input type="checkbox" data-g="${esc(head)}" ${n === its.length ? "checked" : ""} ${n && n < its.length ? 'data-mixed="1"' : ""}>
+            <b>${esc(head)}</b><small>${n}/${its.length}</small></label>` : ""}
+          ${vis2.map((it) => `<label class="pk-i${it.here ? "" : " off"}"${it.here ? "" : ` title="nie ma go na ${lv === null ? "" : fl(lv)}"`}>
+            <input type="checkbox" data-k="${esc(it.key)}" ${has(it.key) ? "checked" : ""}><span>${esc(it.label)}${it.sub ? ` <i>${esc(it.sub)}</i>` : ""}</span>
+            <small>${range(it.lo, it.hi)}</small></label>`).join("")}`;
+      }).join("")}</div>`;
+    el.querySelectorAll("input[data-mixed]").forEach((i) => { i.indeterminate = true; });
+    el.querySelector(".pk-list").scrollTop = scroll;
+    pickBtn(id);
+  }
+  const setPick = (id, keys) => {
+    const known = new Set(itemsOf(id).map((it) => it.key));
+    if (keys) keys = new Set([...keys].filter((k) => known.has(k)));
+    pick[id] = keys === null || keys.size >= known.size ? null : keys;
+    saveAir();
+    drawAirspace();
+    renderPicker(id);
+  };
+  pane.querySelectorAll(".pk").forEach((el) => {
+    const id = el.dataset.air;
+    el.addEventListener("change", (e) => {
+      const i = e.target;
+      if (i.classList.contains("pk-q")) return;
+      const items = itemsOf(id), keys = new Set(pick[id] || items.map((it) => it.key));
+      if (i.dataset.k) { if (i.checked) keys.add(i.dataset.k); else keys.delete(i.dataset.k); }
+      if (i.dataset.g !== undefined) items.filter((it) => it.head === i.dataset.g).forEach((it) => (i.checked ? keys.add(it.key) : keys.delete(it.key)));
+      setPick(id, keys);
+    });
+    el.addEventListener("input", (e) => {
+      if (!e.target.classList.contains("pk-q")) return;
+      renderPicker(id);
+      const q = el.querySelector(".pk-q");
+      q.focus();
+      q.setSelectionRange(q.value.length, q.value.length);
+    });
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-pk]");
+      if (b) setPick(id, b.dataset.pk === "all" ? null : new Set());
+    });
+  });
+  pane.querySelectorAll(".pk-btn").forEach((b) => b.addEventListener("click", () => {
+    const el = pane.querySelector(`.pk[data-air="${b.dataset.air}"]`);
+    const open = el.hidden;
+    pane.querySelectorAll(".pk").forEach((x) => { x.hidden = true; });
+    pane.querySelectorAll(".pk-btn").forEach((x) => x.classList.remove("open"));
+    el.hidden = !open;
+    b.classList.toggle("open", open);
+    if (open) renderPicker(b.dataset.air);
+  }));
+
+  // TMA / CTA / CTR włączone, ale na wybranym poziomie żadnej: podpowiedź, na których poziomach z przycisków są
+  // (nie rysujemy ich poza poziomem). Uwzględnia wybór na listach.
+  const offLevel = (lv, cnt) => {
+    if (lv === null) return "";
+    const ids = ["tma", "cta", "ctr"].filter((id) => air[id] && !cnt[id]);
+    const fs = slices.features.map((f) => f.properties).filter((pr) => ids.includes(pr.pick) && (!pick[pr.pick] || pick[pr.pick].has(pr.key)));
+    if (!fs.length) return "";
+    const at = LEVELS.filter((v) => fs.some((pr) => atLevel(pr, v * 100))).map((v) => String(v).padStart(3, "0"));
+    const where = fs.every((pr) => pr.upper_ft <= lv) ? "leżą niżej" : fs.every((pr) => pr.lower_ft > lv) ? "leżą wyżej" : "są na innych poziomach";
+    const tags = ids.filter((id) => fs.some((pr) => pr.pick === id)).map((id) => AIR_TAG[id]).join("/");
+    return `${tags} ${where}: wybierz ${at.length ? (at.length > 1 ? `${at[0]}–${at[at.length - 1]}` : at[0]) + " albo " : ""}„wszystkie poziomy”`;
+  };
+  // opis pod przełącznikami: źródło kolejności przejmowania, warstwa, liczba wycinków, kto jest online
+  function renderInfo(lv) {
+    const el = $(".sector-info");
+    if (sliceErr) { el.innerHTML = `<span class="error">Sektory z pliku .ese: ${esc(sliceErr)}</span>`; return; }
+    if (!slices) { el.textContent = "ładowanie sektorów…"; return; }
+    if (!slices.features.length) { el.textContent = slices.note || "brak sektorów"; return; }
+    const cnt = {};
+    vis.forEach((v) => { cnt[v.pr.pick] = (cnt[v.pr.pick] || 0) + 1; });
+    const lay = lv === null ? null : vacsLayer(lv);
+    const src = net.vacs?.source_label || net.vacs?.source;
+    const parts = [];
+    if (air.acc) {
+      parts.push(src ? `ACC: kolejność przejmowania wg ${esc(src)}, ${lay ? `warstwa <b>${lay}</b> (${esc(net.vacs.layers?.[lay]?.label || "")})` : "warstwa wg dolnej granicy wycinka"}.`
+        : "ACC: kolejność przejmowania niedostępna, lista OWNER z pliku .ese.");
+    }
+    parts.push(`${lv === null ? "Wszystkie poziomy" : "Na " + fl(lv)}: ${AIR.filter((a) => air[a.id]).map((a) => `${AIR_TAG[a.id]} ${cnt[a.id] || 0}`).join(" · ") || "żadna warstwa"}.`);
+    const off = offLevel(lv, cnt);
+    if (off) parts.push(`<span class="as-note">${off}</span>`);
+    if (net.err) parts.push(`<span class="error">${esc(net.err)}. Rysuję sam podział sektorów bez obsady.</span>`);
+    else if (net.online && $(".online").checked) {
+      // także zalogowani spoza stanowisk .ese (np. EPWA_W_APP na innej częstotliwości), bo też obsadzają TMA / CTR
+      const ep = [...Object.values(net.online.positions || {}), ...(net.online.controllers || [])].map((c) => c.callsign)
+        .filter((c) => c && c.startsWith("EP") && !/_(ATIS|DEL|GND)$/.test(c));
+      parts.push(`Online: ${ep.length ? [...new Set(ep)].map((c) => esc(displayName(c))).join(", ") : "brak kontrolerów EP"}`);
+    }
+    el.innerHTML = parts.join("<br>");
+  }
+
+  // --- dane: wycinki .ese (raz), FIR-y z VATSpy, kto jest online, stanowiska i kolejność przejmowania (co minutę)
   const loadSectors = async () => {
-    const level = parseInt($(".fl").value || "0", 10);
-    const wantOnline = $(".online").checked;
-    const needAir = $(".tma").checked || $(".ctrs").checked;
-    const [gj, firs, net, positions, gjAll, vacs] = await Promise.all([
-      $(".sectors").checked ? api(`/api/nav/sectors?fir=EPWW&level_ft=${level * 100}`).catch((e) => ({ error: e.message })) : null,
+    const [gj, firs, onl, positions, vacs] = await Promise.all([
+      loadSlices().then((x) => { sliceErr = null; return x; }).catch((e) => { sliceErr = e.message; return null; }),
       $(".firs").checked ? loadFirs().catch(() => null) : null,
-      wantOnline || $(".firs").checked || needAir ? vatsimOnline().catch((e) => ({ error: e.message })) : null,
+      vatsimOnline().then((x) => { net.err = null; return x; }).catch((e) => { net.err = e.message; return null; }),
       atcPositions().catch(() => []),
-      needAir ? (allSectors ||= api("/api/nav/sectors?fir=EPWW").catch(() => { allSectors = null; return null; })) : null,
       loadVacs().catch(() => null),
     ]);
-    layers.sectors.clearLayers();
+    slices = gj;
+    migratePick();
+    Object.assign(net, { online: onl, positions, vacs, posBy: Object.fromEntries(positions.map((p) => [p.callsign, p])) });
     layers.firs.clearLayers();
-    // podświetlenie obsady tylko w FIR EPWW; FIR-y sąsiednie jako same kontury
-    const epwwOnline = Object.fromEntries(Object.entries(net?.firs || {}).filter(([id]) => id.startsWith("EPWW")));
-    if (firs) drawFirs(layers.firs, firs, epwwOnline, { panes });
-    drawAirspaceFills(gjAll, positions, net && !net.error ? net.positions : null);
-    if (!gj) { $(".sector-info").textContent = ""; return; }
-    if (gj.error) { $(".sector-info").innerHTML = `<span class="error">Sektory EPWW: ${esc(gj.error)}</span>`; return; }
-    // sektory ACC wg łańcuchów VACS (warstwa z poziomu), pozostałe wg listy OWNER z pliku .ese
-    const online = wantOnline && net && !net.error ? sectorOwners(gj, positions, net.positions, vacs) : null;
-    drawSectors(layers.sectors, gj, online, { tipPane: panes.tip });
-    const layer = vacsLayer(level * 100);
-    $(".sector-info").innerHTML = net?.error ? `<span class="error">${esc(net.error)}</span>`
-      : online ? `${Object.keys(online.vacs).length ? `Sektory ACC wg łańcuchów VACS, warstwa <b>${layer}</b> (${esc(vacs.layers?.[layer]?.label || "")}).<br>` : ""}`
-        + `Online: ${Object.values(net.positions).filter((c) => c.callsign.startsWith("EPWW")).map((c) => esc(c.callsign)).join(", ") || "brak kontrolerów EPWW"}`
-        : `${gj.features.length} sektorów na ${fl(level * 100)} (podział pełny)`;
+    // podświetlenie obsady FIR-ów (VATSpy) tylko w FIR EPWW; FIR-y sąsiednie jako same kontury (ich sektory: warstwa sąsiadów)
+    const epwwOnline = Object.fromEntries(Object.entries(onl?.firs || {}).filter(([id]) => id.startsWith("EPWW")));
+    if (firs && $(".firs").checked) drawFirs(layers.firs, firs, epwwOnline, { panes });
+    drawAirspace();
+    AIR.forEach((a) => pickBtn(a.id));
   };
-  ["sectors", "online", "firs"].forEach((c) => $("." + c).addEventListener("change", loadSectors));
-  $(".fl").addEventListener("change", loadSectors);
-  setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
+  // przełączniki i poziom
+  const syncFl = () => {
+    const all = $(".allfl").checked;
+    $(".fl").disabled = all;
+    pane.querySelectorAll(".as-pre button").forEach((b) => b.classList.toggle("on", !all && +b.dataset.fl === parseInt($(".fl").value || "0", 10)));
+  };
+  let flT = 0;
+  const onLevel = () => { clearTimeout(flT); flT = setTimeout(() => { syncFl(); saveAir(); drawAirspace(); }, 200); };
+  $(".fl").addEventListener("input", onLevel);
+  $(".fl").addEventListener("change", onLevel);
+  $(".allfl").addEventListener("change", onLevel);
+  $(".as-pre").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-fl]");
+    if (!b) return;
+    $(".fl").value = b.dataset.fl;
+    $(".allfl").checked = false;
+    onLevel();
+  });
+  AIR.forEach((a) => $(".air-" + a.id).addEventListener("change", (e) => { air[a.id] = e.target.checked; saveAir(); drawAirspace(); }));
+  $(".online").addEventListener("change", () => { saveAir(); drawAirspace(); });
+  $(".firs").addEventListener("change", () => { saveAir(); loadSectors(); });
+  syncFl();
+  every(60000, loadSectors);
+  // nazwy stanowisk jak w RADIO (etykiety VACS): po wczytaniu przerysuj etykiety i dymki
+  loadDisplayNames().then((ok) => ok && drawAirspace());
 
   // --- vIFF: ruch vs przepustowość sektorów (traffic volumes) na godzinę naprzód.
   // W panelu najpierw scenariusze (aktywne na górze) z ich TV, pod nimi lista wszystkich TV; wykres wybranego TV
@@ -349,20 +846,22 @@ function mainMap(ctx) {
   };
   chart.addTo(map);
   const chartEl = chart.getContainer();
+  let tmaP = null;
+  const tmaLines = () => (tmaP ||= api("/api/nav/airspace?kind=tma").catch(() => { tmaP = null; return null; }));
   // obrys: litera sektora EPWW (EPWW-BH → sektory EPWWB na wszystkich poziomach) albo TMA lotniska (EPWA-TMA)
   const drawTvArea = async (tv) => {
     layers.viff.clearLayers();
     if (!tv) return;
-    const [secs, tma] = await Promise.all([allSectors ||= api("/api/nav/sectors?fir=EPWW").catch(() => { allSectors = null; return null; }), airspaceLines.tma]);
+    const [secs, tma] = await Promise.all([loadSlices().catch(() => null), tmaLines()]);
     const feats = [];
     tv.volumes.forEach((v) => {
       const [area, part = ""] = v.split("-");
       if (area === "EPWW" && /^[A-Z]/.test(part)) {
-        const n = "EPWW" + part[0];
-        feats.push(...(secs?.features || []).filter((f) => f.properties.name === n || f.properties.name.startsWith(n + "-")));
+        feats.push(...(secs?.features || []).filter((f) => f.properties.kind === "acc" && f.properties.group === part[0]));
       } else if (/TMA/.test(part)) {
+        // kontur TMA z .sct i wycinki TMA lotniska z .ese (TMA Warszawa to EPWA_APP_* i EPWA_DIR*)
         feats.push(...(tma?.features || []).filter((f) => f.properties.name.startsWith(area + " ") && !f.properties.inner));
-        feats.push(...(secs?.features || []).filter((f) => f.properties.name.startsWith(area + "_") && /TMA/.test(f.properties.name)));
+        feats.push(...(secs?.features || []).filter((f) => f.properties.kind === "tma" && f.properties.group === area));
       }
     });
     if (viffSel !== tv.id) return;
@@ -441,7 +940,7 @@ function mainMap(ctx) {
   $(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));
   $(".vs-list").addEventListener("click", (e) => { const b = e.target.closest("[data-tv]"); if (b) selectTv(b.dataset.tv); });
   $(".vs-list").addEventListener("toggle", (e) => { if (e.target.matches?.(".vs-more")) store.set("map.viff.off", e.target.open); }, true);
-  setInterval(() => document.body.contains(pane) && $(".viff").checked && loadViff(), 60000);
+  every(60000, () => $(".viff").checked && loadViff());
 
   // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
   // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami, u sąsiadów tylko APP (koordynacja zbliżania).
@@ -471,7 +970,7 @@ function mainMap(ctx) {
     drawAds();
   };
   $(".atc").addEventListener("change", loadAtc);
-  setInterval(() => document.body.contains(pane) && loadAtc(), 30000);
+  every(30000, loadAtc);
 
   // --- trasa: gruba linia z obwódką (czytelna na każdym podkładzie), punkty jako symbole z nazwą w ramce
   const drawRoute = (layer, pts, color) => {
@@ -593,9 +1092,10 @@ function mainMap(ctx) {
   };
   const fitFlight = (f) => {
     // z prawej miejsce na panel szczegółów lotu, z dołu na wykres TV
+    if (map.getSize().x < 40) return;  // ukryta mapa: Leaflet policzyłby zoom NaN
     const pad = { paddingTopLeft: [50, 50], paddingBottomRight: [50 + (fdEl.offsetWidth || 0), 50 + chartH()], maxZoom: 9 };
     if (f.points.length) map.fitBounds(L.latLngBounds(f.points.map((x) => [x.lat, x.lon])), pad);
-    else if (f.lat !== null && f.lat !== undefined) map.setView([f.lat, f.lon], Math.max(map.getZoom(), 8));
+    else if (f.lat !== null && f.lat !== undefined) map.setView([f.lat, f.lon], Math.max(map.getZoom(), 8), { animate: false });
   };
   const showFlight = async (cs) => {
     cs = String(cs).trim().toUpperCase();
@@ -639,7 +1139,7 @@ function mainMap(ctx) {
     api(`/api/viff/flight/${encodeURIComponent(cs)}`).then((v) => { if (fd.cs === cs) { fd.viff = v; renderFd(); } })
       .catch(() => { /* zostają poprzednie dane */ });
   };
-  setInterval(() => document.body.contains(pane) && refreshFd(), 60000);
+  every(60000, refreshFd);
   const closeFlight = () => {
     selected = null; flight = null; fd.cs = null;
     layers.flight.clearLayers();
@@ -647,22 +1147,35 @@ function mainMap(ctx) {
     drawTraffic();
     if (viffData) renderChart();
   };
+  let trafficAt = "";
+  // liczba samolotów wg relacji (po wczytaniu listy lotnisk liczona od nowa: loty krajowe potrzebują ich współrzędnych)
+  const trafficInfo = () => {
+    if (!trafficAt) return;
+    const n = { dep: 0, arr: 0, trn: 0 };
+    pilots.forEach((p) => { n[relation(p, adIdx)]++; });
+    $(".traffic-info").textContent = `${plural(pilots.length, "samolot", "samoloty", "samolotów")} w Europie Środkowej (odloty EP ${n.dep}, przyloty EP ${n.arr}, `
+      + `tranzyt ${n.trn}) · ${trafficAt}. Kliknij samolot: szczegóły lotu i trasa.`;
+  };
   const drawTraffic = () => {
     layers.traffic.clearLayers();
-    if (!$(".traffic").checked) return;
+    if (!$(".traffic").checked || map.getSize().x < 40) return;
     const z = map.getZoom(), b = map.getBounds().pad(0.2);
     pilots.filter((p) => b.contains([p.lat, p.lon])).forEach((p) => {
-      const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9 })
-        .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)}`)
+      const rel = relation(p, adIdx);
+      const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel })
+        .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)} · ${esc(REL_TEXT[rel](p))}`)
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
       if (p.callsign === selected) m.getElement()?.classList.add("sel");
     });
   };
   const loadTraffic = async () => {
     if (!$(".traffic").checked) { layers.traffic.clearLayers(); $(".traffic-info").textContent = ""; return; }
+    const prev = new Map(pilots.map((p) => [p.callsign, p.altitude]));  // poprzedni odczyt: wznoszenie / zniżanie
     try {
       pilots = await api("/api/vatsim/pilots?bbox=44,5,60,35");
-      $(".traffic-info").textContent = `${plural(pilots.length, "samolot", "samoloty", "samolotów")} w Europie Środkowej · ${hhmm(new Date().toISOString())}. Kliknij samolot: szczegóły lotu i trasa.`;
+      pilots.forEach((p) => { const a = prev.get(p.callsign); p.vs = a === undefined || a === null || p.altitude === null ? null : p.altitude - a; });
+      trafficAt = hhmm(new Date().toISOString());
+      trafficInfo();
     } catch (e) { pilots = []; $(".traffic-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     pilotIdx = new Map(pilots.map((p) => [p.callsign, p]));
     const q = fd.vat && pilotIdx.get(fd.cs);  // otwarty panel lotu: świeża pozycja z VATSIM
@@ -673,7 +1186,7 @@ function mainMap(ctx) {
   $(".traffic").addEventListener("change", loadTraffic);
   $(".traffic-detail").addEventListener("change", drawTraffic);
   map.on("moveend", drawTraffic);
-  setInterval(() => document.body.contains(pane) && $(".traffic").checked && loadTraffic(), 30000);
+  every(30000, () => $(".traffic").checked && loadTraffic());
 
   // --- punkty i drogi w widocznym obszarze
   const bbox = () => { const b = map.getBounds(); return [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map((x) => x.toFixed(3)).join(","); };
@@ -712,7 +1225,7 @@ function mainMap(ctx) {
       if (!r.points.length) { info.innerHTML = `<span class="error">Nie rozpoznano żadnego punktu.</span>`; return; }
       route = r;
       redrawRoute();
-      map.fitBounds(L.latLngBounds(r.points.map((p) => [p.lat, p.lon])), { padding: [40, 40] });
+      if (map.getSize().x >= 40) map.fitBounds(L.latLngBounds(r.points.map((p) => [p.lat, p.lon])), { padding: [40, 40] });
       info.innerHTML = `${r.points.length} punktów · ${r.distance_nm} NM<br><span class="mono">${r.points.map((p) => esc(p.ident)).join(" ")}</span>` +
         (r.warnings.length ? `<div class="error">${r.warnings.map(esc).join("<br>")}</div>` : "");
     } catch (e) { info.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
@@ -720,50 +1233,31 @@ function mainMap(ctx) {
   $(".clear-route").addEventListener("click", () => { route = null; layers.route.clearLayers(); $(".route-info").textContent = ""; });
 
   setBase(baseName);
+  loadSectors();
   loadTraffic();
   loadViff();
+  let shown = Date.now();
   return {
     el: pane,
-    // po dłuższym pobycie w SEKTORYZACJI (odłączona mapa nie odświeża się w tle)
-    refresh: () => { loadSectors(); loadTraffic(); loadAtc(); if ($(".viff").checked) loadViff(); },
     activate: (arg) => setTimeout(() => {
       map.invalidateSize();
+      declutter();
       loadVisible();
+      drawTraffic();
+      // po dłuższym pobycie w innej zakładce (w tle mapa się nie odświeża)
+      if (Date.now() - shown > 30000) { loadSectors(); loadTraffic(); loadAtc(); if ($(".viff").checked) loadViff(); }
+      shown = Date.now();
       if (arg && arg !== selected) showFlight(decodeURIComponent(arg));
     }, 50),
+    destroy: () => { timers.forEach(clearInterval); map.remove(); },
   };
 }
 
-// MAP: podzakładki MAPA (mapa z ruchem) i SEKTORYZACJA (trzy mapy warstw LOW/MID/HIGH z dziedziczeniem sektorów).
-// Oba widoki budowane raz i przepinane, więc przełączanie nie gubi stanu (wybrany lot, przybliżenie).
+// MAP: jedna mapa (sektoryzacja warstw LOW/MID/HIGH przeniesiona do RADIO). #map/ZNAK otwiera szczegóły lotu.
 export default {
   mount(root, ctx) {
-    let main = null, split = null, cur = "map", left = 0;
-    const tabs = subtabs(root, [
-      { id: "map", label: "MAPA", fill: true, render: (p) => {
-        cur = "map";
-        const again = !!main;
-        main ||= mainMap(ctx);
-        p.append(main.el);
-        if (again) main.activate();  // powrót z SEKTORYZACJI: przeliczenie rozmiaru mapy
-        if (again && Date.now() - left > 30000) main.refresh();
-      } },
-      { id: "sektoryzacja", label: "SEKTORYZACJA", fill: true, render: (p) => {
-        cur = "sektoryzacja";
-        left = Date.now();  // od tej chwili mapa główna jest odłączona
-        split ||= sectorSplit(ctx);
-        p.append(split.el);
-        split.show();
-        return { destroy: () => split.hide() };
-      } },
-    ]);
-    return {
-      activate: (arg) => {
-        // #map/ZNAK otwiera lot na mapie głównej
-        if (arg && cur !== "map") tabs.show("map");
-        if (cur === "map") main.activate(arg);
-        else split.show();
-      },
-    };
+    const main = mainMap(ctx);
+    root.append(main.el);
+    return { activate: (arg) => main.activate(arg), destroy: () => main.destroy() };
   },
 };

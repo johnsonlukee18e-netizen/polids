@@ -1,14 +1,16 @@
 // Checklisty w formacie vatiris: punkt "Co zrobić...AKCJA", sections = {indeks: nagłówek}.
 // Stan zaznaczeń (i notatki z pól INPUT) zapisuje się w przeglądarce pod podanym kluczem.
-import { esc } from "./api.js";
+import { esc, lsGet, lsSet } from "./api.js";
 
 // Tekst jest escapowany, przepuszczamy tylko proste znaczniki formatowania z plików vatiris
 export const markup = (s) => esc(s).replace(/&lt;(\/?)(b|i|tt)&gt;/g, "<$1$2>");
 
 export function renderChecklist(el, chk, key) {
   let st = {};
-  try { st = JSON.parse(localStorage.getItem(key) || "{}"); } catch { st = {}; }
-  const save = () => { try { localStorage.setItem(key, JSON.stringify(st)); } catch { /* tryb prywatny */ } };
+  try { st = JSON.parse(lsGet(key) || "{}"); } catch { st = {}; }
+  // zapisany stan bywa nie-obiektem ("null", liczba, lista ze starszej wersji): wtedy od zera
+  if (!st || typeof st !== "object" || Array.isArray(st)) st = {};
+  const save = () => lsSet(key, JSON.stringify(st));
   const rows = chk.items.map((item, i) => {
     const cut = item.lastIndexOf("...");
     const what = cut >= 0 ? item.slice(0, cut) : item;

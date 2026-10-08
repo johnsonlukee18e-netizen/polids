@@ -350,7 +350,9 @@ export function mountAwos(el, icao) {
     // składowe dla wybranego kierunku pasa ze średniej 2 min
     const r = rwyOf(selOf(c));
     if (r && !calm && !vrb) {
-      const ang = (a.dir - r.heading) * RAD, hw = Math.round(a.spd * Math.cos(ang)), xw = Math.round(a.spd * Math.sin(ang));
+      // zaokrąglamy wartość bez znaku (jak w METEO i AERODROME), żeby -13,5 kt było TW 14 wszędzie
+      const ang = (a.dir - r.heading) * RAD, rnd = (v) => Math.sign(v) * Math.round(Math.abs(v));
+      const hw = rnd(a.spd * Math.cos(ang)), xw = rnd(a.spd * Math.sin(ang));
       c.row.hw.innerHTML = hw < 0 ? `<span class="${hw <= -5 ? "bad" : "warn"}">TW ${-hw} KT</span>` : `HW ${hw} KT`;
       c.row.xw.innerHTML = `<span class="${Math.abs(xw) >= 20 ? "warn" : ""}">${Math.abs(xw)} KT${xw > 0 ? " R" : xw < 0 ? " L" : ""}</span>`;
     } else {

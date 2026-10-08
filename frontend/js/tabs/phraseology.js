@@ -1,4 +1,5 @@
 import { api, h, iframeWithFallback } from "../api.js";
+import { embedBar } from "./aip.js";
 
 // Frazeologia: "Say Again? The Phraseology Database" z EUROCONTROL Learning Zone (adres z POLIDS_PHRASEOLOGY_URL).
 // Zawsze próbujemy pokazać stronę w ramce. Backend przy tym sprawdza nagłówki X-Frame-Options / CSP; jeśli serwis
@@ -10,6 +11,7 @@ export default {
     const pane = h(`<div class="pane fill"></div>`);
     root.append(pane);
     iframeWithFallback(pane, url, "EUROCONTROL Learning Zone");
+    embedBar(pane);
     const note = h(`<div class="embed-note hint">Sprawdzam, czy Learning Zone pozwala wyświetlić się w ramce…</div>`);
     pane.insertBefore(note, pane.querySelector("iframe"));
     api("/api/embed-check/phraseology").then((r) => {

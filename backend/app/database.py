@@ -4,8 +4,10 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from .config import settings
 
 
-# Podnieś przy każdej zmianie tabel: stara baza zostanie zbudowana od nowa z plików w repo.
-SCHEMA_VERSION = 3
+# Podnieś przy każdej zmianie tabel (albo sposobu importu danych): stara baza zostanie zbudowana od nowa z plików w repo.
+# 3: indeks nav_points, poprawione sklejanie granic sektorów .ese. 4: sektory sąsiadów z ich plików .ese.
+# 5: sąsiedzi – jeden układ pasów na lotnisko, bez sektorów bez OWNER. 6: połączenie z wersją serwerową.
+SCHEMA_VERSION = 6
 
 
 class Base(DeclarativeBase):

@@ -1,10 +1,12 @@
 """Import pliku .ese EuroScope: stanowiska ATC ([POSITIONS]) i sektory ([AIRSPACE]).
 
-Sektor składa się z linii granicznych (SECTORLINE) wymienionych w BORDER; łączymy je w wielokąt.
+Sektor składa się z linii granicznych (SECTORLINE, CIRCLE_SECTORLINE) wymienionych w BORDER; łączymy je w wielokąt.
 Właścicielem sektora jest pierwsze zalogowane stanowisko z listy OWNER."""
 
 import json
+import math
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from sqlalchemy import delete, insert
@@ -26,12 +28,15 @@ def parse_positions(lines: list[str]) -> list[dict]:
 
 
 def _chain(lines: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:
-    """Łączy linie graniczne w zamknięty pierścień, odwracając je w razie potrzeby."""
-    lines = [ln for ln in lines if ln]
+    """Łączy linie graniczne w zamknięty pierścień, odwracając je w razie potrzeby.
+
+    Linie o zerowej długości (wszystkie punkty w jednym miejscu, np. 861 i 862 w UKLV_FIR) pomijamy:
+    nie wnoszą geometrii, a doklejone na końcu jako "najbliższe" przecinały cały sektor fałszywymi krawędziami."""
+    close = lambda a, b: abs(a[0] - b[0]) < 1e-4 and abs(a[1] - b[1]) < 1e-4  # noqa: E731
+    lines = [ln for ln in lines if ln and any(not close(p, ln[0]) for p in ln)]
     if not lines:
         return []
     ring = list(lines.pop(0))
-    close = lambda a, b: abs(a[0] - b[0]) < 1e-4 and abs(a[1] - b[1]) < 1e-4  # noqa: E731
     while lines:
         end = ring[-1]
         for i, ln in enumerate(lines):
@@ -55,7 +60,33 @@ def _chain(lines: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:
     return ring
 
 
-def parse_airspace(lines: list[str]) -> list[dict]:
+# nazwa sektora "FIR·NAZWA·DOL·GORA" (PL, DE, SE…) albo ze spacjami "LKAA NL 125 305" (pakiet czeski)
+_NAME_SPACED = re.compile(r"^(\S+) (.+) (\d{3}) (\d{3})$")
+
+
+def split_sector_name(name: str) -> tuple[str, str]:
+    """(FIR, nazwa) z nazwy sektora .ese: "EPWW·EPWWB·095·245" → ("EPWW", "EPWWB"), "LKAA NL 125 305" → ("LKAA", "NL")."""
+    parts = [x.strip() for x in re.split(r"[\u00a7\u00b7]", name)]
+    if len(parts) > 1:
+        return parts[0], parts[1]
+    if m := _NAME_SPACED.match(name.strip()):
+        return m.group(1), m.group(2).strip()
+    return name, name
+
+
+def _circle(lat: float, lon: float, nm: float, n: int = 72) -> list[tuple[float, float]]:
+    """Okrąg o promieniu nm wokół punktu jako zamknięta łamana (CIRCLE_SECTORLINE)."""
+    dlat = nm / 60
+    dlon = dlat / max(math.cos(math.radians(lat)), 0.01)
+    pts = [(lat + dlat * math.cos(2 * math.pi * i / n), lon + dlon * math.sin(2 * math.pi * i / n)) for i in range(n)]
+    return pts + pts[:1]
+
+
+def parse_airspace(lines: list[str], airport: Callable[[str], tuple[float, float] | None] | None = None) -> list[dict]:
+    """Sektory z sekcji [AIRSPACE]: {fir, name, lower_ft, upper_ft, owners (ID stanowisk ":"), active, geometry}.
+
+    active: warunki ACTIVE:ICAO:pas (sektor istnieje tylko przy tym pasie w użyciu), lista "ICAO:pas".
+    airport: współrzędne lotniska dla CIRCLE_SECTORLINE:nazwa:ICAO:promień (bez niej takie okręgi pomijamy)."""
     sectorlines: dict[str, list[tuple[float, float]]] = {}
     sectors = []
     cur_line = None
@@ -66,22 +97,43 @@ def parse_airspace(lines: list[str]) -> list[dict]:
             cur_line = rest.strip()
             sectorlines[cur_line] = []
             cur_sector = None
-        elif key == "COORD" and cur_line is not None:
-            lat_s, _, lon_s = rest.partition(":")
-            lat, lon = parse_coord(lat_s), parse_coord(lon_s)
-            if lat is not None and lon is not None:
-                sectorlines[cur_line].append((lat, lon))
-        elif key == "SECTOR":
+            continue
+        if key == "COORD":
+            if cur_line is not None:
+                lat_s, _, lon_s = rest.partition(":")
+                lat, lon = parse_coord(lat_s), parse_coord(lon_s)
+                if lat is not None and lon is not None:
+                    sectorlines[cur_line].append((lat, lon))
+            continue
+        if key != "DISPLAY":
+            # COORD należą tylko do bieżącej SECTORLINE (bloki MSAW mają własne COORD, które nie są granicą)
             cur_line = None
+        if key == "CIRCLE_SECTORLINE":
+            f = [x.strip() for x in rest.split(":")]
+            center = None
+            if len(f) >= 4 and parse_coord(f[1]) is not None and parse_coord(f[2]) is not None:
+                center, radius = (parse_coord(f[1]), parse_coord(f[2])), f[3]
+            elif len(f) >= 3 and airport:
+                center, radius = airport(f[1].upper()), f[2]
+            try:
+                if center:
+                    sectorlines[f[0]] = _circle(center[0], center[1], float(radius))
+            except ValueError:
+                pass
+        elif key == "SECTOR":
             name, lower, upper = (rest.split(":") + ["0", "0"])[:3]
-            parts = [x.strip() for x in re.split(r"[\u00a7\u00b7]", name)]
-            cur_sector = {"fir": parts[0], "name": parts[1] if len(parts) > 1 else name,
-                          "lower_ft": int(lower or 0), "upper_ft": int(upper or 0), "owners": "", "border": []}
+            fir, short = split_sector_name(name)
+            cur_sector = {"fir": fir, "name": short, "lower_ft": int(lower or 0), "upper_ft": int(upper or 0),
+                          "owners": "", "active": [], "border": []}
             sectors.append(cur_sector)
         elif key == "OWNER" and cur_sector:
             cur_sector["owners"] = rest.strip()
         elif key == "BORDER" and cur_sector:
             cur_sector["border"] = [b for b in rest.strip().split(":") if b]
+        elif key == "ACTIVE" and cur_sector:
+            icao, _, rwy = rest.strip().partition(":")
+            if icao:
+                cur_sector["active"].append(f"{icao.upper()}:{rwy.split(':')[0].upper()}")
 
     out = []
     for s in sectors:
@@ -94,7 +146,7 @@ def parse_airspace(lines: list[str]) -> list[dict]:
     return out
 
 
-def parse_ese(text: str) -> dict:
+def parse_ese(text: str, airport: Callable[[str], tuple[float, float] | None] | None = None) -> dict:
     secs: dict[str, list[str]] = {}
     current = None
     for line in text.splitlines():
@@ -107,7 +159,7 @@ def parse_ese(text: str) -> dict:
         elif current and line:
             secs[current].append(line)
     return {"positions": parse_positions(secs.get("[POSITIONS]", [])),
-            "sectors": parse_airspace(secs.get("[AIRSPACE]", []))}
+            "sectors": parse_airspace(secs.get("[AIRSPACE]", []), airport)}
 
 
 def import_ese(db: Session, path: Path) -> dict:
@@ -117,7 +169,7 @@ def import_ese(db: Session, path: Path) -> dict:
     if data["positions"]:
         db.execute(insert(AtcPosition), data["positions"])
     if data["sectors"]:
-        db.execute(insert(Sector), data["sectors"])
+        db.execute(insert(Sector), [{k: v for k, v in sec.items() if k != "active"} for sec in data["sectors"]])
     db.commit()
     return {"positions": len(data["positions"]), "sectors": len(data["sectors"])}
 

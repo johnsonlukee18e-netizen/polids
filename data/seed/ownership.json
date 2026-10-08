@@ -1,0 +1,574 @@
+{
+ "source": "om",
+ "source_label": "om.plvacc.pl › Sector ownerships and top-down rules (AIRAC 2610)",
+ "note": "Tabele pierwszeństwa z om.plvacc.pl/docs/2610/ownerships (wklejone przez Marka 06.10.2026). Poprawione literówki: ACC G LOW nr 3: EPWW_N_cTR -> EPWW_N_CTR; ACC J MID nr 4: EPWW_E_FIR -> EPWW_E_CTR. Odstępstwa od tabeli (sprzeczna z opisami stanowisk i plikiem .ese): B HIGH: z pliku .ese zamiast tabeli om; C HIGH: z pliku .ese zamiast tabeli om; D HIGH: z pliku .ese zamiast tabeli om; T MID: z pliku .ese zamiast tabeli om.",
+ "url": "https://om.plvacc.pl/docs/2610/ownerships",
+ "layers": {
+  "LOW": {
+   "lower_ft": 9500,
+   "upper_ft": 33500,
+   "label": "FL095–FL335"
+  },
+  "MID": {
+   "lower_ft": 33500,
+   "upper_ft": 36500,
+   "label": "FL335–FL365"
+  },
+  "HIGH": {
+   "lower_ft": 36500,
+   "upper_ft": 66000,
+   "label": "FL365–FL660"
+  }
+ },
+ "sectors": {
+  "B": {
+   "LOW": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "C": {
+   "LOW": [
+    "EPWW_C_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_C_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_C_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "D": {
+   "LOW": [
+    "EPWW_D_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_D_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_D_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "E": {
+   "LOW": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_NE_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "F": {
+   "LOW": [
+    "EPWW_F_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_F_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_F_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "G": {
+   "LOW": [
+    "EPWW_G_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_G_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_G_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "J": {
+   "LOW": [
+    "EPWW_J_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_J_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_J_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "N": {
+   "LOW": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "R": {
+   "LOW": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  },
+  "T": {
+   "LOW": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "MID": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_ALL_CTR"
+   ],
+   "HIGH": [
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TM_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_ALL_CTR"
+   ]
+  }
+ },
+ "acc_positions": {
+  "EPWW_ALH_CTR": {
+   "short": "ALH",
+   "frequency": "132.700",
+   "ese_id": "AH"
+  },
+  "EPWW_ALL_CTR": {
+   "short": "ALL",
+   "frequency": "125.450",
+   "ese_id": "ALM"
+  },
+  "EPWW_C_CTR": {
+   "short": "C",
+   "frequency": "133.475",
+   "ese_id": "CL"
+  },
+  "EPWW_DBF_CTR": {
+   "short": "DBF",
+   "frequency": "133.180",
+   "ese_id": "DBFG"
+  },
+  "EPWW_DBT_CTR": {
+   "short": "DBT",
+   "frequency": "127.025",
+   "ese_id": "DBT"
+  },
+  "EPWW_DTC_CTR": {
+   "short": "DTC",
+   "frequency": "125.340",
+   "ese_id": "DTC"
+  },
+  "EPWW_DT_CTR": {
+   "short": "DT",
+   "frequency": "128.765",
+   "ese_id": "DT"
+  },
+  "EPWW_D_CTR": {
+   "short": "D",
+   "frequency": "134.225",
+   "ese_id": "DL"
+  },
+  "EPWW_E_CTR": {
+   "short": "E",
+   "frequency": "120.950",
+   "ese_id": "EWW"
+  },
+  "EPWW_FG_CTR": {
+   "short": "FG",
+   "frequency": "124.925",
+   "ese_id": "FG"
+  },
+  "EPWW_F_CTR": {
+   "short": "F",
+   "frequency": "124.275",
+   "ese_id": "F"
+  },
+  "EPWW_G_CTR": {
+   "short": "G",
+   "frequency": "129.075",
+   "ese_id": "G"
+  },
+  "EPWW_JR_CTR": {
+   "short": "JR",
+   "frequency": "130.875",
+   "ese_id": "JR"
+  },
+  "EPWW_J_CTR": {
+   "short": "J",
+   "frequency": "124.625",
+   "ese_id": "J"
+  },
+  "EPWW_NE_CTR": {
+   "short": "NE",
+   "frequency": "127.450",
+   "ese_id": "NE"
+  },
+  "EPWW_N_CTR": {
+   "short": "N",
+   "frequency": "130.675",
+   "ese_id": "NWW"
+  },
+  "EPWW_S_CTR": {
+   "short": "S",
+   "frequency": "123.625",
+   "ese_id": "SWW"
+  },
+  "EPWW_TCJ_CTR": {
+   "short": "TCJ",
+   "frequency": "134.875",
+   "ese_id": "TC"
+  },
+  "EPWW_TM_CTR": {
+   "short": "TM",
+   "frequency": "130.625",
+   "ese_id": "T"
+  }
+ },
+ "tma_topdown": {
+  "TMA Warszawa": {
+   "chain": [
+    "EPWW_C_CTR",
+    "EPWW_NE_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPWA_APP_",
+    "EPWA_TMA",
+    "EPWA_DIR"
+   ]
+  },
+  "TMA Gdańsk": {
+   "chain": [
+    "EPWW_G_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPGD_TMA",
+    "EPGD_UTMA"
+   ]
+  },
+  "TMA Poznań N": {
+   "chain": [
+    "EPWW_D_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPPO_TMA_N"
+   ]
+  },
+  "TMA Poznań S": {
+   "chain": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPPO_TMA_S"
+   ]
+  },
+  "TMA Kraków": {
+   "chain": [
+    "EPWW_J_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPKK_TMA",
+    "EPKK_LTMA",
+    "EPKK_UTMA",
+    "EPKK_DEP",
+    "EPKK_DIR"
+   ]
+  },
+  "TMA Szczecin": {
+   "chain": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPSC_TMA"
+   ]
+  },
+  "TMA Mazury": {
+   "chain": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPSY_TMA"
+   ]
+  },
+  "TMA Lublin": {
+   "chain": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPLB_TMA"
+   ]
+  },
+  "TMA Rzeszów": {
+   "chain": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPRZ_TMA"
+   ]
+  }
+ },
+ "ese_differences": [
+  "B HIGH: om DBT DBF N ALH ALL | .ese N ALH DBT DBF ALL",
+  "C HIGH: om TCJ DTC S E N ALH C ALL | .ese DTC S E N ALH TCJ C ALL",
+  "D HIGH: om DBT DT DTC DBF N ALH D ALL | .ese DTC N DBF ALH DT DBT D ALL",
+  "T MID: om TM DT TCJ DTC DBT S ALL | .ese TM DT TCJ DTC DBT S ALH ALL"
+ ],
+ "corrections": [
+  "B HIGH: z pliku .ese zamiast tabeli om",
+  "C HIGH: z pliku .ese zamiast tabeli om",
+  "D HIGH: z pliku .ese zamiast tabeli om",
+  "T MID: z pliku .ese zamiast tabeli om"
+ ],
+ "om_verbatim": {
+  "B HIGH": [
+   "EPWW_DBT_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "C HIGH": [
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_C_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "D HIGH": [
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_D_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "T MID": [
+   "EPWW_TM_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR"
+  ]
+ }
+}

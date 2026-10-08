@@ -14,6 +14,16 @@ import phraseology from "./tabs/phraseology.js";
 import checklist from "./tabs/checklist.js";
 import admin from "./tabs/admin.js";
 
+// Leaflet po polsku, raz dla wszystkich map (RADIO, METEO › QNH, MAP itd.), zanim którakolwiek się zbuduje:
+// dymki przycisków powiększenia i odnośnika "Leaflet" w atrybucji (sama treść atrybucji bez zmian)
+if (window.L) {
+  L.Control.Zoom.mergeOptions({ zoomInTitle: "Przybliż", zoomOutTitle: "Oddal" });
+  const prefix = L.Control.Attribution.prototype.options.prefix;
+  if (typeof prefix === "string") {
+    L.Control.Attribution.mergeOptions({ prefix: prefix.replace(/title="[^"]*"/, 'title="Leaflet: biblioteka JavaScript do map interaktywnych"') });
+  }
+}
+
 const TABS = { about, radio, meteo, aerodrome, adciv, admil, advfr, callsign, aircraft, map, inop, docs, phraseology, checklist, emergency, admin };
 const views = document.getElementById("views");
 const mounted = {};

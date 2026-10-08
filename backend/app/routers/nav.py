@@ -1,4 +1,5 @@
 import json
+import re
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,7 @@ from ..importers.ese import parse_vfr_points
 from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import AirwaySegment, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
+from ..services.neighbours import covered_firs, nb_positions, nb_sectors, owners_of
 from ..services.route import RouteResolver
 from ..services.vatsim import get_feed, match_positions
 
@@ -161,6 +163,18 @@ def vacs():
     return _vacs()
 
 
+@lru_cache(maxsize=1)
+def _ownership() -> dict:
+    return json.loads((settings.seed_dir / "ownership.json").read_text("utf-8"))
+
+
+@router.get("/ownership")
+def ownership():
+    """Kolejność przejmowania sektorów ACC EPWW w warstwach LOW/MID/HIGH (pole `source` mówi, skąd jest:
+    tymczasowo listy OWNER z pliku .ese, docelowo tabela z om.plvacc.pl/docs/2610/ownerships)."""
+    return _ownership()
+
+
 @router.get("/sectors/online")
 async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     """Aktualna sektoryzacja: dla każdego sektora pierwsze zalogowane stanowisko z listy OWNER."""
@@ -180,3 +194,133 @@ async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
                 break
     return {"online_positions": list(by_id.values()), "sector_owner": result,
             "updated": data.get("general", {}).get("update_timestamp")}
+
+
+# --- MAP: warstwy przestrzeni wg poziomu. Rodzaj przestrzeni rozpoznajemy po nazwie wycinka sektora z pliku .ese.
+# Granice pionowe też z pliku .ese: eAIP PANSA (ENR 2.1) nie był osiągalny tam, gdzie powstawał ten kod
+# (docs.pansa.pl zablokowany), więc limity nie zostały z nim uzgodnione.
+# TMA to nie tylko "*_TMA*": TMA Warszawa jest w pliku .ese jako EPWA_APP_* i EPWA_DIR*, TMA Kraków/Katowice
+# zawiera też wycinki EPKK_DEP07 / EPKT_DIR08 (stąd w rundzie 7 TMA Warszawa nie podświetlała się przy EPWA_APP).
+_ACC = re.compile(r"^EPWW([A-Z])(?:-[A-Z]+)?$")
+_CTR = re.compile(r"^(EP[A-Z]{2})_M?CTR\d*$")
+_TMA = re.compile(r"^(EP[A-Z]{2})_(?:[A-Z_]*TMA|APP_|DEP\d|DIR\d)")
+_ATZ = re.compile(r"^(EP[A-Z]{2})_ATZ")
+_TRA = re.compile(r"^EPTR\d+[A-Z]?$")
+_FIS = re.compile(r"^(?:FIS_([A-Z]{3})|([A-Z]{3})_FIS)_")
+_CTA = re.compile(r"^(CTA\d+)")
+# TMA Poznań dzieli się na N i S z osobną kolejnością przejmowania (klucze tma_topdown w ownership.json)
+_TMA_PART = re.compile(r"^EP[A-Z]{2}_TMA_([NS])_")
+_TECH = re.compile(r"^(?:TECH |T-)")  # wycinki techniczne sąsiadów (np. TECH ESMM IS na FL998)
+
+EP_CITY = {
+    "EPWA": "Warszawa", "EPKK": "Kraków", "EPGD": "Gdańsk", "EPPO": "Poznań", "EPKT": "Katowice", "EPWR": "Wrocław",
+    "EPLL": "Łódź", "EPLB": "Lublin", "EPRZ": "Rzeszów", "EPSC": "Szczecin", "EPSY": "Olsztyn-Mazury",
+    "EPBY": "Bydgoszcz", "EPZG": "Zielona Góra", "EPMO": "Modlin", "EPRA": "Radom", "EPDE": "Dęblin",
+    "EPKS": "Poznań-Krzesiny", "EPBA": "Bielsko-Biała", "EPBC": "Warszawa-Babice", "EPGL": "Gliwice",
+    "EPKA": "Kielce-Masłów", "EPKM": "Katowice-Muchowiec", "EPKP": "Kraków-Pobiednik", "EPKR": "Krosno",
+    "EPLR": "Lublin-Radawiec", "EPML": "Mielec", "EPNT": "Nowy Targ", "EPOD": "Olsztyn-Dajtki", "EPPL": "Płock",
+    "EPPT": "Piotrków Trybunalski", "EPZR": "Żar",
+}
+FIS_REGION = {"WAW": "Warszawa", "GDN": "Gdańsk", "KRK": "Kraków", "POZ": "Poznań"}
+NB_FIR = {"EDMM": "München", "EDWW": "Bremen", "EKDK": "København", "ESAA": "Sverige", "EYVL": "Vilnius",
+          "LKAA": "Praha", "LZBB": "Bratislava", "UKLV": "Lviv", "UMKK": "Kaliningrad", "UMMV": "Minsk"}
+
+
+def slice_kind(fir: str, name: str) -> tuple[str, str] | None:
+    """Rodzaj przestrzeni i grupa wycinka sektora .ese: (acc, litera) | (tma|ctr|atz, ICAO) | (fis, rejon)
+    | (cta, CTAnn) | (nb, FIR sąsiedni). None = wycinek techniczny, nie rysujemy go."""
+    fir, name = fir.upper(), name.upper()
+    if fir != "EPWW":
+        return None if _TECH.match(name) else ("nb", fir)
+    if m := _ACC.match(name):
+        return "acc", m.group(1)
+    if name == "EPWW-MIDSEA":  # FIS nad Bałtykiem (Gdańsk Information)
+        return "fis", "GDN"
+    if m := _CTR.match(name):
+        return "ctr", m.group(1)
+    if m := _TMA.match(name):
+        return "tma", m.group(1)
+    if m := _ATZ.match(name):
+        return "atz", m.group(1)
+    if _TRA.match(name):
+        return "atz", name
+    if m := _FIS.match(name):
+        return "fis", m.group(1) or m.group(2)
+    if m := _CTA.match(name):
+        return "cta", m.group(1)
+    return "oth", name
+
+
+def group_label(kind: str, group: str, name: str = "") -> str:
+    """Nazwa grupy do list wyboru i dymków: TMA Warszawa, TMA Poznań N (EPPO_TMA_N_*), CTR Kraków, Sektor B,
+    FIS Gdańsk, CTA 02, EDWW Bremen. name = nazwa wycinka (potrzebna tylko do części N/S TMA Poznań)."""
+    city = EP_CITY.get(group, group)
+    if kind == "acc":
+        return f"Sektor {group}"
+    if kind == "tma":
+        part = m.group(1) if (m := _TMA_PART.match(name.upper())) else ""
+        return f"TMA {city} {part}".rstrip()
+    if kind == "ctr":
+        return f"CTR {city}"
+    if kind == "cta" and (m := re.match(r"^CTA(\d+)$", group)):
+        return f"CTA {m.group(1)}"
+    if kind == "atz":
+        return f"TRA {group}" if _TRA.match(group) else f"ATZ {city}"
+    if kind == "fis":
+        return f"FIS {FIS_REGION.get(group, group)}"
+    if kind == "nb":
+        return f"{group} {NB_FIR.get(group, '')}".strip()
+    return group
+
+
+def slice_label(fir: str, name: str) -> str:
+    """Nazwa wycinka sąsiada z FIR-em, gdy nazwa go nie zawiera (LZBB "CTR" → "LZBB CTR")."""
+    return name if fir == "EPWW" or name[:2] == fir[:2] else f"{fir} {name}"
+
+
+@router.get("/slices")
+def slices(level_ft: int | None = None, db: Session = Depends(get_db)):
+    """Wszystkie wycinki sektorów z pliku .ese (EPWW i sąsiedzi) z rodzajem przestrzeni do warstw MAP.
+
+    kind: acc | tma | ctr | fis | cta | atz | nb (FIR sąsiedni) | oth; group: litera sektora ACC, ICAO lotniska,
+    rejon FIS, numer CTA albo FIR; group_label: nazwa przestrzeni (TMA Poznań N i S osobno, jak w tabeli om).
+    Z level_ft tylko wycinki, których granice obejmują ten poziom (dolna <= poziom < górna).
+    Bez zaimportowanego pliku .ese pusta lista z `note`."""
+    stmt = select(Sector).order_by(Sector.id)
+    if level_ft is not None:
+        stmt = stmt.where(Sector.lower_ft <= level_ft, Sector.upper_ft > level_ft)
+    pos = _positions(db)
+    covered = covered_firs(db)
+    feats = []
+    for s in db.scalars(stmt):
+        kg = slice_kind(s.fir, s.name)
+        if not kg:
+            continue
+        kind, group = kg
+        if kind == "nb" and group in covered:  # FIR z własnym plikiem .ese: jego sektory niżej
+            continue
+        owners = [o for o in s.owners.split(":") if o]
+        first = pos.get(owners[0]) if owners else None
+        feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
+            "id": s.id, "fir": s.fir, "name": s.name, "label": slice_label(s.fir, s.name), "kind": kind,
+            "group": group, "group_label": group_label(kind, group, s.name),
+            "lower_ft": s.lower_ft, "upper_ft": s.upper_ft,
+            "owners": owners, "owner_callsigns": [pos[o].callsign for o in owners if o in pos],
+            "callsign": first.callsign if first else None, "frequency": first.frequency if first else None,
+            "source": "EPWW", "active": [],
+        }})
+    # sąsiedzi z ich własnych plików .ese: owners to już znaki stanowisk (ID są ważne tylko w obrębie jednego pliku)
+    freq = {p["callsign"]: p["frequency"] for p in nb_positions(db)}
+    for s in nb_sectors(db, level_ft):
+        fir = s.fir.upper()
+        owners = owners_of(s)
+        first = owners[0] if owners else None
+        feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
+            "id": f"nb{s.id}", "fir": fir, "name": s.name, "label": slice_label(fir, s.name), "kind": "nb",
+            "group": fir, "group_label": group_label("nb", fir, s.name),
+            "lower_ft": s.lower_ft, "upper_ft": s.upper_ft, "owners": owners, "owner_callsigns": owners,
+            "callsign": first, "frequency": freq.get(first) if first else None,
+            "source": s.source, "active": (s.active or "").split(),
+        }})
+    note = None if feats or level_ft is not None else "Brak sektorów: zaimportuj plik .ese (data/import)."
+    return {"type": "FeatureCollection", "features": feats, "limits_source": "ese", "note": note}

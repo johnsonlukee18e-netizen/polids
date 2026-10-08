@@ -2082,5 +2082,8189 @@
    "fmp": true,
    "ese": null
   }
+ ],
+ "geo_pages": [
+  {
+   "label": "ACC / KRAJ",
+   "rows": 6,
+   "keys": [
+    {
+     "label": "B H",
+     "lines": [
+      "B",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWB_HIGH",
+     "controlled_by": [
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_N_CTR",
+     "frequency": "130.675",
+     "fmp": false,
+     "sector": {
+      "letter": "B",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "G H",
+     "lines": [
+      "G",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWG_HIGH",
+     "controlled_by": [
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_G_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_N_CTR",
+     "frequency": "130.675",
+     "fmp": false,
+     "sector": {
+      "letter": "G",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "B M",
+     "lines": [
+      "B",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWB_MID",
+     "controlled_by": [
+      "EPWW_DBT_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_DBT_CTR",
+     "frequency": "127.025",
+     "fmp": false,
+     "sector": {
+      "letter": "B",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "G M",
+     "lines": [
+      "G",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWG_MID",
+     "controlled_by": [
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_G_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_FG_CTR",
+     "frequency": "124.925",
+     "fmp": false,
+     "sector": {
+      "letter": "G",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "B L",
+     "lines": [
+      "B",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWB_LOW",
+     "controlled_by": [
+      "EPWW_DBT_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_DBT_CTR",
+     "frequency": "127.025",
+     "fmp": false,
+     "sector": {
+      "letter": "B",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "G L",
+     "lines": [
+      "G",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWG_LOW",
+     "controlled_by": [
+      "EPWW_G_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_G_CTR",
+     "frequency": "129.075",
+     "fmp": false,
+     "sector": {
+      "letter": "G",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "C H",
+     "lines": [
+      "C",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWC_HIGH",
+     "controlled_by": [
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_C_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_DTC_CTR",
+     "frequency": "125.340",
+     "fmp": false,
+     "sector": {
+      "letter": "C",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "J H",
+     "lines": [
+      "J",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWJ_HIGH",
+     "controlled_by": [
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_J_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_S_CTR",
+     "frequency": "123.625",
+     "fmp": false,
+     "sector": {
+      "letter": "J",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "C M",
+     "lines": [
+      "C",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWC_MID",
+     "controlled_by": [
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_C_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_TCJ_CTR",
+     "frequency": "134.875",
+     "fmp": false,
+     "sector": {
+      "letter": "C",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "J M",
+     "lines": [
+      "J",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWJ_MID",
+     "controlled_by": [
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_J_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_JR_CTR",
+     "frequency": "130.875",
+     "fmp": false,
+     "sector": {
+      "letter": "J",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "C L",
+     "lines": [
+      "C",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWC_LOW",
+     "controlled_by": [
+      "EPWW_C_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_C_CTR",
+     "frequency": "133.475",
+     "fmp": false,
+     "sector": {
+      "letter": "C",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "J L",
+     "lines": [
+      "J",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWJ_LOW",
+     "controlled_by": [
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_J_CTR",
+     "frequency": "124.625",
+     "fmp": false,
+     "sector": {
+      "letter": "J",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "D H",
+     "lines": [
+      "D",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWD_HIGH",
+     "controlled_by": [
+      "EPWW_DTC_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_D_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_DTC_CTR",
+     "frequency": "125.340",
+     "fmp": false,
+     "sector": {
+      "letter": "D",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "N H",
+     "lines": [
+      "N",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWN_HIGH",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_N_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "N",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "D M",
+     "lines": [
+      "D",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWD_MID",
+     "controlled_by": [
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_D_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_DBT_CTR",
+     "frequency": "127.025",
+     "fmp": false,
+     "sector": {
+      "letter": "D",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "N M",
+     "lines": [
+      "N",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWN_MID",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_N_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "N",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "D L",
+     "lines": [
+      "D",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWD_LOW",
+     "controlled_by": [
+      "EPWW_D_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_D_CTR",
+     "frequency": "134.225",
+     "fmp": false,
+     "sector": {
+      "letter": "D",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "N L",
+     "lines": [
+      "N",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWN_LOW",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_N_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "N",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "E H",
+     "lines": [
+      "E",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWE_HIGH",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "E",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "R H",
+     "lines": [
+      "R",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWR_HIGH",
+     "controlled_by": [
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_E_CTR",
+     "frequency": "120.950",
+     "fmp": false,
+     "sector": {
+      "letter": "R",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "E M",
+     "lines": [
+      "E",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWE_MID",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "E",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "R M",
+     "lines": [
+      "R",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWR_MID",
+     "controlled_by": [
+      "EPWW_JR_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_JR_CTR",
+     "frequency": "130.875",
+     "fmp": false,
+     "sector": {
+      "letter": "R",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "E L",
+     "lines": [
+      "E",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWE_LOW",
+     "controlled_by": [
+      "EPWW_NE_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": {
+      "letter": "E",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "R L",
+     "lines": [
+      "R",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWR_LOW",
+     "controlled_by": [
+      "EPWW_JR_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_JR_CTR",
+     "frequency": "130.875",
+     "fmp": false,
+     "sector": {
+      "letter": "R",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "F H",
+     "lines": [
+      "F",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWF_HIGH",
+     "controlled_by": [
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_F_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_N_CTR",
+     "frequency": "130.675",
+     "fmp": false,
+     "sector": {
+      "letter": "F",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "T H",
+     "lines": [
+      "T",
+      "H"
+     ],
+     "alt": null,
+     "station": "EPWWT_HIGH",
+     "controlled_by": [
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_TM_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_DTC_CTR",
+     "frequency": "125.340",
+     "fmp": false,
+     "sector": {
+      "letter": "T",
+      "layer": "HIGH"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "F M",
+     "lines": [
+      "F",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWF_MID",
+     "controlled_by": [
+      "EPWW_FG_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_F_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_FG_CTR",
+     "frequency": "124.925",
+     "fmp": false,
+     "sector": {
+      "letter": "F",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "T M",
+     "lines": [
+      "T",
+      "M"
+     ],
+     "alt": null,
+     "station": "EPWWT_MID",
+     "controlled_by": [
+      "EPWW_TM_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALH_CTR",
+      "EPWW_ALL_CTR"
+     ],
+     "callsign": "EPWW_TM_CTR",
+     "frequency": "130.625",
+     "fmp": false,
+     "sector": {
+      "letter": "T",
+      "layer": "MID"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "F L",
+     "lines": [
+      "F",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWF_LOW",
+     "controlled_by": [
+      "EPWW_F_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_F_CTR",
+     "frequency": "124.275",
+     "fmp": false,
+     "sector": {
+      "letter": "F",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "T L",
+     "lines": [
+      "T",
+      "L"
+     ],
+     "alt": null,
+     "station": "EPWWT_LOW",
+     "controlled_by": [
+      "EPWW_TM_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWW_TM_CTR",
+     "frequency": "130.625",
+     "fmp": false,
+     "sector": {
+      "letter": "T",
+      "layer": "LOW"
+     },
+     "in_ese": true
+    },
+    {
+     "label": "C EPWW",
+     "lines": [
+      "C",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_C",
+     "controlled_by": [
+      "EPWW_C_CTR"
+     ],
+     "callsign": "EPWW_C_CTR",
+     "frequency": "133.475",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "D EPWW",
+     "lines": [
+      "D",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_D",
+     "controlled_by": [
+      "EPWW_D_CTR"
+     ],
+     "callsign": "EPWW_D_CTR",
+     "frequency": "134.225",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "FMP EPWW",
+     "lines": [
+      "FMP",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_FMP",
+     "controlled_by": [
+      "EPWW_FMP"
+     ],
+     "callsign": "EPWW_FMP",
+     "frequency": "125.450",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "NFIR EPWW",
+     "lines": [
+      "NFIR",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_N",
+     "controlled_by": [
+      "EPWW_N_CTR"
+     ],
+     "callsign": "EPWW_N_CTR",
+     "frequency": "130.675",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EFIR EPWW",
+     "lines": [
+      "EFIR",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_E",
+     "controlled_by": [
+      "EPWW_E_CTR"
+     ],
+     "callsign": "EPWW_E_CTR",
+     "frequency": "120.950",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "SFIR EPWW",
+     "lines": [
+      "SFIR",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_S",
+     "controlled_by": [
+      "EPWW_S_CTR"
+     ],
+     "callsign": "EPWW_S_CTR",
+     "frequency": "123.625",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "DBF EPWW",
+     "lines": [
+      "DBF",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_DBF",
+     "controlled_by": [
+      "EPWW_DBF_CTR"
+     ],
+     "callsign": "EPWW_DBF_CTR",
+     "frequency": "133.180",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "DBT EPWW",
+     "lines": [
+      "DBT",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_DBT",
+     "controlled_by": [
+      "EPWW_DBT_CTR"
+     ],
+     "callsign": "EPWW_DBT_CTR",
+     "frequency": "127.025",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "DT EPWW",
+     "lines": [
+      "DT",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_DT",
+     "controlled_by": [
+      "EPWW_DT_CTR"
+     ],
+     "callsign": "EPWW_DT_CTR",
+     "frequency": "128.765",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "DTC EPWW",
+     "lines": [
+      "DTC",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_DTC",
+     "controlled_by": [
+      "EPWW_DTC_CTR"
+     ],
+     "callsign": "EPWW_DTC_CTR",
+     "frequency": "125.340",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "F EPWW",
+     "lines": [
+      "F",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_F",
+     "controlled_by": [
+      "EPWW_F_CTR"
+     ],
+     "callsign": "EPWW_F_CTR",
+     "frequency": "124.275",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "FG EPWW",
+     "lines": [
+      "FG",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_FG",
+     "controlled_by": [
+      "EPWW_FG_CTR"
+     ],
+     "callsign": "EPWW_FG_CTR",
+     "frequency": "124.925",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "G EPWW",
+     "lines": [
+      "G",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_G",
+     "controlled_by": [
+      "EPWW_G_CTR"
+     ],
+     "callsign": "EPWW_G_CTR",
+     "frequency": "129.075",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "J EPWW",
+     "lines": [
+      "J",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_J",
+     "controlled_by": [
+      "EPWW_J_CTR"
+     ],
+     "callsign": "EPWW_J_CTR",
+     "frequency": "124.625",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "JR EPWW",
+     "lines": [
+      "JR",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_JR",
+     "controlled_by": [
+      "EPWW_JR_CTR"
+     ],
+     "callsign": "EPWW_JR_CTR",
+     "frequency": "130.875",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "NE EPWW",
+     "lines": [
+      "NE",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_NE",
+     "controlled_by": [
+      "EPWW_NE_CTR"
+     ],
+     "callsign": "EPWW_NE_CTR",
+     "frequency": "127.450",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "T EPWW",
+     "lines": [
+      "T",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_TM",
+     "controlled_by": [
+      "EPWW_TM_CTR"
+     ],
+     "callsign": "EPWW_TM_CTR",
+     "frequency": "130.625",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "TCJ EPWW",
+     "lines": [
+      "TCJ",
+      "EPWW"
+     ],
+     "alt": null,
+     "station": "EPWW_TCJ",
+     "controlled_by": [
+      "EPWW_TCJ_CTR"
+     ],
+     "callsign": "EPWW_TCJ_CTR",
+     "frequency": "134.875",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    }
+   ]
+  },
+  {
+   "label": "TWR / KRAJ",
+   "rows": 5,
+   "keys": [
+    {
+     "label": "GD TWR",
+     "lines": [
+      "GD",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPGD_TWR",
+     "controlled_by": [
+      "EPGD_TWR",
+      "EPGD_L_APP",
+      "EPGD_APP",
+      "EPWW_G_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPGD_TWR",
+     "frequency": "118.105",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "GD GND",
+     "lines": [
+      "GD",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPGD_GND",
+     "controlled_by": [
+      "EPGD_GND"
+     ],
+     "callsign": "EPGD_GND",
+     "frequency": "131.330",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "BY TWR",
+     "lines": [
+      "BY",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPBY_TWR",
+     "controlled_by": [
+      "EPBY_TWR",
+      "EPGD_APP",
+      "EPWW_G_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPBY_TWR",
+     "frequency": "131.005",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KK TWR",
+     "lines": [
+      "KK",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPKK_TWR",
+     "controlled_by": [
+      "EPKK_TWR",
+      "EPKK_KK_APP",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_TWR",
+     "frequency": "123.255",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KK GND",
+     "lines": [
+      "KK",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPKK_GND",
+     "controlled_by": [
+      "EPKK_GND"
+     ],
+     "callsign": "EPKK_GND",
+     "frequency": "118.105",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KK DEL",
+     "lines": [
+      "KK",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPKK_DEL",
+     "controlled_by": [
+      "EPKK_DEL"
+     ],
+     "callsign": "EPKK_DEL",
+     "frequency": "121.980",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LB TWR",
+     "lines": [
+      "LB",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPLB_TWR",
+     "controlled_by": [
+      "EPLB_TWR",
+      "EPWW_JR_CTR",
+      "EPWW_E_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPLB_TWR",
+     "frequency": "136.430",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KT TWR",
+     "lines": [
+      "KT",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPKT_TWR",
+     "controlled_by": [
+      "EPKT_TWR",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKT_TWR",
+     "frequency": "129.255",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KT GND",
+     "lines": [
+      "KT",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPKT_GND",
+     "controlled_by": [
+      "EPKT_GND"
+     ],
+     "callsign": "EPKT_GND",
+     "frequency": "121.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KT DEL",
+     "lines": [
+      "KT",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPKT_DEL",
+     "controlled_by": [
+      "EPKT_DEL"
+     ],
+     "callsign": "EPKT_DEL",
+     "frequency": "124.080",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LL TWR",
+     "lines": [
+      "LL",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPLL_TWR",
+     "controlled_by": [
+      "EPLL_TWR",
+      "EPWA_S_APP",
+      "EPWA_N_APP",
+      "EPWA_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPLL_TWR",
+     "frequency": "124.230",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "MO TWR",
+     "lines": [
+      "MO",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPMO_TWR",
+     "controlled_by": [
+      "EPMO_TWR",
+      "EPWA_N_APP",
+      "EPWA_S_APP",
+      "EPWA_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPMO_TWR",
+     "frequency": "123.930",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "MO DEL",
+     "lines": [
+      "MO",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPMO_DEL",
+     "controlled_by": [
+      "EPMO_DEL"
+     ],
+     "callsign": "EPMO_DEL",
+     "frequency": "119.680",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LL DEL",
+     "lines": [
+      "LL",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPLL_DEL",
+     "controlled_by": [
+      "EPLL_DEL"
+     ],
+     "callsign": "EPLL_DEL",
+     "frequency": "120.005",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "PO TWR",
+     "lines": [
+      "PO",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPPO_TWR",
+     "controlled_by": [
+      "EPPO_TWR",
+      "EPPO_N_APP",
+      "EPWW_D_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPPO_TWR",
+     "frequency": "119.980",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "PO GND",
+     "lines": [
+      "PO",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPPO_GND",
+     "controlled_by": [
+      "EPPO_GND"
+     ],
+     "callsign": "EPPO_GND",
+     "frequency": "124.140",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "PO DEL",
+     "lines": [
+      "PO",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPPO_DEL",
+     "controlled_by": [
+      "EPPO_DEL"
+     ],
+     "callsign": "EPPO_DEL",
+     "frequency": "121.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "RA TWR",
+     "lines": [
+      "RA",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPRA_TWR",
+     "controlled_by": [
+      "EPRA_TWR",
+      "EPWA_S_APP",
+      "EPWA_N_APP",
+      "EPWA_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPRA_TWR",
+     "frequency": "118.430",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "RZ TWR",
+     "lines": [
+      "RZ",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPRZ_TWR",
+     "controlled_by": [
+      "EPRZ_TWR",
+      "EPKK_RZ_APP",
+      "EPKK_E_APP",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPRZ_TWR",
+     "frequency": "126.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "RZ GND",
+     "lines": [
+      "RZ",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPRZ_GND",
+     "controlled_by": [
+      "EPRZ_GND"
+     ],
+     "callsign": "EPRZ_GND",
+     "frequency": "121.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "SC TWR",
+     "lines": [
+      "SC",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPSC_TWR",
+     "controlled_by": [
+      "EPSC_TWR",
+      "EPWW_DBT_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPSC_TWR",
+     "frequency": "121.255",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA TWR",
+     "lines": [
+      "WA",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPWA_TWR",
+     "controlled_by": [
+      "EPWA_TWR",
+      "EPWA_F_APP",
+      "EPWA_APP",
+      "EPWA_N_APP",
+      "EPWA_S_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWA_TWR",
+     "frequency": "118.305",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA GND",
+     "lines": [
+      "WA",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPWA_GND",
+     "controlled_by": [
+      "EPWA_GND"
+     ],
+     "callsign": "EPWA_GND",
+     "frequency": "121.905",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA DEL",
+     "lines": [
+      "WA",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPWA_DEL",
+     "controlled_by": [
+      "EPWA_DEL"
+     ],
+     "callsign": "EPWA_DEL",
+     "frequency": "121.605",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "SY TWR",
+     "lines": [
+      "SY",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPSY_TWR",
+     "controlled_by": [
+      "EPSY_TWR",
+      "EPWW_NE_CTR",
+      "EPWW_N_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPSY_TWR",
+     "frequency": "118.030",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WR TWR",
+     "lines": [
+      "WR",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPWR_TWR",
+     "controlled_by": [
+      "EPWR_TWR",
+      "EPPO_S_APP",
+      "EPPO_N_APP",
+      "EPWW_TM_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWR_TWR",
+     "frequency": "120.255",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WR GND",
+     "lines": [
+      "WR",
+      "GND"
+     ],
+     "alt": null,
+     "station": "EPWR_GND",
+     "controlled_by": [
+      "EPWR_GND"
+     ],
+     "callsign": "EPWR_GND",
+     "frequency": "121.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WR DEL",
+     "lines": [
+      "WR",
+      "DEL"
+     ],
+     "alt": null,
+     "station": "EPWR_DEL",
+     "controlled_by": [
+      "EPWR_DEL"
+     ],
+     "callsign": "EPWR_DEL",
+     "frequency": "124.565",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "ZG TWR",
+     "lines": [
+      "ZG",
+      "TWR"
+     ],
+     "alt": null,
+     "station": "EPZG_TWR",
+     "controlled_by": [
+      "EPZG_TWR",
+      "EPPO_N_APP",
+      "EPWW_D_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPZG_TWR",
+     "frequency": "118.755",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    }
+   ]
+  },
+  {
+   "label": "FMP",
+   "rows": 5,
+   "keys": [
+    {
+     "label": "ESAA FMP",
+     "lines": [
+      "ESAA",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "ESAA_FMP",
+     "controlled_by": [
+      "ESAA_FMP"
+     ],
+     "callsign": "ESAA_FMP",
+     "frequency": "126.825",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EDUU FMP",
+     "lines": [
+      "EDUU",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EDWW FMP",
+     "lines": [
+      "EDWW",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "EDWW-FMP",
+     "controlled_by": [
+      "EDWW_FMP"
+     ],
+     "callsign": "EDWW_FMP",
+     "frequency": "199.998",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EDMM FMP",
+     "lines": [
+      "EDMM",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "EDMM-FMP",
+     "controlled_by": [
+      "EDMM_FMP"
+     ],
+     "callsign": "EDMM_FMP",
+     "frequency": "199.998",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "LKAA FMP",
+     "lines": [
+      "LKAA",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    null,
+    {
+     "label": "EPWW FMP",
+     "lines": [
+      "EPWW",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "EPWW_FMP",
+     "controlled_by": [
+      "EPWW_FMP"
+     ],
+     "callsign": "EPWW_FMP",
+     "frequency": "125.450",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    null,
+    {
+     "label": "UMKK TMU",
+     "lines": [
+      "UMKK",
+      "TMU"
+     ],
+     "alt": null,
+     "station": "UMKK_TMU",
+     "controlled_by": [
+      "UMKK_TMU"
+     ],
+     "callsign": "UMKK_TMU",
+     "frequency": "199.999",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EYVL FMP",
+     "lines": [
+      "EYVL",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "UMMV FMP",
+     "lines": [
+      "UMMV",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "UKR FMP",
+     "lines": [
+      "UKR",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "LZBB FMP",
+     "lines": [
+      "LZBB",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    }
+   ]
+  },
+  {
+   "label": "MALMO / VILNUS",
+   "rows": 5,
+   "keys": [
+    {
+     "label": "ESMM 9",
+     "lines": [
+      "ESMM 9",
+      "+365"
+     ],
+     "alt": "+365",
+     "station": "ESMM_9",
+     "controlled_by": [
+      "ESMM_9_CTR",
+      "ESMM_8_CTR",
+      "ESMM_6_CTR",
+      "ESMM_7_CTR",
+      "ESMM_Y_CTR",
+      "ESMM_2_CTR",
+      "ESAA_CTR"
+     ],
+     "callsign": "ESMM_9_CTR",
+     "frequency": "135.985",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "ESMM 8",
+     "lines": [
+      "ESMM 8",
+      "-365"
+     ],
+     "alt": "-365",
+     "station": "ESMM_8",
+     "controlled_by": [
+      "ESMM_8_CTR",
+      "ESMM_7_CTR",
+      "ESMM_6_CTR",
+      "ESMM_Y_CTR",
+      "ESMM_2_CTR",
+      "ESAA_CTR"
+     ],
+     "callsign": "ESMM_8_CTR",
+     "frequency": "128.180",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "ESMM L",
+     "lines": [
+      "ESMM L",
+      "-195"
+     ],
+     "alt": "-195",
+     "station": "ESMM_L",
+     "controlled_by": [
+      "ESMS_APP",
+      "ESMM_K_CTR",
+      "ESMM_8_CTR",
+      "ESMM_7_CTR",
+      "ESMM_Y_CTR",
+      "ESMM_2_CTR",
+      "ESAA_CTR"
+     ],
+     "callsign": "ESMS_APP",
+     "frequency": "134.980",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "ESMM 6",
+     "lines": [
+      "ESMM 6",
+      "+365"
+     ],
+     "alt": "+365",
+     "station": "ESMM_6",
+     "controlled_by": [
+      "ESMM_6_CTR",
+      "ESMM_7_CTR",
+      "ESMM_8_CTR",
+      "ESMM_Y_CTR",
+      "ESMM_2_CTR",
+      "ESAA_CTR"
+     ],
+     "callsign": "ESMM_6_CTR",
+     "frequency": "135.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "ESMM 7",
+     "lines": [
+      "ESMM 7",
+      "-365"
+     ],
+     "alt": "-365",
+     "station": "ESMM_7",
+     "controlled_by": [
+      "ESMM_7_CTR",
+      "ESMM_6_CTR",
+      "ESMM_8_CTR",
+      "ESMM_Y_CTR",
+      "ESMM_2_CTR",
+      "ESAA_CTR"
+     ],
+     "callsign": "ESMM_7_CTR",
+     "frequency": "124.155",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    {
+     "label": "ESAA FMP",
+     "lines": [
+      "ESAA",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "ESAA_FMP",
+     "controlled_by": [
+      "ESAA_FMP"
+     ],
+     "callsign": "ESAA_FMP",
+     "frequency": "126.825",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EYVL FMP",
+     "lines": [
+      "EYVL",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    null,
+    null,
+    {
+     "label": "EYVL U",
+     "lines": [
+      "EYVL U",
+      "+365"
+     ],
+     "alt": "+365",
+     "station": "EYVL-U",
+     "controlled_by": [
+      "EYVL_U_CTR",
+      "EYVL_CTR"
+     ],
+     "callsign": "EYVL_U_CTR",
+     "frequency": "132.280",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EYVL M",
+     "lines": [
+      "EYVL M",
+      "335-365"
+     ],
+     "alt": "335-365",
+     "station": "EYVL-M",
+     "controlled_by": [
+      "EYVL_M_CTR",
+      "EYVL_CTR"
+     ],
+     "callsign": "EYVL_M_CTR",
+     "frequency": "133.430",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EYVL",
+     "lines": [
+      "EYVL",
+      "225-335"
+     ],
+     "alt": "225-335",
+     "station": "EYVL-L",
+     "controlled_by": [
+      "EYVL_CTR"
+     ],
+     "callsign": "EYVL_CTR",
+     "frequency": "133.305",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EYVL E",
+     "lines": [
+      "EYVL E",
+      "-225"
+     ],
+     "alt": "-225",
+     "station": "EYVL-E",
+     "controlled_by": [
+      "EYVL_E_CTR",
+      "EYVL_CTR"
+     ],
+     "callsign": "EYVL_E_CTR",
+     "frequency": "135.380",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null
+   ]
+  },
+  {
+   "label": "RHEIN / BREMEN / MUNICH",
+   "rows": 6,
+   "keys": [
+    {
+     "label": "EDUU OSE22",
+     "lines": [
+      "EDUU",
+      "OSE22",
+      "+365"
+     ],
+     "alt": "+365",
+     "station": "EDUU-OSE22",
+     "controlled_by": [
+      "EDUU_O22_CTR",
+      "EDUU_O12_CTR",
+      "EDUU_H12_CTR",
+      "EDWW_MRZ_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDUU_O22_CTR",
+     "frequency": "126.785",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDUU OSE12",
+     "lines": [
+      "EDUU",
+      "OSE12",
+      "285-365"
+     ],
+     "alt": "285-365",
+     "station": "EDUU-OSE12",
+     "controlled_by": [
+      "EDUU_O12_CTR",
+      "EDUU_H12_CTR",
+      "EDWW_MRZ_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDUU_O12_CTR",
+     "frequency": "133.035",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDUU HVL22",
+     "lines": [
+      "EDUU",
+      "HVL22",
+      "+365"
+     ],
+     "alt": "+365",
+     "station": "EDUU-HVL22",
+     "controlled_by": [
+      "EDUU_O22_CTR",
+      "EDUU_H12_CTR",
+      "EDUU_O12_CTR",
+      "EDWW_BOR_CTR",
+      "EDWW_FLG_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDUU_O22_CTR",
+     "frequency": "126.785",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDUU HVL12",
+     "lines": [
+      "EDUU",
+      "HVL12",
+      "285-365"
+     ],
+     "alt": "285-365",
+     "station": "EDUU-HVL12",
+     "controlled_by": [
+      "EDUU_H12_CTR",
+      "EDUU_O12_CTR",
+      "EDWW_BOR_CTR",
+      "EDWW_FLG_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDUU_H12_CTR",
+     "frequency": "128.235",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDUU SPE",
+     "lines": [
+      "EDUU",
+      "SPE",
+      "+315"
+     ],
+     "alt": "+315",
+     "station": "EDUU-SPE",
+     "controlled_by": [
+      "EDUU_SPE_CTR",
+      "EDUU_SAL_CTR",
+      "EDUU_H12_CTR",
+      "EDMM_MEI_CTR",
+      "EDMM_GER_CTR",
+      "EDMM_HOF_CTR"
+     ],
+     "callsign": "EDUU_SPE_CTR",
+     "frequency": "133.285",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "EDWW MRZ",
+     "lines": [
+      "EDWW",
+      "MRZ"
+     ],
+     "alt": null,
+     "station": "EDWW-MRZ",
+     "controlled_by": [
+      "EDWW_MRZ_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDWW_MRZ_CTR",
+     "frequency": "124.175",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDWW MAR",
+     "lines": [
+      "EDWW",
+      "MAR"
+     ],
+     "alt": null,
+     "station": "EDWW-MAR",
+     "controlled_by": [
+      "EDWW_MAR_CTR",
+      "EDWW_MRZ_CTR",
+      "EDWW_BOR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDWW_MAR_CTR",
+     "frequency": "136.050",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDWW FLG",
+     "lines": [
+      "EDWW",
+      "FLG"
+     ],
+     "alt": null,
+     "station": "EDWW-FLG",
+     "controlled_by": [
+      "EDWW_FLG_CTR",
+      "EDWW_BOR_CTR",
+      "EDWW_MAR_CTR",
+      "EDWW_CTR"
+     ],
+     "callsign": "EDWW_FLG_CTR",
+     "frequency": "136.450",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "EDMM MEI",
+     "lines": [
+      "EDMM",
+      "MEI"
+     ],
+     "alt": null,
+     "station": "EDMM-MEI",
+     "controlled_by": [
+      "EDMM_MEI_CTR",
+      "EDMM_GER_CTR",
+      "EDMM_HOF_CTR"
+     ],
+     "callsign": "EDMM_MEI_CTR",
+     "frequency": "124.960",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDMM SAS",
+     "lines": [
+      "EDMM",
+      "SAS",
+      "-165"
+     ],
+     "alt": "-165",
+     "station": "EDMM-SAS",
+     "controlled_by": [
+      "EDDC_SAS_APP",
+      "EDMM_MEI_CTR",
+      "EDDP_TRS_APP",
+      "EDMM_GER_CTR",
+      "EDMM_HOF_CTR"
+     ],
+     "callsign": "EDDC_SAS_APP",
+     "frequency": "125.875",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "EDDB N APP",
+     "lines": [
+      "EDDB N",
+      "APP",
+      "-135"
+     ],
+     "alt": "-135",
+     "station": "EDWW-DBAN",
+     "controlled_by": [
+      "EDDB_N_APP",
+      "EDDB_S_APP"
+     ],
+     "callsign": "EDDB_N_APP",
+     "frequency": "119.630",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDDB N DEP",
+     "lines": [
+      "EDDB N",
+      "DEP",
+      "-165"
+     ],
+     "alt": "-165",
+     "station": "EDWW-DBDN",
+     "controlled_by": [
+      "EDDB_N_DEP",
+      "EDDB_S_DEP"
+     ],
+     "callsign": "EDDB_N_DEP",
+     "frequency": "120.340",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDDB S DEP",
+     "lines": [
+      "EDDB S",
+      "DEP",
+      "-165"
+     ],
+     "alt": "-165",
+     "station": "EDWW-DBDS",
+     "controlled_by": [
+      "EDDB_S_DEP",
+      "EDDB_N_DEP"
+     ],
+     "callsign": "EDDB_S_DEP",
+     "frequency": "120.630",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EDDB S APP",
+     "lines": [
+      "EDDB S",
+      "APP",
+      "-135"
+     ],
+     "alt": "-135",
+     "station": "EDWW-DBAS",
+     "controlled_by": [
+      "EDDB_S_APP",
+      "EDDB_N_APP"
+     ],
+     "callsign": "EDDB_S_APP",
+     "frequency": "126.425",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "EDUU FMP",
+     "lines": [
+      "EDUU",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EDWW FMP",
+     "lines": [
+      "EDWW",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "EDWW-FMP",
+     "controlled_by": [
+      "EDWW_FMP"
+     ],
+     "callsign": "EDWW_FMP",
+     "frequency": "199.998",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    {
+     "label": "EDMM FMP",
+     "lines": [
+      "EDMM",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "EDMM-FMP",
+     "controlled_by": [
+      "EDMM_FMP"
+     ],
+     "callsign": "EDMM_FMP",
+     "frequency": "199.998",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "label": "APP / KRAJ",
+   "rows": 5,
+   "keys": [
+    {
+     "label": "PO N APP",
+     "lines": [
+      "PO N",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPPO_TMA_N",
+     "controlled_by": [
+      "EPPO_N_APP",
+      "EPWW_D_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPPO_N_APP",
+     "frequency": "128.925",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "PO S APP",
+     "lines": [
+      "PO S",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPPO_TMA_S",
+     "controlled_by": [
+      "EPPO_S_APP",
+      "EPPO_N_APP",
+      "EPWW_TM_CTR",
+      "EPWW_DT_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_DBT_CTR",
+      "EPWW_S_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPPO_S_APP",
+     "frequency": "123.040",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "KK APP",
+     "lines": [
+      "KK",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPKK_TMA_W",
+     "controlled_by": [
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_APP",
+     "frequency": "121.075",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KT DIR",
+     "lines": [
+      "KT",
+      "DIR"
+     ],
+     "alt": null,
+     "station": "EPKT_DIR",
+     "controlled_by": [
+      "EPKK_KT_APP",
+      "EPKK_E_APP",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_KT_APP",
+     "frequency": "135.405",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    {
+     "label": "KK E APP",
+     "lines": [
+      "KK E",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPKK_TMA_E",
+     "controlled_by": [
+      "EPKK_E_APP",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_E_APP",
+     "frequency": "126.975",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "KK DIR",
+     "lines": [
+      "KK",
+      "DIR"
+     ],
+     "alt": null,
+     "station": "EPKK_DIR",
+     "controlled_by": [
+      "EPKK_KK_APP",
+      "EPKK_E_APP",
+      "EPKK_APP",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_KK_APP",
+     "frequency": "126.530",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "GD APP",
+     "lines": [
+      "GD",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPGD_UTMA",
+     "controlled_by": [
+      "EPGD_APP",
+      "EPWW_G_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPGD_APP",
+     "frequency": "127.280",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "GD L APP",
+     "lines": [
+      "GD L",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPGD_LTMA",
+     "controlled_by": [
+      "EPGD_L_APP",
+      "EPGD_APP",
+      "EPWW_G_CTR",
+      "EPWW_FG_CTR",
+      "EPWW_N_CTR",
+      "EPWW_DBF_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPGD_L_APP",
+     "frequency": "133.660",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "KK RZ APP",
+     "lines": [
+      "KK RZ",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPRZ_TMA",
+     "controlled_by": [
+      "EPKK_RZ_APP",
+      "EPKK_E_APP",
+      "EPKK_APP",
+      "EPRZ_TWR",
+      "EPWW_J_CTR",
+      "EPWW_JR_CTR",
+      "EPWW_S_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_E_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPKK_RZ_APP",
+     "frequency": "133.030",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "WA N APP",
+     "lines": [
+      "WA N",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPWA_TMA_N",
+     "controlled_by": [
+      "EPWA_N_APP",
+      "EPWA_S_APP",
+      "EPWA_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWA_N_APP",
+     "frequency": "125.055",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA S APP",
+     "lines": [
+      "WA S",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPWA_TMA_S",
+     "controlled_by": [
+      "EPWA_S_APP",
+      "EPWA_N_APP",
+      "EPWA_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWA_S_APP",
+     "frequency": "135.930",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA APP",
+     "lines": [
+      "WA",
+      "APP"
+     ],
+     "alt": null,
+     "station": "EPWA_TMA",
+     "controlled_by": [
+      "EPWA_APP",
+      "EPWA_S_APP",
+      "EPWA_N_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWA_APP",
+     "frequency": "128.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "WA DIR",
+     "lines": [
+      "WA",
+      "DIR"
+     ],
+     "alt": null,
+     "station": "EPWA_DIR",
+     "controlled_by": [
+      "EPWA_F_APP",
+      "EPWA_APP",
+      "EPWA_S_APP",
+      "EPWA_N_APP",
+      "EPWW_C_CTR",
+      "EPWW_NE_CTR",
+      "EPWW_TCJ_CTR",
+      "EPWW_DTC_CTR",
+      "EPWW_S_CTR",
+      "EPWW_E_CTR",
+      "EPWW_N_CTR",
+      "EPWW_ALL_CTR",
+      "EPWW_ALH_CTR"
+     ],
+     "callsign": "EPWA_F_APP",
+     "frequency": "129.380",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null
+   ]
+  },
+  {
+   "label": "FIS",
+   "rows": 6,
+   "keys": [
+    null,
+    {
+     "label": "PO N FIS",
+     "lines": [
+      "PO N",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPPO_FIS",
+     "controlled_by": [
+      "EPPO_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPPO_I_APP",
+     "frequency": "126.300",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "PO S FIS",
+     "lines": [
+      "PO S",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPPO_FIS_S",
+     "controlled_by": [
+      "EPPO_IS_APP",
+      "EPPO_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPPO_IS_APP",
+     "frequency": "127.250",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "GD FIS",
+     "lines": [
+      "GD",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPGD_FIS",
+     "controlled_by": [
+      "EPGD_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPGD_I_APP",
+     "frequency": "127.275",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "WA W FIS",
+     "lines": [
+      "WA W",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPWA_FIS_W",
+     "controlled_by": [
+      "EPWA_IW_APP",
+      "EPWA_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPWA_IW_APP",
+     "frequency": "128.575",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "KK FIS",
+     "lines": [
+      "KK",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPKK_FIS",
+     "controlled_by": [
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKK_I_APP",
+     "frequency": "119.275",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "WA N FIS",
+     "lines": [
+      "WA N",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPWA_FIS_N",
+     "controlled_by": [
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPSY_I_APP",
+     "frequency": "118.775",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "WA C FIS",
+     "lines": [
+      "WA C",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPWA_FIS_C",
+     "controlled_by": [
+      "EPWA_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPWA_I_APP",
+     "frequency": "123.975",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    {
+     "label": "GD E FIS",
+     "lines": [
+      "GD E",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPGD_FIS_E",
+     "controlled_by": [
+      "EPGD_IE_APP",
+      "EPGD_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPGD_IE_APP",
+     "frequency": "127.150",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "WA E FIS",
+     "lines": [
+      "WA E",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPWA_FIS_E",
+     "controlled_by": [
+      "EPWA_IE_APP",
+      "EPWA_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPWA_IE_APP",
+     "frequency": "119.450",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "KK E FIS",
+     "lines": [
+      "KK E",
+      "FIS"
+     ],
+     "alt": null,
+     "station": "EPKK_FIS_E",
+     "controlled_by": [
+      "EPKK_IE_APP",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKK_IE_APP",
+     "frequency": "119.950",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "EPBC BABICE INFO",
+     "lines": [
+      "EPBC",
+      "BABICE",
+      "INFO"
+     ],
+     "alt": null,
+     "station": "EPBC",
+     "controlled_by": [
+      "EPBC_I_TWR",
+      "EPWA_I_APP",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPBC_I_TWR",
+     "frequency": "119.180",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPML MIELEC INFO",
+     "lines": [
+      "EPML",
+      "MIELEC",
+      "INFO"
+     ],
+     "alt": null,
+     "station": "EPML",
+     "controlled_by": [
+      "EPML_I_TWR",
+      "EPKK_IE_APP",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPML_I_TWR",
+     "frequency": "119.105",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPBK BIALY STOK",
+     "lines": [
+      "EPBK",
+      "BIALY",
+      "STOK"
+     ],
+     "alt": null,
+     "station": "EPBK",
+     "controlled_by": [
+      "EPBK_R_TWR",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPBK_R_TWR",
+     "frequency": "123.205",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPBA BIELSKO",
+     "lines": [
+      "EPBA",
+      "BIELSKO"
+     ],
+     "alt": null,
+     "station": "EPBA",
+     "controlled_by": [
+      "EPBA_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPBA_R_TWR",
+     "frequency": "118.330",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPOD DAJTKI",
+     "lines": [
+      "EPOD",
+      "DAJTKI"
+     ],
+     "alt": null,
+     "station": "EPOD",
+     "controlled_by": [
+      "EPOD_R_TWR",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPOD_R_TWR",
+     "frequency": "124.480",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPGL GLIWICE",
+     "lines": [
+      "EPGL",
+      "GLIWICE"
+     ],
+     "alt": null,
+     "station": "EPGL",
+     "controlled_by": [
+      "EPGL_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPGL_R_TWR",
+     "frequency": "118.260",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPGY GRADY",
+     "lines": [
+      "EPGY",
+      "GRADY"
+     ],
+     "alt": null,
+     "station": "EPGY",
+     "controlled_by": [
+      "EPGY_R_TWR",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPGY_R_TWR",
+     "frequency": "126.855",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPJA JASTA RNIA",
+     "lines": [
+      "EPJA",
+      "JASTA",
+      "RNIA"
+     ],
+     "alt": null,
+     "station": "EPJA",
+     "controlled_by": [
+      "EPJA_R_TWR",
+      "EPGD_IE_APP",
+      "EPGD_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPJA_R_TWR",
+     "frequency": "122.830",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPKM KATOWICE",
+     "lines": [
+      "EPKM",
+      "KATOWICE"
+     ],
+     "alt": null,
+     "station": "EPKM",
+     "controlled_by": [
+      "EPKM_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKM_R_TWR",
+     "frequency": "120.080",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPKI KIKITY",
+     "lines": [
+      "EPKI",
+      "KIKITY"
+     ],
+     "alt": null,
+     "station": "EPKI",
+     "controlled_by": [
+      "EPKI_R_TWR",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKI_R_TWR",
+     "frequency": "119.405",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPKR KROSNO",
+     "lines": [
+      "EPKR",
+      "KROSNO"
+     ],
+     "alt": null,
+     "station": "EPKR",
+     "controlled_by": [
+      "EPKR_R_TWR",
+      "EPKK_IE_APP",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKR_R_TWR",
+     "frequency": "119.555",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPKA MASLOW",
+     "lines": [
+      "EPKA",
+      "MASLOW"
+     ],
+     "alt": null,
+     "station": "EPKA",
+     "controlled_by": [
+      "EPKA_R_TWR",
+      "EPKK_IE_APP",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKA_R_TWR",
+     "frequency": "118.080",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPNT NOWY TARG",
+     "lines": [
+      "EPNT",
+      "NOWY",
+      "TARG"
+     ],
+     "alt": null,
+     "station": "EPNT",
+     "controlled_by": [
+      "EPNT_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPNT_R_TWR",
+     "frequency": "122.305",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPKP POBIE DNIK",
+     "lines": [
+      "EPKP",
+      "POBIE",
+      "DNIK"
+     ],
+     "alt": null,
+     "station": "EPKP",
+     "controlled_by": [
+      "EPKP_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPKP_R_TWR",
+     "frequency": "118.605",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPPZ PRZAS NYSZ",
+     "lines": [
+      "EPPZ",
+      "PRZAS",
+      "NYSZ"
+     ],
+     "alt": null,
+     "station": "EPPZ",
+     "controlled_by": [
+      "EPPZ_R_TWR",
+      "EPSY_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPPZ_R_TWR",
+     "frequency": "122.600",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPZP PRZYLEP",
+     "lines": [
+      "EPZP",
+      "PRZYLEP"
+     ],
+     "alt": null,
+     "station": "EPZP",
+     "controlled_by": [
+      "EPZP_R_TWR",
+      "EPPO_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPZP_R_TWR",
+     "frequency": "130.780",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPLR RADAWIEC",
+     "lines": [
+      "EPLR",
+      "RADAWIEC"
+     ],
+     "alt": null,
+     "station": "EPLR",
+     "controlled_by": [
+      "EPLR_R_TWR",
+      "EPWA_IE_APP",
+      "EPWA_I_APP",
+      "EPWW_IE_CTR",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPLR_R_TWR",
+     "frequency": "121.390",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "EPZR ZAR",
+     "lines": [
+      "EPZR",
+      "ZAR"
+     ],
+     "alt": null,
+     "station": "EPZR",
+     "controlled_by": [
+      "EPZR_R_TWR",
+      "EPKK_I_APP",
+      "EPWW_I_CTR"
+     ],
+     "callsign": "EPZR_R_TWR",
+     "frequency": "122.805",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    }
+   ]
+  },
+  {
+   "label": "UMKK / MINSK / LVIV",
+   "rows": 6,
+   "keys": [
+    {
+     "label": "UMKK",
+     "lines": [
+      "UMKK"
+     ],
+     "alt": null,
+     "station": "UMKK_ACC",
+     "controlled_by": [
+      "UMKK_CTR"
+     ],
+     "callsign": "UMKK_CTR",
+     "frequency": "123.700",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UMKK APP",
+     "lines": [
+      "UMKK",
+      "APP",
+      "-265"
+     ],
+     "alt": "-265",
+     "station": "UMKK_APP",
+     "controlled_by": [
+      "UMKK_APP"
+     ],
+     "callsign": "UMKK_APP",
+     "frequency": "126.000",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UMKK TMU",
+     "lines": [
+      "UMKK",
+      "TMU"
+     ],
+     "alt": null,
+     "station": "UMKK_TMU",
+     "controlled_by": [
+      "UMKK_TMU"
+     ],
+     "callsign": "UMKK_TMU",
+     "frequency": "199.999",
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    {
+     "label": "UKLV",
+     "lines": [
+      "UKLV"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UKLV_CTR"
+     ],
+     "callsign": "UKLV_CTR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UKLU TWR",
+     "lines": [
+      "UKLU",
+      "TWR"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UKLU_TWR"
+     ],
+     "callsign": "UKLU_TWR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    {
+     "label": "UKR CTR",
+     "lines": [
+      "UKR",
+      "CTR"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UKR_CTR"
+     ],
+     "callsign": "UKR_CTR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UKLL APP",
+     "lines": [
+      "UKLL",
+      "APP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UKLL_APP"
+     ],
+     "callsign": "UKLL_APP",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UMMV N",
+     "lines": [
+      "UMMV",
+      "N"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UMMV_N_CTR"
+     ],
+     "callsign": "UMMV_N_CTR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UMMV W",
+     "lines": [
+      "UMMV",
+      "W"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UMMV_W_CTR"
+     ],
+     "callsign": "UMMV_W_CTR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "UMBB TWR",
+     "lines": [
+      "UMBB",
+      "TWR"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UMBB_TWR"
+     ],
+     "callsign": "UMBB_TWR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    {
+     "label": "UMMV",
+     "lines": [
+      "UMMV"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [
+      "UMMV_CTR"
+     ],
+     "callsign": "UMMV_CTR",
+     "frequency": null,
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "label": "PRAHA / BRATI / SLAVA",
+   "rows": 5,
+   "keys": [
+    {
+     "label": "LKAA N",
+     "lines": [
+      "LKAA",
+      "N",
+      "+305"
+     ],
+     "alt": "+305",
+     "station": "LKAA NU",
+     "controlled_by": [
+      "LKAA_U_CTR",
+      "LKAA_N_CTR",
+      "LKAA_NS_CTR",
+      "LKAA_CTR"
+     ],
+     "callsign": "LKAA_U_CTR",
+     "frequency": "124.775",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "LKAA N",
+     "lines": [
+      "LKAA",
+      "N",
+      "-305"
+     ],
+     "alt": "-305",
+     "station": "LKAA NL",
+     "controlled_by": [
+      "LKAA_N_CTR",
+      "LKAA_NS_CTR",
+      "LKAA_L_CTR",
+      "LKAA_CTR"
+     ],
+     "callsign": "LKAA_N_CTR",
+     "frequency": "127.825",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LZBB U",
+     "lines": [
+      "LZBB",
+      "U",
+      "+305"
+     ],
+     "alt": "+305",
+     "station": "LZBB_CENTER_1U",
+     "controlled_by": [
+      "LZBB_U_CTR",
+      "LZBB_CTR"
+     ],
+     "callsign": "LZBB_U_CTR",
+     "frequency": "127.425",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "LZBB",
+     "lines": [
+      "LZBB",
+      "-305"
+     ],
+     "alt": "-305",
+     "station": "LZBB_CENTER_0L",
+     "controlled_by": [
+      "LZBB_CTR"
+     ],
+     "callsign": "LZBB_CTR",
+     "frequency": "134.475",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "LKAA S",
+     "lines": [
+      "LKAA",
+      "S",
+      "+305"
+     ],
+     "alt": "+305",
+     "station": "LKAA SU",
+     "controlled_by": [
+      "LKAA_U_CTR",
+      "LKAA_S_CTR",
+      "LKAA_NS_CTR",
+      "LKAA_CTR"
+     ],
+     "callsign": "LKAA_U_CTR",
+     "frequency": "124.775",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "LKAA S",
+     "lines": [
+      "LKAA",
+      "S",
+      "-305"
+     ],
+     "alt": "-305",
+     "station": "LKAA SL",
+     "controlled_by": [
+      "LKAA_S_CTR",
+      "LKAA_NS_CTR",
+      "LKAA_L_CTR",
+      "LKAA_CTR"
+     ],
+     "callsign": "LKAA_S_CTR",
+     "frequency": "133.410",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LZTT TWR",
+     "lines": [
+      "LZTT",
+      "TWR",
+      "-135"
+     ],
+     "alt": "-135",
+     "station": "LZTT_TWR",
+     "controlled_by": [
+      "LZTT_TWR"
+     ],
+     "callsign": "LZTT_TWR",
+     "frequency": "121.350",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    null,
+    {
+     "label": "LKMT APP",
+     "lines": [
+      "LKMT",
+      "APP",
+      "-125"
+     ],
+     "alt": "-125",
+     "station": "LKAA MT",
+     "controlled_by": [
+      "LKMT_APP",
+      "LKAA_R_CTR",
+      "LKAA_N_CTR",
+      "LKAA_NS_CTR",
+      "LKAA_L_CTR",
+      "LKAA_CTR"
+     ],
+     "callsign": "LKMT_APP",
+     "frequency": "119.375",
+     "fmp": false,
+     "sector": null,
+     "in_ese": true
+    },
+    {
+     "label": "LKAA FMP",
+     "lines": [
+      "LKAA",
+      "FMP"
+     ],
+     "alt": null,
+     "station": "lkaa",
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null,
+    {
+     "label": "LZBB FMP",
+     "lines": [
+      "LZBB",
+      "FMP"
+     ],
+     "alt": null,
+     "station": null,
+     "controlled_by": [],
+     "callsign": null,
+     "frequency": null,
+     "fmp": true,
+     "sector": null,
+     "in_ese": false
+    },
+    null
+   ]
+  }
+ ],
+ "neighbour_positions": [
+  {
+   "id": "EDWW_ALR_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "126.325",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_BOR_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "123.225",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_EID_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "124.075",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_EMS_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "125.025",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWW_FLG_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "136.450",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_HEI_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "125.855",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWW_HRZ_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "124.240",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWW_MAR_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "136.050",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_MRZ_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "124.175",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDWW_W_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "127.675",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWW_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "133.725",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDUU_O12_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "133.035",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDUU_O22_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "126.785",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDUU_H12_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "128.235",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDYY_BB_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "129.840",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_CH_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "128.810",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_CL_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "133.955",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_HH_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "132.780",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_HL_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "120.860",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_JH_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "129.735",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_JL_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "136.465",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_SH_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "131.380",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDYY_SL_CTR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDYY"
+   ],
+   "frequency": "134.710",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_AN_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "136.105",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDB_AS_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "121.130",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDB_N_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "119.630",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDB_S_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "126.425",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDB_N_DEP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "120.340",
+   "facility_type": "DEP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDB_S_DEP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "120.630",
+   "facility_type": "DEP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDH_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "120.540",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_A_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "118.205",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_W_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "134.255",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDV_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDV"
+   ],
+   "frequency": "119.490",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDV_A_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDV"
+   ],
+   "frequency": "119.605",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDW_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDW"
+   ],
+   "frequency": "124.800",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_N_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "120.030",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_S_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "118.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "126.855",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_VFR_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "121.280",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDV_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDV"
+   ],
+   "frequency": "120.180",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDW_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDW"
+   ],
+   "frequency": "120.330",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_A_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "121.855",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_E_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "129.605",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_ICE_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "121.665",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_N_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "129.505",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_S_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "121.705",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_E_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "121.705",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_W_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "121.980",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDV_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDV"
+   ],
+   "frequency": "121.955",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDW_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDW"
+   ],
+   "frequency": "121.755",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDB_DEL",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDB"
+   ],
+   "frequency": "121.605",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "EDDH_DEL",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDH"
+   ],
+   "frequency": "121.805",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "EDDV_DEL",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDDV"
+   ],
+   "frequency": "120.405",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "ETHB_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHB"
+   ],
+   "frequency": "124.505",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETHB_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHB"
+   ],
+   "frequency": "123.240",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETHC_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHC"
+   ],
+   "frequency": "123.305",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETHC_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHC"
+   ],
+   "frequency": "130.505",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETHC_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHC"
+   ],
+   "frequency": "118.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETHS_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHS"
+   ],
+   "frequency": "119.355",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETHS_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETHS"
+   ],
+   "frequency": "118.525",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETMN_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETMN"
+   ],
+   "frequency": "129.855",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETMN_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETMN"
+   ],
+   "frequency": "131.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETND_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETND"
+   ],
+   "frequency": "135.130",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETNH_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNH"
+   ],
+   "frequency": "122.700",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNH_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNH"
+   ],
+   "frequency": "125.600",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNH_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNH"
+   ],
+   "frequency": "125.600",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETNL_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNL"
+   ],
+   "frequency": "123.300",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNL_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNL"
+   ],
+   "frequency": "133.105",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNL_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNL"
+   ],
+   "frequency": "118.430",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETNL_A_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNL"
+   ],
+   "frequency": "121.955",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ETNS_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNS"
+   ],
+   "frequency": "123.300",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNS_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNS"
+   ],
+   "frequency": "118.555",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNS_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNS"
+   ],
+   "frequency": "135.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETNT_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNT"
+   ],
+   "frequency": "131.015",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNT_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNT"
+   ],
+   "frequency": "118.730",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETNW_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNW"
+   ],
+   "frequency": "124.655",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNW_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNW"
+   ],
+   "frequency": "123.300",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETNW_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETNW"
+   ],
+   "frequency": "132.055",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ETSH_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETSH"
+   ],
+   "frequency": "129.855",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETSH_P_APP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETSH"
+   ],
+   "frequency": "123.300",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ETSH_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "ETSH"
+   ],
+   "frequency": "130.505",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDAH_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDAH"
+   ],
+   "frequency": "132.830",
+   "facility_type": "TWR",
+   "in_ese": true
+  },
+  {
+   "id": "EDHI_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDHI"
+   ],
+   "frequency": "123.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDHL_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDHL"
+   ],
+   "frequency": "128.705",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDHL_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDHL"
+   ],
+   "frequency": "121.780",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDVE_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDVE"
+   ],
+   "frequency": "120.055",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDVK_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDVK"
+   ],
+   "frequency": "118.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDVK_GND",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDVK"
+   ],
+   "frequency": "121.905",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDXW_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDXW"
+   ],
+   "frequency": "119.750",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDAY_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDAY"
+   ],
+   "frequency": "118.735",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDAZ_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDAZ"
+   ],
+   "frequency": "131.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDBC_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDBC"
+   ],
+   "frequency": "131.130",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDBH_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDBH"
+   ],
+   "frequency": "118.080",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDBM_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDBM"
+   ],
+   "frequency": "119.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDBN_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDBN"
+   ],
+   "frequency": "119.180",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDHK_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDHK"
+   ],
+   "frequency": "119.980",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWE_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWE"
+   ],
+   "frequency": "118.605",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWI_I_TWR",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWI"
+   ],
+   "frequency": "118.605",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDWW_FMP",
+   "fir_dir": "EDWW",
+   "prefixes": [
+    "EDWW"
+   ],
+   "frequency": "199.998",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_FMP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "199.998",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_ALB_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "129.100",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_BBG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "133.615",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_EGG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "129.555",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_FUE_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "133.550",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_GER_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "133.230",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDMM_HAL_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "118.235",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDMM_HOF_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "133.565",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDMM_MEI_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "124.960",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDMM_NDG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "125.140",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_RDG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "132.555",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_STA_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "132.455",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_TEG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "133.680",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_TRU_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "132.635",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_WLD_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "136.230",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_ZUG_CTR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "134.150",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_ALP_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "133.755",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_AMM_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "123.390",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_DON_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "127.290",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_ERL_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "136.405",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDUU_SAL_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "133.860",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDUU_SPE_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "133.285",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EDDM_ND_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "118.830",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_NH_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "128.030",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_NL_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "123.905",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_SD_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "132.305",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_SH_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "120.780",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_SL_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "127.955",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_FB_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "131.230",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDN_FRK_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDN"
+   ],
+   "frequency": "129.525",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDN_D_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDN"
+   ],
+   "frequency": "119.475",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_TRN_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "126.065",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_TRS_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "126.175",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDDP_ND_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "129.765",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_SD_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "120.840",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDC_SAS_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDC"
+   ],
+   "frequency": "125.875",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EDJA_ILR_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDJA"
+   ],
+   "frequency": "129.450",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDMM_SWA_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMM"
+   ],
+   "frequency": "136.525",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDMA_APP",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMA"
+   ],
+   "frequency": "128.255",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_N_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "118.705",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_S_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "120.505",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_1_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.780",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_2_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.710",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_3_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.930",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_I_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.990",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_N_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.980",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_S_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.830",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDM_DEL",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDM"
+   ],
+   "frequency": "121.730",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_N_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "125.955",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_S_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "121.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "121.805",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDP_DEL",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDP"
+   ],
+   "frequency": "121.680",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "EDDN_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDN"
+   ],
+   "frequency": "118.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDN_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDN"
+   ],
+   "frequency": "121.760",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDJA_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDJA"
+   ],
+   "frequency": "126.855",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDJA_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDJA"
+   ],
+   "frequency": "121.680",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDMA_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMA"
+   ],
+   "frequency": "124.980",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDMO_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDMO"
+   ],
+   "frequency": "119.555",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDC_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDC"
+   ],
+   "frequency": "122.930",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDC_A_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDC"
+   ],
+   "frequency": "121.755",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDC_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDC"
+   ],
+   "frequency": "121.980",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDE_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDE"
+   ],
+   "frequency": "121.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDDE_A_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDE"
+   ],
+   "frequency": "121.905",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDDE_GND",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDDE"
+   ],
+   "frequency": "121.755",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EDQM_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDQM"
+   ],
+   "frequency": "124.355",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EDNY_TWR",
+   "fir_dir": "EDMM",
+   "prefixes": [
+    "EDNY"
+   ],
+   "frequency": "120.080",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKAA_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "127.125",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_U_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "124.775",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_L_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "135.135",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_R_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "124.050",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_N_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "127.825",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_S_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "133.410",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_NS_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "132.890",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_W_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "120.275",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LKAA_WU_CTR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "132.065",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "LKAA_FIC_FSS",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKAA"
+   ],
+   "frequency": "126.100",
+   "facility_type": "FSS",
+   "in_ese": true
+  },
+  {
+   "id": "LKPR_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "127.580",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "LKPR_D_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "119.010",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "LKPR_DEP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "120.530",
+   "facility_type": "DEP",
+   "in_ese": true
+  },
+  {
+   "id": "LKCV_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKCV"
+   ],
+   "frequency": "130.280",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKKB_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKKB"
+   ],
+   "frequency": "124.680",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKKV_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKKV"
+   ],
+   "frequency": "118.650",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKMT_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKMT"
+   ],
+   "frequency": "119.375",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "LKNA_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKNA"
+   ],
+   "frequency": "118.155",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKPD_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPD"
+   ],
+   "frequency": "128.365",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKTB_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKTB"
+   ],
+   "frequency": "127.350",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKVO_APP",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKVO"
+   ],
+   "frequency": "127.480",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LKCS_I_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKCS"
+   ],
+   "frequency": "135.930",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKCV_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKCV"
+   ],
+   "frequency": "134.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKKB_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKKB"
+   ],
+   "frequency": "120.880",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKKU_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKKU"
+   ],
+   "frequency": "120.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKKV_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKKV"
+   ],
+   "frequency": "121.230",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKLT_I_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKLT"
+   ],
+   "frequency": "120.335",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKMT_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKMT"
+   ],
+   "frequency": "120.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKNA_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKNA"
+   ],
+   "frequency": "126.505",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKPD_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPD"
+   ],
+   "frequency": "120.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKPR_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "134.560",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKTB_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKTB"
+   ],
+   "frequency": "119.605",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKVO_TWR",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKVO"
+   ],
+   "frequency": "133.080",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LKPR_GND",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "121.910",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "LKPR_DEL",
+   "fir_dir": "LK",
+   "prefixes": [
+    "LKPR"
+   ],
+   "frequency": "120.060",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "LZBB_CTR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZBB"
+   ],
+   "frequency": "134.475",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LZBB_I_CTR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZBB"
+   ],
+   "frequency": "124.300",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LZBB_U_CTR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZBB"
+   ],
+   "frequency": "127.425",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "LZIB_APP",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZIB"
+   ],
+   "frequency": "134.930",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LZIB_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZIB"
+   ],
+   "frequency": "118.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LZIB_GND",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZIB"
+   ],
+   "frequency": "120.905",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "LZKZ_APP",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZKZ"
+   ],
+   "frequency": "129.355",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LZKZ_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZKZ"
+   ],
+   "frequency": "120.405",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LZMC_APP",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZMC"
+   ],
+   "frequency": "129.575",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LZPP_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZPP"
+   ],
+   "frequency": "118.580",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LZSL_APP",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZSL"
+   ],
+   "frequency": "119.150",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "LZSL_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZSL"
+   ],
+   "frequency": "122.905",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "LZTT_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZTT"
+   ],
+   "frequency": "121.350",
+   "facility_type": "TWR",
+   "in_ese": true
+  },
+  {
+   "id": "LZZI_TWR",
+   "fir_dir": "LZ",
+   "prefixes": [
+    "LZZI"
+   ],
+   "frequency": "124.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESAA_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESAA"
+   ],
+   "frequency": "126.825",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESAA_FMP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESAA"
+   ],
+   "frequency": "126.825",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "ESCF_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCF"
+   ],
+   "frequency": "135.855",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESCF_F_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCF"
+   ],
+   "frequency": "126.405",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESCF_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCF"
+   ],
+   "frequency": "121.855",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESCF_P_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCF"
+   ],
+   "frequency": "125.205",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESCF_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCF"
+   ],
+   "frequency": "129.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESCM_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCM"
+   ],
+   "frequency": "130.405",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESCM_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCM"
+   ],
+   "frequency": "119.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESCR_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESCR"
+   ],
+   "frequency": "135.205",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESDF_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDF"
+   ],
+   "frequency": "128.455",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESDF_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDF"
+   ],
+   "frequency": "121.855",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESDF_P_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDF"
+   ],
+   "frequency": "134.105",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESDF_F_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDF"
+   ],
+   "frequency": "129.905",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESDF_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDF"
+   ],
+   "frequency": "119.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESDK_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESDK"
+   ],
+   "frequency": "132.105",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESFR_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESFR"
+   ],
+   "frequency": "133.505",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESFR_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESFR"
+   ],
+   "frequency": "136.030",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_A_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "120.130",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_DEL",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "121.680",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_E_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "124.680",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "121.905",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "118.605",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESGG_W_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGG"
+   ],
+   "frequency": "124.205",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESGJ_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGJ"
+   ],
+   "frequency": "118.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESGT_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESGT"
+   ],
+   "frequency": "122.730",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESIA_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIA"
+   ],
+   "frequency": "132.055",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESIA_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIA"
+   ],
+   "frequency": "133.005",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESIB_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIB"
+   ],
+   "frequency": "134.555",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESIB_F_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIB"
+   ],
+   "frequency": "123.005",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESIB_P_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIB"
+   ],
+   "frequency": "119.305",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESIB_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIB"
+   ],
+   "frequency": "128.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESIB_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESIB"
+   ],
+   "frequency": "121.855",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESKM_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESKM"
+   ],
+   "frequency": "119.055",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESKN_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESKN"
+   ],
+   "frequency": "127.705",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESKS_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESKS"
+   ],
+   "frequency": "124.460",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMK_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMK"
+   ],
+   "frequency": "129.355",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMM_2_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "127.755",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_3_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "128.055",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_4_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "124.405",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_5_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "132.765",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_6_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "135.805",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_7_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "124.155",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_8_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "128.180",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_9_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "135.985",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_IN_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "128.630",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESMM_IS_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "124.855",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_K_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "131.280",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMM_W_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "133.260",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMM_XK_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "133.805",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMM_Y_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMM"
+   ],
+   "frequency": "134.455",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESMQ_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMQ"
+   ],
+   "frequency": "130.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMS_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMS"
+   ],
+   "frequency": "134.980",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "ESMS_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMS"
+   ],
+   "frequency": "121.705",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESMS_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMS"
+   ],
+   "frequency": "118.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMS_XL_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMS"
+   ],
+   "frequency": "134.155",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "ESMT_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMT"
+   ],
+   "frequency": "130.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMV_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMV"
+   ],
+   "frequency": "121.155",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESMV_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMV"
+   ],
+   "frequency": "136.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESMX_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESMX"
+   ],
+   "frequency": "118.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESND_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESND"
+   ],
+   "frequency": "122.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNG_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNG"
+   ],
+   "frequency": "122.330",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNJ_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNJ"
+   ],
+   "frequency": "124.855",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESNJ_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNJ"
+   ],
+   "frequency": "133.005",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNK_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNK"
+   ],
+   "frequency": "122.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNL_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNL"
+   ],
+   "frequency": "122.230",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNN_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNN"
+   ],
+   "frequency": "129.555",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNO_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNO"
+   ],
+   "frequency": "122.255",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNQ_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNQ"
+   ],
+   "frequency": "130.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNS_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNS"
+   ],
+   "frequency": "122.055",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNU_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNU"
+   ],
+   "frequency": "119.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNV_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNV"
+   ],
+   "frequency": "122.555",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNX_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNX"
+   ],
+   "frequency": "122.730",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESNZ_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESNZ"
+   ],
+   "frequency": "135.655",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOE_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOE"
+   ],
+   "frequency": "120.280",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOH_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOH"
+   ],
+   "frequency": "122.230",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOK_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOK"
+   ],
+   "frequency": "119.455",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_1_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "118.405",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "ESOS_2_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "133.705",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_3_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "131.130",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_4_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "118.205",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_6_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "132.480",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_7_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "118.280",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_8_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "129.180",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_9_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "127.530",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_F_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "124.430",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_K_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "131.055",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_N_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "132.155",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_XK_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "125.600",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOS_YK_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOS"
+   ],
+   "frequency": "133.455",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESOW_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOW"
+   ],
+   "frequency": "125.955",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESOW_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESOW"
+   ],
+   "frequency": "130.605",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESPA_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPA"
+   ],
+   "frequency": "125.455",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESPA_F_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPA"
+   ],
+   "frequency": "130.805",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESPA_P_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPA"
+   ],
+   "frequency": "119.005",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESPA_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPA"
+   ],
+   "frequency": "128.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESPE_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPE"
+   ],
+   "frequency": "124.155",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESPE_P_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPE"
+   ],
+   "frequency": "135.405",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESPE_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPE"
+   ],
+   "frequency": "130.405",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESPF_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESPF"
+   ],
+   "frequency": "129.455",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_A_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "120.505",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_DEL",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "121.830",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_FMP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "126.655",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_E_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "126.655",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_E_DEP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "130.330",
+   "facility_type": "DEP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_E_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "121.980",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_E_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "128.730",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_F_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "119.630",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_N_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "121.930",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_S_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "125.130",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_W_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "123.755",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_W_DEP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "124.105",
+   "facility_type": "DEP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_W_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "121.705",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESSA_W_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSA"
+   ],
+   "frequency": "118.505",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSB_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSB"
+   ],
+   "frequency": "120.155",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSB_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSB"
+   ],
+   "frequency": "121.605",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESSB_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSB"
+   ],
+   "frequency": "118.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSD_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSD"
+   ],
+   "frequency": "127.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSL_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSL"
+   ],
+   "frequency": "118.805",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSP_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSP"
+   ],
+   "frequency": "132.955",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSP_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSP"
+   ],
+   "frequency": "120.355",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSR_CTR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSR"
+   ],
+   "frequency": "130.900",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSR_MM_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSR"
+   ],
+   "frequency": "122.325",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESST_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESST"
+   ],
+   "frequency": "122.055",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSU_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSU"
+   ],
+   "frequency": "126.855",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESSV_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSV"
+   ],
+   "frequency": "126.155",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESSV_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESSV"
+   ],
+   "frequency": "120.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESTA_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESTA"
+   ],
+   "frequency": "132.455",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESTA_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESTA"
+   ],
+   "frequency": "127.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESTL_APP",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESTL"
+   ],
+   "frequency": "129.555",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "ESTL_GND",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESTL"
+   ],
+   "frequency": "121.655",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "ESTL_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESTL"
+   ],
+   "frequency": "130.705",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESUP_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESUP"
+   ],
+   "frequency": "118.380",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "ESUT_I_TWR",
+   "fir_dir": "ES",
+   "prefixes": [
+    "ESUT"
+   ],
+   "frequency": "122.980",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EYKA_TWR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYKA"
+   ],
+   "frequency": "124.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EYKA_I_APP",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYKA"
+   ],
+   "frequency": "124.530",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "EYPA_TWR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYPA"
+   ],
+   "frequency": "124.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EYPA_I_APP",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYPA"
+   ],
+   "frequency": "125.730",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EYSA_TWR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYSA"
+   ],
+   "frequency": "120.405",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EYVI_APP",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVI"
+   ],
+   "frequency": "120.705",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EYVI_I_APP",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVI"
+   ],
+   "frequency": "123.855",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EYVI_TWR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVI"
+   ],
+   "frequency": "118.205",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EYVL_CTR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVL"
+   ],
+   "frequency": "133.305",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EYVL_E_CTR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVL"
+   ],
+   "frequency": "135.380",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EYVL_M_CTR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVL"
+   ],
+   "frequency": "133.430",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EYVL_U_CTR",
+   "fir_dir": "EY",
+   "prefixes": [
+    "EYVL"
+   ],
+   "frequency": "132.280",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_FMP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "131.040",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_FMP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "131.785",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_A_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "135.290",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_B_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "119.555",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "136.555",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_C_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "128.215",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_D_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "133.155",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_E_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "123.730",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_F_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "129.475",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_F_FSS",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "129.475",
+   "facility_type": "FSS",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_FW_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "127.080",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_I_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "121.380",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_L_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "124.555",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_M_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "130.990",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_N_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "134.680",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_UA_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "136.485",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_UC_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "127.865",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_UN_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "136.555",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_UV_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "126.055",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_V_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "135.565",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "EKDK_Y_CTR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "124.000",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EKDK_Y_FSS",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKDK"
+   ],
+   "frequency": "124.000",
+   "facility_type": "FSS",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_K_DEP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "124.980",
+   "facility_type": "DEP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_R_DEP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "120.255",
+   "facility_type": "DEP",
+   "in_ese": false
+  },
+  {
+   "id": "EKAH_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKAH"
+   ],
+   "frequency": "119.280",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKBI_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKBI"
+   ],
+   "frequency": "127.580",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKBI_F_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKBI"
+   ],
+   "frequency": "119.255",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKBI_M_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKBI"
+   ],
+   "frequency": "130.980",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_F_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "120.205",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_M_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "130.985",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_O_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "118.455",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_P_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "131.405",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_W_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "119.805",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKKA_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKKA"
+   ],
+   "frequency": "120.430",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKRK_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKRK"
+   ],
+   "frequency": "125.530",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKSP_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKSP"
+   ],
+   "frequency": "124.105",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKSP_F_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKSP"
+   ],
+   "frequency": "122.205",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKYT_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKYT"
+   ],
+   "frequency": "123.980",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKYT_F_APP",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKYT"
+   ],
+   "frequency": "120.705",
+   "facility_type": "APP",
+   "in_ese": false
+  },
+  {
+   "id": "EKAH_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKAH"
+   ],
+   "frequency": "118.530",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKBI_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKBI"
+   ],
+   "frequency": "119.005",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_A_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "118.105",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_GW_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "118.580",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_GE_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "121.830",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_D_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "119.355",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_M_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "118.705",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKEB_I_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKEB"
+   ],
+   "frequency": "120.155",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKKA_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKKA"
+   ],
+   "frequency": "119.580",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKOD_I_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKOD"
+   ],
+   "frequency": "119.530",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKRK_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKRK"
+   ],
+   "frequency": "118.905",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKRN_P_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKRN"
+   ],
+   "frequency": "118.330",
+   "facility_type": "TWR",
+   "in_ese": true
+  },
+  {
+   "id": "EKSB_I_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKSB"
+   ],
+   "frequency": "126.405",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKSP_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKSP"
+   ],
+   "frequency": "118.280",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKVJ_I_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKVD"
+   ],
+   "frequency": "121.405",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKVD_I_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKVD"
+   ],
+   "frequency": "118.655",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKYT_TWR",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKYT"
+   ],
+   "frequency": "118.305",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_A_GND",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "121.630",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_B_GND",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "121.905",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_C_GND",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "121.730",
+   "facility_type": "GND",
+   "in_ese": false
+  },
+  {
+   "id": "EKCH_DEL",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKCH"
+   ],
+   "frequency": "119.905",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "EKBI_DEL",
+   "fir_dir": "EK",
+   "prefixes": [
+    "EKBI"
+   ],
+   "frequency": "129.505",
+   "facility_type": "DEL",
+   "in_ese": false
+  },
+  {
+   "id": "UMKK_CTR",
+   "fir_dir": "UMKK",
+   "prefixes": [
+    "UMKK"
+   ],
+   "frequency": "123.700",
+   "facility_type": "CTR",
+   "in_ese": true
+  },
+  {
+   "id": "UMKK_APP",
+   "fir_dir": "UMKK",
+   "prefixes": [
+    "UMKK"
+   ],
+   "frequency": "126.000",
+   "facility_type": "APP",
+   "in_ese": true
+  },
+  {
+   "id": "UMKK_TWR",
+   "fir_dir": "UMKK",
+   "prefixes": [
+    "UMKK"
+   ],
+   "frequency": "127.200",
+   "facility_type": "TWR",
+   "in_ese": false
+  },
+  {
+   "id": "UMKK_TMU",
+   "fir_dir": "UMKK",
+   "prefixes": [
+    "UMKK"
+   ],
+   "frequency": "199.999",
+   "facility_type": "FMP",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_CW_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "134.690",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_W_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "136.560",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_C_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "130.260",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_FUL_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "122.785",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_FFM_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "132.330",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_NTM_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "132.080",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_WUR_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "134.085",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_TGO_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "132.405",
+   "facility_type": "CTR",
+   "in_ese": false
+  },
+  {
+   "id": "EDUU_SLN_CTR",
+   "fir_dir": "EDUU",
+   "prefixes": [
+    "EDUU"
+   ],
+   "frequency": "120.930",
+   "facility_type": "CTR",
+   "in_ese": false
+  }
  ]
 }

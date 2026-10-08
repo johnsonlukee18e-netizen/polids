@@ -23,10 +23,11 @@ export const loadFirs = () => (firsPromise ||= api("/api/vatsim/firs").catch((e)
 
 export const fl = (ft) => "FL" + String(Math.round((ft || 0) / 100)).padStart(3, "0");
 
-// --- VACS (vacs-data, CC BY-NC-SA 4.0): łańcuchy dziedziczenia sektorów EPWW w warstwach LOW/MID/HIGH.
+// --- Kolejność przejmowania sektorów EPWW w warstwach LOW/MID/HIGH (dawniej łańcuchy VACS, CC BY-NC-SA 4.0).
 // Wczytywane raz przy starcie modułu, żeby sectorOwners() (też w RADIO) miało je od razu.
 let vacsPromise = null, vacsData = null;
-export const loadVacs = () => (vacsPromise ||= api("/api/nav/vacs").then((d) => (vacsData = d))
+// Od rundy 8 kolejność przejmowania z /api/nav/ownership (tymczasowo .ese, docelowo tabela z om.plvacc.pl); kształt jak w VACS.
+export const loadVacs = () => (vacsPromise ||= api("/api/nav/ownership").then((d) => (vacsData = d))
   .catch((e) => { vacsPromise = null; throw e; }));
 loadVacs().catch(() => { /* bez VACS: właściciele z listy OWNER pliku .ese */ });
 export const VACS_LAYERS = ["LOW", "MID", "HIGH"];
@@ -39,8 +40,8 @@ export const vacsShort = (vacs, cs) => vacs?.acc_positions?.[cs]?.short || cs;
 
 // --- Plakietki stanowisk online jak w VATSIM Radar: lotnisko = ICAO + D/G/T/A/APP, FIR = CTR + id.
 // Po najechaniu dymek z listą: znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy online, ATIS.
-export const FACILITIES = [["DEL", "D", "Delivery"], ["GND", "G", "Ground"], ["TWR", "T", "Tower"], ["ATIS", "A", "ATIS"],
-  ["APP", "APP", "Approach / Departure"]];
+export const FACILITIES = [["DEL", "D", "zezwolenia (DEL)"], ["GND", "G", "kontrola naziemna (GND)"], ["TWR", "T", "wieża (TWR)"],
+  ["ATIS", "A", "ATIS"], ["APP", "APP", "zbliżanie / odloty (APP, DEP)"]];
 const RATINGS = { 1: "OBS", 2: "S1", 3: "S2", 4: "S3", 5: "C1", 6: "C2", 7: "C3", 8: "I1", 9: "I2", 10: "I3", 11: "SUP", 12: "ADM" };
 const since = (iso) => {
   if (!iso) return "";
@@ -58,10 +59,11 @@ function atcRows(list, kind, letter) {
 
 // Osobne warstwy (panes) nad nazwami punktów, żeby plakietek nie przykrywały etykiety; dymki jeszcze wyżej.
 export function atcPanes(map) {
-  [["atcFir", 655], ["atcAd", 660], ["atcTip", 700]].forEach(([n, z]) => {
+  // atcFirName: szare nazwy FIR-ów pod etykietami przestrzeni (asLbl = 590), żeby nie zasłaniały częstotliwości sąsiada (UKLV)
+  [["atcFirName", 585], ["atcFir", 655], ["atcAd", 660], ["atcTip", 700]].forEach(([n, z]) => {
     if (!map.getPane(n)) map.createPane(n).style.zIndex = z;
   });
-  return { fir: "atcFir", ad: "atcAd", tip: "atcTip" };
+  return { firName: "atcFirName", fir: "atcFir", ad: "atcAd", tip: "atcTip" };
 }
 
 export function atcTooltip(title, subtitle, rows) {
@@ -98,7 +100,8 @@ export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels
     if (!labels) return;
     const at = [f.properties.label[1], f.properties.label[0]];
     if (!on) {
-      L.marker(at, { interactive: false, icon: L.divIcon({ className: "maplabel", html: `<div><span class="firname">${esc(id)}</span></div>`, iconSize: null }) })
+      L.marker(at, { interactive: false, pane: panes.firName || "markerPane",
+        icon: L.divIcon({ className: "maplabel", html: `<div><span class="firname">${esc(id)}</span></div>`, iconSize: null }) })
         .addTo(layer);
       return;
     }
@@ -110,69 +113,82 @@ export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels
   });
 }
 
-// Sektory EPWW: kolor wg właściciela; w trybie online szary = nikt nie obsługuje (UNICOM).
+// Sektory EPWW: kolor wg właściciela; w trybie online sektor bez kontrolera to sam szary kontur.
 // online = {sector_owner: {nazwa: {callsign, frequency, name, cid}}} albo null (podział pełny z pliku .ese).
 // tipPane: warstwa dymków (np. nad plakietkami ATC), domyślnie zwykła warstwa dymków Leafleta.
-export function drawSectors(layer, gj, online = null, { labels = true, tipPane = "tooltipPane" } = {}) {
+// chain: dopisz w dymku kolejność przejmowania (domyślnie nie: Marek nie chce hierarchii na mapie, tylko właściciela).
+export function drawSectors(layer, gj, online = null, { labels = true, tipPane = "tooltipPane", chain = false } = {}) {
   gj.features.forEach((f) => {
     const pr = f.properties;
     const own = online ? online.sector_owner[pr.name] : null;
     const cs = online ? own?.callsign : pr.callsign;
     const freq = online ? own?.frequency : pr.frequency;
-    // sektor ACC rozstrzygnięty wg VACS: łańcuch dziedziczenia z wyróżnionym właścicielem; kolor wg stanowiska VACS
+    // sektor ACC rozstrzygnięty wg kolejności przejmowania: kolor wg stanowiska z tej kolejności
     // (ten sam co w SEKTORYZACJI także przy znaku zastępczym, np. EPWW_C1_CTR na częstotliwości C)
     const vc = online?.vacs?.[pr.name];
     const color = online && !own ? "#555" : colorFor(vc?.key || cs || pr.name);
-    const chain = vc ? `<br><span class="muted">VACS ${esc(vc.layer)}:</span> ${vc.chain.map((s) => (s === vc.owner ? `<b>${esc(s)}</b>` : esc(s))).join(" › ")}` : "";
-    const poly = L.geoJSON(f, { style: { color, weight: 1.2, fillColor: color, fillOpacity: online && !own ? 0.03 : 0.16 } })
-      .bindTooltip(`<b>${esc(pr.name)}</b> ${fl(pr.lower_ft)}–${fl(pr.upper_ft)}<br>${online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : "UNICOM 122.800") : `${esc(cs || "")} ${esc(freq || "")}`}${chain}`, { sticky: true, pane: tipPane, opacity: 1 });
+    const ch = chain && vc ? `<br><span class="muted">${esc(vc.layer)}:</span> ${vc.chain.map((x) => (x === vc.owner ? `<b>${esc(x)}</b>` : esc(x))).join(" › ")}` : "";
+    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">brak kontrolera</span>`)
+      : `${esc(cs || "")} ${esc(freq || "")}`;
+    const poly = L.geoJSON(f, { style: { color, weight: 1.2, fillColor: color, fillOpacity: online && !own ? 0 : 0.16 } })
+      .bindTooltip(`<b>${esc(pr.name)}</b> ${fl(pr.lower_ft)}–${fl(pr.upper_ft)}<br>${who}${ch}`, { sticky: true, pane: tipPane, opacity: 1 });
     poly.addTo(layer);
     if (labels) {
       L.marker(poly.getBounds().getCenter(), {
         interactive: false,
         icon: L.divIcon({ className: "maplabel", iconSize: null,
-          html: `<div><small>${esc(pr.name)}</small><br>${freq ? `<span class="freq${own ? " on" : ""}">${esc(freq)}</span>` : `<span class="hint">UNICOM</span>`}</div>` }),
+          html: `<div><small>${esc(pr.name)}</small>${freq ? `<br><span class="freq${own ? " on" : ""}">${esc(freq)}</span>` : ""}</div>` }),
       }).addTo(layer);
     }
   });
 }
 
-// Właściciel każdego sektora. Sektory ACC EPWW (B, C, … R-N): pierwsze zalogowane stanowisko z łańcucha VACS
-// w warstwie wycinka (LOW/MID/HIGH wg jego dolnej granicy). Reszta (TMA, CTR, EPWW-MIDSEA) i brak danych VACS:
-// pierwsze zalogowane z listy OWNER pliku .ese (jak w EuroScope).
-// Wynik: {sector_owner: {nazwa: kontroler}, vacs: {nazwa: {layer, chain: [skróty], owner: skrót|null, key: znak VACS|null}}}.
+// Właściciel jednego wycinka sektora (properties z /api/nav/sectors albo /api/nav/slices). Sektor ACC EPWW (B, C, … R-N):
+// pierwsze zalogowane stanowisko z kolejności przejmowania w warstwie wycinka (LOW/MID/HIGH wg jego dolnej granicy).
+// Reszta (TMA, CTR, FIS, sąsiedzi) i brak kolejności: pierwsze zalogowane z listy OWNER pliku .ese (jak w EuroScope).
+// byId: stanowiska .ese wg position_id; online: kontrolerzy wg znaku stanowiska .ese.
+// Wynik: {c: kontroler online|null, key: znak stanowiska|null, layer: LOW/MID/HIGH|null, chain: [znaki]|null}.
+export function sliceOwner(pr, byId, online, vacs = vacsData) {
+  const letter = accLetter(pr.name), layer = vacsLayer(pr.lower_ft ?? 0);
+  const chain = letter && vacs?.sectors?.[letter]?.[layer];
+  if (chain?.length) {
+    // stanowisko z kolejności → wpis online (klucze online to znaki z pliku .ese; dopasowanie przez ese_id)
+    const onl = (cs) => online[byId[vacs?.acc_positions?.[cs]?.ese_id]?.callsign] || online[cs];
+    const cs = chain.find(onl);
+    return { c: cs ? onl(cs) : null, key: cs || null, layer, chain };
+  }
+  const p = (pr.owners || []).map((id) => byId[id]).find((x) => x && online[x.callsign]);
+  return { c: p ? online[p.callsign] : null, key: p?.callsign || null, layer: null, chain: null };
+}
+
+// Właściciel każdego sektora (sliceOwner dla całej warstwy, klucz = nazwa sektora).
+// Wynik: {sector_owner: {nazwa: kontroler}, vacs: {nazwa: {layer, chain: [skróty], owner: skrót|null, key: znak|null}}}.
 export function sectorOwners(gj, positions, online, vacs = vacsData) {
   if (!vacsData && !vacsPromise) loadVacs().catch(() => { /* następna próba przy kolejnym rysowaniu */ });
   const byId = Object.fromEntries(positions.map((p) => [p.position_id, p]));
-  // stanowisko VACS → wpis online (klucze online to znaki z pliku .ese; dopasowanie przez ese_id)
-  const onl = (cs) => online[byId[vacs?.acc_positions?.[cs]?.ese_id]?.callsign] || online[cs];
   const owners = {}, chains = {};
   gj.features.forEach((f) => {
-    const pr = f.properties, letter = accLetter(pr.name);
-    const layer = vacsLayer(pr.lower_ft ?? 0);
-    const chain = letter && vacs?.sectors?.[letter]?.[layer];
-    if (chain?.length) {
-      const cs = chain.find(onl);
-      chains[pr.name] = { layer, chain: chain.map((c) => vacsShort(vacs, c)), owner: cs ? vacsShort(vacs, cs) : null, key: cs || null };
-      if (cs) owners[pr.name] = onl(cs);
-      return;
-    }
-    const owner = (pr.owners || []).map((id) => byId[id]).find((p) => p && online[p.callsign]);
-    if (owner) owners[pr.name] = online[owner.callsign];
+    const pr = f.properties, o = sliceOwner(pr, byId, online, vacs);
+    if (o.chain) chains[pr.name] = { layer: o.layer, chain: o.chain.map((c) => vacsShort(vacs, c)), owner: o.key ? vacsShort(vacs, o.key) : null, key: o.key };
+    if (o.c) owners[pr.name] = o.c;
   });
   return { sector_owner: owners, vacs: chains };
 }
+
+// Wysokość do dymków: GND, stopy do wysokości przejściowej (6500 ft), wyżej poziom lotu
+export const altLabel = (ft) => (!ft ? "GND" : ft <= 6500 ? `${ft} ft` : fl(ft));
 
 // Sylwetka samolotu widziana z góry (nos do góry), obracana wg kursu
 export const PLANE_PATH = "M0,-9.5 C0.9,-9.5 1.3,-8.4 1.3,-7 L1.3,-2.6 L9,1.6 L9,3.3 L1.3,1 L1.1,5.6 L3.6,7.6 L3.6,8.9 L0,8 "
   + "L-3.6,8.9 L-3.6,7.6 L-1.1,5.6 L-1.3,1 L-9,3.3 L-9,1.6 L-1.3,-2.6 L-1.3,-7 C-1.3,-8.4 -0.9,-9.5 0,-9.5 Z";
 
 // Samolot: sylwetka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
-export function aircraftMarker(p, { label = true, detail = false } = {}) {
+// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt względem FIR EPWW).
+export function aircraftMarker(p, { label = true, detail = false, cls = "" } = {}) {
   const fl = p.altitude !== null && p.altitude !== undefined ? "FL" + String(Math.round(p.altitude / 100)).padStart(3, "0") : "";
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
     + (label ? `<span>${esc(p.callsign)}${detail ? `<br>${fl} ${esc(p.aircraft || "")} ${p.groundspeed ?? ""}` : ""}</span>` : "") + "</div>";
-  return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon", html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
+  return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
 }
 
 // Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).

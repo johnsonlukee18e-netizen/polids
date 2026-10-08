@@ -1,9 +1,19 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["08.10.2026", "Nowa nazwa: PolIDS (Polish Integrated Display System), wcześniej vPANDORA / POLIDS. Nowe logo w menu, na tej stronie i na stronie logowania, nowe ikony aplikacji i favicon."],
+  ["07.10.2026", "Dania (EKDK) też z własnego pliku .ese: sektory Kopenhagi, Bornholmu i FIS na MAP i w RADIO › GEO, kolejność przejmowania z ich pliku. Z pliku EPWW zostaje już tylko Białoruś."],
+  ["07.10.2026", "Sektory sąsiadów (Niemcy, Szwecja, Litwa, Czechy, Słowacja, Lwów, Kaliningrad) z ich własnych plików .ese: MAP rysuje je dokładnie na wybranym poziomie i koloruje wg tego, kto je obsługuje (kolejność przejmowania z ich plików), a RADIO › GEO pokazuje dokładny zasięg ich stanowisk. Z pakietu ukraińskiego bierzemy tylko Lwów, bez jego starych polskich sektorów. Sektory zależne od pasa w konfiguracji zachodniej."],
+  ["07.10.2026", "MAP: poprawiony kształt sektora UKLV (Lwów) – bez fałszywego trójkąta w środku; szare nazwy FIR-ów nie zasłaniają już częstotliwości sąsiada."],
   ["07.10.2026", "ADMIN: lista CID-ów z dostępem, odmowy logowania"],
   ["07.10.2026", "0.9.0 - wersja serwerowa: Docker, logowanie przez VATSIM Connect, PWA"],
   ["07.10.2026", "Poprawki pod wielu użytkowników naraz, walidacja parametrów API"],
+  ["06.10.2026", "RADIO › GEO: kafelki stanowisk jak strony GEO w VACS (bez FMP), z częstotliwościami i tym, kto jest online; obok mapa zasięgu: kliknij jedną lub kilka pozycji (także dowolne stanowiska FIR-ów sąsiednich), żeby zobaczyć, co obsługują. Sąsiedzi: wszystkie stanowiska z pliku .ese i vacs-data, zasięgi z VATSpy."],
+  ["06.10.2026", "RADIO › SEKTORYZACJA (przeniesiona z MAP): kolejność przejmowania sektorów ACC z om.plvacc.pl › ownerships zamiast VACS, lista stanowisk w jednej kolumnie, krótkie nazwy pozycji (PO N APP, EPWW DBF, EDMM MEI, WA TWR)."],
+  ["06.10.2026", "TMA i CTR z pełną kolejnością przejmowania: najpierw APP i TWR z pliku .ese, potem ACC wg om.plvacc.pl. RADIO › SEKTORYZACJA: karta TMA i CTR, stanowiska APP/TWR w symulacji. MAP: dymek TMA, CTA i CTR pokazuje wszystkie stanowiska po kolei z częstotliwością i tym, kto jest online; warstwa CTA (np. CTA 02 nad TMA Warszawa) domyślnie włączona. RADIO › GEO: kafelki sąsiadów w kolorach FIR-ów jak w VACS. Komunikaty po polsku, gdy serwer nie odpowiada."],
+  ["06.10.2026", "MAP: przestrzeń rysowana dla wybranego poziomu (FL) albo dla wszystkich poziomów, listy do wyboru pojedynczych sektorów ACC, TMA, CTR i FIR-ów sąsiednich, opis TMA/CTR po najechaniu, samoloty w kolorach odlot / przylot / tranzyt, ATIS z nazwiskiem kontrolera, bez UNICOM i bez hierarchii dziedziczenia. Naprawione podświetlanie TMA Warszawa przy EPWA APP online."],
+  ["06.10.2026", "METEO: WIND (dawniej WINDY) z przełącznikiem 0 ft / 3000 ft na podejściu (punkt FAF/IAF każdego pasa), METAR i TAF alfabetycznie. AERODROME: wiatr 0 ft i 3000 ft w punktach podejścia (Open-Meteo), pasy ARR/DEP w kolorach listy lotów."],
+  ["06.10.2026", "AIRCRAFT: przyciski AIRBUS, BOEING, EMBRAER, MCDONNELL, ATR, CESSNA. Cała aplikacja w czcionce Consolas."],
   ["06.10.2026", "MAP: sektoryzacja LOW/MID/HIGH wg łańcuchów VACS"],
   ["06.10.2026", "RADIO: stanowiska sąsiadów jak w profilu VACS ACC_EPWW"],
   ["06.10.2026", "AERODROME: paski EFES w zakładce RUCH"],
@@ -23,11 +33,11 @@ const CHANGES = [
 
 const TILES = [
   ["aerodrome", "AERODROME", "Lotnisko na jednym ekranie: METAR, wiatr, pasy, ATIS, ruch z vIFF, NOTAM, widok AWOS."],
-  ["meteo", "METEO", "METAR i TAF lotnisk, mapa QNH regionalnego."],
-  ["map", "MAP", "Ruch VATSIM, sektory, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
-  ["radio", "RADIO", "Częstotliwości, kto jest online i rezerwacje na dziś."],
+  ["meteo", "METEO", "METAR i TAF lotnisk, mapa QNH regionalnego, wiatr przy ziemi i na podejściu."],
+  ["map", "MAP", "Ruch VATSIM, przestrzeń na wybranym poziomie, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
+  ["radio", "RADIO", "Kafelki GEO z częstotliwościami, zasięg stanowisk na mapie, sektoryzacja, kto jest online i rezerwacje na dziś."],
   ["callsign", "CALLSIGN", "Znaki wywoławcze linii lotniczych."],
-  ["aircraft", "AIRCRAFT", "Typy samolotów, kategorie turbulencji, zdjęcia."],
+  ["aircraft", "AIRCRAFT", "Typy samolotów wg producenta, kategorie turbulencji, zdjęcia."],
   ["checklist", "CHECKLIST", "Otwarcie i zamknięcie stanowiska, przekazanie, zmiana pasa."],
   ["emergency", "EMERGENCY", "ASSIST i checklisty sytuacji awaryjnych."],
 ];
@@ -36,7 +46,7 @@ export default {
   mount(root, ctx) {
     const pane = h(`<div class="pane about">
       <div class="about-head">
-        <div class="logo">${esc(ctx.config.name || "")}<small>${esc(ctx.config.tagline || "")}</small></div>
+        <div class="logo"><img src="/static/icons/polids-logo.svg" alt="${esc(ctx.config.name || "PolIDS")} – Polish Integrated Display System"><small>VATSIM PL vACC</small></div>
         <div class="card about-info"><h3>System</h3><dl class="props info"></dl></div>
       </div>
       <div class="about-tiles">${TILES.map(([tab, name, txt]) => `<button class="about-tile${tab === "emergency" ? " red" : ""}" data-open="${tab}"><b>${name}</b><span>${esc(txt)}</span></button>`).join("")}</div>

@@ -109,7 +109,7 @@ export function chartHtml(tv, now, pilot = () => null, sel = null) {
       <td class="t">${esc(f.entry)}</td><td class="t">${esc(f.exit)}</td></tr>`;
   }).join("");
   const active = tv.active ?? tv.status === 1;
-  return `<div class="vf-title"><span class="vf-kind">Traffic volume</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
+  return `<div class="vf-title"><span class="vf-kind" title="TV (traffic volume) w vIFF: sektor albo obszar z ustaloną przepustowością">Sektor TV</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
       ${active ? `<span class="vs-chip on">AKTYWNY</span>` : `<span class="vs-chip">nieaktywny</span>`}
       <button class="vf-close" title="Zamknij wykres">✕</button></div>
     <div class="vf-body">
