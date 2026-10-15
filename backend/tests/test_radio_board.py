@@ -289,7 +289,7 @@ def test_every_loa_has_a_stack(client, board):
     stacks = {s["fir"] for s in board["stacks"]}
     assert set(loa) <= stacks and stacks - set(loa) == {"UMKK", "UMMV"}
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
-    assert 'api("/api/radio/loa")' in radio and 'navigate("other", "docs/"' in radio
+    assert 'api("/api/radio/loa")' in radio and 'navigate("coordination", "docs/"' in radio
 
 
 # --- czyste funkcje radioboard.py
@@ -869,8 +869,8 @@ console.log(JSON.stringify({
 
 
 def test_js_loa_panel(tmp_path):
-    """Panel LOA w RADIO (tabs/radio.js loaHtml): tabele przekazań w obie strony, zasady, stanowiska, PDF w OTHER › DOCS
-    i w nowej karcie; brak LOA, wczytywanie i błąd; dane z loa.json zawsze przez esc()."""
+    """Panel LOA w RADIO (tabs/radio.js loaHtml): tabele przekazań w obie strony, zasady, stanowiska, LOA
+    w COORDINATION › DOKUMENTY i PDF w nowej karcie; brak LOA, wczytywanie i błąd; dane z loa.json zawsze przez esc()."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -890,15 +890,15 @@ def test_js_loa_panel(tmp_path):
     assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Stanowiska i sektory wg LOA" in e
     rows = len(f["transfers"]) + len(f["positions"]) + sum(len(f[k]) for k in ("silent", "vfr", "other"))
     assert e.count("data-f=") == rows
-    assert 'data-docs="LOA/LOA EPWW EDWW Bremen, EDUU Karlsruhe (AIRAC 2602).pdf"' in e
+    assert 'data-coord="EDWW"' in e and "COORDINATION ›" in e
     assert 'href="/files/docs/LOA/LOA%20EPWW%20EDWW%20Bremen,%20EDUU%20Karlsruhe%20(AIRAC%202602).pdf"' in e
     assert "<td>Bremen Radar</td>" in e  # znak radiowy z tablicy RADIO, gdy LOA go nie podaje
-    assert "Brak LOA EPWW z UMKK" in out["none"] and "data-docs" not in out["none"] and "KALININGRAD" in out["none"]
+    assert "Brak LOA EPWW z UMKK" in out["none"] and "data-coord" not in out["none"] and "KALININGRAD" in out["none"]
     assert "Wczytywanie LOA…" in out["loading"]
     assert 'class="error">LOA: &lt;zły plik&gt;' in out["error"]
     ev = out["evil"]
     assert "<img" not in ev and "<b>X" not in ev and "<i>s" not in ev and "<s>" not in ev and 'C"OP' not in ev
-    assert "javascript:" not in ev and "data-docs" not in ev  # PDF tylko z /files/docs/
+    assert "javascript:" not in ev and "data-coord" not in ev  # PDF tylko z /files/docs/
 
 
 NB_SCRIPT = r"""

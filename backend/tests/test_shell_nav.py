@@ -52,8 +52,8 @@ def test_every_tab_has_module():
 
 def test_docs_moved_to_other():
     """DOCS nie ma już w menu: to pierwsza podzakładka OTHER (#other/docs/<plik>); stare adresy #docs i #docs/<plik>
-    app.js przekierowuje na OTHER › DOCS (link #docs bez arg zostawia otwarty dokument), a DOCS › LOA w RADIO
-    otwiera PDF w OTHER."""
+    app.js przekierowuje na OTHER › DOCS (link #docs bez arg zostawia otwarty dokument), a przycisk COORDINATION ›
+    w panelu LOA w RADIO otwiera LOA w COORDINATION › DOKUMENTY."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
     assert ('const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"], '
             'phraseology: () => ["other", "phraseology"] };') in APP
@@ -68,7 +68,9 @@ def test_docs_moved_to_other():
     # plik spoza listy (wpisany ręcznie, stary odnośnik) = pierwszy dokument, nigdy pusty podgląd
     assert "docs.find((x) => argOf(x.url) === arg) || docs[0];" in docs
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
-    assert 'navigate("other", "docs/" + doc.dataset.docs)' in radio and 'navigate("docs"' not in radio
+    # 0.12.3: LOA z panelu RADIO otwiera się w COORDINATION › DOKUMENTY (OTHER › DOCS pokazuje pozostałe dokumenty)
+    assert 'navigate("coordination", "docs/" + doc.dataset.coord)' in radio and 'navigate("docs"' not in radio
+    assert 'navigate("other"' not in radio
 
 
 def test_phraseology_moved_to_other():

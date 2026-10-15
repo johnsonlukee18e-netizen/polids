@@ -1,14 +1,19 @@
 import { api, esc, frameGo, h } from "./api.js";
 
 // OTHER › DOCS: dokumenty PDF zgromadzone w folderze data/docs/ (podfolder = kategoria). Tylko podgląd.
+// LOA i LOP (podfoldery data/docs/LOA i LOP) są od 0.12.3 w COORDINATION › DOKUMENTY, tu tylko pozostałe dokumenty.
 // Wybrany dokument w adresie zapisuje OTHER (#other/docs/<plik w data/docs>, ← i Wstecz wracają do poprzedniego
 // dokumentu): start = dokument z adresu ("" = pierwszy z listy), onPick(plik) po kliknięciu dokumentu na liście.
+export const COORD_CATEGORIES = ["LOA", "LOP"];
+export const otherDocs = (list) => list.filter((d) => !COORD_CATEGORIES.includes(String(d.category).toUpperCase()));
+
 export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
   const wrap = h(`<div class="mapwrap">
     <div class="mapside">
       <div class="ms-card"><h4>Dokumenty</h4><div class="list doc-list"></div></div>
       <p class="hint">Nowe PDF-y wrzuć do folderu <span class="mono">data/docs/</span>
       (podfolder = kategoria) i kliknij „Odśwież”.</p>
+      <p class="hint">LOA i LOP: <a href="#coordination/docs">COORDINATION › DOKUMENTY</a>.</p>
       <button class="btn refresh">Odśwież</button>
     </div>
     <iframe class="embed viewer" style="background:#333"></iframe>
@@ -27,7 +32,7 @@ export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
   };
 
   const load = async () => {
-    docs = await api("/api/docs");
+    docs = otherDocs(await api("/api/docs"));
     if (!docs.length) {
       list.innerHTML = `<p class="hint">Brak dokumentów w data/docs/.</p>`;
       return;
@@ -54,6 +59,6 @@ export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
     load();
   });
   load();
-  // dokument z adresu (←, Wstecz, DOCS › LOA w RADIO); "" = pierwszy
+  // dokument z adresu (←, Wstecz); "" = pierwszy
   return { pick: (arg) => { if (docs.length) pick(arg); else want = arg; } };
 }
