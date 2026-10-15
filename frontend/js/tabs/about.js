@@ -1,6 +1,13 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["15.10.2026", "0.12.3 – według issue #13: nowe zakładki COORDINATION, CONVERSION i SQUAWK; PHRASEOLOGY przeniesione do OTHER jako podzakładka po DOCS (stary adres #phraseology przekierowuje). Ukryty przycisk ADMIN nie zajmuje już miejsca w menu."],
+  ["15.10.2026", "HOME: rating zalogowanego kontrolera, stanowisko, na którym jest zalogowany w VATSIM, i jego rezerwacje na najbliższą dobę; wybór stanowiska wspólny z AERODROME › OVERVIEW i przycisk PRZYGOTUJ SESJĘ (OVERVIEW albo lotnisko dla TWR); na dole wersja i bieżący AIRAC z datami."],
+  ["15.10.2026", "METEO: kolejność METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN (WIND i RADAR na końcu). GAMET IMGW dla rejonów A1–A5 albo wszystkich, z ważnością i mapą rejonów; ICING: oblodzenie z Windy na FL050–FL300; SUN: mapa dnia i nocy na Ziemi oraz wschód, zachód, górowanie, BMCT i EECT dla dowolnego lotniska albo punktu na mapie (UTC i czas polski). Godziny słońca liczone poprawnie także daleko od Greenwich."],
+  ["15.10.2026", "AD CIV: przyciski 15 lotnisk AD 2, każdy otwiera stronę lotniska w eAIP (adres #adciv/EPWA). Linki eAIP same przechodzą na poprawkę bieżącego cyklu AIRAC. CALLSIGN i AIRCRAFT: przycisk ALL zamiast ∗ na całą szerokość, litery w dwóch równych kolumnach."],
+  ["15.10.2026", "COORDINATION: porozumienia z LOA jak w ATCISS – WYJŚCIE (COPX) i WEJŚCIE (COPN), filtr po punktach (kilka słów naraz), wybór stanowiska z sektorami, które obsługuje (kolejność przejmowania i kontrolerzy online), FIR-y i rodzaj LOA/LOP; DOKUMENTY z czytelnymi nazwami, tagami AIRAC, FIR i sektorów oraz PDF obok. LOA nie ma już w OTHER › DOCS, a w RADIO przycisk COORDINATION › otwiera dokument."],
+  ["15.10.2026", "CONVERSION: kalkulator jednostek – hPa/inHg/mmHg, ft/m/FL, wysokość a FL przy QNH, NM/km/SM, kt/km/h/m/s/mph, Mach/TAS/CAS w ISA, prędkość pionowa, gradient, °C/°F/K, kg/lb/t, UTC a czas w Polsce."],
+  ["15.10.2026", "SQUAWK: pule kodów SSR FIR EPWW z EUROCONTROL CAL v4.13 (obszar EUR-E, jednostka EP), a także CCAMS, NATO i wszystkie wpisy EUR-E; sprawdzanie kodu i kody specjalne (7500, 7600, 7700, 2000, 7000, 1000)."],
   ["14.10.2026", "0.12.2 – sektory EPWW i sąsiadów z jednego pliku data/seed/sectors.geojson, generowanego z plików .ese (MAP i RADIO biorą je stamtąd); nowy plik .ese EDGG (Langen): sektory EDGG na MAP, a w AERODROME › ED i ET wszystkie lotniska z jego stanowiskami."],
   ["14.10.2026", "MAP: przy obsadzie wg kontrolerów online sektory obsługiwane przez to samo stanowisko są jednym obszarem w jego kolorze z jedną etykietą (stanowisko i częstotliwość); granica tylko tam, gdzie zmienia się obsługujący, przestrzeni bez nikogo nie rysujemy (gdy w FIR-ze nikogo nie ma, zostają same granice FIR-ów)."],
   ["14.10.2026", "MAP: nowa sekcja Pozycje – lista stanowisk FIR EPWW i sąsiadów (ACC, FIS i lotniska, np. EPGD: GD APP, GD TWR, GD GND), domyślnie zaznaczeni zalogowani. Kliknięcie włącza stanowisko offline jak po zalogowaniu (SYM, przerywany kontur) albo ukrywa zalogowane; sektoryzacja i plakietki lotnisk rysują się wg tego wyboru. „jak online” wraca do stanu z sieci, „wyczyść” wyłącza wszystkie. Na liście są stanowiska z pliku .ese EPWW, z vacs-data i obsługujące sektory sąsiadów; zalogowani na innych lotniskach zagranicznych (np. EDDS_TWR, LOWW_TWR) mają zawsze plakietkę i nie da się ich wyłączyć."],
@@ -53,13 +60,16 @@ const CHANGES = [
 
 const TILES = [
   ["aerodrome", "AERODROME", "Przegląd FIR EPWW, listy lotnisk EPWW i sąsiadów, lotnisko na jednym ekranie: METAR, wiatr, pasy, ATIS, NOTAM, AWOS, RUCH (DMAN/AMAN)."],
-  ["meteo", "METEO", "METAR i TAF lotnisk, mapa QNH regionalnego, wiatr przy ziemi i na podejściu, satelita, turbulencje, SIGWX."],
+  ["meteo", "METEO", "METAR i TAF lotnisk, GAMET, SIGWX, oblodzenie, mapa QNH regionalnego, satelita, turbulencje, słońce, wiatr przy ziemi i na podejściu."],
   ["map", "MAP", "Ruch VATSIM, przestrzeń na wybranym poziomie, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
   ["radio", "RADIO", "Jedna strona jak w PANDORZE: sektory ACC EPWW na podglądach LOW/MID/HIGH z częstotliwościami, warstwy APP/TWR/FIS, ATIS i stanowiska sąsiadów; nazwa FIR-u sąsiada otwiera wyciąg z LOA."],
+  ["coordination", "COORDINATION", "Porozumienia LOA i LOP: przekazania po punktach i stanowisku, dokumenty z tagami."],
   ["sytop", "SYT OP", "Aktywne NOTAM-y FIR EPWW i głównych lotnisk."],
   ["strip", "STRIP", "Paski postępu lotu EFES dla 15 głównych lotnisk."],
   ["callsign", "CALLSIGN", "Znaki wywoławcze linii lotniczych."],
   ["aircraft", "AIRCRAFT", "Typy samolotów wg producenta, kategorie turbulencji, zdjęcia."],
+  ["squawk", "SQUAWK", "Pule kodów SSR FIR EPWW z EUROCONTROL CAL i kody specjalne."],
+  ["conversion", "CONVERSION", "Przeliczanie jednostek: ciśnienie, wysokość, FL przy QNH, prędkość, Mach, czas."],
   ["checklist", "CHECKLIST", "Otwarcie i zamknięcie stanowiska, przekazanie, zmiana pasa."],
   ["emergency", "EMERGENCY", "ASSIST i checklisty sytuacji awaryjnych."],
 ];
