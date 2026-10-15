@@ -216,7 +216,11 @@ function linkQnh(el) {
     const q = val("qnh");
     const bad = ok(q) && (q < 850 || q > 1100);
     f("qnh").classList.toggle("bad", bad);
-    if (!ok(q) || bad) { out.textContent = q === null ? "Wpisz QNH." : "QNH poza zakresem 850–1100 hPa."; return; }
+    if (!ok(q) || bad) {
+      put(src === "alt" ? "fl" : "alt", null);
+      out.textContent = q === null ? "Wpisz QNH." : "QNH poza zakresem 850–1100 hPa.";
+      return;
+    }
     const lvl = qnhLevelFt(q);
     const v = val(src);
     if (!Number.isNaN(v)) {
@@ -239,17 +243,21 @@ function linkMach(el) {
   let src = "mach";   // ostatnio wpisana prędkość; zmiana FL przelicza pozostałe z niej
   const update = () => {
     const fl = val("fl");
-    if (!ok(fl)) { out.textContent = "Wpisz FL."; return; }
+    // bez poprawnego FL wyniki z poprzedniego FL znikają (zostaje tylko wpisana prędkość)
+    const stop = (msg) => { ["mach", "tas", "cas"].forEach((id) => id !== src && put(id, null)); out.textContent = msg; };
+    if (!ok(fl)) return stop("Wpisz FL.");
+    if (fl < 0 || fl > 650) return stop("Wzory ISA w kalkulatorze: FL000–FL650.");
     const ft = fl * 100;
     const v = val(src);
+    let m = null;
     if (!Number.isNaN(v)) {
-      const m = v === null ? null : src === "mach" ? v : src === "tas" ? tasToMach(v, ft) : casToMach(v, ft);
+      m = v === null ? null : src === "mach" ? v : src === "tas" ? tasToMach(v, ft) : casToMach(v, ft);
       if (src !== "mach") put("mach", m, 3);
       if (src !== "tas") put("tas", m === null ? null : machToTas(m, ft), 0);
-      if (src !== "cas") put("cas", m === null ? null : machToCas(m, ft), 0);
+      if (src !== "cas") put("cas", m === null || m >= 1 ? null : machToCas(m, ft), 0);
     }
     out.textContent = `ISA na FL${fmtNum(fl, 0).padStart(3, "0")}: ${signed(isaTempK(ft) - 273.15, 1)} °C · a = ${fmtNum(soundKt(ft), 0)} kt`
-      + ` · p = ${fmtNum(isaPressure(ft), 1)} hPa`;
+      + ` · p = ${fmtNum(isaPressure(ft), 1)} hPa${m >= 1 ? " · M ≥ 1: CAS poza zakresem wzoru" : ""}`;
   };
   el.addEventListener("input", (e) => {
     if (["mach", "tas", "cas"].includes(e.target.dataset.u)) src = e.target.dataset.u;
