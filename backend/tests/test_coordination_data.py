@@ -1,8 +1,11 @@
 """Rejestr dokumentów COORDINATION (data/seed/coordination.json): pliki, identyfikatory, AIRAC, powiązanie z loa.json
 i tabela etykiet polskich sektorów (ep_sectors)."""
+import csv
 import itertools
 import json
 import re
+import unicodedata
+from collections import Counter
 from datetime import date
 
 import pytest
@@ -64,13 +67,90 @@ def test_files_exist_and_every_pdf_registered(coord):
     files = set()
     for d in coord["documents"]:
         f = d["file"]
-        assert f.startswith(d["type"] + "/") and f.endswith(".pdf") and ".." not in f, d["id"]
-        # nazwa bez "_" i "-": OTHER › DOCS robi z nich spacje (a stare odnośniki prowadzą do tych samych plików)
-        assert "_" not in f and "-" not in f, d["id"]
+        assert f.startswith(d["type"] + "/") and f.endswith(".pdf") and ".." not in f.split("/"), d["id"]
+        # nazwa bez "_" i "-": OTHER › DOCS robi z nich spacje (a stare odnośniki prowadzą do tych samych plików);
+        # spacje, polskie litery i podfoldery (LOP/LOP TWR/LOP TWR Okęcie.pdf) są w porządku
+        assert "_" not in f and "-" not in f and "\\" not in f and not f.startswith("/"), d["id"]
         assert (DOCS / f).is_file(), f"{d['id']}: brak pliku data/docs/{f}"
         files.add(f)
-    on_disk = {p.relative_to(DOCS).as_posix() for sub in ("LOA", "LOP") for p in (DOCS / sub).glob("*.pdf")}
+    # też zagnieżdżone (LOP/LOP TWR/…), jak w routers/coordination.py::_files
+    on_disk = {p.relative_to(DOCS).as_posix() for sub in ("LOA", "LOP") for p in (DOCS / sub).glob("**/*.pdf")}
     assert on_disk == files, "PDF w data/docs/LOA|LOP bez wpisu w coordination.json (albo odwrotnie)"
+
+
+def test_every_loa_lop_pdf_has_exactly_one_entry(coord):
+    """Każdy PDF z data/docs/LOA i data/docs/LOP (z podfolderami) ma dokładnie jeden wpis, a każdy wpis – plik
+    na dysku pod tą samą ścieżką (te same znaki: spacje, polskie litery w NFC, wielkość liter)."""
+    on_disk = sorted(p.relative_to(DOCS).as_posix() for sub in ("LOA", "LOP") for p in (DOCS / sub).rglob("*")
+                     if p.is_file() and p.suffix.lower() == ".pdf")
+    assert len(on_disk) >= 27 and any(f.startswith("LOP/LOP TWR/") for f in on_disk)
+    count = Counter(d["file"] for d in coord["documents"])
+    assert {f: n for f, n in count.items() if n != 1} == {}, "PDF z kilkoma wpisami"
+    assert [f for f in on_disk if f not in count] == [], "PDF bez wpisu w coordination.json"
+    assert [f for f in count if f not in on_disk] == [], "wpis bez pliku w data/docs"
+    assert all(unicodedata.is_normalized("NFC", f) for f in count)
+
+
+# LOP-y z data/docs/LOP (nazwy plików od właściciela repozytorium): miasto z nazwy pliku → lotnisko
+LOP_ICAO = {"Okęcie": "EPWA", "Modlin": "EPMO", "Radom": "EPRA", "Łódź": "EPLL", "Lublin": "EPLB", "Bydgoszcz": "EPBY",
+            "Katowice": "EPKT", "Gdańsk": "EPGD", "Kraków": "EPKK", "Poznań": "EPPO", "Rzeszów": "EPRZ",
+            "Szczecin": "EPSC", "Wrocław": "EPWR", "Zielona Góra": "EPZG", "Mazury": "EPSY", "Warszawa": "EPWA"}
+LOP_FILE = re.compile(r"^LOP/LOP (ACC|APP|TWR)/LOP \1 (.+)\.pdf$")
+PL = "aąbcćdeęfghijklłmnńoóprsśtuvwxyzźż"
+
+
+def _pl_key(s: str) -> list:
+    return [(PL.index(c), c) if c in PL else (-1, c) for c in s.lower()]
+
+
+def test_lop_icao_mapping(coord, own):
+    """LOP: rodzaj (ACC/APP/TWR) z podfolderu i nazwy pliku, lotnisko z miasta w nazwie pliku. Tag stanowiska
+    (EPWA TWR, EPKK APP) i kod w nazwie wyświetlanej to ten sam ICAO; potwierdza go znak radiowy z AIP
+    (frequencies.csv: „Okęcie TOWER” to EPWA) i stanowisko w pliku .ese. LOP ACC: wszystkie sektory ACC EPWW."""
+    airports = {r["ident"] for r in csv.DictReader((SEED / "airports.csv").open(encoding="utf-8"))}
+    radio = {}
+    for r in csv.DictReader((SEED / "frequencies.csv").open(encoding="utf-8")):
+        radio.setdefault((r["airport_ident"], r["service"]), []).append(r["callsign"].upper())
+    ese = {p["callsign"]: p["name"] for p in
+           parse_positions(ese_sections(read_text(DATA_DIR / "import" / "EPWW-Sector.ese")).get("[POSITIONS]", []))}
+    lops = [d for d in coord["documents"] if d["type"] == "LOP"]
+    assert len(lops) == 20
+    kinds = []
+    for d in lops:
+        m = LOP_FILE.match(d["file"])
+        assert m, d["file"]
+        kind, city = m.groups()
+        kinds.append(kind)
+        assert d["firs"] == ["EPWW"] and d["loa"] == [] and d["agreements"] == [], d["id"]
+        if kind == "ACC":
+            assert city == "Warszawa" and d["id"] == "lop-acc-epww" and d["name"] == "LOP ACC Warszawa (EPWW)"
+            assert d["positions"] == [f"{s} {lvl}" for s, layers in own["sectors"].items() for lvl in layers]
+            assert all(cs.ref_chain(p, own) for p in d["positions"])
+            continue
+        icao = LOP_ICAO[city]
+        assert icao in airports, (d["id"], icao)
+        assert d["id"] == f"lop-{kind.lower()}-{icao.lower()}", d["file"]
+        assert d["positions"] == [f"{icao} {kind}"], d["id"]
+        assert d["name"].startswith(f"LOP {kind} ") and d["name"].endswith(f" ({icao})"), d["id"]
+        # znak radiowy z AIP AD 2.18 dla tej służby na tym lotnisku zawiera miasto z nazwy pliku
+        assert any(city.upper() in c for c in radio.get((icao, kind), [])), (d["file"], icao, radio.get((icao, kind)))
+        # stanowisko VATSIM z pliku .ese: EPXX_TWR albo któreś EPXX_…APP z „Approach”
+        if kind == "TWR":
+            assert f"{icao}_TWR" in ese, icao
+        else:
+            assert any(c.startswith(icao + "_") and c.endswith("_APP") and "Approach" in n for c, n in ese.items()), icao
+    # jeden LOP na lotnisko i rodzaj
+    assert len({tuple(d["positions"]) for d in lops}) == len(lops)
+    # kolejność na liście DOKUMENTY: LOA, potem LOP ACC, APP, TWR; w grupie alfabetycznie po nazwie (polski alfabet)
+    types = [d["type"] for d in coord["documents"]]
+    assert types == sorted(types, key=["LOA", "LOP"].index)
+    assert kinds == sorted(kinds, key=["ACC", "APP", "TWR"].index)
+    for k in ("APP", "TWR"):
+        names = [d["name"] for d, kd in zip(lops, kinds) if kd == k]
+        assert names == sorted(names, key=_pl_key), k
+    twr = [d["name"] for d, kd in zip(lops, kinds) if kd == "TWR"]
+    assert twr.index("LOP TWR Lublin (EPLB)") + 1 == twr.index("LOP TWR Łódź (EPLL)")
+    assert "LOP TWR Warszawa Chopin (EPWA)" in twr and "LOP APP Kraków (EPKK)" in [d["name"] for d in lops]
 
 
 def test_airac_and_dates(coord):

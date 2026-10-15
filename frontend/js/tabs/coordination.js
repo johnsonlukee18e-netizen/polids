@@ -1,7 +1,7 @@
 import { api, debounce, esc, frameGo, h, lsGet, lsSet, remember, stash, stashed, subtabs, vatsimOnline } from "../api.js";
 import {
-  POS_KEY, agreementsArg, blockHtml, defaultPosition, docCardHtml, docFilter, docFocus, docRef, docsArg, notesHtml, ownedKeys,
-  parseArg, positionOptions, shortCs, sumHtml, view,
+  POS_KEY, agreementsArg, blockHtml, defaultPosition, docCardHtml, docFilter, docFocus, docRef, docSelect, docsArg, notesHtml,
+  ownedKeys, parseArg, positionOptions, shortCs, sumHtml, view,
 } from "../agreements.js";
 
 // COORDINATION (0.12.3): wszystkie LOA i LOP, jak „Agreements” w ATCISS (VATSIM Germany). Podmenu:
@@ -148,6 +148,9 @@ export default {
         list.querySelectorAll(".cd-card").forEach((c) => c.classList.toggle("on", c.dataset.doc === d.id));
         list.querySelector(".cd-card.on")?.scrollIntoView({ block: "nearest" });
       };
+      // reveal: dokument wskazany z zewnątrz (adres, RADIO, znacznik w POROZUMIENIACH) ma kartę na liście – filtr, który
+      // go ukrywa, znika; zmiana filtra ukrywająca pokazany dokument: pierwszy z listy (adres podmieniony bez kroku historii)
+      let reveal = true;
       const refresh = () => {
         if (!data) {
           list.innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Wczytywanie…</p>`;
@@ -156,19 +159,25 @@ export default {
         // uwagi do danych (PDF bez wpisu, nieznany sektor): dla tego, kto utrzymuje coordination.json
         errs.hidden = !data.errors?.length;
         errs.innerHTML = data.errors?.length ? `<h4>Do poprawienia w danych</h4><ul>${data.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : "";
+        const was = docRef(data.documents, st.doc);
+        const sel = docSelect(data.documents, st.doc, { fir: st.dfir, type: st.dtype }, { reveal });
+        reveal = false;
+        st.dfir = sel.fir;
+        st.dtype = sel.type;
         const firs = [...new Set(data.documents.flatMap((d) => d.firs))].sort();
         fir.innerHTML = `<option value="">Wszystkie FIR-y</option>` + firs.map((f) => `<option${f === st.dfir ? " selected" : ""}>${esc(f)}</option>`).join("");
         type.value = st.dtype;
         const ds = docFilter(data.documents, { fir: st.dfir, type: st.dtype });
-        const cur = docRef(data.documents, st.doc) || ds[0] || data.documents[0];
-        list.innerHTML = ds.length ? ds.map((d) => docCardHtml(d, { selected: d.id === cur?.id, airac: data.current_airac })).join("")
+        list.innerHTML = ds.length ? ds.map((d) => docCardHtml(d, { selected: d.id === sel.doc?.id, airac: data.current_airac })).join("")
           : `<p class="hint">Brak dokumentów dla tego filtra.</p>`;
-        show(cur);
+        show(sel.doc);
+        if (was && sel.doc && was.id !== sel.doc.id) remember("coordination", argOf(), { replace: true });
       };
       const pick = (id) => {
         const d = data && docRef(data.documents, id);
         if (!d) return false;
-        show(d);
+        if (docFilter([d], { fir: st.dfir, type: st.dtype }).length) show(d);
+        else { st.doc = d.id; reveal = true; refresh(); }
         return true;
       };
       fir.addEventListener("change", () => { st.dfir = fir.value; refresh(); });

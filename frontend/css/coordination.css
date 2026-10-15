@@ -81,6 +81,7 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .cd-meta { font-size: 12px; color: var(--muted); }
 .cd-card.on .cd-meta { color: #c8d8c4; }
 .cd-pos { margin-top: 2px; font: 11px var(--mono); color: #9aa59a; }
+.cd-pos span { white-space: nowrap; }   /* „B LOW”, „EPWA TWR” w jednej linii; łamanie tylko na · */
 .cd-act { display: flex; gap: 6px; align-items: center; margin-top: 5px; }
 .cd-act .btn { padding: 1px 8px; font-size: 11px; }
 /* PDF bez wpisu w coordination.json i lista uwag do danych (dla utrzymującego rejestr) */

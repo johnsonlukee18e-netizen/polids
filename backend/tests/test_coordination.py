@@ -2,12 +2,14 @@
 stanowiska (kto obsługuje sektor) i GET /api/coordination."""
 import json
 import shutil
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import main
 from backend.app.config import settings
+from backend.app.routers import coordination as coord_router
 from backend.app.services import coordination as cs
 
 
@@ -222,8 +224,14 @@ def test_for_position(built):
 def test_endpoint(client):
     d = client.get("/api/coordination").json()
     assert d["errors"] == []
-    assert len(d["documents"]) == 7 and all(x["exists"] and x["type"] == "LOA" and x["registered"] for x in d["documents"])
-    assert all(x["count"] > 0 for x in d["documents"])
+    assert all(x["exists"] and x["registered"] for x in d["documents"])
+    loas = [x for x in d["documents"] if x["type"] == "LOA"]
+    lops = [x for x in d["documents"] if x["type"] == "LOP"]
+    # LOA najpierw (z przekazaniami z loa.json), potem 20 LOP-ów z data/docs/LOP (na razie bez przekazań)
+    assert len(loas) == 7 and d["documents"][:7] == loas and all(x["count"] > 0 for x in loas)
+    assert len(lops) == 20 and all(x["count"] == 0 and x["firs"] == ["EPWW"] and x["file"].startswith("LOP/LOP ")
+                                   for x in lops)
+    assert not any(r["type"] == "LOP" for r in d["agreements"])
     loa = json.loads((settings.seed_dir / "loa.json").read_text("utf-8"))["firs"]
     assert len(d["agreements"]) == sum(len(f["transfers"]) for f in loa.values())
     assert set(d["firs"]) == set(loa) and set(d["notes"]) == set(loa)
@@ -239,6 +247,34 @@ def test_endpoint(client):
     edww = next(x for x in d["documents"] if x["id"] == "loa-edww-eduu")
     assert client.get(edww["url"]).status_code == 200   # PDF przez /files/docs
     assert edww["current"] is (edww["airac"] == d["current_airac"])
+
+
+def test_lop_pdf_served(client):
+    """LOP w podfolderze ze spacjami i polskimi literami: /files/docs podaje PDF pod adresem z karty (procentowo
+    zakodowanym jak encodeURI w przeglądarce), a wyjście poza data/docs dalej się nie udaje."""
+    d = client.get("/api/coordination").json()
+    lop = next(x for x in d["documents"] if x["id"] == "lop-twr-epwa")
+    assert lop["url"] == "/files/docs/LOP/LOP TWR/LOP TWR Okęcie.pdf" and lop["exists"]
+    for url in (lop["url"], quote(lop["url"]), "/files/docs/LOP%2FLOP%20TWR%2FLOP%20TWR%20Ok%C4%99cie.pdf",
+                quote(next(x for x in d["documents"] if x["id"] == "lop-twr-epzg")["url"])):
+        r = client.get(url)
+        assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content[:5] == b"%PDF-", url
+    assert client.get(quote("/files/docs/LOP/LOP TWR/LOP TWR Okecie.pdf")).status_code == 404   # bez „ę”: inny plik
+    # wyjście poza data/docs: ../ zakodowane na różne sposoby (klient HTTP nie normalizuje %2F i %2E: serwer dostaje
+    # „..” – kontrola: „..” wewnątrz data/docs prowadzi do pliku, a te same pliki poza data/docs istnieją)
+    assert client.get("/files/docs/LOP/%2E%2E/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf").status_code == 200
+    assert (settings.docs_dir / ".." / "seed" / "coordination.json").is_file()
+    assert (settings.docs_dir / ".." / ".." / "backend" / "app" / "config.py").is_file()
+    for bad in ("/files/docs/LOP/LOP%20TWR/..%2F..%2F..%2Fseed%2Fcoordination.json",
+                "/files/docs/LOP%2F..%2F..%2Fseed%2Fcoordination.json",
+                "/files/docs/LOP/%2E%2E/%2E%2E/seed/coordination.json",
+                "/files/docs/%2E%2E%2F%2E%2E%2Fbackend%2Fapp%2Fconfig.py"):
+        r = client.get(bad)
+        assert r.status_code == 404 and b"_format" not in r.content and b"docs_dir" not in r.content, bad
+    assert not coord_router._exists("../seed/coordination.json") and not coord_router._exists("LOP/../../seed/loa.json")
+    assert coord_router._exists("LOP/LOP TWR/LOP TWR Łódź.pdf") and coord_router._exists("LOP/LOP APP/LOP APP Kraków.pdf")
+    files = coord_router._files()
+    assert "LOP/LOP ACC/LOP ACC Warszawa.pdf" in files and "LOP/LOP TWR/LOP TWR Zielona Góra.pdf" in files
 
 
 def test_endpoint_position(client):

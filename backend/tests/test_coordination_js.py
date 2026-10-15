@@ -20,6 +20,7 @@ const tab = await import(process.argv[3]);
 const docsMod = await import(process.argv[4]);
 const data = JSON.parse(readFileSync(process.argv[5], "utf-8"));
 const cases = JSON.parse(readFileSync(process.argv[6], "utf-8"));
+const apiDocs = JSON.parse(readFileSync(process.argv[7], "utf-8"));   // GET /api/docs (OTHER › DOCS)
 const ids = (v) => [...v.out, ...v.in].map((r) => r.id);
 const out = {};
 out.args = {
@@ -105,7 +106,28 @@ out.html = {
 };
 out.level = [A.levelHtml({ level_text: "↑ FL230-FL270", level: 230, transfer: "C" }),
   A.levelHtml({ level_text: "uzgodniony z EPWW", level: null, transfer: null })];
-out.docFilter = [A.docFilter(data.documents, { fir: "EDUU" }).map((d) => d.id), A.docFilter(data.documents, { type: "LOP" }).length];
+out.docFilter = [A.docFilter(data.documents, { fir: "EDUU" }).map((d) => d.id), A.docFilter(data.documents, { type: "LOP" }).map((d) => d.id),
+  A.docFilter(data.documents, { type: "LOA" }).length, A.docFilter(data.documents, { fir: "EPWW", type: "LOP" }).length];
+// DOKUMENTY: dokument i filtr (zmiana filtra / dokument z adresu, RADIO, znacznika w POROZUMIENIACH = reveal)
+const sel = (ref, f, o) => { const r = A.docSelect(data.documents, ref, f, o); return [r.doc?.id ?? null, r.fir, r.type]; };
+out.select = {
+  keepIn: sel("loa-edmm", { type: "LOA" }), filterHides: sel("loa-edww-eduu", { type: "LOP" }),
+  revealType: sel("loa-edww-eduu", { type: "LOP" }, { reveal: true }), emptyKeeps: sel("lop-twr-epwa", { fir: "EDWW", type: "LOP" }),
+  revealFir: sel("lop-twr-epwa", { fir: "EDWW", type: "LOP" }, { reveal: true }),
+  revealBoth: sel("lop-twr-epwa", { fir: "EDWW", type: "LOA" }, { reveal: true }), byFir: sel("EDUU", { type: "LOP" }, { reveal: true }),
+  byFile: sel("LOP/LOP TWR/LOP TWR Łódź.pdf", { fir: "EPWW", type: "LOA" }, { reveal: true }),
+  none: sel("", { type: "LOP" }), unknown: sel("XXXX", { fir: "EDMM" }), empty: A.docSelect([], "x").doc,
+};
+// LOP-y z data/docs/LOP/<podfolder>/ (spacje, polskie litery): karta, adres, stary adres OTHER › DOCS, OTHER › DOCS bez nich
+const lopFile = "LOP/LOP TWR/LOP TWR Okęcie.pdf";
+const lop = data.documents.find((d) => d.file === lopFile);
+out.lop = {
+  card: A.docCardHtml(lop, { airac: data.current_airac }), acc: A.docCardHtml(data.documents.find((d) => d.id === "lop-acc-epww"), {}),
+  refFile: ref(lopFile), refId: ref("lop-app-epkk"), arg: A.parseArg("docs/" + lopFile), docsArg: A.docsArg(lop.id),
+  coordFile: [lopFile, "LOP/LOP APP/LOP APP Kraków.pdf", "lop/lop twr/x.pdf"].map(docsMod.isCoordFile),
+  cards: data.documents.filter((d) => d.type === "LOP").map((d) => A.docCardHtml(d, {})),
+  other: docsMod.otherDocs(apiDocs).map((d) => d.url),
+};
 out.tab = typeof tab.default.mount;
 out.other = docsMod.otherDocs([{ category: "LOA" }, { category: "lop" }, { category: "ICAO" }, { category: "INNE" }]).map((d) => d.category);
 console.log(JSON.stringify(out));
@@ -123,7 +145,13 @@ def data():
 
 
 @pytest.fixture(scope="module")
-def out(data, tmp_path_factory):
+def api_docs():
+    with TestClient(main.app) as c:
+        return c.get("/api/docs").json()
+
+
+@pytest.fixture(scope="module")
+def out(data, api_docs, tmp_path_factory):
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -133,10 +161,12 @@ def out(data, tmp_path_factory):
     (d / "package.json").write_text('{"type": "module"}', "utf-8")
     (tmp / "data.json").write_text(json.dumps(data), "utf-8")
     (tmp / "cases.json").write_text(json.dumps(CASES), "utf-8")
+    (tmp / "docs.json").write_text(json.dumps(api_docs), "utf-8")
     script = tmp / "run.mjs"
     script.write_text(SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "agreements.js").as_uri(), (d / "tabs" / "coordination.js").as_uri(),
-                        (d / "docs.js").as_uri(), str(tmp / "data.json"), str(tmp / "cases.json")],
+                        (d / "docs.js").as_uri(), str(tmp / "data.json"), str(tmp / "cases.json"),
+                        str(tmp / "docs.json")],
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
@@ -253,8 +283,9 @@ def test_owner_shown(out):
     assert '<span class="cr-by" title="obsługuje teraz">DBT</span>' in out["html"]["ownerOther"]
 
 
-def test_documents_and_other_docs(out):
-    assert out["docFilter"] == [["loa-edww-eduu"], 0]
+def test_documents_and_other_docs(out, data):
+    lops = [d["id"] for d in data["documents"] if d["type"] == "LOP"]
+    assert len(lops) == 20 and out["docFilter"] == [["loa-edww-eduu"], lops, 7, 20]
     assert out["tab"] == "function"
     # OTHER › DOCS: bez LOA i LOP (są w COORDINATION)
     assert out["other"] == ["ICAO", "INNE"]
@@ -270,3 +301,45 @@ def test_tab_wiring():
     assert "main.scrollTop = wantTop" in src
     assert "sumHtml(v, { pos: st.pos" in src and "data.errors" in src
 
+
+
+def test_lop_cards_and_addresses(out, api_docs):
+    """LOP-y z data/docs/LOP/LOP ACC|APP|TWR/ (spacje i polskie litery w ścieżce): karta z tagami LOP i EPWW, PDF pod
+    adresem zakodowanym jak w przeglądarce, bez POROZUMIENIA › (0 przekazań); dokument z adresu po id i po pliku
+    (stary adres OTHER › DOCS); OTHER › DOCS ich nie pokazuje."""
+    lop = out["lop"]
+    c = lop["card"]
+    assert 'data-doc="lop-twr-epwa"' in c and ">LOP TWR Warszawa Chopin (EPWA)<" in c
+    assert '<span class="cd-tag ty">LOP</span><span class="cd-tag fir">EPWW</span>' in c and "AIRAC" not in c
+    assert '<div class="cd-pos"><span>EPWA TWR</span></div>' in c and "0 przekazań" in c and "treść w przygotowaniu" in c
+    assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="LOP/LOP TWR/LOP TWR Okęcie.pdf"' in c
+    assert "brak pliku" not in c and "cd-new" not in c
+    # 30 sektorów ACC: każda etykieta bez łamania w środku („B LOW”), łamanie tylko na „ · ”
+    assert "<span>B LOW</span> · <span>B MID</span> · <span>B HIGH</span>" in lop["acc"] and "<span>T HIGH</span></div>" in lop["acc"]
+    assert len(lop["cards"]) == 20 and not any("cd-agr" in x or "POROZUMIENIA" in x for x in lop["cards"])
+    assert all('href="/files/docs/LOP/LOP%20' in x for x in lop["cards"])
+    assert lop["refFile"] == "lop-twr-epwa" and lop["refId"] == "lop-app-epkk" and lop["docsArg"] == "docs/lop-twr-epwa"
+    assert lop["arg"] == {"sub": "docs", "doc": "LOP/LOP TWR/LOP TWR Okęcie.pdf"}
+    assert lop["coordFile"] == [True, True, True]
+    # /api/docs: kategoria LOP także dla zagnieżdżonych (pierwszy folder), więc OTHER › DOCS je pomija
+    nested = [d for d in api_docs if d["url"].startswith("/files/docs/LOP/")]
+    assert len(nested) == 20 and {d["category"] for d in nested} == {"LOP"}
+    assert lop["other"] and not any(u.startswith(("/files/docs/LOP/", "/files/docs/LOA/")) for u in lop["other"])
+
+
+def test_doc_select(out):
+    """Filtr „LOP” przy pokazanym LOA: pierwszy LOP z listy (obok nie zostaje PDF spoza listy, karta podświetlona);
+    dokument z adresu, RADIO albo znacznika w POROZUMIENIACH: zdejmowany jest tylko filtr, który go ukrywa."""
+    s = out["select"]
+    assert s["keepIn"] == ["loa-edmm", "", "LOA"]
+    assert s["filterHides"] == ["lop-acc-epww", "", "LOP"] and s["none"] == ["lop-acc-epww", "", "LOP"]
+    assert s["revealType"] == ["loa-edww-eduu", "", ""] and s["byFir"] == ["loa-edww-eduu", "", ""]
+    assert s["emptyKeeps"] == ["lop-twr-epwa", "EDWW", "LOP"]   # pusta lista: dokument zostaje
+    assert s["revealFir"] == ["lop-twr-epwa", "", "LOP"] and s["revealBoth"] == ["lop-twr-epwa", "", ""]
+    assert s["byFile"] == ["lop-twr-epll", "EPWW", ""]
+    assert s["unknown"] == ["loa-edmm", "EDMM", ""] and s["empty"] is None
+    src = (FRONTEND / "js" / "tabs" / "coordination.js").read_text("utf-8")
+    fn = src[src.index("function mountDocuments("):src.index("function openDoc(")]
+    assert "docSelect(data.documents, st.doc, { fir: st.dfir, type: st.dtype }, { reveal })" in fn
+    assert "let reveal = true;" in fn and "reveal = false;" in fn and "reveal = true; refresh();" in fn
+    assert 'remember("coordination", argOf(), { replace: true })' in fn

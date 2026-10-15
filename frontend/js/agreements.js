@@ -211,10 +211,21 @@ export function docCardHtml(d, { selected = false, airac = "" } = {}) {
     <div class="cd-name">${esc(d.name)}</div>
     <div class="cd-tags">${tags.join("")}</div>
     <div class="cd-meta">${meta}</div>
-    ${d.positions.length ? `<div class="cd-pos">${d.positions.map(esc).join(" · ")}</div>` : ""}
+    ${d.positions.length ? `<div class="cd-pos">${d.positions.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</div>` : ""}
     <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="${esc(d.file)}">PDF ↗</a>`
       : `<span class="error">brak pliku ${esc(d.file)}</span>`}
       ${d.count ? `<button type="button" class="btn cd-agr" title="Porozumienia z tego dokumentu">POROZUMIENIA ›</button>` : ""}</div>
   </div>`;
 }
 export const docFilter = (docs, { fir = "", type = "" } = {}) => docs.filter((d) => (!fir || d.firs.includes(fir)) && (!type || d.type === type));
+// który dokument pokazać na liście DOKUMENTY i z jakim filtrem (FIR, rodzaj). Dokument wskazany z zewnątrz (adres,
+// RADIO, znacznik w POROZUMIENIACH; reveal) ma zawsze kartę na liście: filtr, który go ukrywa, jest zdejmowany.
+// Zmiana filtra (reveal: false), która ukrywa pokazany dokument, przechodzi na pierwszy dokument z listy, więc obok
+// nie zostaje PDF spoza listy (np. LOA po wybraniu „LOP”); pusta lista: dokument zostaje. Nieznany ref: pierwszy z listy.
+export function docSelect(docs, ref, { fir = "", type = "" } = {}, { reveal = false } = {}) {
+  const d = docRef(docs, ref);
+  const ds = docFilter(docs, { fir, type });
+  if (d && ds.includes(d)) return { doc: d, fir, type };
+  if (d && reveal) return { doc: d, fir: fir && !d.firs.includes(fir) ? "" : fir, type: type && d.type !== type ? "" : type };
+  return { doc: ds[0] || d || docs[0] || null, fir, type };
+}
