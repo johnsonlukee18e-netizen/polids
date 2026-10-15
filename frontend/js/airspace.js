@@ -196,12 +196,27 @@ export const PLANE_PATH = "M0,-9.5 C0.9,-9.5 1.3,-8.4 1.3,-7 L1.3,-2.6 L9,1.6 L9
   + "L-3.6,8.9 L-3.6,7.6 L-1.1,5.6 L-1.3,1 L-9,3.3 L-9,1.6 L-1.3,-2.6 L-1.3,-7 C-1.3,-8.4 -0.9,-9.5 0,-9.5 Z";
 
 // Samolot: sylwetka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
-// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt względem FIR EPWW).
+// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP).
 export function aircraftMarker(p, { label = true, detail = false, cls = "" } = {}) {
   const fl = p.altitude !== null && p.altitude !== undefined ? "FL" + String(Math.round(p.altitude / 100)).padStart(3, "0") : "";
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
     + (label ? `<span>${esc(p.callsign)}${detail ? `<br>${fl} ${esc(p.aircraft || "")} ${p.groundspeed ?? ""}` : ""}</span>` : "") + "</div>";
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
+}
+
+// Wznoszenie / zniżanie (MAP, loty krajowe): p.vs = zmiana wysokości od odczytu sprzed co najmniej minAge ms.
+// hist: znak → {alt, t, vs} z poprzednich wczytań ruchu; wynik to nowa hist (tylko samoloty z listy). Wczytanie
+// częstsze niż co minAge (wybór lotu, wykres vIFF) nie przesuwa punktu odniesienia i zostawia poprzednie vs: serwer
+// trzyma feed VATSIM 30 s, więc odczyt sprzed kilku sekund ma tę samą wysokość (vs = 0 zrobiłoby z przylotu odlot).
+export function climbRates(pilots, hist, now, minAge = 25000) {
+  const out = new Map();
+  pilots.forEach((p) => {
+    const h = hist.get(p.callsign), alt = p.altitude ?? null;
+    if (h && now - h.t < minAge) { p.vs = h.vs; out.set(p.callsign, h); return; }
+    p.vs = h && h.alt !== null && alt !== null ? alt - h.alt : null;
+    out.set(p.callsign, { alt, t: now, vs: p.vs });
+  });
+  return out;
 }
 
 // Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).
