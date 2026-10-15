@@ -118,6 +118,32 @@ def bookings_by_callsign(bookings: list[dict], prefix: str = "", now: datetime |
     return out
 
 
+def user_connections(feed: dict, cid) -> list[dict]:
+    """Połączenia kontrolera o danym CID w data feed (stanowiska ATC, obserwator i ATIS) z polem `facility`;
+    najpierw stanowiska, potem ATIS i obserwator, w każdej grupie od najwcześniejszego zalogowania."""
+    cid = str(cid)
+    conns = []
+    for key in ("controllers", "atis"):
+        if isinstance(feed.get(key), list):
+            conns += feed[key]
+    rows = [controller_info(c) | {"facility": c.get("facility")} for c in conns
+            if isinstance(c, dict) and c.get("callsign") and str(c.get("cid")) == cid]
+
+    def order(c):
+        side = str(c.get("callsign") or "").upper().endswith(("_ATIS", "_OBS")) or c.get("facility") == 0
+        return side, str(c.get("logon_time") or "")
+    return sorted(rows, key=order)
+
+
+def user_bookings(bookings: list[dict], cid, now: datetime | None = None, hours: int = 24) -> list[dict]:
+    """Rezerwacje kontrolera o danym CID (dowolny znak stanowiska), które jeszcze się nie skończyły i zaczynają
+    się w ciągu `hours` godzin; od najwcześniejszej. Kształt jak w bookings_by_callsign."""
+    now = now or datetime.now(timezone.utc)
+    mine = [b for b in bookings if isinstance(b, dict) and str(b.get("cid")) == str(cid)]
+    grouped = bookings_by_callsign(mine, "", now=now, until=now + timedelta(hours=hours))
+    return sorted((b for lst in grouped.values() for b in lst), key=lambda b: (b["start"], b["callsign"]))
+
+
 @lru_cache(maxsize=1)
 def fir_boundaries() -> dict:
     return json.loads((settings.seed_dir / "vatspy_firs.geojson").read_text("utf-8"))

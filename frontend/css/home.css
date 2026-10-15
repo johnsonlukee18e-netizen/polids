@@ -1,7 +1,22 @@
-/* HOME ("?" w menu): samo powitanie zalogowanego kontrolera, na środku ekranu. */
-.home-pane { display: flex; align-items: center; justify-content: center; padding: 24px; }
+/* HOME ("?" w menu): powitanie z ratingiem, VATSIM i wybór stanowiska w jednym bloku na środku ekranu;
+   na dole wersja aplikacji i AIRAC */
+.home-pane { display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: 24px 24px 10px; }
+.home-main { align-self: center; width: min(780px, 100%); display: flex; flex-direction: column; gap: 12px; }
 .home-hello { margin: 0; max-width: 100%; color: var(--text); font: 700 44px/1.25 var(--ui); text-align: center; overflow-wrap: anywhere; }
+.home-rating { margin: -6px 0 6px; color: var(--green-text); font: 700 18px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .5px; text-align: center; }
+.home-card { --cy: 10px; --cx: 14px; }
+.home-line { font: 14px/1.6 var(--mono); }
+.home-line.home-on { color: var(--green-hi); font-weight: 700; }
+.home-line.error { font-size: 12px; }
+.home-pos { display: block; width: 100%; padding: 6px 8px; font: 14px var(--mono); }
+.home-pos-note { min-height: 1.4em; margin: 6px 0 10px; font-family: var(--mono); }
+.home-pos-note b { color: var(--text); font-weight: 400; }
+.home-ok { color: var(--green-text); }
+.home-go { margin: 0; padding: 9px 10px; font-size: 15px; }
+.home-go:hover { background: linear-gradient(#52bd3c, #36992a); }
+.home-foot { display: flex; gap: 28px; justify-content: center; padding-top: 10px; color: var(--muted); font: 12px var(--mono); }
 @media (max-width: 900px) { .home-hello { font-size: 30px; } }
+@media (max-height: 700px) { .home-hello { font-size: 32px; } }
 
 /* AUP: krótka informacja na środku ekranu */
 .soon-pane { display: flex; align-items: center; justify-content: center; padding: 24px; }

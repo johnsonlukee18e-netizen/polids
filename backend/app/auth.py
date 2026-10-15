@@ -260,4 +260,4 @@ def me(request: Request):
     if not user:
         raise HTTPException(401, "Wymagane logowanie")
     return {"mode": settings.auth_mode, "admin": is_admin(user),
-            "user": {k: user.get(k) for k in ("cid", "name", "rating_short", "division", "subdivision")}}
+            "user": {k: user.get(k) for k in ("cid", "name", "rating", "rating_short", "division", "subdivision")}}
