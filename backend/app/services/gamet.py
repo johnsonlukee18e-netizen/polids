@@ -67,35 +67,42 @@ def _clean(s: str) -> str:
     return "\n".join(lines)
 
 
-def _region(data) -> dict | None:
-    """Słownik rejonów (A1…A5) z odpowiedzi: root["EPWW"], root["gamet"]["EPWW"] albo od razu rejony."""
+def _region(cand) -> dict | None:
+    """Rejony z jednego obiektu odpowiedzi: cand["EPWW"] albo sam cand, gdy ma klucze "An" (inaczej None)."""
+    if not isinstance(cand, dict):
+        return None
+    if isinstance(cand.get("EPWW"), dict):
+        return cand["EPWW"]
+    return cand if any(_AREA_KEY.match(str(k)) for k in cand) else None
+
+
+def _regions(data) -> list[dict]:
+    """Słowniki rejonów (A1…A5) z odpowiedzi: root["EPWW"], root["gamet"]["EPWW"] albo od razu rejony; lista (jedna albo
+    kilka migawek, np. bez parametru count) daje słownik z każdego elementu."""
     for cand in (data, data.get("gamet") if isinstance(data, dict) else None):
-        if isinstance(cand, list) and len(cand) == 1:
-            cand = cand[0]
-        if not isinstance(cand, dict):
-            continue
-        if isinstance(cand.get("EPWW"), dict):
-            return cand["EPWW"]
-        if any(_AREA_KEY.match(str(k)) for k in cand):
-            return cand
-    return None
+        found = [r for r in map(_region, cand if isinstance(cand, list) else [cand]) if r is not None]
+        if found:
+            return found
+    return []
 
 
-def _message(item) -> str | None:
-    """Tekst GAMET rejonu: gamets[0].message, bez niego messageHTML bez znaczników (także gdy rejon to sama lista
-    komunikatów albo sam komunikat)."""
+def _messages(item) -> list[str]:
+    """Teksty GAMET rejonu (wszystkie z listy "gamets"): message, bez niego messageHTML bez znaczników (także gdy rejon
+    to sama lista komunikatów albo sam komunikat)."""
     if isinstance(item, dict) and "gamets" in item:
         item = item["gamets"]
-    if isinstance(item, list):
-        item = item[0] if item else None
-    if isinstance(item, str):
-        return _clean(item) or None
-    if not isinstance(item, dict):
-        return None
-    for key, conv in (("message", str), ("raw_message", str), ("messageHTML", strip_html)):
-        if isinstance(item.get(key), str) and item[key].strip():
-            return _clean(conv(item[key])) or None
-    return None
+    out = []
+    for one in item if isinstance(item, list) else [item]:
+        if isinstance(one, str):
+            text = _clean(one)
+        elif isinstance(one, dict):
+            text = next((_clean(conv(one[key])) for key, conv in (("message", str), ("raw_message", str),
+                         ("messageHTML", strip_html)) if isinstance(one.get(key), str) and one[key].strip()), "")
+        else:
+            text = ""
+        if text:
+            out.append(text)
+    return out
 
 
 def _ddhhmm(s: str, now: datetime) -> str | None:
@@ -129,6 +136,18 @@ def area_info(text: str | None, now: datetime) -> dict:
     return out
 
 
+def pick(texts: list[str], now: datetime) -> dict:
+    """Komunikat rejonu do pokazania, gdy w odpowiedzi jest ich kilka (np. ostatnie komunikaty bez count, poprawka AMD
+    albo COR): najpierw ważny teraz, z nich najpóźniej zaczynający ważność (poprawka), potem najpóźniej wydany; bez
+    dat w tekście pierwszy z listy. area_info(None) = brak komunikatu."""
+    infos = [area_info(t, now) for t in texts]
+    if not infos:
+        return area_info(None, now)
+    t = now.strftime("%Y-%m-%dT%H:%MZ")
+    return max(infos, key=lambda a: (bool(a["valid_from"] and a["valid_to"] and a["valid_from"] <= t < a["valid_to"]),
+                                     a["valid_from"] or "", a["issued"] or ""))
+
+
 def parse(text: str, now: datetime | None = None) -> dict:
     """{"areas": {"A1": {text, valid, valid_from, valid_to, below, issued}, ...}, "error": None albo opis}.
     Rejony A1–A5 zawsze (text None = brak komunikatu), inne klucze "An" z odpowiedzi także."""
@@ -138,11 +157,11 @@ def parse(text: str, now: datetime | None = None) -> dict:
         data = json.loads(text)
     except ValueError:
         return {"areas": empty, "error": "Nieczytelna odpowiedź serwera IMGW (to nie JSON)"}
-    region = _region(data)
-    if region is None:
+    regions = _regions(data)
+    if not regions:
         return {"areas": empty, "error": "Nieznany format odpowiedzi IMGW: brak rejonów A1–A5"}
-    keys = list(AREAS) + sorted(k for k in region if _AREA_KEY.match(str(k)) and k not in AREAS)
-    areas = {k: area_info(_message(region.get(k)), now) for k in keys}
+    keys = list(AREAS) + sorted({k for r in regions for k in r if _AREA_KEY.match(str(k)) and k not in AREAS})
+    areas = {k: pick([t for r in regions for t in _messages(r.get(k))], now) for k in keys}
     error = None if any(a["text"] for a in areas.values()) else "Brak komunikatów GAMET w odpowiedzi IMGW"
     return {"areas": areas, "error": error}
 
