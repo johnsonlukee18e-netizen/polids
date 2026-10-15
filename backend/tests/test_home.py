@@ -194,11 +194,11 @@ function homeRun(steps, seen = "") {
 }
 
 // wybór w pamięci okna: z localStorage przy pierwszym odczycie, potem drugie okno go nie zmienia; bez localStorage w pamięci
-const choice = [api.choiceGet(home.POS_KEY)];
-store.set(home.POS_KEY, "EPKK_APP");                         // drugie okno PolIDS zapisuje swój wybór
-choice.push(api.choiceGet(home.POS_KEY));
-api.choiceSet(home.POS_KEY, "EPGD_APP");
-choice.push(api.choiceGet(home.POS_KEY), store.get(home.POS_KEY));
+const choice = [api.choiceGet(api.POS_KEY)];
+store.set(api.POS_KEY, "EPKK_APP");                         // drugie okno PolIDS zapisuje swój wybór
+choice.push(api.choiceGet(api.POS_KEY));
+api.choiceSet(api.POS_KEY, "EPGD_APP");
+choice.push(api.choiceGet(api.POS_KEY), store.get(api.POS_KEY));
 blocked = true;
 choice.push(api.choiceGet("test.blocked"));
 api.choiceSet("test.blocked", "EPKK_APP");
@@ -209,7 +209,7 @@ const privateSync = ov.syncPosition({ seen: "EPKK_APP", position: "EPKK_APP", lo
 blocked = false;
 
 console.log(JSON.stringify({
-  posKey: home.POS_KEY,
+  posKey: api.POS_KEY,
   choice,
   privateSync,
   homeRuns: {
@@ -392,7 +392,12 @@ def test_overview_sync_rules(js):
 def test_home_shares_position_with_overview(js):
     """HOME i OVERVIEW wymieniają stanowisko przez wybór w pamięci okna (choiceGet / choiceSet pod kluczem OVERVIEW)."""
     overview = (FRONTEND / "js" / "overview.js").read_text("utf-8")
-    assert re.search(r'^const POS_KEY = "([^"]+)";$', overview, re.M).group(1) == js["posKey"]
+    # jeden klucz w api.js (ten sam co dawniej, więc zapisany wybór zostaje); OVERVIEW, HOME i COORDINATION go importują
+    assert js["posKey"] == "overview.position"
+    assert re.search(r'^import \{[^}]*\bPOS_KEY\b[^}]*\} from "\./api\.js";$', overview, re.M)
+    coordination = (FRONTEND / "js" / "tabs" / "coordination.js").read_text("utf-8")
+    agreements = (FRONTEND / "js" / "agreements.js").read_text("utf-8")
+    assert 'export { POS_KEY } from "./api.js";' in agreements
     # otwarty PRZEGLĄD: reguły syncPosition; filtr dopiero z listą stanowisk (bez niej wieża z HOME nie jest filtrem)
     assert "sync() {" in overview
     assert "syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed)" in overview
@@ -402,9 +407,13 @@ def test_home_shares_position_with_overview(js):
     assert 'if (mode === "ov" && ov) { ov.sync(); return; }' in aerodrome
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
     assert "homeChoice(choice, { net, shared: choiceGet(POS_KEY), list })" in home
+    assert re.search(r'^import \{[^}]*\bPOS_KEY\b[^}]*\} from "\.\./api\.js";$', home, re.M)
+    # COORDINATION: stanowisko domyślne z tego samego wyboru okna (zachowanie: test_coord_tab_js.py)
+    assert "defaultPosition(d.positions, choiceGet(POS_KEY))" in coordination
     # bez localStorage wprost: inaczej tryb prywatny i drugie okno PolIDS znowu zmieniałyby wybór
-    for src in (overview, home):
+    for src in (overview, home, coordination, agreements):
         assert "lsGet(POS_KEY)" not in src and "lsSet(POS_KEY" not in src
+        assert "const POS_KEY" not in src
     # przycisk: OVERVIEW (0) albo strona lotniska wieży, zapis dopiero z wczytaną listą (inaczej pusty wybór kasowałby
     # zapisany); HOME importuje tylko api.js (test powłoki wczytuje go w Node)
     assert re.search(r'if \(listLoaded\) save\(\);\s*navigate\("aerodrome", sessionTarget\(current\(\)\)\.arg\);', home)

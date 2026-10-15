@@ -1,13 +1,12 @@
-import { api, choiceGet, choiceSet, esc, h, navigate, ONLINE_EVENT } from "../api.js";
+import { api, choiceGet, choiceSet, esc, h, navigate, ONLINE_EVENT, POS_KEY } from "../api.js";
 
 // HOME ("?" w menu, strona startowa): powitanie zalogowanego kontrolera (imię i nazwisko z CID z /auth/me) z ratingiem,
 // jego połączenie i rezerwacje w VATSIM (/api/vatsim/me), wybór stanowiska jak w AERODROME › OVERVIEW i przycisk
 // przejścia tam przed sesją; na dole wersja aplikacji i bieżący AIRAC z datami.
 // Bez logowania (tryb lokalny) samo "Witaj" i wybór stanowiska, bez ratingu i bez VATSIM.
 
-// ten sam klucz co POS_KEY w overview.js: stanowisko wybrane tutaj AERODROME › OVERVIEW otwiera od razu
+// POS_KEY z api.js (ten sam w overview.js): stanowisko wybrane tutaj AERODROME › OVERVIEW otwiera od razu
 // (moduł importuje tylko api.js, bo test powłoki wczytuje go w Node)
-export const POS_KEY = "overview.position";
 const REFRESH_MS = 60000;    // stan VATSIM odświeżany, gdy HOME jest na ekranie (data feed i tak co 30 s)
 
 export function greeting(me) {

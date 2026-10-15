@@ -317,6 +317,8 @@ export function lsSet(key, value) {
 // (następne otwarcie strony), ale odczyt z pamięci okna, wczytanej z localStorage przy pierwszym użyciu. Działa bez
 // localStorage (tryb prywatny), a wybór w drugim oknie PolIDS nie zmienia tego, co otwarte tutaj.
 const choices = new Map();
+// stanowisko wybrane w HOME / AERODROME › OVERVIEW (domyślne także w COORDINATION): jeden klucz dla wszystkich zakładek
+export const POS_KEY = "overview.position";
 export function choiceGet(key) {
   if (!choices.has(key)) choices.set(key, lsGet(key) || "");
   return choices.get(key);
