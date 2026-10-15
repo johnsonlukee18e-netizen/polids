@@ -1,10 +1,14 @@
 """SQUAWK: kody SSR (Mode A) – cztery cyfry ósemkowe 0000–7777, zawsze jako napis (0100, nigdy 100 ani 100.0).
 
-Pule FIR EPWW z arkusza EUROCONTROL / ICAO EUR CAL (importers/squawk_cal.py) i kody specjalne leżą w
-data/seed/squawk.json. Tu: sprawdzanie kodu, rozmiar puli, rozpoznawanie zakresów w komórkach arkusza
-i wyszukiwanie kodu w pulach (to samo liczy frontend w tabs/squawk.js)."""
+Pule z arkusza EUROCONTROL / ICAO EUR CAL (importers/squawk_cal.py) i kody specjalne leżą w data/seed/squawk.json.
+Tu: sprawdzanie kodu, rozmiar puli, rozpoznawanie zakresów w komórkach arkusza i wyszukiwanie kodu w pulach
+wszystkich kategorii (to samo liczy frontend w tabs/squawk.js)."""
 
 import re
+
+# kategorie pul (importer squawk_cal): epww = FIR EPWW przydziela sam (PA EUR-E, Unit EP), ccams = przydział
+# centralny CCAMS, nato = pule wojskowe NATO, eur-e = pozostałe wpisy obszaru EUR-E (sąsiedzi i retencja)
+CATEGORIES = ("epww", "ccams", "nato", "eur-e")
 
 OCTAL4 = re.compile(r"^[0-7]{4}$")
 # kod w komórce arkusza: 1–4 cyfry ósemkowe (liczba 100.0 z arkusza to po normalizacji "100" = 0100)
@@ -63,23 +67,30 @@ def _pool(p) -> dict | None:
     last = p.get("to") or p["from"]
     if not valid_code(last) or code_value(last) < code_value(p["from"]):
         return None
-    return {**p, "to": last, "count": pool_size(p["from"], last)}
+    # bez kategorii (plik sprzed podziału na kategorie): pula EPWW
+    cat = p.get("category") if isinstance(p.get("category"), str) and p.get("category") else "epww"
+    return {**p, "to": last, "count": pool_size(p["from"], last), "category": cat}
+
+
+def _order(p: dict) -> tuple:
+    cat = CATEGORIES.index(p["category"]) if p["category"] in CATEGORIES else len(CATEGORIES)
+    row = p.get("row") if isinstance(p.get("row"), int) else 0
+    return cat, code_value(p["from"]), code_value(p["to"]), str(p.get("unit") or ""), row
 
 
 def normalize(data) -> dict:
-    """Treść squawk.json dla /api/squawk: pule z poprawnymi kodami posortowane po kodzie (count przeliczony),
-    kody specjalne z poprawnym kodem; status = notatka "_status" (np. import CAL jeszcze nie zrobiony)."""
+    """Treść squawk.json dla /api/squawk: pule z poprawnymi kodami posortowane po kategorii i kodzie (count
+    przeliczony, brak kategorii = epww), kody specjalne z poprawnym kodem."""
     data = data if isinstance(data, dict) else {}
-    pools = [x for x in map(_pool, data.get("pools") or []) if x]
-    pools.sort(key=lambda p: (code_value(p["from"]), code_value(p["to"]), str(p.get("unit") or "")))
+    pools = sorted((x for x in map(_pool, data.get("pools") or []) if x), key=_order)
     special = [s for s in data.get("special") or [] if isinstance(s, dict) and valid_code(s.get("code"))]
     meta = data.get("meta")
-    return {"status": data.get("_status") or None, "note": data.get("_uwaga") or None,
-            "meta": meta if isinstance(meta, dict) else None, "pools": pools, "special": special}
+    return {"note": data.get("_uwaga") or None, "meta": meta if isinstance(meta, dict) else None,
+            "pools": pools, "special": special}
 
 
 def lookup(data: dict, code: str) -> dict:
-    """Znaczenie kodu: wpisy z listy kodów specjalnych i pule, w których leży (data = wynik normalize)."""
-    return {"code": code, "imported": bool(data["pools"]),
-            "special": [s for s in data["special"] if s["code"] == code],
+    """Znaczenie kodu: wpisy z listy kodów specjalnych i wszystkie pule (każdej kategorii), w których leży
+    (data = wynik normalize)."""
+    return {"code": code, "special": [s for s in data["special"] if s["code"] == code],
             "pools": [p for p in data["pools"] if in_pool(code, p)]}

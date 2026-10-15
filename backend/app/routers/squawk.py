@@ -4,7 +4,7 @@ from ..config import settings
 from ..services.radio import seed_json
 from ..services.squawk import lookup, normalize, valid_code
 
-# SQUAWK (0.12.3): pule kodów SSR FIR EPWW
+# SQUAWK (0.12.3): pule kodów SSR z EUROCONTROL CAL (FIR EPWW, CCAMS, NATO, EUR-E) i kody specjalne
 router = APIRouter(prefix="/api/squawk", tags=["squawk"])
 
 
@@ -20,17 +20,18 @@ def _data() -> dict:
 
 @router.get("")
 def squawk():
-    """Pule kodów SSR FIR EPWW z arkusza EUROCONTROL CAL (importers/squawk_cal.py) i kody specjalne.
+    """Pule kodów SSR z arkusza EUROCONTROL CAL (importers/squawk_cal.py) i kody specjalne.
 
-    `pools`: [{from, to, count, unit, type, remarks, match, sheet, row, raw}] posortowane po kodzie (puste, dopóki
-    nikt nie zaimportował arkusza; wtedy `status` mówi, jak to zrobić). `special`: [{code, label, meaning, source,
-    note?, excluded?}]. `meta`: źródło, wydanie CAL, data importu, filtr."""
+    `pools`: [{from, to, count, category, pa, unit, civ_mil, app, assigned_by, ar, destination, via, protection,
+    remarks, ver, sheet, row}] posortowane po kategorii (epww, ccams, nato, eur-e) i kodzie. `special`: [{code,
+    label, meaning, source, note?, excluded?}]. `meta`: źródło, wydanie CAL, data importu, obszary uczestniczące
+    (participating_areas), liczba pul w kategoriach (counts). `note`: opis pliku."""
     return _data()
 
 
 @router.get("/lookup")
 def squawk_lookup(code: str = Query(..., description="kod SSR: 4 cyfry ósemkowe, np. 7700")):
-    """Znaczenie kodu: kody specjalne o tym numerze i pule, w których leży (`imported` = są już pule z CAL)."""
+    """Znaczenie kodu: kody specjalne o tym numerze i wszystkie pule (każdej kategorii), w których leży."""
     code = code.strip()
     if not valid_code(code):
         hint = " (8 i 9 nie występują)" if any(c in "89" for c in code) else ""

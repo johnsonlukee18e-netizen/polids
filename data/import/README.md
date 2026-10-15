@@ -14,6 +14,7 @@ Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyt
 | `GRpluginOperatorInfo.txt` | oznaczenie operatorów CARGO (`C`) i wojskowych (`Mil`) w zakładce CALLSIGN |
 | `ICAO_Aircraft.json` | typy samolotów z WTC / RECAT-EU / wymiarami (zakładka AIRCRAFT) |
 | `qnh_pansa.png` | zrzut mapy rejonów QNH z AIP Polska (PAŻP): wzór dla `scripts/trace_qnh_regions.py --image` (aplikacja go nie czyta) |
+| `eurocontrol-icao-eur-cal-v4-13.xls` | EUROCONTROL CAL v4.13: źródło pul kodów SSR w zakładce SQUAWK, importer niżej (aplikacja go nie czyta) |
 
 ## neighbours/
 
@@ -39,6 +40,25 @@ Usunięcie pliku i generator usuwają sektory tego sąsiada, a w ich miejsce wra
 Białorusi (UMMV) nie ma: dodanie jej wymaga pliku i wpisu w `NB_SOURCES` (`backend/app/importers/neighbours.py`).
 
 Ponowny import wszystkiego: `python -m backend.app.importers.seed --force`
+
+## SQUAWK: EUROCONTROL CAL
+
+`eurocontrol-icao-eur-cal-v4-13.xls`: SSR Code Allocation List regionu ICAO EUR (CAL), wydanie 4.13 z 4 marca 2026,
+ze strony https://www.eurocontrol.int/publication/secondary-surveillance-radar-code-allocation-list-icao-eur-region-cal
+(nazwa pliku oryginalna). Arkusz `CAL`: Series | From | To | PA | Unit | CIV/MIL | APP | Unit which assigned | A/R |
+Destination | Via | Protection | Remarks | Ver (kod = Series + From/To, np. 75 / 01 / 77 → 7501–7577), arkusz `PAs`:
+obszary uczestniczące i ich państwa (Polska w EUR-E). Pule dla zakładki SQUAWK wpisuje z niego do
+`data/seed/squawk.json` importer (potrzebny `xlrd` z `requirements-dev.txt`):
+
+```bash
+python -m backend.app.importers.squawk_cal data/import/eurocontrol-icao-eur-cal-v4-13.xls --dry-run   # tylko raport
+python -m backend.app.importers.squawk_cal data/import/eurocontrol-icao-eur-cal-v4-13.xls             # zapis squawk.json
+```
+
+Kategorie pul: `epww` (PA EUR-E, A/R = A, Unit dokładnie EP: FIR EPWW przydziela sam), `ccams` (PA CCAMS, A, Unit
+z EP), `nato` (PA NATO, A, Unit z EP) i `eur-e` (pozostałe wiersze EUR-E: przydziały sąsiadów i retencja R). Nowe
+wydanie: podmień plik (nazwa z numerem wydania, np. `…-v4-14.xls`), uruchom importer i popraw w
+`backend/tests/test_squawk.py` nazwę pliku i oczekiwane pule EPWW (test porównuje `squawk.json` ze świeżym importem).
 
 ## Sektory: data/seed/sectors.geojson
 
