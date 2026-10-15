@@ -1,2 +1,7 @@
 -r requirements.txt
 pytest>=8
+# importer arkusza EUROCONTROL CAL (python -m backend.app.importers.squawk_cal): .xls i .xlsx; xlwt tylko do
+# syntetycznego arkusza .xls w test_squawk.py. Obraz aplikacji (target runtime) ich nie ma.
+xlrd>=2.0
+openpyxl>=3.1
+xlwt>=1.3
