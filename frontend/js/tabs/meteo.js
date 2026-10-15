@@ -780,6 +780,7 @@ function gametTab(pane) {
   im.onerror = () => {
     if (dead) return;
     im.hidden = true;
+    $(".gmt-map").classList.add("off");   // wąska kolumna z uwagą, więcej miejsca na tekst
     const m = $(".gmt-imgmsg");
     m.hidden = false;
     m.innerHTML = `<span>Mapa rejonów GAMET (awiacja.imgw.pl) nie wczytała się.</span>
@@ -805,7 +806,9 @@ function gametTab(pane) {
         ${a.issued ? `<span>wydany ${esc(a.issued.slice(11, 16))}Z</span>` : ""}</h4>
         ${a.text ? `<pre>${esc(a.text)}</pre>` : `<p class="hint">Brak komunikatu GAMET dla rejonu ${esc(k)}.</p>`}</section>`;
     }).join("");
-    $(".gmt-text").innerHTML = (error ? `<p class="error">${esc(error)} · ${link}</p>` : "") + (data ? body : "");
+    // bez żadnego komunikatu (serwer IMGW nie odpowiada): sam błąd z odnośnikiem, bez pięciu pustych rejonów
+    const any = Object.values(areas).some((a) => a?.text);
+    $(".gmt-text").innerHTML = (error ? `<p class="error">${esc(error)} · ${link}</p>` : "") + (any ? body : "");
   };
 
   const load = async () => {
@@ -924,11 +927,21 @@ function sunTab(ctx) {
     input.value = sunIcao(lsGet("meteo.sun.icao")) || "EPWA";
     const shown = () => !document.hidden && wrap.offsetParent !== null;
 
-    const map = L.map($(".sun-map"), { worldCopyJump: true, minZoom: 1, maxZoom: 10, zoomSnap: 0.5 }).setView([25, 10], 2);
+    // na start cały świat: zoom, przy którym mapa świata (256 px · 2^zoom) wypełnia okno bez pustych pasów nad biegunami
+    const box = $(".sun-map").getBoundingClientRect();
+    const zoom = Math.max(1, Math.ceil(4 * Math.log2(Math.max(box.width, box.height, 256) / 256)) / 4);
+    const map = L.map($(".sun-map"), { worldCopyJump: true, minZoom: 1, maxZoom: 10, zoomSnap: 0.25, zoomDelta: 0.5 })
+      .setView([0, 15], zoom);
     BASEMAPS.dark(L, ctx?.config?.carto_api_key).addTo(map);
     // zmierzch cywilny (słońce 0,8°–6° pod horyzontem) jaśniej, noc (niżej niż 6°) ciemniej: dwie nałożone czasze
     const twi = L.polygon([], { className: "sun-twi", stroke: false, interactive: false }).addTo(map);
     const night = L.polygon([], { className: "sun-night", stroke: false, interactive: false }).addTo(map);
+    // siatka bez kafelków (gdy podkład się nie wczyta, granica cienia nadal ma odniesienie): równik, zwrotniki, koła
+    // podbiegunowe i południki co 30°, na pięć obiegów długości jak cień
+    const grat = L.layerGroup().addTo(map), lons = [-540, -180, 180, 540];
+    [[0, ""], [23.44, " dash"], [-23.44, " dash"], [66.56, " dash"], [-66.56, " dash"]].forEach(([la, c]) =>
+      L.polyline(lons.map((lo) => [la, lo]), { className: "sun-grat" + c, interactive: false }).addTo(grat));
+    for (let lo = -540; lo <= 540; lo += 30) L.polyline([[-85, lo], [85, lo]], { className: "sun-grat", interactive: false }).addTo(grat);
     const sub = L.circleMarker([0, 0], { radius: 8, className: "sun-subsolar", interactive: true }).addTo(map);
     const place = L.circleMarker([0, 0], { radius: 6, className: "sun-place" });
     let q = null, data = null, err = "", seq = 0, last = 0, dead = false, day0 = "";
@@ -945,7 +958,7 @@ function sunTab(ctx) {
       const nxt = data.next && Date.parse(data.next.at) > now ? data.next : null;
       const head = data.icao ? `${esc(data.icao)}${data.name ? ` · ${esc(data.name)}` : ""}` : "Punkt na mapie";
       const rows = SUN_ROWS.map(([k, label, tip]) => `<tr title="${esc(tip)}"><td>${label}</td>${data.days.map((d) =>
-        `<td class="num">${sunCell(d[k], d.date, k === "noon" ? null : d.local?.[k])}</td>`).join("")}</tr>`).join("");
+        `<td class="num">${sunCell(d[k], d.date, d.local?.[k])}</td>`).join("")}</tr>`).join("");
       const notes = data.days.map((d) => polarTxt(d) && `${dm(d.date)}: ${polarTxt(d)}`).filter(Boolean);
       el.innerHTML = `<div class="card wnd-card sun-card"><h3>${head}</h3>
         <div class="sun-pos">${latLonTxt(data.lat, data.lon)}</div>

@@ -129,6 +129,7 @@ def test_report_today_tomorrow_and_next():
     assert 600 < r["days"][0]["day_length"] < 700 and "local" not in r["days"][0]
     p = sun.report(*EPWA, now=datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc), polish=True)
     assert p["days"][0]["local"]["sunrise"] == {"hm": "07:01", "tz": "CEST"} and p["next"]["event"] == "sunset"
+    assert p["days"][0]["local"]["noon"] == {"hm": "12:22", "tz": "CEST"}
     assert len(p["subsolar"]) == 2
     polar = sun.report(*ENSB, now=datetime(2026, 12, 21, 12, 0, tzinfo=timezone.utc))
     assert polar["days"][0]["polar"] == "night" and polar["days"][0]["day_length"] == 0 and polar["next"] is None

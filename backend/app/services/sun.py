@@ -147,7 +147,7 @@ def report(lat: float, lon: float, now: datetime | None = None, polish: bool = F
         day = {"date": (now.date() + timedelta(days=k)).isoformat(), "noon": _iso(ev["noon"]), "polar": ev["polar"],
                "civil_polar": ev["civil_polar"], "day_length": length, **{n: _iso(ev[n]) for n in names}}
         if polish:
-            day["local"] = {n: polish_time(ev[n]) if ev[n] else None for n in names}
+            day["local"] = {n: polish_time(ev[n]) if ev[n] else None for n in [*names, "noon"]}
         days.append(day)
     upcoming = sorted((ev[n], n) for ev in evs.values() for n in names if ev[n] and ev[n] > now)
     nxt = None
