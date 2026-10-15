@@ -158,25 +158,27 @@ export function subtabs(root, tabs, opts = {}) {
   return { nav, pane, show, current: () => currentId };
 }
 
-// Podmenu z literami A–Z (jak w AIRCRAFT / CALLSIGN w PANDORZE). onPick("") = wszystkie.
+// Podmenu z literami A–Z (jak w AIRCRAFT / CALLSIGN w PANDORZE): u góry ALL (wszystkie rekordy) na obie kolumny,
+// pod nim litery parami w dwóch równych kolumnach (A B, C D … Y Z). onPick("") = wszystkie.
 // Kliknięcie litery to krok do cofnięcia: remember(zakładka, "A".."Z" albo "" dla wszystkich); activate(arg)
-// zakładki ustawia literę z adresu przez set(). opts.remember = false wyłącza.
+// zakładki ustawia literę z adresu przez set() ("" albo brak = ALL). opts.remember = false wyłącza.
+export const LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+export const letterButtons = () => `<button class="all" data-l="" title="Wszystkie rekordy">ALL</button>`
+  + LETTERS.map((l) => `<button data-l="${l}">${l}</button>`).join("");
 export function letterMenu(root, onPick, opts = {}) {
-  const letters = ["*", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-  const nav = h(`<nav class="submenu letters">${letters.map((l) => `<button data-l="${l}">${l === "*" ? "∗" : l}</button>`).join("")}</nav>`);
+  const nav = h(`<nav class="submenu letters">${letterButtons()}</nav>`);
   root.append(nav);
-  const set = (l) => nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.l === l));
+  const set = (l) => nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.l === (l || "")));
   nav.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-l]");
     if (!b) return;
     set(b.dataset.l);
-    const l = b.dataset.l === "*" ? "" : b.dataset.l;
-    onPick(l);
+    onPick(b.dataset.l);
     const tab = tabOf(nav);
-    if (tab && opts.remember !== false) remember(tab, l);
+    if (tab && opts.remember !== false) remember(tab, b.dataset.l);
   });
-  set("*");
-  return { set: (l) => set(l || "*") };
+  set("");
+  return { set };
 }
 
 // Nowy adres w ramce (iframe) bez kroku w historii przeglądarki: zmiana src w załadowanej ramce dodaje wpis, który
