@@ -276,3 +276,83 @@ def test_detect_roles_without_name_hints():
     assert squawk_cal.detect_roles(names, rows) == {"unit": 4, "from": 2, "to": 3, "code": None, "type": 5, "remarks": 6}
     forced = squawk_cal.detect_roles(names, rows, {"code": "series", "type": "NOTES"})
     assert (forced["code"], forced["from"], forced["type"], forced["remarks"]) == (1, None, 6, None)
+
+
+# --- frontend: czyste funkcje tabs/squawk.js w Node (bez DOM)
+
+NODE_SCRIPT = r"""
+const sq = await import(process.argv[2]);
+const pools = [
+  { from: "0100", to: "0177", count: 64, unit: "EPWW", type: "DOMESTIC", remarks: "test", match: ["unit"], raw: { NOTE: "abc" } },
+  { from: "4000", to: "4000", count: 1, unit: "EPKK", type: "", remarks: "", match: ["unit"] },
+  { from: "5000", to: "5077", count: 64, unit: "ORCAM", type: "TRANSIT", remarks: "", match: ["EUR-E"] }];
+const data = { pools, special: [{ code: "7700", label: "EMERGENCY" }, { code: "1000", label: "MODE S CONSPICUITY" }] };
+const empty = { pools: [], special: data.special };
+const short = (r) => [r.imported, r.special.map((s) => s.code), r.pools.map((p) => p.from)];
+console.log(JSON.stringify({
+  isCode: ["7700", "0000", "7777", "7800", "0900", "770", "77000", "", null, 7700].map(sq.isCode),
+  size: [sq.rangeSize("0100", "0177"), sq.rangeSize("0000", "7777"), sq.rangeSize("7700", "7700"), sq.rangeSize("0170", "0207")],
+  inRange: ["0077", "0100", "0177", "0200"].map((c) => sq.inRange(c, pools[0])).concat([sq.inRange("4000", { from: "4000" })]),
+  check: ["", " 7700 ", "77", "7800", "9", "77a", "77000", "0000"].map(sq.checkCode),
+  lookup: [sq.lookup(data, "7700"), sq.lookup(data, "0150"), sq.lookup(data, "5077"), sq.lookup(data, "1234"),
+    sq.lookup(empty, "7700"), sq.lookup(empty, "1234"), sq.lookup(null, "7700")].map(short),
+  miss: [sq.lookup(data, "0150"), sq.lookup(data, "7700"), sq.lookup(empty, "7700"), sq.lookup(data, "1234"), sq.lookup(empty, "1234")].map(sq.missText),
+  filter: ["", "epww", "eur-e", "0150", "4000", "5070", "transit orcam", "abc", "7700"].map((q) => sq.filterPools(pools, q).map((p) => p.from)),
+  plural: [0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024].map((n) => sq.plural(n, "kod", "kody", "kodów")),
+  range: [sq.rangeText(pools[0]), sq.rangeText(pools[1]), sq.rangeText({ from: "1000" })],
+  cmd: sq.IMPORT_CMD,
+}));
+"""
+
+
+@pytest.fixture(scope="module")
+def js(tmp_path_factory):
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    front = settings.frontend_dir / "js"
+    d = tmp_path_factory.mktemp("sqjs")
+    (d / "api.mjs").write_text((front / "api.js").read_text("utf-8"), "utf-8")
+    (d / "squawk.mjs").write_text((front / "tabs" / "squawk.js").read_text("utf-8").replace('"../api.js"', '"./api.mjs"'), "utf-8")
+    (d / "run.mjs").write_text(NODE_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(d / "run.mjs"), (d / "squawk.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_js_codes(js):
+    assert js["isCode"] == [True, True, True, False, False, False, False, False, False, False]
+    assert js["size"] == [64, 4096, 1, 16]   # 0170–0207 przez granicę serii: 0170..0177 i 0200..0207
+    assert js["inRange"] == [False, True, True, False, True]
+
+
+def test_js_check_code(js):
+    res = [(c["code"], c["ok"], c["error"]) for c in js["check"]]
+    assert res[0] == ("", False, None) and res[1] == ("7700", True, None) and res[2] == ("77", False, None)
+    assert "8 i 9" in res[3][2] and "8 i 9" in res[4][2] and "0–7" in res[5][2] and "4 cyfry" in res[6][2]
+    assert res[7] == ("0000", True, None)
+
+
+def test_js_lookup_and_filter(js):
+    assert js["lookup"] == [[True, ["7700"], []], [True, [], ["0100"]], [True, [], ["5000"]], [True, [], []],
+                            [False, ["7700"], []], [False, [], []], [False, [], []]]
+    miss = js["miss"]
+    assert miss[0] == "" and miss[1] == "Nie leży w żadnej puli EPWW z CAL."
+    assert "nie są jeszcze zaimportowane" in miss[2] and "nie jest kodem specjalnym" in miss[3]
+    assert "nie jest kodem specjalnym" in miss[4] and "zaimportowane" in miss[4]
+    assert js["filter"] == [["0100", "4000", "5000"], ["0100"], ["5000"], ["0100"], ["4000"], ["5000"], ["5000"], ["0100"], []]
+    # 0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024
+    assert js["plural"] == ["kodów", "kod", "kody", "kody", "kodów", "kodów", "kodów", "kody", "kodów", "kody", "kodów", "kody"]
+    assert js["range"] == ["0100–0177", "4000", "1000"]
+    assert js["cmd"].startswith("python -m backend.app.importers.squawk_cal ")
+
+
+def test_squawk_tab_wiring():
+    """Zakładka czyta /api/squawk, adres #squawk/<kod>, pusty stan z poleceniem importu; arkusz stylów podpięty."""
+    src = (settings.frontend_dir / "js" / "tabs" / "squawk.js").read_text("utf-8")
+    assert 'api("/api/squawk")' in src and 'remember("squawk", c.code)' in src and "activate: (arg)" in src
+    assert "soon(" not in src and "emptyPools()" in src and "IMPORT_CMD" in src
+    index = (settings.frontend_dir / "index.html").read_text("utf-8")
+    assert 'href="/static/css/squawk.css"' in index

@@ -1,1 +1,46 @@
-/* SQUAWK (0.12.3) */
+/* SQUAWK (0.12.3): pule kodów SSR FIR EPWW (CAL) i kody specjalne. Panele i tabele jak NM UI (style.css: .card,
+   table.data), kody czcionką mono; kody alarmowe 7500/7600/7700 na czerwono. Bez poświaty i cieni pod tekstem. */
+.sq-pane h2.title { margin-bottom: 10px; }
+.sq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(400px, 600px); gap: 10px; align-items: start; }
+.sq-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (max-width: 1200px) { .sq-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* sprawdzanie kodu: duże pole na 4 cyfry, odpowiedź obok */
+.sq-lookrow { display: flex; align-items: flex-start; gap: 14px; }
+.sq-lookrow input.sq-code { flex: none; width: 7ch; padding: 4px 8px; font: 700 26px/1.2 var(--mono); letter-spacing: 2px; text-align: center; }
+.sq-lookrow input.sq-code.bad { border-color: var(--bad); color: #ffb3ad; }
+.sq-answer { flex: 1; min-width: 0; min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
+.sq-answer p { margin: 2px 0; font: 14px/1.45 var(--ui); }
+.sq-answer p.hint { font-size: 13px; }
+.sq-answer .sq-bad { color: var(--warn); font-weight: 700; }
+.sq-big { font: 700 18px var(--mono); color: #fff; margin-right: 4px; }
+.sq-big.emerg { color: var(--bad); }
+.sq-label { color: var(--green-text); letter-spacing: .3px; }
+
+/* tabela pul */
+.sq-bar { margin: 2px 0 4px; }
+.sq-bar .sq-filter { width: 360px; max-width: 100%; }
+.sq-bar .sq-filter:disabled { opacity: .5; }
+.sq-meta { margin: 0 0 6px; }
+.sq-meta:empty { display: none; }
+table.data.sq-table td { vertical-align: top; }
+table.data.sq-table th.num { text-align: right; }
+.sq-range { font: 700 15px var(--mono); color: #fff; white-space: nowrap; }
+.sq-unit { font-family: var(--mono); white-space: nowrap; }
+.sq-unit .tag.sq-match { padding: 0 4px; font-size: 11px; color: var(--cyan); border-color: var(--cyan); }
+.sq-minor { font-size: 12px; color: var(--muted); }
+td.sq-empty { padding: 14px 12px; }
+td.sq-empty p { margin: 0 0 8px; color: var(--text); }
+td.sq-empty b { color: var(--green-text); }
+.sq-cmd { display: inline-block; padding: 4px 8px; background: #050605; border: 1px solid var(--line); color: var(--yellow);
+  font: 13px var(--mono); overflow-wrap: anywhere; }
+
+/* kody specjalne */
+.sq-scode { width: 64px; font: 700 18px var(--mono); color: var(--green-hi); }
+.sq-scode.emerg { color: var(--bad); }
+.sq-meaning { color: var(--text); }
+.sq-note { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.sq-excl { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.sq-excl .tag { padding: 0 4px; font-size: 11px; color: var(--muted); border-color: var(--line); }
+.sq-src { margin-top: 3px; font-size: 11px; }
+.sq-foot { margin: 8px 0 0; }
