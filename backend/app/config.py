@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
-VERSION = "0.12.2"
+VERSION = "0.12.3"
 
 
 def csv_set(value: str) -> set[str]:

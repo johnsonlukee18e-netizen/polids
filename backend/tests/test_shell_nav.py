@@ -13,11 +13,12 @@ FRONTEND = ROOT_DIR / "frontend"
 INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 
-# INOP pod AD VFR, DOCS w OTHER (runda 11)
+# INOP pod AD VFR, DOCS w OTHER (runda 11); 0.12.3 (issue #13): COORDINATION i CONVERSION po MAP, SQUAWK po STRIP,
+# PHRASEOLOGY w OTHER
 MENU = ["home", "radio", "meteo", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
-        "phraseology", "checklist", "sytop", "aup", "strip", "other", "about", "emergency", "admin"]
+        "coordination", "conversion", "checklist", "sytop", "aup", "strip", "squawk", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
-          "PHRASEOLOGY", "CHECKLIST", "SYT OP", "AUP", "STRIP", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+          "COORDINATION", "CONVERSION", "CHECKLIST", "SYT OP", "AUP", "STRIP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
 
 
 def _menu_buttons():
@@ -54,12 +55,13 @@ def test_docs_moved_to_other():
     app.js przekierowuje na OTHER › DOCS (link #docs bez arg zostawia otwarty dokument), a DOCS › LOA w RADIO
     otwiera PDF w OTHER."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
-    assert 'const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"] };' in APP
+    assert ('const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"], '
+            'phraseology: () => ["other", "phraseology"] };') in APP
     assert "if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);" in APP
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { mountDocs } from "../docs.js";' in other and "soon(" not in other
     subs = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', other)
-    assert subs[0] == ("docs", "DOCS")
+    assert subs == [("docs", "DOCS"), ("phraseology", "PHRASEOLOGY")]
     assert 'remember("other", argOf())' in other and "activate(arg)" in other and "SUBS" not in other
     docs = (FRONTEND / "js" / "docs.js").read_text("utf-8")
     assert "export function mountDocs(" in docs and "remember(" not in docs and "frameGo(" in docs
@@ -67,6 +69,22 @@ def test_docs_moved_to_other():
     assert "docs.find((x) => argOf(x.url) === arg) || docs[0];" in docs
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     assert 'navigate("other", "docs/" + doc.dataset.docs)' in radio and 'navigate("docs"' not in radio
+
+
+def test_phraseology_moved_to_other():
+    """0.12.3: PHRASEOLOGY nie jest już w menu, tylko podzakładką OTHER po DOCS (#other/phraseology); stary adres
+    #phraseology przekierowuje app.js."""
+    assert "phraseology" not in MENU and not (FRONTEND / "js" / "tabs" / "phraseology.js").exists()
+    phr = (FRONTEND / "js" / "phraseology.js").read_text("utf-8")
+    assert "export function mountPhraseology(pane, ctx)" in phr and "/api/embed-check/phraseology" in phr
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert 'import { mountPhraseology } from "../phraseology.js";' in other
+
+
+def test_hidden_menu_button_takes_no_space():
+    """display:block przycisków menu przykrywał [hidden]: ADMIN był widoczny dla każdego."""
+    css = (FRONTEND / "css" / "style.css").read_text("utf-8")
+    assert ".menu nav button[hidden] { display: none; }" in css
 
 
 def test_all_css_linked():
@@ -96,6 +114,7 @@ console.log(JSON.stringify({
   noop: [api.navigate("meteo", "qnh"), api.remember("meteo", "qnh"), api.stash("aerodrome", { q: "BER" }), api.stashed("aerodrome")],
   // stare adresy #docs: przycisk/link bez arg, "#docs", "#docs/<plik>" (undefined w JSON = null)
   moved: [undefined, "", "LOA/LOA EPWW EDMM (AIRAC 2602).pdf"].map((a) => moved.MOVED.docs(a)),
+  phraseology: moved.MOVED.phraseology(),
 }));
 """
 
@@ -139,6 +158,7 @@ def test_hash_roundtrip(js):
 def test_moved_docs(js):
     # bez arg OTHER zostaje w swoim stanie (otwarty dokument), "" = pierwszy dokument, plik = ten PDF
     assert js["moved"] == [["other", None], ["other", "docs"], ["other", "docs/LOA/LOA EPWW EDMM (AIRAC 2602).pdf"]]
+    assert js["phraseology"] == ["other", "phraseology"]
 
 
 def test_home_greeting(js):

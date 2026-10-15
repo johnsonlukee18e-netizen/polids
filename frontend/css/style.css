@@ -46,8 +46,10 @@ a { color: var(--green-text); }
 .menu nav button.active, .submenu button.active {
   background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06;
 }
-/* menu główne ciaśniej niż podmenu: 21 przycisków + logo, zegar i użytkownik mieszczą się bez przewijania od 900 px wysokości */
+/* menu główne ciaśniej niż podmenu: 22 przyciski + logo, zegar i użytkownik mieszczą się bez przewijania od 900 px wysokości */
 .menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }
+/* display:block wyżej przykrywa [hidden] przeglądarki: ADMIN (hidden dla nie-administratorów) zajmował miejsce w menu */
+.menu nav button[hidden] { display: none; }
 @media (max-height: 820px) {
   #tabs button { padding: 3px 6px; margin-bottom: 1px; }
   #tabs button.red, #tabs button.admin { margin-top: 6px; }
