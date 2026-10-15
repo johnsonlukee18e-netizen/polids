@@ -29,3 +29,20 @@ def lvp_memory():
     lvp.reset_memory()
     yield
     lvp.reset_memory()
+
+
+@pytest.fixture(autouse=True)
+def eaip_offline(monkeypatch):
+    """Testy nie pytają serwera PAŻP o katalog poprawki eAIP: brak połączenia = wyliczony adres cyklu
+    (test_eaip_links podmienia odpowiedzi serwera sam)."""
+    import httpx
+
+    from backend.app.services import eaip
+
+    def offline(request):
+        raise httpx.ConnectError("testy bez sieci", request=request)
+
+    monkeypatch.setattr(eaip, "_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(offline)))
+    eaip.reset_cache()
+    yield
+    eaip.reset_cache()
