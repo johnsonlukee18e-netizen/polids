@@ -1,0 +1,14 @@
+{
+ "_uwaga": "SQUAWK: pule kodów SSR (Mode A) do przydzielania w FIR EPWW i kody specjalne. Kody zawsze jako 4 cyfry ósemkowe w cudzysłowie (\"0100\"). pools: z arkusza EUROCONTROL / ICAO EUR CAL (SSR Code Allocation List), filtr UNIT = EP / EP… oraz wiersze z EUR-E; plik nadpisuje importer (python -m backend.app.importers.squawk_cal <plik.xls>), zostawia _uwaga i special. Pola puli: from, to, count (liczba kodów, ósemkowo), unit, type (przeznaczenie), remarks, match (dlaczego wiersz trafił do filtra), sheet i row (miejsce w arkuszu), raw (wszystkie kolumny wiersza). special: kody o stałym znaczeniu – ogólne zasady ICAO/SERA, nie z arkusza CAL; do potwierdzenia w AIP Polska ENR 1.6.",
+ "_status": "Import CAL oczekuje: pule kodów SSR FIR EPWW z EUROCONTROL CAL v4.13 (eurocontrol-icao-eur-cal-v4-13.xls, filtr UNIT EP i EUR-E) pojawią się po uruchomieniu: python -m backend.app.importers.squawk_cal eurocontrol-icao-eur-cal-v4-13.xls",
+ "meta": null,
+ "special": [
+  {"code": "7500", "label": "UNLAWFUL INTERFERENCE", "meaning": "bezprawna ingerencja (np. uprowadzenie statku powietrznego)", "source": "ICAO Doc 8168 PANS-OPS tom I i Doc 4444 PANS-ATM; SERA (rozporządzenie 923/2012), sekcja 13 – transponder SSR"},
+  {"code": "7600", "label": "RADIO FAILURE", "meaning": "niesprawność łączności radiowej (RCF)", "source": "ICAO Doc 8168 PANS-OPS tom I i Doc 4444 PANS-ATM; SERA (rozporządzenie 923/2012), sekcja 13 – transponder SSR"},
+  {"code": "7700", "label": "EMERGENCY", "meaning": "niebezpieczeństwo (sytuacja awaryjna)", "source": "ICAO Doc 8168 PANS-OPS tom I i Doc 4444 PANS-ATM; SERA (rozporządzenie 923/2012), sekcja 13 – transponder SSR"},
+  {"code": "2000", "label": "NO ATC CODE", "meaning": "brak kodu przydzielonego przez ATC – wlot do przestrzeni z SSR przed otrzymaniem instrukcji ATC", "source": "ICAO Doc 8168 PANS-OPS tom I (eksploatacja transpondera)"},
+  {"code": "7000", "label": "VFR CONSPICUITY", "meaning": "kod rozpoznawczy (conspicuity) lotów VFR bez kodu przydzielonego przez ATC", "source": "SERA.13005"},
+  {"code": "1000", "label": "MODE S CONSPICUITY", "meaning": "kod rozpoznawczy Mode S: statek powietrzny identyfikowany po znaku wywoławczym przesyłanym przez Mode S, bez kodu dyskretnego", "source": "EUROCONTROL (Mode S conspicuity code A1000); VATSIM: wtyczka CCAMS do EuroScope (github.com/kusterjs/CCAMS, CCAMS.h)", "note": "Na VATSIM kod 1000 przydziela wtyczka CCAMS samolotom z transponderem Mode S, gdy lotnisko docelowe oraz lotnisko startu (albo stanowisko kontrolera) leżą w obszarze Mode S. Polskie lotniska wojskowe są wyłączone – tam CCAMS daje kod dyskretny.", "excluded": ["EPCE", "EPDA", "EPDE", "EPIR", "EPKS", "EPLK", "EPLY", "EPMB", "EPMI", "EPMM", "EPOK", "EPPR", "EPPW", "EPSN", "EPTM"]}
+ ],
+ "pools": []
+}
