@@ -83,11 +83,12 @@ def read_book(path: Path) -> dict[str, list[list[str]]]:
             raise CalError("Brak modułu xlrd (pliki .xls): pip install -r requirements-dev.txt "
                            "albo pip install xlrd") from exc
         try:
-            book = xlrd.open_workbook(str(path), formatting_info=True)
-        except NotImplementedError:   # część plików .xls nie ma informacji o formatowaniu (bez scaleń)
-            book = xlrd.open_workbook(str(path))
-        except xlrd.XLRDError as exc:
-            raise CalError(f"{path.name}: to nie jest arkusz .xls ({exc})") from exc
+            try:
+                book = xlrd.open_workbook(str(path), formatting_info=True)
+            except NotImplementedError:   # część plików .xls nie ma informacji o formatowaniu (bez scaleń)
+                book = xlrd.open_workbook(str(path))
+        except Exception as exc:  # noqa: BLE001 - xlrd rzuca różne wyjątki dla uszkodzonych plików
+            raise CalError(f"{path.name}: nie da się odczytać arkusza .xls ({exc})") from exc
         for sh in book.sheets():
             grid = []
             for r in range(sh.nrows):

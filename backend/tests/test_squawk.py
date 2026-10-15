@@ -2,6 +2,7 @@
 
 Arkusze w testach importera są SYNTETYCZNE (budowane w teście, wymyślone kody i układ kolumn) – to nie są dane
 CAL; prawdziwy plik eurocontrol-icao-eur-cal-v4-13.xls nie był dostępny przy pisaniu importera."""
+import importlib.util
 import json
 import os
 import sys
@@ -251,6 +252,10 @@ def test_import_errors(tmp_path, monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "openpyxl", None)   # biblioteki nie ma: czytelny błąd, nie ślad stosu
     with pytest.raises(squawk_cal.CalError, match="openpyxl"):
         squawk_cal.read_book(xlsx)
+    if "xlrd" in sys.modules or importlib.util.find_spec("xlrd"):   # uszkodzony plik: błąd zamiast śladu stosu
+        (tmp_path / "zly.xls").write_bytes(b"to nie arkusz")
+        assert squawk_cal.main([str(tmp_path / "zly.xls")]) == 2
+        assert "nie da się odczytać arkusza .xls" in capsys.readouterr().err
     monkeypatch.setitem(sys.modules, "xlrd", None)
     assert squawk_cal.main([str(tmp_path / "cal.xls")]) == 2   # brak pliku sprawdzany przed biblioteką
     (tmp_path / "cal.xls").write_bytes(b"x")
