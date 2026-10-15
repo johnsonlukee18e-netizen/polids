@@ -312,3 +312,16 @@ export function lsGet(key) {
 export function lsSet(key, value) {
   try { localStorage.setItem(key, value); } catch { /* tryb prywatny */ }
 }
+
+// Wybór przekazywany między zakładkami tego okna (stanowisko HOME ↔ AERODROME › OVERVIEW): zapis także w localStorage
+// (następne otwarcie strony), ale odczyt z pamięci okna, wczytanej z localStorage przy pierwszym użyciu. Działa bez
+// localStorage (tryb prywatny), a wybór w drugim oknie PolIDS nie zmienia tego, co otwarte tutaj.
+const choices = new Map();
+export function choiceGet(key) {
+  if (!choices.has(key)) choices.set(key, lsGet(key) || "");
+  return choices.get(key);
+}
+export function choiceSet(key, value) {
+  choices.set(key, value);
+  lsSet(key, value);
+}
