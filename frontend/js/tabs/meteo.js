@@ -900,13 +900,33 @@ export const durTxt = (min) => (min === null || min === undefined ? "–"
   : `${Math.floor(min / 60) ? `${Math.floor(min / 60)} h` : ""}${min % 60 || !Math.floor(min / 60) ? ` ${min % 60} min` : ""}`.trim());
 // odliczanie do zdarzenia: "za 3 h 12 min", "za 5 min", "za chwilę"
 export const untilTxt = (ms) => (ms < 60000 ? "za chwilę" : `za ${durTxt(Math.floor(ms / 60000))}`);
-// opis doby bez wschodu lub zmierzchu (dzień / noc polarna, białe noce)
+// opis doby bez wschodu lub zmierzchu (dzień / noc polarna, białe noce) albo z jednym z nich (dzień przejścia: wschód bez
+// zachodu = słońce nie zachodzi do końca doby, zachód bez wschodu = było nad horyzontem od jej początku)
 export function polarTxt(d) {
   if (d.polar === "day") return "dzień polarny: słońce całą dobę nad horyzontem";
   if (d.polar === "night") return d.civil_polar === "night" ? "noc polarna: słońce całą dobę niżej niż 6° pod horyzontem"
     : "noc polarna: słońce całą dobę pod horyzontem";
+  if (d.sunrise && !d.sunset) return "początek dnia polarnego: po wschodzie słońce nie zachodzi do końca doby";
+  if (!d.sunrise && d.sunset) return "koniec dnia polarnego: słońce nad horyzontem od początku doby do zachodu";
   if (d.civil_polar === "day") return "białe noce: słońce nie schodzi 6° pod horyzont (bez BMCT i EECT)";
+  if (d.civil_dawn && !d.civil_dusk) return "początek białych nocy: po BMCT słońce nie schodzi już 6° pod horyzont (bez EECT)";
+  if (!d.civil_dawn && d.civil_dusk) return "koniec białych nocy: słońce 6° pod horyzontem dopiero po EECT (bez BMCT)";
   return "";
+}
+// najbliższe zdarzenie: pierwsze jeszcze nieminione z listy z serwera (po zachodzie od razu EECT, bez czekania na
+// kolejne pobranie); starsza odpowiedź bez listy: samo "next"
+export const sunNext = (data, now) => (data?.upcoming || (data?.next ? [data.next] : []))
+  .find((e) => Date.parse(e.at) > now) || null;
+// zoom na start: cały świat (256 px · 2^zoom) mieści się w szerokości mapy, co 0,25, co najmniej 1; wolne miejsce po
+// bokach to kopie świata (cień i siatka sięgają ±540°), nad biegunami tło mapy
+export const sunZoom = (width) => Math.max(1, Math.floor(4 * Math.log2(Math.max(width || 0, 256) / 256)) / 4);
+// długość lon na tej kopii świata, która leży najbliżej ref (kliknięte miejsce albo środek widoku)
+export const nearLon = (lon, ref) => lon + 360 * Math.round((ref - lon) / 360);
+// pole lotniska: zapytanie o kod ICAO albo (zły format) brak zapytania, błąd i wpisany tekst do nagłówka karty
+export function sunQuery(value) {
+  const icao = sunIcao(value);
+  return icao ? { q: { icao }, err: "", label: icao }
+    : { q: null, err: "Wpisz kod ICAO lotniska (3–4 znaki)", label: String(value || "").trim().toUpperCase().slice(0, 12) };
 }
 
 function sunTab(ctx) {
@@ -927,11 +947,9 @@ function sunTab(ctx) {
     input.value = sunIcao(lsGet("meteo.sun.icao")) || "EPWA";
     const shown = () => !document.hidden && wrap.offsetParent !== null;
 
-    // na start cały świat: zoom, przy którym mapa świata (256 px · 2^zoom) wypełnia okno bez pustych pasów nad biegunami
-    const box = $(".sun-map").getBoundingClientRect();
-    const zoom = Math.max(1, Math.ceil(4 * Math.log2(Math.max(box.width, box.height, 256) / 256)) / 4);
+    // na start cały świat w szerokości mapy (cała granica cienia, także nad Pacyfikiem)
     const map = L.map($(".sun-map"), { worldCopyJump: true, minZoom: 1, maxZoom: 10, zoomSnap: 0.25, zoomDelta: 0.5 })
-      .setView([0, 15], zoom);
+      .setView([0, 15], sunZoom($(".sun-map").getBoundingClientRect().width));
     BASEMAPS.dark(L, ctx?.config?.carto_api_key).addTo(map);
     // zmierzch cywilny (słońce 0,8°–6° pod horyzontem) jaśniej, noc (niżej niż 6°) ciemniej: dwie nałożone czasze
     const twi = L.polygon([], { className: "sun-twi", stroke: false, interactive: false }).addTo(map);
@@ -944,18 +962,20 @@ function sunTab(ctx) {
     for (let lo = -540; lo <= 540; lo += 30) L.polyline([[-85, lo], [85, lo]], { className: "sun-grat", interactive: false }).addTo(grat);
     const sub = L.circleMarker([0, 0], { radius: 8, className: "sun-subsolar", interactive: true }).addTo(map);
     const place = L.circleMarker([0, 0], { radius: 6, className: "sun-place" });
-    let q = null, data = null, err = "", seq = 0, last = 0, dead = false, day0 = "";
+    // q: zapytanie ({icao} albo {lat, lon}; ref = długość znacznika na kopii świata, na której go widać), cardTitle:
+    // nagłówek karty przed odpowiedzią serwera i przy błędzie
+    let q = null, cardTitle = "", data = null, err = "", seq = 0, last = 0, dead = false, day0 = "";
 
     const side = () => {
       const el = $(".sun-side");
       if (!data) {
-        el.innerHTML = `<div class="card wnd-card sun-card"><h3>${esc(q?.icao || "Słońce")}</h3>
+        el.innerHTML = `<div class="card wnd-card sun-card"><h3>${esc(cardTitle || "Słońce")}</h3>
           <p class="${err ? "error" : "hint"}">${esc(err || "Ładowanie…")}</p></div>`;
         return;
       }
       const now = Date.now(), elev = sunElevation(data.lat, data.lon, now), st = sunState(elev);
       const today = new Date(now).toISOString().slice(0, 10);
-      const nxt = data.next && Date.parse(data.next.at) > now ? data.next : null;
+      const nxt = sunNext(data, now);
       const head = data.icao ? `${esc(data.icao)}${data.name ? ` · ${esc(data.name)}` : ""}` : "Punkt na mapie";
       const rows = SUN_ROWS.map(([k, label, tip]) => `<tr title="${esc(tip)}"><td>${label}</td>${data.days.map((d) =>
         `<td class="num">${sunCell(d[k], d.date, d.local?.[k])}</td>`).join("")}</tr>`).join("");
@@ -1002,7 +1022,10 @@ function sunTab(ctx) {
         if (dead || my !== seq) return;
         data = d;
         err = "";
-        place.setLatLng([d.lat, d.lon]).addTo(map);
+        if (q.icao) lsSet("meteo.sun.icao", d.icao || q.icao);   // zapamiętane tylko lotnisko, które serwer zna
+        // znacznik na kopii świata klikniętej albo najbliższej środka widoku: bez przeskoku mapy o pełny obrót
+        q.ref = nearLon(d.lon, q.ref ?? map.getCenter().lng);
+        place.setLatLng([d.lat, q.ref]).addTo(map);
         place.unbindTooltip().bindTooltip(d.icao || latLonTxt(d.lat, d.lon), { permanent: true, direction: "right",
           offset: [8, 0], className: "sun-tip" });
         if (!map.getBounds().contains(place.getLatLng())) map.panTo(place.getLatLng());
@@ -1014,23 +1037,37 @@ function sunTab(ctx) {
       }
       side();
     };
-    const pick = (next) => {
+    const pick = (next, title) => {
       q = next;
+      cardTitle = title;
       data = null;
       err = "";
       side();
       load();
     };
     const go = () => {
-      const code = sunIcao(input.value);
-      if (!code) { err = "Wpisz kod ICAO lotniska (3–4 znaki)"; data = null; side(); return; }
-      input.value = code;
-      lsSet("meteo.sun.icao", code);
-      pick({ icao: code });
+      const r = sunQuery(input.value);
+      if (!r.q) {
+        // zły format: bez zapytania i bez znacznika (zegar ani powrót serwera nie wczytają znów poprzedniego miejsca)
+        seq++;
+        q = null; cardTitle = r.label; data = null; err = r.err;
+        place.remove();
+        side();
+        return;
+      }
+      input.value = r.q.icao;
+      pick(r.q, r.label);
     };
     $(".sun-go").addEventListener("click", go);
     input.addEventListener("keydown", (e) => e.key === "Enter" && go());
-    map.on("click", (e) => pick({ lat: e.latlng.lat, lon: wrapLon(e.latlng.lng) }));
+    // do serwera długość -180..180, znacznik w klikniętym miejscu (także na kopii świata za linią zmiany daty)
+    map.on("click", (e) => pick({ lat: e.latlng.lat, lon: wrapLon(e.latlng.lng), ref: e.latlng.lng }, "Punkt na mapie"));
+    // po przesunięciu mapy znacznik poza widokiem: na kopię świata najbliższą środka (worldCopyJump przenosi widok o obrót)
+    map.on("moveend", () => {
+      if (!data || !q || !map.hasLayer(place) || map.getBounds().contains(place.getLatLng())) return;
+      q.ref = nearLon(q.ref, map.getCenter().lng);
+      place.setLatLng([data.lat, q.ref]);
+    });
 
     tick();
     go();

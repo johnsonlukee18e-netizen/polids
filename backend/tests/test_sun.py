@@ -17,9 +17,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import main  # noqa: E402
 from backend.app.services import sun  # noqa: E402
 
-TOL = timedelta(minutes=3)
+# najgorszy błąd względem PyEphem w REF: 0,32 min; dawny algorytm (sprzed 0.12.3) myli się o 1–2 min już w Warszawie
+TOL = timedelta(minutes=1)
 EPWA, KSFO, RJTT = (52.1657, 20.9671), (37.6188, -122.3756), (35.5523, 139.7798)
 NZAA, ENSB = (-37.0081, 174.7917), (78.2461, 15.4656)
+CYLT, ENTC = (82.5178, -62.2806), (69.6833, 18.9189)
 
 # (miejsce, data doby lotniska, {zdarzenie: UTC z PyEphem})
 REF = [
@@ -64,6 +66,61 @@ def test_polar_day_and_night():
     # białe noce: słońce zachodzi, ale nie schodzi 6° pod horyzont
     assert april["polar"] is None and april["civil_polar"] == "day" and april["civil_dawn"] is None
     assert sun.sun_day(*EPWA, date(2026, 6, 21))["polar"] is None
+
+
+def _crossings(lat, lon, ev, alt):
+    """Przejścia środka tarczy przez wysokość alt w dobie słonecznej (od północy do północy wokół górowania), co 15 s:
+    [("rise" / "set", chwila)]; ta sama wysokość słońca co w sun.py, tylko bez żadnego wzoru na kąt godzinny."""
+    t, end, out = ev["noon"] - timedelta(hours=12), ev["noon"] + timedelta(hours=12), []
+    prev = sun.elevation(lat, lon, t) - alt
+    while t < end:
+        t += timedelta(seconds=15)
+        e = sun.elevation(lat, lon, t) - alt
+        if prev * e < 0:
+            out.append(("rise" if e > 0 else "set", t))
+        prev = e
+    return out
+
+
+@pytest.mark.parametrize("place,day,alt,kind", [
+    # pierwsze słońce po nocy polarnej (Svalbard 15.02 i Alert 14.10: kilka minut nad horyzontem); dawniej bez wschodu
+    (ENSB, date(2026, 2, 15), -0.833, "both"), (CYLT, date(2026, 10, 14), -0.833, "both"),
+    # początek dnia polarnego: wschód, a zachodu do końca doby już nie ma
+    (ENSB, date(2026, 4, 18), -0.833, "rise"), (CYLT, date(2026, 4, 6), -0.833, "rise"),
+    (ENTC, date(2026, 5, 17), -0.833, "rise"),
+    # koniec dnia polarnego: słońce nad horyzontem od początku doby i zachodzi
+    (CYLT, date(2026, 9, 5), -0.833, "set"), (ENTC, date(2026, 7, 26), -0.833, "set"),
+    (ENSB, date(2026, 8, 24), -0.833, "set"),
+    # białe noce: pierwszy BMCT bez EECT i ostatni EECT bez BMCT
+    (ENSB, date(2026, 4, 4), -6, "rise"), (ENSB, date(2026, 9, 8), -6, "set"),
+])
+def test_polar_transition_days(place, day, alt, kind):
+    """Dni przejścia do dnia lub nocy polarnej i białych nocy: te same zdarzenia co gęste przeszukanie wysokości słońca
+    (±1 min), w dniu jednostronnym brak drugiego zdarzenia, a "polar" puste (to nie jest cała doba po jednej stronie)."""
+    ev = sun.sun_day(*place, day)
+    rise, set_, key = ("sunrise", "sunset", "polar") if alt > -1 else ("civil_dawn", "civil_dusk", "civil_polar")
+    want = _crossings(*place, ev, alt)
+    assert [k for k, _ in want] == {"both": ["rise", "set"], "rise": ["rise"], "set": ["set"]}[kind]
+    got = {"rise": ev[rise], "set": ev[set_]}
+    assert ev[key] is None and sum(v is not None for v in got.values()) == len(want)
+    for k, t in want:
+        assert got[k] is not None and abs(got[k] - t) <= TOL, (k, got[k], t)
+        assert abs(sun.elevation(*place, got[k]) - alt) < 0.01
+
+
+def test_report_transition_day_length():
+    """Dzień jednostronny: długość dnia od wschodu do końca doby albo od początku doby do zachodu (zamiast "–")."""
+    r = sun.report(*ENSB, now=datetime(2026, 4, 18, 12, 0, tzinfo=timezone.utc))
+    d = r["days"][0]
+    assert d["sunrise"] and d["sunset"] is None and d["polar"] is None
+    end = datetime.fromisoformat(d["noon"].replace("Z", "+00:00")) + timedelta(hours=12)
+    sr = datetime.fromisoformat(d["sunrise"].replace("Z", "+00:00"))
+    assert abs(d["day_length"] - (end - sr).total_seconds() / 60) <= 1 and 1300 < d["day_length"] < 1440
+    d = sun.report(*CYLT, now=datetime(2026, 9, 5, 12, 0, tzinfo=timezone.utc))["days"][0]
+    assert d["sunrise"] is None and d["sunset"] and 1300 < d["day_length"] < 1440
+    # pierwsze słońce po nocy polarnej: kilka minut dnia
+    d = sun.report(*ENSB, now=datetime(2026, 2, 15, 12, 0, tzinfo=timezone.utc))["days"][0]
+    assert 0 < d["day_length"] < 10
 
 
 def test_sun_times_keys_for_aerodrome():
@@ -134,6 +191,19 @@ def test_report_today_tomorrow_and_next():
     polar = sun.report(*ENSB, now=datetime(2026, 12, 21, 12, 0, tzinfo=timezone.utc))
     assert polar["days"][0]["polar"] == "night" and polar["days"][0]["day_length"] == 0 and polar["next"] is None
     assert sun.report(*ENSB, now=datetime(2026, 6, 21, 12, 0, tzinfo=timezone.utc))["days"][0]["day_length"] == 1440
+
+
+def test_report_upcoming_events():
+    """Lista najbliższych zdarzeń (co najmniej doba naprzód): po zachodzie przeglądarka od razu pokazuje EECT."""
+    r = sun.report(*EPWA, now=datetime(2026, 10, 15, 15, 39, tzinfo=timezone.utc), polish=True)
+    up = r["upcoming"]
+    assert [u["event"] for u in up[:5]] == ["sunset", "civil_dusk", "civil_dawn", "sunrise", "sunset"]
+    assert r["next"] == up[0] and [u["at"] for u in up] == sorted(u["at"] for u in up) and len(up) == 8
+    assert all(u["at"] > r["now"] for u in up) and up[1]["local"]["tz"] == "CEST"
+    # daleko na zachód (doba lokalna od 11:20 UTC): o 02:00 UTC najbliższy jest zachód z doby "wczorajszej"
+    w = sun.report(70.0, -170.0, now=datetime(2026, 10, 15, 2, 0, tzinfo=timezone.utc))["upcoming"]
+    assert w[0]["event"] == "sunset" and w[0]["at"].startswith("2026-10-15T03:")
+    assert sun.report(*ENSB, now=datetime(2026, 12, 21, 12, 0, tzinfo=timezone.utc))["upcoming"] == []
 
 
 @pytest.fixture(scope="module")
