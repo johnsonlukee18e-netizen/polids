@@ -12,7 +12,10 @@ from ..config import DATA_DIR, settings
 from ..database import get_db
 from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import Aerodrome, NavPoint, Sector
+from ..services import gamet as gamet_svc
+from ..services import sun as sun_svc
 from ..services import upperwind
+from ..services.aerolist import airport_entry
 from ..services.http_cache import UpstreamError
 from ..services.metar import parse_metar
 from ..services.runways import wind_components
@@ -257,3 +260,36 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
             "fetched": datetime.now(timezone.utc).strftime("%H:%MZ"),
             "metar": metar, "metar_wind": metar_wind, "model_surface": surface_model, "runways": runways,
             "metar_error": metar_error, "model_error": model_error}
+
+
+# --- SUN: słońce nad lotniskiem albo punktem mapy (METEO › SUN)
+
+@router.get("/sun")
+def sun(icao: str | None = Query(None, description="Kod ICAO lotniska"),
+        lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180),
+        db: Session = Depends(get_db)):
+    """Wschód i zachód słońca, zmierzch cywilny (BMCT/EECT) dziś i jutro (UTC) oraz słońce teraz: dla lotniska
+    (listy FIR-ów, navdata, airports.csv) albo punktu (lat, lon). Lotniska EP mają też czas polski (CET/CEST)."""
+    if icao:
+        code = icao.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]{3,4}", code):
+            raise HTTPException(400, f"Niepoprawny kod ICAO: {code[:10]}")
+        ad = airport_entry(db, code)
+        if not ad or ad.get("lat") is None or ad.get("lon") is None:
+            raise HTTPException(404, f"Nie znam lotniska {code}")
+        place = {"icao": ad["icao"], "name": ad["name"], "lat": ad["lat"], "lon": ad["lon"]}
+    elif lat is not None and lon is not None:
+        place = {"icao": None, "name": None, "lat": lat, "lon": lon}
+    else:
+        raise HTTPException(400, "Podaj kod ICAO lotniska albo współrzędne (lat, lon)")
+    polish = bool(place["icao"] and place["icao"].startswith("EP"))
+    return {**place, "polish": polish, **sun_svc.report(place["lat"], place["lon"], polish=polish)}
+
+
+# --- GAMET: prognoza obszarowa IMGW dla rejonów A1–A5 FIR EPWW (METEO › GAMET)
+
+@router.get("/gamet")
+async def gamet():
+    """GAMET z serwisu lotniczego IMGW (tekst rejonów A1–A5, ważność, pułap BLW FLnnn). Bez wyjątku przy awarii
+    źródła: "error" z opisem, a interfejs pokazuje odnośnik do awiacja.imgw.pl."""
+    return await gamet_svc.get_gamet()
