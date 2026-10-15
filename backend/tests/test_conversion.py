@@ -70,8 +70,7 @@ console.log(JSON.stringify({
 """
 
 
-@pytest.fixture(scope="module")
-def js(tmp_path_factory):
+def run_node(tmp_path_factory, source):
     node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
     if not node:
         pytest.skip("brak Node.js")
@@ -79,10 +78,108 @@ def js(tmp_path_factory):
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
     (d / "conversion.mjs").write_text(CONV.replace('"../api.js"', '"./api.mjs"'), "utf-8")
     script = d / "run.mjs"
-    script.write_text(NODE_SCRIPT, "utf-8")
+    script.write_text(source, "utf-8")
     r = subprocess.run([node, str(script), (d / "conversion.mjs").as_uri()], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
+
+
+@pytest.fixture(scope="module")
+def js(tmp_path_factory):
+    return run_node(tmp_path_factory, NODE_SCRIPT)
+
+
+# Karty z prawdziwym kodem obsługi pól (linkQnh, linkMach, linkGradient, linkGroup) na małej atrapie DOM: pola
+# input[data-u], .conv-out, zdarzenie "input" z e.target. Każdy krok: wpis w pole → stan wszystkich pól karty.
+CARDS_SCRIPT = r"""
+const c = await import(process.argv[2]);
+function card(ids) {
+  const inputs = {}, listeners = [];
+  for (const id of ids) {
+    const cls = new Set(["field"]);
+    inputs[id] = { value: "", dataset: { u: id }, cls, classList: {
+      toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)), remove: (k) => cls.delete(k), contains: (k) => cls.has(k) } };
+  }
+  let html = "";
+  const out = { set textContent(t) { html = String(t); }, set innerHTML(t) { html = String(t); } };
+  const el = {
+    querySelector(sel) {
+      const m = sel.match(/^input\[data-u="([^"]+)"\]$/);
+      if (m) return inputs[m[1]] ?? null;
+      return sel === ".conv-out" ? out : sel === ".conv-now" ? { addEventListener() {} } : null;
+    },
+    addEventListener: (type, fn) => type === "input" && listeners.push(fn),
+  };
+  const state = () => ({
+    v: Object.fromEntries(ids.map((id) => [id, inputs[id].value])),
+    bad: ids.filter((id) => inputs[id].cls.has("bad")),
+    out: html.replace(/<[^>]+>/g, ""),
+  });
+  const type = (id, value) => { inputs[id].value = value; listeners.forEach((fn) => fn({ target: inputs[id] })); return state(); };
+  return { el, type, state };
+}
+const steps = (link, ids, seq) => { const k = card(ids); link(k.el); return seq.map(([id, v]) => k.type(id, v)); };
+console.log(JSON.stringify({
+  qnh: steps(c.linkQnh, ["qnh", "alt", "fl"],
+    [["fl", "70"], ["qnh", "998"], ["qnh", "99B"], ["qnh", "1200"], ["qnh", ""], ["qnh", "1013,25"], ["fl", "x"]]),
+  gradient: steps(c.linkGradient, ["pct", "ftnm", "deg", "gs", "fpm"],
+    [["gs", "140"], ["fpm", "1000"], ["gs", ""], ["gs", "140"], ["fpm", ""], ["fpm", "1000"], ["gs", "0"], ["gs", "1x"],
+     ["gs", "140"], ["pct", "5.24"], ["gs", ""], ["gs", "abc"], ["gs", "140"], ["pct", ""]]),
+  mach: steps(c.linkMach, ["fl", "mach", "tas", "cas"],
+    [["fl", "350"], ["mach", "0.78"], ["fl", ""], ["fl", "700"], ["fl", "350"], ["mach", "1.2"]]),
+  rows: c.CARDS.map((h) => {
+    const rows = h.split('<label class="conv-row">').slice(1);
+    return [h.match(/data-k="([^"]+)"/)[1], rows.filter((r) => r.trimStart().startsWith('<span class="conv-name">')).length, rows.length];
+  }),
+}));
+"""
+
+
+@pytest.fixture(scope="module")
+def cards(tmp_path_factory):
+    return run_node(tmp_path_factory, CARDS_SCRIPT)
+
+
+def test_qnh_card_marks_bad_qnh(cards):
+    q = cards["qnh"]
+    assert q[0]["out"] == "Wpisz QNH." and q[0]["v"]["alt"] == ""
+    assert q[1]["v"]["alt"] == "6581" and q[1]["bad"] == []
+    # tekst zamiast liczby: czerwona ramka, wynik znika, komunikat o złej wartości (nie o zakresie)
+    assert q[2]["bad"] == ["qnh"] and q[2]["v"]["alt"] == "" and q[2]["out"] == "Zła wartość QNH."
+    assert q[3]["bad"] == ["qnh"] and q[3]["v"]["alt"] == "" and q[3]["out"] == "QNH poza zakresem 850–1100 hPa."
+    assert q[4]["bad"] == [] and q[4]["out"] == "Wpisz QNH."
+    assert q[5]["bad"] == [] and q[5]["v"]["alt"] == "7000" and q[5]["out"].startswith("Poziom QNH: 0 ft")
+    assert q[6]["bad"] == ["fl"]
+
+
+def test_gradient_card_clears_stale_results(cards):
+    g = cards["gradient"]
+    assert g[1]["v"] == {"pct": "7.05", "ftnm": "428.6", "deg": "4.03", "gs": "140", "fpm": "1000"}
+    # bez GS, bez VS, GS 0 albo zła GS: gradient znika zamiast zostać policzony z poprzedniej GS
+    for i, gs in ((2, ""), (4, "140"), (6, "0"), (7, "1x")):
+        assert {k: g[i]["v"][k] for k in ("pct", "ftnm", "deg", "gs")} == {"pct": "", "ftnm": "", "deg": "", "gs": gs}, i
+    assert g[3]["v"]["pct"] == "7.05" and g[5]["v"]["deg"] == "4.03" and g[7]["bad"] == ["gs"]
+    # wpisany gradient liczy VS; bez poprawnej GS VS znika
+    assert g[9]["v"]["fpm"] == "743" and g[9]["v"]["ftnm"] == "318.4"
+    assert g[10]["v"]["fpm"] == "" and g[11]["v"]["fpm"] == "" and g[11]["bad"] == ["gs"]
+    assert g[12]["v"]["fpm"] == "743" and g[13]["v"] == {"pct": "", "ftnm": "", "deg": "", "gs": "140", "fpm": ""}
+
+
+def test_mach_card_clears_without_fl(cards):
+    m = cards["mach"]
+    assert m[1]["v"]["tas"] == "450" and m[1]["v"]["cas"] == "264"
+    assert m[2]["v"] == {"fl": "", "mach": "0.78", "tas": "", "cas": ""} and m[2]["out"] == "Wpisz FL."
+    assert m[3]["v"]["tas"] == "" and m[3]["out"] == "Wzory ISA w kalkulatorze: FL000–FL650."
+    assert m[4]["v"]["tas"] == "450"
+    assert m[5]["v"]["cas"] == "" and m[5]["out"].endswith("M ≥ 1: CAS poza zakresem wzoru")
+
+
+def test_inputs_share_one_column(cards):
+    # w karcie, w której choć jeden wiersz ma etykietę (GS, VS, QNH, FL…), mają ją wszystkie, więc pola zaczynają się
+    # w jednej linii; wiersz z null ma pustą kolumnę etykiet
+    for key, named, total in cards["rows"]:
+        assert named in (0, total), key
+    assert dict((k, (n, t)) for k, n, t in cards["rows"])["gradient"] == (5, 5)
 
 
 def test_units_per_card(js):

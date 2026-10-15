@@ -44,11 +44,16 @@ def test_all_button_first_then_letters(js):
     assert "∗" not in API and '"*"' not in API
 
 
-def test_two_symmetric_columns():
-    # siatka dwóch kolumn; ALL zajmuje cały pierwszy rząd, więc 26 liter to 13 pełnych rzędów
+def test_two_symmetric_columns(js):
+    # siatka dwóch kolumn; ALL zajmuje cały pierwszy rząd, więc litery z letterButtons() to pełne rzędy po dwie
+    # (układ na ekranie sprawdzany w demie: ALL na górze, A B … Y Z w 13 rzędach)
     assert ".submenu.letters { display: grid; grid-template-columns: 1fr 1fr;" in CSS
     assert ".submenu.letters button.all { grid-column: 1 / -1; }" in CSS
-    assert len("ABCDEFGHIJKLMNOPQRSTUVWXYZ") % 2 == 0
+    letters = re.findall(r'<button data-l="[A-Z]">', js["html"])
+    assert len(letters) == 26 and len(letters) % 2 == 0
+    # żadna inna reguła nie zmienia siatki menu liter ani miejsca przycisków (np. grid-column dla liter)
+    rules = re.findall(r"^([^{}\n]*\.letters[^{}]*)\{", CSS, re.M)
+    assert [r.strip() for r in rules] == [".submenu.letters", ".submenu.letters button", ".submenu.letters button.all"]
 
 
 def test_letter_menu_contract():
