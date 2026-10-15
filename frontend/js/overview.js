@@ -201,8 +201,13 @@ export function mountOverview(el, { onGoto } = {}) {
         ? ` → PRZEGLĄD ${esc(p.goto)}` : ` (${p.airports.length} ${lotnisk(p.airports.length)})`}</option>`).join("");
       sel.append(og);
     });
-    if (position && !sel.querySelector(`option[value="${CSS.escape(position)}"]`)) position = "";
+    if (!listed(position)) position = "";
     sel.value = position;
+  };
+  // stanowisko z listy jako filtr: ACC / APP; wieża zapisana w HOME (ten sam klucz) nie jest filtrem, jak wybór TWR tutaj
+  const listed = (cs) => {
+    const opt = cs && $(".ov-pos").querySelector(`option[value="${CSS.escape(cs)}"]`);
+    return Boolean(opt && !opt.dataset.goto);
   };
 
   const drawChecklist = (data) => {
@@ -297,6 +302,16 @@ export function mountOverview(el, { onGoto } = {}) {
   loadPositions().then(load);
   timer = setInterval(load, REFRESH_MS);
   return {
+    // ponowne pokazanie otwartego PRZEGLĄDU: stanowisko zapisane w międzyczasie gdzie indziej (HOME) zamiast starego
+    sync() {
+      const want = lsGet(POS_KEY) || "";
+      if (!posLoaded || want === position || (want && !listed(want))) return;
+      position = want;
+      $(".ov-pos").value = position;
+      open = new Set();
+      chk = null;
+      load();
+    },
     destroy() {
       destroyed = true;
       clearInterval(timer);

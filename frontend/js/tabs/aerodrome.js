@@ -510,7 +510,8 @@ export default {
     // 0: cały FIR EPWW (overview.js) w miejscu siatki lotniska
     const showOverview = () => {
       markSub("0");
-      if (mode === "ov" && ov) return;      // już otwarty: zostaje ze swoim filtrem i zaznaczeniami checklisty
+      // już otwarty: zostaje ze swoim filtrem i zaznaczeniami checklisty, chyba że w HOME wybrano inne stanowisko
+      if (mode === "ov" && ov) { ov.sync(); return; }
       leave();
       setMode("ov");
       $(".title").textContent = "OVERVIEW · FIR EPWW";
