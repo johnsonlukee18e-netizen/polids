@@ -77,31 +77,75 @@ def _hhmm(t: datetime | None) -> str | None:
     return t.strftime("%H:%M")
 
 
+def _bisect(lat: float, lon: float, alt: float, t0: datetime, t1: datetime) -> datetime:
+    """Chwila między t0 a t1, w której wysokość środka tarczy przechodzi przez alt (na końcach różne strony alt)."""
+    below0 = elevation(lat, lon, t0) < alt
+    for _ in range(24):   # 12 h / 2^24: poniżej 0,01 s
+        mid = t0 + (t1 - t0) / 2
+        if (elevation(lat, lon, mid) < alt) == below0:
+            t0 = mid
+        else:
+            t1 = mid
+    return t0 + (t1 - t0) / 2
+
+
+def _extremum(f, m: float, highest: bool) -> float:
+    """Chwila (minuty) największej / najmniejszej wartości f w promieniu 90 min od m (złoty podział)."""
+    g, sign = (math.sqrt(5) - 1) / 2, 1 if highest else -1
+    a, b = m - 90, m + 90
+    c, d = b - g * (b - a), a + g * (b - a)
+    fc, fd = sign * f(c), sign * f(d)
+    for _ in range(20):   # 180 min · 0,618^20: ok. 1 s
+        if fc > fd:
+            b, d, fd = d, c, fc
+            c = b - g * (b - a)
+            fc = sign * f(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + g * (b - a)
+            fd = sign * f(d)
+    return (a + b) / 2
+
+
 def sun_day(lat: float, lon: float, day: date) -> dict:
     """Zdarzenia doby słonecznej lotniska z datą day (lokalnie od północy do północy): {nazwa: datetime UTC albo None},
     "polar": "day" / "night" (słońce całą dobę nad / pod horyzontem), "civil_polar" to samo dla zmierzchu cywilnego,
-    "noon": górowanie (UTC)."""
+    "noon": górowanie (UTC). Tylko jedno z pary (wschód bez zachodu albo zachód bez wschodu) w dniu przejścia: słońce
+    nie zachodzi do końca doby (początek dnia polarnego) albo było nad horyzontem od jej początku (koniec)."""
     midnight = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
     at = lambda minutes: midnight + timedelta(minutes=minutes)  # noqa: E731
     noon = 720 - 4 * lon
     for _ in range(2):   # górowanie: południe średnie poprawione o równanie czasu w chwili górowania
         noon = 720 - 4 * lon - solar_position(at(noon))[1]
     decl_noon = solar_position(at(noon))[0]
+    # słońce najniżej na początku doby, najwyżej w okolicy górowania i znów najniżej na końcu doby (na dalekiej północy
+    # wiosną i jesienią, gdy deklinacja szybko się zmienia, kilka minut obok górowania i północy): wschód i świt są
+    # w pierwszej połowie doby tylko wtedy, gdy słońce przechodzi tam przez próg z dołu, zachód i zmierzch w drugiej z góry
+    el = lambda minutes: elevation(lat, lon, at(minutes))  # noqa: E731
+    edges = [_extremum(el, m, top) for m, top in ((noon - 720, False), (noon, True), (noon + 720, False))]
+    elev = [el(m) for m in edges]
     out: dict = {"noon": at(noon), "polar": None, "civil_polar": None}
     for name, zenith, rising in EVENTS:
-        ha = _hour_angle(lat, decl_noon, zenith)
-        if isinstance(ha, str):
+        alt, (lo, hi) = 90 - zenith, (edges[:2] if rising else edges[1:])
+        e_lo, e_hi = elev[:2] if rising else elev[1:]
+        if not (e_lo < alt < e_hi if rising else e_lo > alt > e_hi):
             out[name] = None
-            out["polar" if zenith == SR_ZENITH else "civil_polar"] = ha
             continue
-        minutes = noon + (-4 if rising else 4) * ha
+        ha = _hour_angle(lat, decl_noon, zenith)
+        minutes = None if isinstance(ha, str) else noon + (-4 if rising else 4) * ha
         for _ in range(3):   # deklinacja i równanie czasu w chwili samego zdarzenia
+            if minutes is None:
+                break
             decl, eqt = solar_position(at(minutes))
             ha = _hour_angle(lat, decl, zenith)
-            if isinstance(ha, str):
-                break
-            minutes = 720 - 4 * lon - eqt + (-4 if rising else 4) * ha
-        out[name] = at(minutes) if not isinstance(ha, str) else None
+            minutes = None if isinstance(ha, str) else 720 - 4 * lon - eqt + (-4 if rising else 4) * ha
+        # dzień przejścia do dnia lub nocy polarnej: deklinacja w chwili zdarzenia nie daje kąta godzinnego (albo daje
+        # chwilę poza tą połową doby), a słońce jednak przechodzi przez próg: bisekcja wysokości w tej połowie doby
+        out[name] = at(minutes) if minutes is not None and lo <= minutes <= hi else _bisect(lat, lon, alt, at(lo), at(hi))
+    for rise, set_, key, zenith in (("sunrise", "sunset", "polar", SR_ZENITH),
+                                    ("civil_dawn", "civil_dusk", "civil_polar", CIVIL_ZENITH)):
+        if out[rise] is None and out[set_] is None:   # całą dobę po jednej stronie progu
+            out[key] = "day" if elev[1] > 90 - zenith else "night"
     return out
 
 
@@ -142,17 +186,18 @@ def report(lat: float, lon: float, now: datetime | None = None, polish: bool = F
     for k in (0, 1):
         ev = evs[k]
         sr, ss = ev["sunrise"], ev["sunset"]
-        length = (round((ss - sr).total_seconds() / 60) if sr and ss
-                  else {"day": 1440, "night": 0}.get(ev["polar"]))
+        # dzień przejścia (tylko wschód albo tylko zachód): od wschodu do końca doby albo od jej początku do zachodu
+        length = (round(((ss or ev["noon"] + timedelta(hours=12)) - (sr or ev["noon"] - timedelta(hours=12)))
+                        .total_seconds() / 60) if sr or ss else {"day": 1440, "night": 0}.get(ev["polar"]))
         day = {"date": (now.date() + timedelta(days=k)).isoformat(), "noon": _iso(ev["noon"]), "polar": ev["polar"],
                "civil_polar": ev["civil_polar"], "day_length": length, **{n: _iso(ev[n]) for n in names}}
         if polish:
             day["local"] = {n: polish_time(ev[n]) if ev[n] else None for n in [*names, "noon"]}
         days.append(day)
-    upcoming = sorted((ev[n], n) for ev in evs.values() for n in names if ev[n] and ev[n] > now)
-    nxt = None
-    if upcoming:
-        t, n = upcoming[0]
-        nxt = {"event": n, "at": _iso(t), "local": polish_time(t) if polish else None}
+    # najbliższe zdarzenia (z dób od wczoraj do pojutrza, więc co najmniej na dobę naprzód): przeglądarka bierze pierwsze
+    # jeszcze nieminione, więc po zachodzie od razu pokazuje EECT, bez czekania na kolejne pobranie
+    upcoming = [{"event": n, "at": _iso(t), "local": polish_time(t) if polish else None}
+                for t, n in sorted((ev[n], n) for ev in evs.values() for n in names if ev[n] and ev[n] > now)[:8]]
     return {"now": _iso(now), "elevation": round(elevation(lat, lon, now), 1), "state": state(lat, lon, now),
-            "subsolar": [round(v, 2) for v in subsolar_point(now)], "days": days, "next": nxt}
+            "subsolar": [round(v, 2) for v in subsolar_point(now)], "days": days,
+            "next": upcoming[0] if upcoming else None, "upcoming": upcoming}

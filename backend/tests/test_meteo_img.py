@@ -50,6 +50,23 @@ console.log(JSON.stringify({
     until: [m.untilTxt(30000), m.untilTxt(12 * 60000 + 59000), m.untilTxt(3 * 3600000 + 12 * 60000)],
     polar: [m.polarTxt({ polar: "day" }), m.polarTxt({ polar: "night", civil_polar: "night" }),
             m.polarTxt({ polar: "night" }), m.polarTxt({ civil_polar: "day" }), m.polarTxt({})],
+    // dni przejścia: tylko wschód / tylko zachód / tylko BMCT / tylko EECT; zwykły dzień bez uwagi
+    edge: [m.polarTxt({ sunrise: "a", sunset: null, civil_polar: "day" }), m.polarTxt({ sunrise: null, sunset: "b" }),
+           m.polarTxt({ sunrise: "a", sunset: "b", civil_dawn: "c", civil_dusk: null }),
+           m.polarTxt({ sunrise: "a", sunset: "b", civil_dawn: null, civil_dusk: "d" }),
+           m.polarTxt({ sunrise: "a", sunset: "b", civil_dawn: "c", civil_dusk: "d" })],
+    next: (() => {
+      const up = [{ event: "sunset", at: "2026-10-15T15:42:04Z" }, { event: "civil_dusk", at: "2026-10-15T16:16:14Z" },
+                  { event: "civil_dawn", at: "2026-10-16T04:28:17Z" }];
+      const at = (hm) => Date.parse(`2026-10-15T${hm}:00Z`);
+      const ev = (n) => n?.event ?? null;
+      return [ev(m.sunNext({ upcoming: up, next: up[0] }, at("15:41"))), ev(m.sunNext({ upcoming: up, next: up[0] }, at("15:44"))),
+              ev(m.sunNext({ upcoming: up, next: up[0] }, at("16:17"))), ev(m.sunNext({ upcoming: up }, Date.parse("2026-10-16T05:00:00Z"))),
+              ev(m.sunNext({ next: up[0] }, at("15:41"))), ev(m.sunNext({ next: up[0] }, at("15:44"))), ev(m.sunNext(null, 0))];
+    })(),
+    zoom: [932, 698, 1600, 1024, 1366, 300, 0].map((w) => [w, m.sunZoom(w)]),
+    near: [m.nearLon(-47, 313), m.nearLon(-47, 0), m.nearLon(170, -175), m.nearLon(20.97, 380), m.nearLon(-170, 200)],
+    query: [m.sunQuery(" epwa "), m.sunQuery("ep-a"), m.sunQuery(null)],
     ms: [m.SUN_TICK, m.SUN_REFRESH],
   },
   stamp: [m.stamp(T, P), m.stamp(T + 7 * 60000, P), m.stamp(T + 8 * 60000, P), m.stamp(T, 1000)],
@@ -151,10 +168,33 @@ def test_sun_helpers(js):
     assert s["until"] == ["za chwilę", "za 12 min", "za 3 h 12 min"]
     assert s["polar"][0].startswith("dzień polarny") and s["polar"][1].startswith("noc polarna")
     assert s["polar"][3].startswith("białe noce") and s["polar"][4] == ""
+    assert s["edge"][0].startswith("początek dnia polarnego") and s["edge"][1].startswith("koniec dnia polarnego")
+    assert s["edge"][2].startswith("początek białych nocy") and s["edge"][3].startswith("koniec białych nocy")
+    assert s["edge"][4] == ""
+    # "Następne": pierwsze nieminione z listy, więc po zachodzie od razu EECT (bez czekania 10 min na serwer)
+    assert s["next"] == ["sunset", "civil_dusk", "civil_dawn", None, "sunset", None, None]
+    # zoom na start: świat (256 px · 2^zoom) mieści się w szerokości mapy, a o 0,25 większy już nie
+    for w, z in s["zoom"]:
+        assert z >= 1 and (z == 1 or 256 * 2 ** z <= w < 256 * 2 ** (z + 0.25)), (w, z)
+    assert dict(s["zoom"]) == {932: 1.75, 698: 1.25, 1600: 2.5, 1024: 2, 1366: 2.25, 300: 1, 0: 1}
+    # znacznik na kopii świata klikniętej albo najbliższej środka widoku
+    assert [round(v, 2) for v in s["near"]] == [313, -47, -190, 380.97, 190]
+    assert s["query"][0] == {"q": {"icao": "EPWA"}, "err": "", "label": "EPWA"}
+    assert s["query"][1]["q"] is None and s["query"][1]["label"] == "EP-A" and "ICAO" in s["query"][1]["err"]
+    assert s["query"][2]["q"] is None and s["query"][2]["label"] == ""
     assert s["ms"] == [60000, 600000]
     view = METEO[METEO.index("function sunTab("):METEO.index("export default {")]
     assert 'lsGet("meteo.sun.icao")' in view and '"EPWA"' in view and "BASEMAPS.dark(L, ctx?.config?.carto_api_key)" in view
     assert "/api/meteo/sun?" in view and "map.remove()" in view and "ro.disconnect()" in view
+    # kod lotniska zapamiętany dopiero po odpowiedzi serwera (nieznany kod nie wraca po przeładowaniu), a zły format
+    # kasuje zapytanie (zegar i powrót serwera nie wczytują znów poprzedniego lotniska)
+    load = view[view.index("const load = async"):view.index("const pick =")]
+    go = view[view.index("const go = () =>"):view.index('$(".sun-go")')]
+    assert view.count('lsSet("meteo.sun.icao"') == 1 and load.index("await api(") < load.index('lsSet("meteo.sun.icao"')
+    assert "lsSet(" not in go and "q = null" in go and "place.remove()" in go and "seq++" in go
+    # kliknięcie mapy: do serwera długość -180..180, znacznik w klikniętym miejscu
+    assert "wrapLon(e.latlng.lng), ref: e.latlng.lng" in view and "nearLon(d.lon, q.ref ?? map.getCenter().lng)" in view
+    assert "sunZoom(" in view and "sunNext(data, now)" in view
     assert re.search(r"offsetParent\s*!==\s*null", view)
 
 

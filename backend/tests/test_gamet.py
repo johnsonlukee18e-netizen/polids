@@ -6,6 +6,7 @@ aviation-api.imgw.pl, który był nieosiągalny; treść komunikatów wg wzoru G
 import asyncio
 import json
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -63,6 +64,46 @@ def test_parse_errors():
     assert "brak rejonów" in gamet.parse(json.dumps({"metar": {}}), NOW)["error"]
     out = gamet.parse(json.dumps({"EPWW": {"A1": {"gamets": []}}}), NOW)
     assert out["error"] and set(out["areas"]) == {"A1", "A2", "A3", "A4", "A5"}
+
+
+def _msg(valid: str, issued: str, area: str = "A1", extra: str = "") -> str:
+    return (f"FAPL21 EPWA {issued}{extra}\nEPWW GAMET VALID {valid} EPWA-\nEPWW WARSAW FIR/{area} BLW FL100\n"
+            "SECN I\nSFC VIS: 04/08 3000 BR\n")
+
+
+OLD, NEW = _msg("150400/151000", "150300"), _msg("151000/151600", "150900")
+
+
+@pytest.mark.parametrize("order", ["old-first", "new-first"])
+def test_parse_picks_current_message(order):
+    """Kilka komunikatów rejonu w jednej odpowiedzi (bez count serwer zwraca ostatnie komunikaty): pokazany ważny teraz,
+    nie pierwszy z listy; kolejność w odpowiedzi bez znaczenia."""
+    msgs = [{"message": OLD}, {"message": NEW}]
+    doc = {"EPWW": {"A1": {"gamets": msgs if order == "old-first" else msgs[::-1]}}}
+    at = lambda h, m: datetime(2026, 10, 15, h, m, tzinfo=timezone.utc)  # noqa: E731
+    a1 = gamet.parse(json.dumps(doc), at(13, 30))["areas"]["A1"]
+    assert (a1["valid"], a1["valid_to"], a1["issued"]) == ("151000/151600", "2026-10-15T16:00Z", "2026-10-15T09:00Z")
+    # 09:30: nowy (wydany 09:00, ważny od 10:00) jeszcze nie obowiązuje, stary tak
+    assert gamet.parse(json.dumps(doc), at(9, 30))["areas"]["A1"]["valid"] == "150400/151000"
+    # 17:00: oba już nieważne, pokazany późniejszy
+    assert gamet.parse(json.dumps(doc), at(17, 0))["areas"]["A1"]["valid"] == "151000/151600"
+    # poprawka AMD w trakcie ważności: późniejszy początek ważności wygrywa; COR z tą samą ważnością: późniejsze wydanie
+    amd = _msg("151200/151600", "151150", extra=" AMD")
+    cor = _msg("151000/151600", "151020", extra=" COR")
+    for msgs2 in ([NEW, amd, cor], [amd, cor, NEW], [cor, NEW]):
+        a = gamet.pick(msgs2, at(13, 30))
+        assert a["text"] == (amd if amd in msgs2 else cor)
+
+
+def test_parse_list_of_snapshots():
+    """Lista kilku migawek całej odpowiedzi (zamiast jednego obiektu): rejony ze wszystkich, w każdym komunikat ważny teraz."""
+    now = datetime(2026, 10, 15, 13, 30, tzinfo=timezone.utc)
+    doc = [{"EPWW": {"A1": {"gamets": [{"message": NEW}]}, "A2": {"gamets": []}}},
+           {"EPWW": {"A1": {"gamets": [{"message": OLD}]}, "A2": {"gamets": [{"message": _msg("150400/151000", "150300", "A2")}]}}}]
+    out = gamet.parse(json.dumps(doc), now)
+    assert out["error"] is None and out["areas"]["A1"]["valid"] == "151000/151600"
+    assert out["areas"]["A2"]["valid"] == "150400/151000" and out["areas"]["A3"]["text"] is None
+    assert gamet.parse(json.dumps({"gamet": doc}), now)["areas"]["A1"]["valid"] == "151000/151600"
 
 
 @pytest.fixture
@@ -137,3 +178,27 @@ def test_gamet_endpoint_never_500(monkeypatch):
         r = c.get("/api/meteo/gamet")
     assert r.status_code == 200 and "nie odpowiada" in r.json()["error"]
     assert set(r.json()["areas"]) == {"A1", "A2", "A3", "A4", "A5"}
+
+
+def test_get_gamet_stale_through_fetch_text(fresh, monkeypatch):
+    """Starsze dane naprawdę z fetch_text: serwer IMGW odpowiedział, po TTL przestał (HTTP 503), więc fetch_text oddaje
+    ostatnią udaną odpowiedź, a get_gamet oznacza ją jako "stale" z czasem pobrania sprzed awarii."""
+    from backend.app.services import http_cache
+
+    clock, up = [1000.0], [True]
+    # zegar tylko w http_cache (asyncio dalej korzysta z prawdziwego time.monotonic)
+    monkeypatch.setattr(http_cache, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+    def handler(request):
+        assert request.url.host == "aviation-api.imgw.pl" and request.url.params["params"] == "gamet"
+        return httpx.Response(200, text=json.dumps(INFERRED)) if up[0] else httpx.Response(503, text="down")
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(http_cache.httpx, "AsyncClient",
+                        lambda **kw: real(**{**kw, "transport": httpx.MockTransport(handler)}))
+    out = asyncio.run(gamet.get_gamet(NOW))
+    assert out["stale"] is False and out["fetched_at"] == "2026-10-15T06:10:00Z" and out["areas"]["A1"]["below"] == "FL100"
+    up[0], clock[0] = False, 1000.0 + 900   # 15 min później serwer nie odpowiada
+    out = asyncio.run(gamet.get_gamet(NOW))
+    assert out["stale"] is True and out["error"] is None and out["fetched_at"] == "2026-10-15T05:55:00Z"
+    assert out["areas"]["A1"]["valid"] == "150400/151000"
