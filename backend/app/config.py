@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
-VERSION = "0.12.2"
+VERSION = "0.12.3"
 
 
 def csv_set(value: str) -> set[str]:
@@ -58,10 +58,12 @@ class Settings(BaseSettings):
     notam_prefix: str = "notam/get-icao-format?icao="
     notam_suffix: str = "&read=true"
 
-    # Zewnętrzne strony osadzane w zakładkach (zmieniaj przy nowym AIRAC)
-    aip_ifr_url: str = "https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html"
-    aip_vfr_url: str = "https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2010-26_2026_10_01/index-v2.html"
-    aip_mil_url: str = "https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2010-26_2026_10_01/index-v2.html"
+    # Zewnętrzne strony osadzane w zakładkach. eAIP PAŻP: puste = katalog poprawki bieżącego cyklu AIRAC, liczony przy
+    # każdym zapytaniu (services/eaip.py, np. eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html) i sprawdzony
+    # na serwerze PAŻP (cykl bez poprawki → poprzednia); wpisany adres wygrywa bez zmian (np. gdy PAŻP zmieni nazwy)
+    aip_ifr_url: str = ""
+    aip_vfr_url: str = ""
+    aip_mil_url: str = ""
     inop_url: str = "https://om.plvacc.pl/"
     imgw_url: str = "https://awiacja.imgw.pl/"
     sectors_url: str = "https://plvacc.pl/acc-sectors/"

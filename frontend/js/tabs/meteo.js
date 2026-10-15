@@ -1,4 +1,5 @@
-import { api, esc, h, splitTaf, subtabs, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { api, BASEMAPS, esc, frameGo, h, splitTaf, subtabs, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { CIVIL_ALT, SR_ALT, latLonTxt, nightRings, subsolarPoint, sunElevation, sunState, wrapLon } from "../solar.js";
 
 // listy domyślne alfabetycznie (wyniki i tak są sortowane po ICAO)
 const PL_CIV = "EPBY EPGD EPKK EPKT EPLB EPLL EPMO EPPO EPRA EPRZ EPSC EPSY EPWA EPWR EPZG";
@@ -308,14 +309,16 @@ function qnhMap(pane) {
   return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); ro.disconnect(); map.remove(); } };
 }
 
-// --- RADAR, SAT PL, SAT EUR: Windy z własnym środkiem i zoomem dla każdej podzakładki
+// --- RADAR, SAT PL, SAT EUR, ICING: Windy z własnym środkiem i zoomem dla każdej podzakładki; ICING także z poziomem
+// ciśnienia (oblodzenie liczone na poziomie, przy ziemi bez sensu), pozostałe przy ziemi
 export const WINDY_VIEWS = {
   radar: { overlay: "radar", lat: 52.0, lon: 19.3, zoom: 6 },
   "sat-pl": { overlay: "satellite", lat: 52.0, lon: 19.0, zoom: 6 },     // Polska (FIR EPWW z sąsiadami)
   "sat-eur": { overlay: "satellite", lat: 50.0, lon: 12.0, zoom: 4 },    // Europa
+  icing: { overlay: "icing", lat: 52.0, lon: 19.0, zoom: 6, level: "700h" },   // Polska, domyślnie 700 hPa ≈ FL100
 };
-export const windyEmbedUrl = ({ overlay, lat, lon, zoom }) => `https://embed.windy.com/embed2.html?lat=${lat.toFixed(1)}`
-  + `&lon=${lon.toFixed(1)}&detailLat=52.17&detailLon=20.97&zoom=${zoom}&level=surface&overlay=${overlay}&product=ecmwf&menu=`
+export const windyEmbedUrl = ({ overlay, lat, lon, zoom, level = "surface" }) => `https://embed.windy.com/embed2.html?lat=${lat.toFixed(1)}`
+  + `&lon=${lon.toFixed(1)}&detailLat=52.17&detailLon=20.97&zoom=${zoom}&level=${level}&overlay=${overlay}&product=ecmwf&menu=`
   + "&message=true&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1";
 const windy = (view) => (pane) => {
   pane.append(h(`<iframe class="embed" src="${esc(windyEmbedUrl(WINDY_VIEWS[view]))}" allowfullscreen></iframe>`));
@@ -365,6 +368,16 @@ export function fetchedAt(url, now = new Date()) {
   return FETCHED.get(url);
 }
 
+// <img> obrazu z zewnętrznego serwera (IMGW): wszystkie powstają tutaj, bez nagłówka Referer
+function imgEl(alt) {
+  const im = document.createElement("img");
+  im.referrerPolicy = "no-referrer";
+  im.decoding = "async";
+  im.draggable = false;
+  im.alt = alt;
+  return im;
+}
+
 // Widok obrazu (klatek) z serwera IMGW. o: {key, title, note (krótko, w pasku), desc (w podpowiedzi), frames: [{label, url}]};
 // przy kilku klatkach odtwarzacz: start/stop, poprzednia/następna, wybór klatki; wszystkie klatki wczytywane od razu
 // (płynna animacja).
@@ -397,11 +410,7 @@ function imgView(o) {
 
     // klatki: <img> dla każdej, wszystkie od razu w DOM (przeglądarka pobiera je równolegle), widoczna tylko bieżąca
     const mk = (i) => {
-      const im = document.createElement("img");
-      im.referrerPolicy = "no-referrer";
-      im.decoding = "async";
-      im.draggable = false;
-      im.alt = multi ? `${o.title} ${fr[i].label}` : o.title;
+      const im = imgEl(multi ? `${o.title} ${fr[i].label}` : o.title);
       im.dataset.i = i;
       return im;
     };
@@ -724,8 +733,356 @@ function windTab(pane) {
   return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); } };
 }
 
+// --- GAMET: prognoza obszarowa IMGW dla rejonów A1–A5 FIR EPWW (tekst z backendu: services/gamet.py) obok mapy rejonów
+// z awiacja.imgw.pl (obraz wczytuje przeglądarka, bez Referer, jak SIGWX). Wybór rejonu jak sektory SIGWX w PANDORZE.
+export const GAMET_AREAS = ["A1", "A2", "A3", "A4", "A5"];
+export const GAMET_MAP_URL = "https://awiacja.imgw.pl/assets/img/gamet-map.webp";
+export const GAMET_PAGE = "https://awiacja.imgw.pl/prognozy-lotnicze/gamet";
+export const GAMET_REFRESH = 10 * 60000;   // nowy tekst co 10 min (GAMET co 6 h plus poprawki)
+// zapamiętany wybór: rejon A1–A5 albo ALL (wszystkie jeden pod drugim, domyślnie)
+export const gametArea = (v) => (v === "ALL" || GAMET_AREAS.includes(v) ? v : "ALL");
+// rejony do pokazania: ALL = wszystkie z odpowiedzi (A1–A5 i ewentualne inne), inaczej tylko wybrany
+export const gametShown = (areas, sel) => (sel === "ALL" ? Object.keys(areas || {}).sort() : [sel]);
+// "2026-10-15T04:00Z" -> "15.10 04:00"
+const dm = (t) => `${t.slice(8, 10)}.${t.slice(5, 7)}`;
+// ważność rejonu: "15.10 04:00–10:00Z", przez północ "15.10 22:00 – 16.10 04:00Z"; bez dat sam napis z VALID
+export function gametValidTxt(a) {
+  if (!a?.valid_from || !a?.valid_to) return a?.valid || "";
+  const f = a.valid_from, t = a.valid_to;
+  return f.slice(0, 10) === t.slice(0, 10) ? `${dm(f)} ${f.slice(11, 16)}–${t.slice(11, 16)}Z`
+    : `${dm(f)} ${f.slice(11, 16)} – ${dm(t)} ${t.slice(11, 16)}Z`;
+}
+export const gametExpired = (a, now = Date.now()) => !!a?.valid_to && Date.parse(a.valid_to) <= now;
+
+function gametTab(pane) {
+  const wrap = h(`<div class="mimg gmt">
+    <div class="mimg-bar">
+      <b class="mimg-title">GAMET</b>
+      <span class="mimg-seg gmt-areas">${[...GAMET_AREAS, "ALL"].map((a) => `<button data-area="${a}"
+        title="${a === "ALL" ? "Wszystkie rejony jeden pod drugim" : `Rejon ${a}`}">${a}</button>`).join("")}</span>
+      <span class="mimg-hint gmt-hint"></span>
+      <a class="btn mimg-open" href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer"
+        title="GAMET w serwisie lotniczym IMGW">awiacja.imgw.pl › GAMET ↗</a>
+    </div>
+    <div class="gmt-body">
+      <div class="gmt-text"><p class="hint">Wczytywanie GAMET…</p></div>
+      <div class="gmt-map"><div class="gmt-imgmsg" hidden></div></div>
+    </div>
+  </div>`);
+  pane.append(wrap);
+  const $ = (s) => wrap.querySelector(s);
+  let area = gametArea(lsGet("meteo.gamet.area")), data = null, err = "", last = 0, dead = false;
+  const shown = () => !document.hidden && wrap.offsetParent !== null;
+
+  // mapa rejonów: nie wczytała się (np. serwer IMGW nie wydaje obrazu innym stronom) = krótka uwaga zamiast obrazu
+  const im = imgEl("Mapa rejonów GAMET A1–A5 (IMGW)");
+  im.className = "gmt-img";
+  im.onerror = () => {
+    if (dead) return;
+    im.hidden = true;
+    $(".gmt-map").classList.add("off");   // wąska kolumna z uwagą, więcej miejsca na tekst
+    const m = $(".gmt-imgmsg");
+    m.hidden = false;
+    m.innerHTML = `<span>Mapa rejonów GAMET (awiacja.imgw.pl) nie wczytała się.</span>
+      <a href="${GAMET_MAP_URL}" target="_blank" rel="noopener noreferrer">otwórz mapę ↗</a>`;
+  };
+  $(".gmt-map").prepend(im);
+  im.src = GAMET_MAP_URL;
+
+  const draw = () => {
+    wrap.querySelectorAll(".gmt-areas button").forEach((b) => b.classList.toggle("active", b.dataset.area === area));
+    const hint = $(".gmt-hint");
+    const at = data?.fetched_at ? `pobrano ${data.fetched_at.slice(11, 16)}Z` : "";
+    hint.textContent = ["IMGW · FIR EPWW", at, data?.stale ? "starsze dane: serwer IMGW nie odpowiada" : ""].filter(Boolean).join(" · ");
+    hint.title = `GAMET (prognoza obszarowa dla lotów na małych wysokościach) z serwisu lotniczego IMGW, odświeżany co ${GAMET_REFRESH / 60000} min.`;
+    if (!data && !err) return;
+    const link = `<a href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer">awiacja.imgw.pl › GAMET ↗</a>`;
+    const error = err || data?.error;
+    const areas = data?.areas || {};
+    const body = gametShown(areas, area).map((k) => {
+      const a = areas[k] || {}, valid = gametValidTxt(a), old = gametExpired(a);
+      return `<section class="gmt-area" data-area="${esc(k)}"><h4><b>${esc(k)}</b>${a.below ? `<span>BLW ${esc(a.below)}</span>` : ""}
+        ${valid ? `<span class="${old ? "old" : ""}" title="${old ? "Ważność minęła" : "Ważność prognozy"}">ważny ${esc(valid)}</span>` : ""}
+        ${a.issued ? `<span>wydany ${esc(a.issued.slice(11, 16))}Z</span>` : ""}</h4>
+        ${a.text ? `<pre>${esc(a.text)}</pre>` : `<p class="hint">Brak komunikatu GAMET dla rejonu ${esc(k)}.</p>`}</section>`;
+    }).join("");
+    // bez żadnego komunikatu (serwer IMGW nie odpowiada): sam błąd z odnośnikiem, bez pięciu pustych rejonów
+    const any = Object.values(areas).some((a) => a?.text);
+    $(".gmt-text").innerHTML = (error ? `<p class="error">${esc(error)} · ${link}</p>` : "") + (any ? body : "");
+  };
+
+  const load = async () => {
+    last = Date.now();
+    try {
+      const d = await api("/api/meteo/gamet");
+      if (dead) return;
+      data = d;
+      err = "";
+    } catch (e) {
+      if (dead) return;
+      err = e.message;
+    }
+    draw();
+  };
+  $(".gmt-areas").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-area]");
+    if (!b) return;
+    area = b.dataset.area;
+    lsSet("meteo.gamet.area", area);
+    draw();
+  });
+  draw();
+  load();
+  // co 10 min, tylko gdy METEO jest na ekranie; po powrocie zaległe odświeżenie w ciągu 10 s
+  const timer = setInterval(() => { if (shown() && Date.now() - last >= GAMET_REFRESH) load(); }, 10000);
+  const online = () => err && load();   // serwer PolIDS wrócił, a na ekranie jest komunikat błędu
+  window.addEventListener(ONLINE_EVENT, online);
+  return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); } };
+}
+
+// --- ICING: Windy, warstwa "icing" (prawdopodobieństwo oblodzenia w locie) na wybranym poziomie ciśnienia;
+// poziomy jak w PANDORZE w FL (wysokość ciśnienia wg atmosfery wzorcowej ISA)
+export const ICING_LEVELS = [["850h", "FL050"], ["700h", "FL100"], ["600h", "FL140"], ["500h", "FL180"], ["400h", "FL240"],
+  ["300h", "FL300"]];
+export const icingLevel = (v) => (ICING_LEVELS.some(([l]) => l === v) ? v : WINDY_VIEWS.icing.level);
+
+function icingTab(pane) {
+  const wrap = h(`<div class="mimg icg">
+    <div class="mimg-bar">
+      <b class="mimg-title">ICING</b>
+      <span class="mimg-seg icg-levels">${ICING_LEVELS.map(([l, fl]) => `<button data-level="${l}"
+        title="${l.slice(0, -1)} hPa ≈ ${fl}">${fl}</button>`).join("")}</span>
+      <span class="mimg-hint icg-hint"></span>
+    </div>
+    <iframe class="embed icg-frame" allowfullscreen></iframe>
+  </div>`);
+  pane.append(wrap);
+  let level = icingLevel(lsGet("meteo.icing.level")), frame = wrap.querySelector(".icg-frame");
+  const show = () => {
+    const fl = ICING_LEVELS.find(([l]) => l === level)[1];
+    wrap.querySelectorAll(".icg-levels button").forEach((b) => b.classList.toggle("active", b.dataset.level === level));
+    const hint = wrap.querySelector(".icg-hint");
+    hint.textContent = `Windy · oblodzenie ${level.slice(0, -1)} hPa ≈ ${fl}`;
+    hint.title = `Windy, warstwa "icing": prawdopodobieństwo oblodzenia w locie na poziomie ${level.slice(0, -1)} hPa (≈ ${fl} w ISA).`;
+    // nowa ramka zamiast zmiany src: bez kroku w historii przeglądarki (← i Wstecz cofają ekrany, nie ramkę Windy)
+    frame = frameGo(frame, windyEmbedUrl({ ...WINDY_VIEWS.icing, level }));
+  };
+  wrap.querySelector(".icg-levels").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-level]");
+    if (!b || b.dataset.level === level) return;
+    level = b.dataset.level;
+    lsSet("meteo.icing.level", level);
+    show();
+  });
+  show();
+}
+
+// --- SUN: dzień i noc na mapie świata (granica cienia, pas zmierzchu cywilnego, punkt podsłoneczny; co minutę)
+// oraz wschód i zachód słońca dziś i jutro dla lotniska albo klikniętego punktu (backend: /api/meteo/sun)
+export const SUN_TICK = 60000;               // mapa i "teraz" co minutę
+export const SUN_REFRESH = 10 * 60000;       // godziny wschodu i zachodu z serwera co 10 min (i po zmianie doby)
+const SUN_ROWS = [["civil_dawn", "BMCT", "początek świtu cywilnego (słońce 6° pod horyzontem)"],
+  ["sunrise", "Wschód", "wschód słońca (SR): górny brzeg tarczy na horyzoncie"], ["noon", "Górowanie", "słońce najwyżej"],
+  ["sunset", "Zachód", "zachód słońca (SS)"], ["civil_dusk", "EECT", "koniec zmierzchu cywilnego (słońce 6° pod horyzontem)"]];
+const SUN_NEXT = { civil_dawn: "BMCT", sunrise: "wschód", sunset: "zachód", civil_dusk: "EECT" };
+const SUN_STATE = { day: "DZIEŃ", civil: "ZMIERZCH CYWILNY", night: "NOC" };
+// kod lotniska z pola: wielkie litery, 3–4 znaki, inaczej ""
+export const sunIcao = (v) => { const s = String(v || "").trim().toUpperCase(); return /^[A-Z0-9]{3,4}$/.test(s) ? s : ""; };
+// czas zdarzenia "05:01Z", zaokrąglony do minuty; data, gdy wypada innego dnia UTC niż kolumna (np. wschód w Tokio)
+export function sunCell(iso, day, local = null) {
+  if (!iso) return "–";
+  const t = new Date(Date.parse(iso) + 30000).toISOString();
+  return `${t.slice(11, 16)}Z${t.slice(0, 10) !== day ? ` <small class="d">${dm(t)}</small>` : ""}`
+    + (local ? `<small class="loc">${esc(local.hm)} ${esc(local.tz)}</small>` : "");
+}
+// "10 h 41 min", "24 h", "0 min"
+export const durTxt = (min) => (min === null || min === undefined ? "–"
+  : `${Math.floor(min / 60) ? `${Math.floor(min / 60)} h` : ""}${min % 60 || !Math.floor(min / 60) ? ` ${min % 60} min` : ""}`.trim());
+// odliczanie do zdarzenia: "za 3 h 12 min", "za 5 min", "za chwilę"
+export const untilTxt = (ms) => (ms < 60000 ? "za chwilę" : `za ${durTxt(Math.floor(ms / 60000))}`);
+// opis doby bez wschodu lub zmierzchu (dzień / noc polarna, białe noce) albo z jednym z nich (dzień przejścia: wschód bez
+// zachodu = słońce nie zachodzi do końca doby, zachód bez wschodu = było nad horyzontem od jej początku)
+export function polarTxt(d) {
+  if (d.polar === "day") return "dzień polarny: słońce całą dobę nad horyzontem";
+  if (d.polar === "night") return d.civil_polar === "night" ? "noc polarna: słońce całą dobę niżej niż 6° pod horyzontem"
+    : "noc polarna: słońce całą dobę pod horyzontem";
+  if (d.sunrise && !d.sunset) return "początek dnia polarnego: po wschodzie słońce nie zachodzi do końca doby";
+  if (!d.sunrise && d.sunset) return "koniec dnia polarnego: słońce nad horyzontem od początku doby do zachodu";
+  if (d.civil_polar === "day") return "białe noce: słońce nie schodzi 6° pod horyzont (bez BMCT i EECT)";
+  if (d.civil_dawn && !d.civil_dusk) return "początek białych nocy: po BMCT słońce nie schodzi już 6° pod horyzont (bez EECT)";
+  if (!d.civil_dawn && d.civil_dusk) return "koniec białych nocy: słońce 6° pod horyzontem dopiero po EECT (bez BMCT)";
+  return "";
+}
+// najbliższe zdarzenie: pierwsze jeszcze nieminione z listy z serwera (po zachodzie od razu EECT, bez czekania na
+// kolejne pobranie); starsza odpowiedź bez listy: samo "next"
+export const sunNext = (data, now) => (data?.upcoming || (data?.next ? [data.next] : []))
+  .find((e) => Date.parse(e.at) > now) || null;
+// zoom na start: cały świat (256 px · 2^zoom) mieści się w szerokości mapy, co 0,25, co najmniej 1; wolne miejsce po
+// bokach to kopie świata (cień i siatka sięgają ±540°), nad biegunami tło mapy
+export const sunZoom = (width) => Math.max(1, Math.floor(4 * Math.log2(Math.max(width || 0, 256) / 256)) / 4);
+// długość lon na tej kopii świata, która leży najbliżej ref (kliknięte miejsce albo środek widoku)
+export const nearLon = (lon, ref) => lon + 360 * Math.round((ref - lon) / 360);
+// pole lotniska: zapytanie o kod ICAO albo (zły format) brak zapytania, błąd i wpisany tekst do nagłówka karty
+export function sunQuery(value) {
+  const icao = sunIcao(value);
+  return icao ? { q: { icao }, err: "", label: icao }
+    : { q: null, err: "Wpisz kod ICAO lotniska (3–4 znaki)", label: String(value || "").trim().toUpperCase().slice(0, 12) };
+}
+
+function sunTab(ctx) {
+  return (pane) => {
+    const wrap = h(`<div class="mimg sun">
+      <div class="mimg-bar">
+        <b class="mimg-title">SUN</b>
+        <label class="sun-l">Lotnisko <input type="text" class="sun-icao" maxlength="4" size="5" spellcheck="false"
+          title="Kod ICAO dowolnego lotniska (listy FIR, navdata)"></label>
+        <button class="btn primary sun-go">Pokaż</button>
+        <span class="mimg-hint sun-hint"></span>
+      </div>
+      <div class="sun-body"><div class="map sun-map"></div><aside class="sun-side"></aside></div>
+    </div>`);
+    pane.append(wrap);
+    const $ = (s) => wrap.querySelector(s);
+    const input = $(".sun-icao");
+    input.value = sunIcao(lsGet("meteo.sun.icao")) || "EPWA";
+    const shown = () => !document.hidden && wrap.offsetParent !== null;
+
+    // na start cały świat w szerokości mapy (cała granica cienia, także nad Pacyfikiem)
+    const map = L.map($(".sun-map"), { worldCopyJump: true, minZoom: 1, maxZoom: 10, zoomSnap: 0.25, zoomDelta: 0.5 })
+      .setView([0, 15], sunZoom($(".sun-map").getBoundingClientRect().width));
+    BASEMAPS.dark(L, ctx?.config?.carto_api_key).addTo(map);
+    // zmierzch cywilny (słońce 0,8°–6° pod horyzontem) jaśniej, noc (niżej niż 6°) ciemniej: dwie nałożone czasze
+    const twi = L.polygon([], { className: "sun-twi", stroke: false, interactive: false }).addTo(map);
+    const night = L.polygon([], { className: "sun-night", stroke: false, interactive: false }).addTo(map);
+    // siatka bez kafelków (gdy podkład się nie wczyta, granica cienia nadal ma odniesienie): równik, zwrotniki, koła
+    // podbiegunowe i południki co 30°, na pięć obiegów długości jak cień
+    const grat = L.layerGroup().addTo(map), lons = [-540, -180, 180, 540];
+    [[0, ""], [23.44, " dash"], [-23.44, " dash"], [66.56, " dash"], [-66.56, " dash"]].forEach(([la, c]) =>
+      L.polyline(lons.map((lo) => [la, lo]), { className: "sun-grat" + c, interactive: false }).addTo(grat));
+    for (let lo = -540; lo <= 540; lo += 30) L.polyline([[-85, lo], [85, lo]], { className: "sun-grat", interactive: false }).addTo(grat);
+    const sub = L.circleMarker([0, 0], { radius: 8, className: "sun-subsolar", interactive: true }).addTo(map);
+    const place = L.circleMarker([0, 0], { radius: 6, className: "sun-place" });
+    // q: zapytanie ({icao} albo {lat, lon}; ref = długość znacznika na kopii świata, na której go widać), cardTitle:
+    // nagłówek karty przed odpowiedzią serwera i przy błędzie
+    let q = null, cardTitle = "", data = null, err = "", seq = 0, last = 0, dead = false, day0 = "";
+
+    const side = () => {
+      const el = $(".sun-side");
+      if (!data) {
+        el.innerHTML = `<div class="card wnd-card sun-card"><h3>${esc(cardTitle || "Słońce")}</h3>
+          <p class="${err ? "error" : "hint"}">${esc(err || "Ładowanie…")}</p></div>`;
+        return;
+      }
+      const now = Date.now(), elev = sunElevation(data.lat, data.lon, now), st = sunState(elev);
+      const today = new Date(now).toISOString().slice(0, 10);
+      const nxt = sunNext(data, now);
+      const head = data.icao ? `${esc(data.icao)}${data.name ? ` · ${esc(data.name)}` : ""}` : "Punkt na mapie";
+      const rows = SUN_ROWS.map(([k, label, tip]) => `<tr title="${esc(tip)}"><td>${label}</td>${data.days.map((d) =>
+        `<td class="num">${sunCell(d[k], d.date, d.local?.[k])}</td>`).join("")}</tr>`).join("");
+      const notes = data.days.map((d) => polarTxt(d) && `${dm(d.date)}: ${polarTxt(d)}`).filter(Boolean);
+      el.innerHTML = `<div class="card wnd-card sun-card"><h3>${head}</h3>
+        <div class="sun-pos">${latLonTxt(data.lat, data.lon)}</div>
+        <div class="sun-now ${st}"><b>${SUN_STATE[st]}</b> słońce ${Math.abs(elev).toFixed(1).replace(".", ",")}° ${elev >= 0 ? "nad" : "pod"} horyzontem</div>
+        ${nxt ? `<div class="sun-next">Następne: <b>${SUN_NEXT[nxt.event]} ${sunCell(nxt.at, today)}</b>${nxt.local ? ` (${esc(nxt.local.hm)} ${esc(nxt.local.tz)})` : ""}
+          · ${untilTxt(Date.parse(nxt.at) - now)}</div>` : ""}
+        <table class="data sun-tab"><thead><tr><th></th>${data.days.map((d, i) => `<th class="num">${i ? "Jutro" : "Dziś"} ${dm(d.date)}</th>`).join("")}</tr></thead>
+          <tbody>${rows}<tr title="od wschodu do zachodu"><td>Dzień</td>${data.days.map((d) => `<td class="num">${durTxt(d.day_length)}</td>`).join("")}</tr></tbody></table>
+        ${notes.map((n) => `<p class="sun-polar">${esc(n)}</p>`).join("")}
+        <p class="wnd-note">Godziny UTC${data.polish ? ", pod nimi czas polski" : ""}. Doba według czasu słonecznego miejsca, więc daleko od
+          Greenwich wschód albo zachód wypada innego dnia UTC (data obok godziny). Wschód i zachód: górny brzeg tarczy na horyzoncie
+          (z refrakcją); BMCT i EECT: środek tarczy 6° pod horyzontem.</p>
+      </div>
+      <div class="card wnd-card sun-card"><h3>Mapa</h3>
+        <div class="sun-legend"><span><i class="lg-day"></i>dzień</span><span><i class="lg-twi"></i>zmierzch cywilny</span>
+          <span><i class="lg-night"></i>noc</span><span><i class="lg-sub"></i>słońce w zenicie</span></div>
+        <p class="wnd-note">Kliknij mapę: słońce w dowolnym punkcie. Granica cienia odświeżana co minutę.</p></div>`;
+    };
+
+    const tick = () => {
+      const now = Date.now(), s = subsolarPoint(now);
+      twi.setLatLngs(nightRings(now, SR_ALT).map((r) => [r]));
+      night.setLatLngs(nightRings(now, CIVIL_ALT).map((r) => [r]));
+      sub.setLatLng([s.lat, s.lon]);
+      sub.unbindTooltip().bindTooltip(`Słońce w zenicie: ${latLonTxt(s.lat, s.lon)}`, { direction: "top", offset: [0, -6] });
+      const hint = $(".sun-hint");
+      hint.textContent = `${new Date(now).toISOString().slice(11, 16)}Z · słońce w zenicie ${latLonTxt(s.lat, s.lon)}`;
+      hint.title = "Granica dnia i nocy co minutę (położenie słońca liczone w przeglądarce). Kliknij mapę: słońce w punkcie.";
+      const today = new Date(now).toISOString().slice(0, 10);
+      if (q && (today !== day0 || now - last >= SUN_REFRESH)) load();   // nowa doba UTC: dziś i jutro od nowa
+      else if (data) side();
+    };
+
+    const load = async () => {
+      const my = ++seq;
+      last = Date.now();
+      day0 = new Date(last).toISOString().slice(0, 10);
+      const qs = q.icao ? `icao=${encodeURIComponent(q.icao)}` : `lat=${q.lat.toFixed(4)}&lon=${q.lon.toFixed(4)}`;
+      try {
+        const d = await api(`/api/meteo/sun?${qs}`);
+        if (dead || my !== seq) return;
+        data = d;
+        err = "";
+        if (q.icao) lsSet("meteo.sun.icao", d.icao || q.icao);   // zapamiętane tylko lotnisko, które serwer zna
+        // znacznik na kopii świata klikniętej albo najbliższej środka widoku: bez przeskoku mapy o pełny obrót
+        q.ref = nearLon(d.lon, q.ref ?? map.getCenter().lng);
+        place.setLatLng([d.lat, q.ref]).addTo(map);
+        place.unbindTooltip().bindTooltip(d.icao || latLonTxt(d.lat, d.lon), { permanent: true, direction: "right",
+          offset: [8, 0], className: "sun-tip" });
+        if (!map.getBounds().contains(place.getLatLng())) map.panTo(place.getLatLng());
+      } catch (e) {
+        if (dead || my !== seq) return;
+        data = null;
+        err = e.message;
+        place.remove();
+      }
+      side();
+    };
+    const pick = (next, title) => {
+      q = next;
+      cardTitle = title;
+      data = null;
+      err = "";
+      side();
+      load();
+    };
+    const go = () => {
+      const r = sunQuery(input.value);
+      if (!r.q) {
+        // zły format: bez zapytania i bez znacznika (zegar ani powrót serwera nie wczytają znów poprzedniego miejsca)
+        seq++;
+        q = null; cardTitle = r.label; data = null; err = r.err;
+        place.remove();
+        side();
+        return;
+      }
+      input.value = r.q.icao;
+      pick(r.q, r.label);
+    };
+    $(".sun-go").addEventListener("click", go);
+    input.addEventListener("keydown", (e) => e.key === "Enter" && go());
+    // do serwera długość -180..180, znacznik w klikniętym miejscu (także na kopii świata za linią zmiany daty)
+    map.on("click", (e) => pick({ lat: e.latlng.lat, lon: wrapLon(e.latlng.lng), ref: e.latlng.lng }, "Punkt na mapie"));
+    // po przesunięciu mapy znacznik poza widokiem: na kopię świata najbliższą środka (worldCopyJump przenosi widok o obrót)
+    map.on("moveend", () => {
+      if (!data || !q || !map.hasLayer(place) || map.getBounds().contains(place.getLatLng())) return;
+      q.ref = nearLon(q.ref, map.getCenter().lng);
+      place.setLatLng([data.lat, q.ref]);
+    });
+
+    tick();
+    go();
+    const timer = setInterval(() => { if (shown()) tick(); }, SUN_TICK);
+    const online = () => err && q && load();
+    window.addEventListener(ONLINE_EVENT, online);
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe($(".sun-map"));
+    return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); ro.disconnect(); map.remove(); } };
+  };
+}
+
 export default {
-  mount(root) {
+  mount(root, ctx) {
+    // kolejność z issue #13: METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN; WIND i RADAR (spoza listy) na końcu
     subtabs(root, [
       { id: "metar-pl", label: "METAR PL", render: wxList("metar", PL_CIV, "meteo.metar.pl") },
       { id: "metar-mil", label: "METAR MIL", render: wxList("metar", PL_MIL, "meteo.metar.mil") },
@@ -733,15 +1090,19 @@ export default {
       { id: "taf-pl", label: "TAF PL", render: wxList("taf", PL_CIV, "meteo.taf.pl") },
       { id: "taf-intl", label: "TAF INTL", render: wxList("taf", INTL, "meteo.taf.intl") },
       { sep: true },
-      { id: "qnh", label: "QNH", fill: true, render: qnhMap },
-      { id: "wind", label: "WIND", fill: true, render: windTab },
-      { id: "radar", label: "RADAR", fill: true, render: windy("radar") },
-      { id: "sat-pl", label: "SAT PL", fill: true, render: windy("sat-pl") },
-      { id: "sat-eur", label: "SAT EUR", fill: true, render: windy("sat-eur") },
-      { id: "turb", label: "TURB", fill: true, render: imgView({ key: "turb", title: "TURB", frames: turbFrames(),
-        note: "IMGW · DWD · statki\u00a0rejsowe", desc: "prognoza turbulencji IMGW (model DWD), statki rejsowe" }) },
+      { id: "gamet", label: "GAMET", fill: true, render: gametTab },
       { id: "sigwx", label: "SIGWX", fill: true, render: imgView({ key: "sigwx", title: "SIGWX", frames: [{ label: "", url: SIGWX_URL }],
         note: "IMGW · SFC–FL100", desc: "mapa zjawisk istotnych SFC–FL100 (FIR Warszawa), IMGW" }) },
+      { id: "icing", label: "ICING", fill: true, render: icingTab },
+      { id: "qnh", label: "QNH", fill: true, render: qnhMap },
+      { id: "sat-eur", label: "SAT EUR", fill: true, render: windy("sat-eur") },
+      { id: "sat-pl", label: "SAT PL", fill: true, render: windy("sat-pl") },
+      { id: "turb", label: "TURB", fill: true, render: imgView({ key: "turb", title: "TURB", frames: turbFrames(),
+        note: "IMGW · DWD · statki rejsowe", desc: "prognoza turbulencji IMGW (model DWD), statki rejsowe" }) },
+      { id: "sun", label: "SUN", fill: true, render: sunTab(ctx) },
+      { sep: true },
+      { id: "wind", label: "WIND", fill: true, render: windTab },
+      { id: "radar", label: "RADAR", fill: true, render: windy("radar") },
     ]);
   },
 };

@@ -10,8 +10,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import access, auth
 from .config import VERSION, settings
 from .importers.seed import init_db
-from .routers import (admin, aerodromes, aircraft, callsigns, docs, meteo, nav, notam, overview, radio, system, vatsim,
-                      viff)
+from .routers import (admin, aerodromes, aircraft, callsigns, coordination, docs, meteo, nav, notam, overview, radio,
+                      squawk, system, vatsim, viff)
+from .services import eaip
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 # healthcheck dockera co 30 s, nie potrzebujemy tego w logu
@@ -26,13 +27,15 @@ async def lifespan(_app: FastAPI):
     access.init_state()
     logging.getLogger("polids").info("%s %s: %s, logowanie: %s", settings.name, VERSION, settings.public_url,
                                      settings.auth_mode)
+    eaip.warm()   # katalogi eAIP u PAŻP sprawdzane w tle od startu: pierwsze /api/config bez czekania
     yield
 
 
 app = FastAPI(title=f"{settings.name} API", version=VERSION, lifespan=lifespan)
 
 app.include_router(auth.router)
-for r in (system, meteo, aerodromes, overview, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs, admin):
+for r in (system, meteo, aerodromes, overview, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs, coordination, squawk,
+          admin):
     app.include_router(r.router)
 
 

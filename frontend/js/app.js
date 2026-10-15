@@ -10,11 +10,13 @@ import aircraft from "./tabs/aircraft.js";
 import callsign from "./tabs/callsign.js";
 import aerodrome from "./tabs/aerodrome.js";
 import map from "./tabs/map.js";
-import phraseology from "./tabs/phraseology.js";
+import coordination from "./tabs/coordination.js";
+import conversion from "./tabs/conversion.js";
 import checklist from "./tabs/checklist.js";
 import sytop from "./tabs/sytop.js";
 import aup from "./tabs/aup.js";
 import strip from "./tabs/strip.js";
+import squawk from "./tabs/squawk.js";
 import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
@@ -28,11 +30,11 @@ if (window.L) {
   }
 }
 
-const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, phraseology, checklist,
-  sytop, aup, strip, other, emergency, admin };
+const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
+  checklist, sytop, aup, strip, squawk, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
-// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem
-const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"] };
+// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY
+const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"], phraseology: () => ["other", "phraseology"] };
 const views = document.getElementById("views");
 const back = document.getElementById("nav-back");
 const mounted = {};
@@ -61,12 +63,15 @@ function write(tab, arg, push) {
 // arg: undefined = przycisk menu (zakładka zostaje w swoim stanie), napis = stan z adresu ("" = domyślny).
 // Zakładka z activate(arg) sama czyta arg; bez activate() arg to ścieżka podzakładek (subtabs w api.js).
 function open(tab, arg, push = false) {
+  // activate() innej zakładki od razu przenosi tutaj (stary adres, np. LOA z OTHER do COORDINATION): krok historii jak
+  // tamto otwarcie; Wstecz/Dalej i wpisany adres podmieniają wpis, inaczej Wstecz wracałby na przekierowanie
+  if (activating) push = activating.push;
   if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);   // adres zapisuje już nowa zakładka (bez martwego ekranu)
   if (!TABS[tab]) { tab = "home"; arg = undefined; }
   document.querySelectorAll("#tabs button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   views.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   current = tab;
-  const me = { tab };
+  const me = { tab, push };
   activating = me;
   try {
     if (!mounted[tab]) {

@@ -65,6 +65,7 @@ def test_dev_login_flow(client):
     assert client.get("/api/config").json()["name"] == settings.name
     me = client.get("/auth/me").json()
     assert me["user"]["cid"] == "1234567" and me["user"]["rating_short"] == "S1" and me["admin"] is False
+    assert me["user"]["rating"] == 2   # numer z VATSIM: HOME pokazuje pełną nazwę (S1 · Tower Trainee)
     assert settings.name in client.get("/").text
     assert client.post("/api/import").status_code == 403
     assert client.post("/auth/logout").status_code == 303
@@ -147,8 +148,8 @@ def test_vatsim_login_flow(client, monkeypatch):
     r = client.get("/auth/callback", params={"code": "kod", "state": state})
     assert r.status_code == 303 and r.headers["location"] == "/#map" and calls == ["kod"]
     me = client.get("/auth/me").json()
-    assert me["mode"] == "vatsim" and me["user"] == {"cid": "1234567", "name": "Jan Kowalski", "rating_short": "S2",
-                                                     "division": "EUD", "subdivision": "POL"}
+    assert me["mode"] == "vatsim" and me["user"] == {"cid": "1234567", "name": "Jan Kowalski", "rating": 3,
+                                                     "rating_short": "S2", "division": "EUD", "subdivision": "POL"}
     # state jednorazowy
     client.post("/auth/logout")
     r = client.get("/auth/callback", params={"code": "kod", "state": state})

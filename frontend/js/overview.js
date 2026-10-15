@@ -7,11 +7,10 @@
 //   5. Airport Monitor vIFF (przepustowość, ruch, loty z CTOT) + liczby lotów z sieci VATSIM.
 // Filtr stanowiska u góry: ACC / APP / TWR. APP i ACC zawężają panele do swoich lotnisk i pokazują checklistę
 // otwarcia stanowiska, TWR przeskakuje od razu do PRZEGLĄDU danego lotniska (onGoto).
-import { api, esc, h, lsGet, lsSet, lvpState, lvpTip, ONLINE_EVENT } from "./api.js";
+import { api, choiceGet, choiceSet, esc, h, lvpState, lvpTip, ONLINE_EVENT, POS_KEY } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 import { renderChecklist } from "./checklist.js";
 
-const POS_KEY = "overview.position";
 const CHK_KEY = "checklist.overview.open-position";
 const REFRESH_MS = 60000;
 
@@ -156,6 +155,21 @@ function monitorPanel(d) {
     <div class="hint">vIFF: przyloty zaplanowane w godzinie vs przepustowość lotniska (zielony &lt; 90&nbsp;%, pomarańczowy 90–100&nbsp;%, czerwony powyżej).</div>`;
 }
 
+// --- stanowisko wspólne z HOME (czyste funkcje, testy w Node) ---------------------------------------------------
+// Wybór stanowiska (choiceGet: z HOME albo z tego PRZEGLĄDU, w pamięci tego okna) a filtr PRZEGLĄDU. isFilter(cs):
+// stanowisko jest na liście jako filtr (ACC / APP); wieża zapisana w HOME nie jest filtrem, jak wybór TWR tutaj.
+// Filtr po wczytaniu listy stanowisk: wybór, jeśli jest filtrem, inaczej cały FIR. Bez listy zawsze cały FIR: inaczej
+// filtra nie byłoby widać w polu, a wieża z HOME stałaby się filtrem.
+export const listPosition = (seen, isFilter) => (seen && isFilter(seen) ? seen : "");
+// ponowne pokazanie otwartego PRZEGLĄDU. state: {seen, position, loaded}: wybór, jaki PRZEGLĄD ostatnio widział, bieżący
+// filtr i czy lista stanowisk już jest. Zmienia filtr tylko nowy wybór (z HOME): ten sam co ostatnio zostawia filtr
+// i zaznaczenia checklisty; przed wczytaniem listy filtr ustawi loadPositions (z `seen`).
+export function syncPosition({ seen = "", position = "", loaded = false } = {}, shared = "", isFilter = () => false) {
+  if (shared === seen) return { seen, position };
+  if (!loaded) return { seen: shared, position };
+  return { seen: shared, position: !shared || isFilter(shared) ? shared : position };
+}
+
 // --- widok -----------------------------------------------------------------------------------------------------
 export function mountOverview(el, { onGoto } = {}) {
   el.innerHTML = `<div class="ov">
@@ -182,7 +196,8 @@ export function mountOverview(el, { onGoto } = {}) {
       </div>
     </div></div>`;
   const $ = (s) => el.querySelector(s);
-  let position = lsGet(POS_KEY) || "";
+  let seen = choiceGet(POS_KEY);  // wybór stanowiska (HOME albo tutaj), jaki PRZEGLĄD ostatnio widział
+  let position = "";             // filtr: dopiero z listą stanowisk (listPosition), bez niej cały FIR
   let open = new Set();          // lotniska kliknięte: TAF w stanie odwrotnym do domyślnego (rozwinięty / zwinięty)
   let timer = null, chk = null, destroyed = false, last = null, posLoaded = false;
 
@@ -201,8 +216,13 @@ export function mountOverview(el, { onGoto } = {}) {
         ? ` → PRZEGLĄD ${esc(p.goto)}` : ` (${p.airports.length} ${lotnisk(p.airports.length)})`}</option>`).join("");
       sel.append(og);
     });
-    if (position && !sel.querySelector(`option[value="${CSS.escape(position)}"]`)) position = "";
+    position = listPosition(seen, listed);
     sel.value = position;
+  };
+  // stanowisko z listy jako filtr: ACC / APP; wieża zapisana w HOME (ten sam klucz) nie jest filtrem, jak wybór TWR tutaj
+  const listed = (cs) => {
+    const opt = cs && $(".ov-pos").querySelector(`option[value="${CSS.escape(cs)}"]`);
+    return Boolean(opt && !opt.dataset.goto);
   };
 
   const drawChecklist = (data) => {
@@ -273,7 +293,8 @@ export function mountOverview(el, { onGoto } = {}) {
       return;
     }
     position = e.target.value;
-    lsSet(POS_KEY, position);
+    seen = position;
+    choiceSet(POS_KEY, position);
     open = new Set();
     chk = null;
     load();
@@ -297,6 +318,17 @@ export function mountOverview(el, { onGoto } = {}) {
   loadPositions().then(load);
   timer = setInterval(load, REFRESH_MS);
   return {
+    // ponowne pokazanie otwartego PRZEGLĄDU: stanowisko wybrane w międzyczasie w HOME (tego okna) zamiast starego
+    sync() {
+      const next = syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed);
+      seen = next.seen;
+      if (next.position === position) return;
+      position = next.position;
+      $(".ov-pos").value = position;
+      open = new Set();
+      chk = null;
+      load();
+    },
     destroy() {
       destroyed = true;
       clearInterval(timer);

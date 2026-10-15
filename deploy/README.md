@@ -100,7 +100,9 @@ Bez danych klienta VATSIM albo z za krótkim `POLIDS_SECRET_KEY` aplikacja nie w
 - logi: `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f app` (albo `caddy`)
 - rollback: ponowny run workflow dla starszego commita albo
   `POLIDS_IMAGE=ghcr.io/<org>/polids:sha-<stary> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
-- nowy AIRAC: pliki w `data/import/` + linki `POLIDS_AIP_*_URL` w `.env`
+- nowy AIRAC: pliki w `data/import/`; linki eAIP same przechodzą na poprawkę nowego cyklu, o ile w `.env` nie ma
+  `POLIDS_AIP_*_URL` (wpisany adres trzeba zmieniać ręcznie co AIRAC). Katalog poprawki serwer sprawdza na
+  docs.pansa.pl: cykl bez poprawki (np. 2513) daje poprzednią, a bez połączenia z PAŻP zostaje wyliczony adres
 - backup: `.env` i wolumeny `polids_state` (lista dostępu!), `polids_photos`, `polids_caddy_data`
   (główna baza jest budowana z repo)
 

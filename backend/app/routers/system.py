@@ -10,20 +10,23 @@ from ..database import get_db
 from ..importers.seed import init_db
 from ..models import (AircraftType, Aerodrome, AirwaySegment, AtcPosition, Callsign, Document, ImportLog,
                       NavPoint, Sector)
-from ..services import embed
+from ..services import eaip, embed
 from ..services.airac import current_airac
 
 router = APIRouter(prefix="/api", tags=["system"])
 
 
 @router.get("/config")
-def config():
+async def config():
+    # cykl AIRAC i adresy eAIP z daty UTC przy każdym zapytaniu: nowy cykl bez restartu serwera; katalog poprawki
+    # sprawdzony u PAŻP (cykl bez poprawki → poprzednia), wynik w pamięci na cykl
+    today = eaip.utc_today()
     return {
         "name": settings.name, "tagline": settings.tagline, "version": VERSION, "auth_mode": settings.auth_mode,
-        "airac": current_airac(),
+        "airac": current_airac(today),
         "default_aerodrome": settings.default_aerodrome,
         "links": {
-            "aip_ifr": settings.aip_ifr_url, "aip_vfr": settings.aip_vfr_url, "aip_mil": settings.aip_mil_url,
+            **await eaip.resolved_links(today),
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
             "phraseology": settings.phraseology_url, "performance_db": settings.performance_db_url,
         },
@@ -42,7 +45,9 @@ async def embed_check(link: str):
     """Czy strona z linków aplikacji pozwala wyświetlić się w ramce (X-Frame-Options / CSP frame-ancestors)."""
     if link not in EMBED_LINKS:
         raise HTTPException(404, f"Nieznany link: {link}")
-    return await embed.check(getattr(settings, EMBED_LINKS[link]))
+    # eAIP: ten sam adres co w /api/config (z .env albo sprawdzona poprawka bieżącego cyklu AIRAC)
+    url = await eaip.resolved_url(link) if link in eaip.PACKAGES else getattr(settings, EMBED_LINKS[link])
+    return await embed.check(url)
 
 
 @router.get("/emergency")

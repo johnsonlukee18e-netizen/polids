@@ -1,0 +1,23 @@
+/* CONVERSION (0.12.3): karty przeliczania jednostek w siatce; pola po prawej wyrównane, jednostka za polem,
+   pod kartą stała albo wzór małym szarym tekstem */
+.conv-pane { padding: 8px 14px; }
+.conv-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.conv-head h2.title { margin: 0; }
+.conv-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-items: start; }
+.conv-card { display: flex; flex-direction: column; }
+.conv-rows { display: flex; flex-direction: column; gap: 4px; }
+.conv-row { display: flex; align-items: center; gap: 8px; }
+.conv-name { flex: none; width: 6ch; color: var(--green-text); font: 700 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
+.conv-row input.field { flex: none; width: 130px; padding: 3px 8px; font: 15px/1.3 var(--mono); text-align: right; }
+.conv-row input.field.bad { border-color: var(--bad); }
+.conv-row input.conv-day { width: 136px; text-align: left; color-scheme: dark; }
+.conv-row input.conv-time { width: 66px; }
+.conv-unit { color: var(--text); font: 13px var(--mono); white-space: nowrap; }
+.conv-zone { color: var(--yellow); }
+.conv-row .btn { margin-top: 2px; }
+/* wynik pośredni (poziom QNH, ISA na FL, uwaga o zmianie czasu) */
+.conv-out { margin-top: 6px; color: var(--cyan); font: 12px/1.45 var(--mono); }
+.conv-out:empty { display: none; }
+.conv-nowrap { white-space: nowrap; }
+.conv-note { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid #1c221c; color: var(--muted); font: 11px/1.45 var(--sans); }
+.conv-note sup { font-size: 9px; }

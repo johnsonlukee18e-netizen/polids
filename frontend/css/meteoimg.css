@@ -44,3 +44,73 @@
 .mimg-msg.err b { color: var(--bad); }
 .mimg-acts { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
 .mimg-acts a { color: var(--green-text); font-weight: 700; }
+
+/* --- GAMET (0.12.3): wybór rejonu A1–A5 / ALL w pasku jak klatki TURB; tekst komunikatu po lewej (pre, przewijany),
+   mapa rejonów IMGW po prawej, dopasowana do okna */
+.gmt-body { flex: 1; min-height: 0; display: flex; }
+.gmt-text { flex: 1 1 0; min-width: 0; overflow: auto; padding: 10px 14px; }
+.gmt-area { margin: 0 0 14px; max-width: 110ch; }
+.gmt-area h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 6px; padding: 4px 8px;
+  background: var(--head); border-left: 3px solid var(--green-hi); font: 12px var(--mono); color: var(--muted); }
+.gmt-area h4 b { font: 700 14px var(--mono); color: var(--green-text); letter-spacing: .5px; }
+.gmt-area h4 .old { color: var(--bad); }
+.gmt-area pre { margin: 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); font: 14px/1.5 var(--mono);
+  color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.gmt-text .error { font: 13px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
+.gmt-text .error a { color: var(--green-text); font-weight: 700; }
+.gmt-map { flex: 0 1 46%; min-width: 0; position: relative; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border-left: 1px solid var(--line); }
+.gmt-img { width: 100%; height: 100%; object-fit: contain; }
+.gmt-img[hidden] { display: none; }
+.gmt-imgmsg { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; max-width: 360px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 3px; font: 12px/1.45 var(--mono); color: var(--muted); text-align: center; }
+.gmt-imgmsg[hidden] { display: none; }
+.gmt-imgmsg a { color: var(--green-text); font-weight: 700; }
+.gmt-map.off { flex: 0 0 300px; align-items: flex-start; padding-top: 10px; }
+@media (max-width: 1365px) { .gmt-map { flex-basis: 38%; } }
+
+/* --- ICING (0.12.3): poziomy FL050–FL300 w pasku, pod nim ramka Windy */
+.icg .icg-levels button { min-width: 56px; }
+
+/* --- SUN (0.12.3): mapa świata z granicą dnia i nocy, obok karta lotniska (godziny UTC, pod nimi czas polski) */
+.sun-l { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sun-icao { width: 64px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 3px; padding: 3px 6px;
+  font: 700 13px var(--mono); text-transform: uppercase; outline: none; }
+.sun-icao:focus { border-color: var(--green-hi); }
+.sun-body { flex: 1; min-height: 0; display: flex; }
+.sun-map { flex: 1 1 auto; min-width: 0; cursor: crosshair; }
+.sun-side { flex: none; width: 388px; overflow: auto; padding: 8px; background: #050605; border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px; }
+.sun-card .error { font: 12px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
+.sun-pos { font: 12px var(--mono); color: var(--muted); margin-bottom: 6px; }
+.sun-now { font: 13px var(--mono); margin-bottom: 4px; }
+.sun-now b { margin-right: 6px; letter-spacing: .5px; }
+.sun-now.day b { color: var(--yellow); }
+.sun-now.civil b { color: #f29b38; }
+.sun-now.night b { color: #7fa7ff; }
+.sun-next { font: 12px var(--mono); color: var(--muted); margin-bottom: 8px; }
+.sun-next b { color: var(--text); }
+.sun-tab td.num, .sun-tab th.num { text-align: right; white-space: nowrap; }
+.sun-tab td.num { font: 700 14px var(--mono); color: #fff; }
+.sun-tab td small { display: block; font: 11px var(--mono); color: var(--muted); }
+.sun-tab td small.d { display: inline; color: var(--yellow); }
+.sun-polar { margin: 6px 0 0; font: 12px var(--mono); color: var(--yellow); }
+.sun-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 12px var(--mono); color: var(--muted); }
+.sun-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sun-legend i { width: 14px; height: 10px; border: 1px solid var(--line); }
+.sun-legend .lg-day { background: #232823; }
+.sun-legend .lg-twi { background: #151a1c; }
+.sun-legend .lg-night { background: #07090c; }
+.sun-legend .lg-sub { width: 10px; border-radius: 50%; background: var(--yellow); border-color: #000; }
+/* bez kafelków podkładu szare tło (dzień), żeby cień było widać; siatka: równik ciągły, zwrotniki i koła podbiegunowe
+   przerywane. Cień: zmierzch cywilny i noc nałożone (noc ciemniejsza), punkt podsłoneczny żółty, lotnisko zielone */
+.sun-map.leaflet-container { background: #232823; }
+.sun-map .sun-grat { stroke: #4a554a; stroke-width: 1; fill: none; }
+.sun-map .sun-grat.dash { stroke-dasharray: 4 4; }
+.sun-map .sun-twi { fill: #000814; fill-opacity: .4; }
+.sun-map .sun-night { fill: #000208; fill-opacity: .45; }
+.sun-map .sun-subsolar { fill: var(--yellow); fill-opacity: 1; stroke: #000; stroke-width: 2; }
+.sun-map .sun-place { fill: var(--green-hi); fill-opacity: 1; stroke: #000; stroke-width: 2; }
+.sun-map .leaflet-tooltip.sun-tip { background: #111; color: #fff; border: 1px solid var(--green-hi); font: 700 12px var(--mono);
+  padding: 1px 5px; box-shadow: none; }
+.sun-map .leaflet-tooltip.sun-tip::before { display: none; }

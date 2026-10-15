@@ -1,0 +1,65 @@
+/* SQUAWK (0.12.3): pule kodów SSR z EUROCONTROL CAL (EPWW, CCAMS, NATO, EUR-E) i kody specjalne. Panele i tabele
+   jak NM UI (style.css: .card, table.data), kody czcionką mono; kody alarmowe 7500/7600/7700 na czerwono.
+   Bez poświaty i cieni pod tekstem. */
+.sq-pane h2.title { margin-bottom: 10px; }
+.sq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: 10px; align-items: start; }
+.sq-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* węższe okno: tabela pul na całą szerokość, kody specjalne pod nią */
+@media (max-width: 1450px) { .sq-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* sprawdzanie kodu: duże pole na 4 cyfry, odpowiedź obok */
+.sq-lookrow { display: flex; align-items: flex-start; gap: 14px; }
+.sq-lookrow input.sq-code { flex: none; width: 7ch; padding: 4px 8px; font: 700 26px/1.2 var(--mono); letter-spacing: 2px; text-align: center; }
+.sq-lookrow input.sq-code.bad { border-color: var(--bad); color: #ffb3ad; }
+.sq-answer { flex: 1; min-width: 0; min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
+.sq-answer p { margin: 2px 0; font: 14px/1.45 var(--ui); }
+.sq-answer p.hint { font-size: 13px; }
+.sq-answer .sq-bad { color: var(--warn); font-weight: 700; }
+.sq-big { font: 700 18px var(--mono); color: #fff; margin-right: 4px; }
+.sq-big.emerg { color: var(--bad); }
+.sq-label { color: var(--green-text); letter-spacing: .3px; }
+.sq-hits { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.sq-hits li { display: flex; align-items: baseline; gap: 8px; font: 13px/1.4 var(--mono); }
+.sq-hit { min-width: 0; overflow-wrap: anywhere; }
+button.sq-cat { flex: none; min-width: 64px; padding: 0 6px; background: #111; border: 1px solid var(--line); border-radius: 2px;
+  color: var(--muted); font: 700 11px/1.5 var(--mono); cursor: pointer; }
+button.sq-cat:hover { color: var(--text); border-color: var(--green); }
+button.sq-cat.on { background: var(--green); border-color: var(--green-hi); color: #fff; }
+
+/* tabela pul: przełącznik kategorii (jak sortowanie w SYTOP), opis kategorii, filtr */
+.sq-bar { margin: 2px 0 4px; flex-wrap: wrap; gap: 6px 10px; }
+.sq-views { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.sq-views .btn { padding: 2px 10px; }
+.sq-views .btn:not(.primary) { background: #111; color: var(--muted); border-color: var(--line); }
+.sq-views .btn:not(.primary):hover { color: var(--text); border-color: var(--green); }
+.sq-views .sq-n { margin-left: 2px; font-weight: 400; opacity: .8; }
+.sq-bar .sq-filter { width: 280px; max-width: 100%; }
+.sq-line { margin: 0 0 2px; font-size: 12px; color: var(--text); }
+.sq-meta { margin: 0 0 6px; }
+.sq-meta:empty, .sq-line:empty { display: none; }
+table.data.sq-table td { vertical-align: top; }
+table.data.sq-table th.num { text-align: right; }
+.sq-range { font: 700 15px var(--mono); color: #fff; white-space: nowrap; }
+.sq-cm { font-family: var(--mono); white-space: nowrap; }
+.sq-units { font: 12px/1.4 var(--mono); min-width: 5ch; }
+.sq-ep { color: var(--green-hi); }
+.sq-all { color: var(--text); border-bottom: 1px dotted var(--muted); cursor: help; }
+.sq-ar { display: inline-block; padding: 0 5px; border: 1px solid; font: 700 11px/1.5 var(--mono); white-space: nowrap; cursor: help; }
+.sq-ar-a { color: var(--green-text); border-color: #2f7a22; }
+.sq-ar-r { color: var(--cyan); border-color: #1f6f7d; }
+.tag.sq-app, .tag.sq-cat-tag { padding: 0 4px; font-size: 10px; color: var(--yellow); border-color: #6b5d10; vertical-align: 1px; }
+.tag.sq-cat-tag { color: var(--green-hi); border-color: #2f7a22; }
+.sq-minor { font-size: 12px; color: var(--muted); }
+.sq-units .sq-minor { white-space: nowrap; }
+.sq-ver { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+td.sq-empty { padding: 14px 12px; }
+
+/* kody specjalne */
+.sq-scode { width: 64px; font: 700 18px var(--mono); color: var(--green-hi); }
+.sq-scode.emerg { color: var(--bad); }
+.sq-meaning { color: var(--text); }
+.sq-note { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.sq-excl { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.sq-excl .tag { padding: 0 4px; font-size: 11px; color: var(--muted); border-color: var(--line); }
+.sq-src { margin-top: 3px; font-size: 11px; }
+.sq-foot { margin: 8px 0 0; }
