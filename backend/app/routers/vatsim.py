@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,7 @@ from ..auth import current_user
 from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
+from ..services.eptraffic import ep_traffic
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import online_stations
@@ -133,15 +135,24 @@ def firs():
 
 
 @router.get("/pilots")
-async def pilots(bbox: str = "46,8,58,30"):
-    """Samoloty w obszarze bbox = południe,zachód,północ,wschód."""
+async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db: Session = Depends(get_db)):
+    """Samoloty w obszarze bbox = południe,zachód,północ,wschód, każdy z relacją z ruchem EP w polu `ep`:
+    "dep" = odlot z lotniska EP**, "arr" = przylot na EP**, "trn" = tranzyt przez FIR EPWW (jest w nim teraz
+    albo reszta trasy z planu lotu w niego wchodzi; bez planu: tylko w FIR-ze), null = bez związku z Polską
+    (services/eptraffic.py). ep=1 (MAP): tylko samoloty z relacją. keep: znaki po przecinku, które są w odpowiedzi
+    zawsze, także bez relacji i poza bbox (MAP: wybrany lot i loty z wykresu vIFF)."""
     try:
         s, w, n, e = (float(x) for x in bbox.split(","))
     except ValueError as exc:
         raise HTTPException(400, "bbox = poludnie,zachod,polnoc,wschod") from exc
     data = await _feed()
-    return [pilot_info(p) for p in data.get("pilots", [])
-            if p.get("latitude") is not None and s <= p["latitude"] <= n and w <= p["longitude"] <= e]
+    keep_cs = {x.strip().upper() for x in keep.split(",")[:200] if x.strip()}
+    infos = [pilot_info(p) for p in data.get("pilots", []) if p.get("latitude") is not None and (
+        s <= p["latitude"] <= n and w <= p["longitude"] <= e or (p.get("callsign") or "").upper() in keep_cs)]
+    # rozpisywanie nowych tras (zapytania do bazy) poza pętlą zdarzeń
+    rels = await run_in_threadpool(ep_traffic.relations, infos, RouteResolver(db))
+    return [p | {"ep": r} for p, r in zip(infos, rels)
+            if not ep or r or (p["callsign"] or "").upper() in keep_cs]
 
 
 @router.get("/pilots/{callsign}/route")

@@ -196,7 +196,7 @@ export const PLANE_PATH = "M0,-9.5 C0.9,-9.5 1.3,-8.4 1.3,-7 L1.3,-2.6 L9,1.6 L9
   + "L-3.6,8.9 L-3.6,7.6 L-1.1,5.6 L-1.3,1 L-9,3.3 L-9,1.6 L-1.3,-2.6 L-1.3,-7 C-1.3,-8.4 -0.9,-9.5 0,-9.5 Z";
 
 // Samolot: sylwetka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
-// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt względem FIR EPWW).
+// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP).
 export function aircraftMarker(p, { label = true, detail = false, cls = "" } = {}) {
   const fl = p.altitude !== null && p.altitude !== undefined ? "FL" + String(Math.round(p.altitude / 100)).padStart(3, "0") : "";
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`

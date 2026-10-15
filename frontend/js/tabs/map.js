@@ -79,8 +79,12 @@ const LEGEND = [
       sąsiednich vACC (data/import/neighbours; sektory zależne od pasa w konfiguracji zachodniej), UMMV (Białoruś) z pliku EPWW.</p>`].join("")],
   ["traffic", "Ruch", () => [
     lg(plane("dep"), "odlot z lotniska EP**"), lg(plane("arr"), "przylot na lotnisko EP**"),
-    lg(plane("trn"), "tranzyt / bez planu lotu"), lg(plane("sel"), "wybrany lot"),
+    lg(plane("trn"), "tranzyt przez FIR EPWW / bez planu w FIR EPWW"), lg(plane("sel"), "wybrany lot"),
     lg(`<span class="lg-line lg-flight"></span>`, "trasa wybranego samolotu"), lg(`<span class="lg-line lg-route"></span>`, "trasa wpisana ręcznie"),
+    `<p class="lgx-note">Na mapie tylko ruch EP: odloty z lotnisk EP**, przyloty na EP** i tranzyt, czyli samolot w FIR EPWW
+      albo taki, którego reszta trasy z planu lotu (od bieżącej pozycji do lotniska docelowego) wchodzi w FIR EPWW; bez planu lotu
+      tylko w FIR EPWW. Samolot, który z FIR-u już wyleciał, znika z mapy; wybrany lot zostaje (szczegóły lotu dalej się odświeżają).
+      Granica FIR EPWW: obrys sektorów z pliku .ese, z przestrzenią nad Bałtykiem delegowaną do EPWW.</p>`,
     `<p class="lgx-note">Lot krajowy (EP → EP) jest odlotem na ziemi przy lotnisku startu, do 40 NM od niego i przy wznoszeniu,
       a przylotem przy zniżaniu i na drugiej połowie trasy (wznoszenie / zniżanie z porównania z poprzednim odczytem sprzed 30 s).</p>`].join("")],
   ["pts", "Punkty", () => [
@@ -135,14 +139,15 @@ const distNm = (la1, lo1, la2, lo2) => {
 };
 const range = (lo, hi) => `${altLabel(lo)}–${altLabel(hi)}`;
 
-// Lot względem FIR EPWW (kolor ikony): dep = odlot z lotniska EP** (niebieski jak paski odlotów w AERODROME),
-// arr = przylot na EP** (żółty jak paski przylotów), trn = tranzyt albo bez planu (biały).
+// Lot względem ruchu EP (kolor ikony): dep = odlot z lotniska EP** (niebieski jak paski odlotów w AERODROME),
+// arr = przylot na EP** (żółty jak paski przylotów), trn = tranzyt przez FIR EPWW albo bez planu w FIR EPWW (biały;
+// rozstrzyga serwer, pole ep z /api/vatsim/pilots), out = bez związku z EP (rysowany tylko wybrany lot).
 // Lot krajowy EP → EP: odlot na ziemi przy lotnisku startu, do 40 NM od niego i przy wznoszeniu; przylot przy zniżaniu
 // i na drugiej połowie trasy. vs = zmiana wysokości od poprzedniego odczytu (ok. 30 s).
 const EP_AD = /^EP[A-Z]{2}$/;
 function relation(p, adIdx) {
   const dep = EP_AD.test(p.departure || ""), arr = EP_AD.test(p.arrival || "");
-  if (!dep || !arr) return dep ? "dep" : arr ? "arr" : "trn";
+  if (!dep || !arr) return dep ? "dep" : arr ? "arr" : p.ep === "trn" ? "trn" : "out";
   if (p.departure === p.arrival) return "dep";  // krąg, lot lokalny
   const a = adIdx.get(p.departure), b = adIdx.get(p.arrival);
   const da = a ? distNm(p.lat, p.lon, a.lat, a.lon) : null, db = b ? distNm(p.lat, p.lon, b.lat, b.lon) : null;
@@ -153,7 +158,8 @@ function relation(p, adIdx) {
   if (p.vs <= -300) return "arr";
   return half;
 }
-const REL_TEXT = { dep: (p) => `odlot z ${p.departure}`, arr: (p) => `przylot na ${p.arrival}`, trn: () => "tranzyt" };
+const REL_TEXT = { dep: (p) => `odlot z ${p.departure}`, arr: (p) => `przylot na ${p.arrival}`,
+  trn: (p) => (p.departure || p.arrival ? "tranzyt przez FIR EPWW" : "bez planu w FIR EPWW"), out: () => "poza ruchem EP (wybrany lot)" };
 
 // Widok MAP: duża mapa z panelem bocznym
 function mainMap(ctx) {
@@ -166,7 +172,7 @@ function mainMap(ctx) {
       <section class="ms-card" data-sec="traffic">
         <h4>Ruch VATSIM</h4>
         ${sw("traffic", "samoloty", true, PLANE_SVG)}
-        <div class="ac-key" title="kolor samolotu: odlot z lotniska EP**, przylot na EP**, tranzyt"><span>${plane("dep")}odlot</span><span>${plane("arr")}przylot</span><span>${plane("trn")}tranzyt</span></div>
+        <div class="ac-key" title="kolor samolotu: odlot z lotniska EP**, przylot na EP**, tranzyt przez FIR EPWW (albo bez planu w FIR EPWW)"><span>${plane("dep")}odlot</span><span>${plane("arr")}przylot</span><span>${plane("trn")}tranzyt</span></div>
         ${sw("traffic-detail", "etykiety z FL, typem i GS")}
         ${sw("atc", "kontrolerzy online: plakietki lotnisk (u sąsiadów mniejsze)", true, `<span class="ab ab-twr">T</span>`)}
         <div class="atc-info hint"></div>
@@ -1233,6 +1239,7 @@ function mainMap(ctx) {
     $(".viff-tv").innerHTML = `<option value="">wybierz sektor…</option>` + Object.entries(groups).filter(([, ts]) => ts.length).map(([g, ts]) =>
       `<optgroup label="${g} (${ts.length})">${ts.map((t) => `<option value="${esc(t.id)}" ${t.id === viffSel ? "selected" : ""}>${esc(t.id)} · ${esc(tvLabel(t.id))}</option>`).join("")}</optgroup>`).join("");
     drawTvArea(renderChart());
+    keepTraffic();  // loty wykresu w odpowiedzi /api/vatsim/pilots (ADEP / ADES / typ w tabeli)
   };
   const selectTv = (id) => {
     viffSel = id;
@@ -1441,6 +1448,7 @@ function mainMap(ctx) {
     renderFd();
     drawTraffic();
     if (viffData) renderChart();  // podświetlenie lotu w tabeli wykresu
+    keepTraffic();
     const vatP = api(`/api/vatsim/pilots/${encodeURIComponent(cs)}/route`).then((f) => {
       if (selected !== cs) return;
       fd.vat = flight = f;
@@ -1486,10 +1494,10 @@ function mainMap(ctx) {
   // liczba samolotów wg relacji (po wczytaniu listy lotnisk liczona od nowa: loty krajowe potrzebują ich współrzędnych)
   const trafficInfo = () => {
     if (!trafficAt) return;
-    const n = { dep: 0, arr: 0, trn: 0 };
+    const n = { dep: 0, arr: 0, trn: 0, out: 0 };
     pilots.forEach((p) => { n[relation(p, adIdx)]++; });
-    $(".traffic-info").textContent = `${plural(pilots.length, "samolot", "samoloty", "samolotów")} w Europie Środkowej (odloty EP ${n.dep}, przyloty EP ${n.arr}, `
-      + `tranzyt ${n.trn}) · ${trafficAt}. Kliknij samolot: szczegóły lotu i trasa.`;
+    $(".traffic-info").textContent = `${plural(pilots.length - n.out, "samolot", "samoloty", "samolotów")} w ruchu EP (odloty ${n.dep}, przyloty ${n.arr}, `
+      + `tranzyt przez EPWW ${n.trn}) · ${trafficAt}. Kliknij samolot: szczegóły lotu i trasa.`;
   };
   const drawTraffic = () => {
     layers.traffic.clearLayers();
@@ -1497,21 +1505,37 @@ function mainMap(ctx) {
     const z = map.getZoom(), b = map.getBounds().pad(0.2);
     pilots.filter((p) => b.contains([p.lat, p.lon])).forEach((p) => {
       const rel = relation(p, adIdx);
+      if (rel === "out" && p.callsign !== selected) return;  // tylko w tabeli wykresu vIFF
       const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel })
         .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)} · ${esc(REL_TEXT[rel](p))}`)
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
       if (p.callsign === selected) m.getElement()?.classList.add("sel");
     });
   };
+  // Serwer odsiewa samoloty bez związku z ruchem EP (ep=1). Wybrany lot i loty z wykresu vIFF są w odpowiedzi zawsze
+  // (keep; bez relacji ep = null): panel lotu odświeża pozycję także po wylocie z FIR EPWW, a tabela wykresu ma ADEP,
+  // ADES i typ. Wykres i wybór lotu zmieniają listę keep: wtedy ruch wczytujemy od razu (sentKeep = ostatnio wysłana).
+  const keepList = () => {
+    const tv = $(".viff").checked && (viffData?.sectors || []).find((t) => t.id === viffSel);
+    return [...new Set([selected, ...(tv?.flights || []).map((f) => f.callsign)].filter(Boolean))].sort().join(",");
+  };
+  let sentKeep = "", trafficSeq = 0;
+  const keepTraffic = () => { if ($(".traffic").checked && keepList() !== sentKeep) loadTraffic(); };
   const loadTraffic = async () => {
     if (!$(".traffic").checked) { layers.traffic.clearLayers(); $(".traffic-info").textContent = ""; return; }
     const prev = new Map(pilots.map((p) => [p.callsign, p.altitude]));  // poprzedni odczyt: wznoszenie / zniżanie
+    const my = ++trafficSeq, keep = sentKeep = keepList();
     try {
-      pilots = await api("/api/vatsim/pilots?bbox=44,5,60,35");
+      const list = await api(`/api/vatsim/pilots?bbox=44,5,60,35&ep=1${keep ? "&keep=" + encodeURIComponent(keep) : ""}`);
+      if (my !== trafficSeq) return;  // nowsze zapytanie (zmiana wyboru) już w drodze
+      pilots = list;
       pilots.forEach((p) => { const a = prev.get(p.callsign); p.vs = a === undefined || a === null || p.altitude === null ? null : p.altitude - a; });
       trafficAt = hhmm(new Date().toISOString());
       trafficInfo();
-    } catch (e) { pilots = []; $(".traffic-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+    } catch (e) {
+      if (my !== trafficSeq) return;
+      pilots = []; $(".traffic-info").innerHTML = `<span class="error">${esc(e.message)}</span>`;
+    }
     pilotIdx = new Map(pilots.map((p) => [p.callsign, p]));
     const q = fd.vat && pilotIdx.get(fd.cs);  // otwarty panel lotu: świeża pozycja z VATSIM
     if (q) { ["lat", "lon", "altitude", "groundspeed", "heading", "squawk"].forEach((k) => { fd.vat[k] = q[k]; }); renderFd(); }
