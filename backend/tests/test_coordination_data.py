@@ -1,5 +1,6 @@
 """Rejestr dokumentów COORDINATION (data/seed/coordination.json): pliki, identyfikatory, AIRAC, powiązanie z loa.json
 i tabela etykiet polskich sektorów (ep_sectors)."""
+import itertools
 import json
 import re
 from datetime import date
@@ -7,6 +8,7 @@ from datetime import date
 import pytest
 
 from backend.app.config import DATA_DIR
+from backend.app.importers.ese import ese_sections, parse_positions, read_airspace, read_text
 from backend.app.services import coordination as cs
 from backend.app.services.airac import current_airac
 
@@ -122,3 +124,28 @@ def test_every_ep_label_in_loa_resolves(coord, loa, own):
     labels = {(t["from"] if t["dir"] == "out" else t["to"]) for f in loa.values() for t in f["transfers"]}
     for label in sorted(labels - {""}):
         assert cs.resolve_label(label, coord["ep_sectors"], own), label
+
+
+# etykieta z tabeli ep_sectors → wycinek z pliku .ese EPWW przy sąsiedzie z LOA, którego listę OWNER odwzorowuje "local"
+ESE_SECTOR = {"EPSC TMA": "EPSC_TMA_D", "EPGD APP": "EPGD_UTMA", "AGD": "EPGD_UTMA", "EPPO S": "EPPO_TMA_S_G",
+              "EPPO-S": "EPPO_TMA_S_G", "TRZ": "EPRZ_TMA_D",
+              # LOA LKAA (Praha): część TMA przy granicy z Czechami, tylko EPKK_APP; LOA LZBB rozróżnia West i East
+              "TMA Kraków": "EPKK_TMA_W", "TMA Kraków West": "EPKK_TMA_W", "TMA Kraków East": "EPKK_TMA_E"}
+
+
+def test_ep_sectors_local_matches_ese_owner(coord):
+    """local = stanowiska z listy OWNER wycinka w pliku .ese przed pierwszym sektorem ACC, w tej samej kolejności.
+    Inaczej przy dwóch zalogowanych APP Kraków przekazania z Pragą dostałby EPKK_E_APP zamiast EPKK_APP."""
+    secs = ese_sections(read_text(DATA_DIR / "import" / "EPWW-Sector.ese"))
+    ids = {}
+    for p in parse_positions(secs.get("[POSITIONS]", [])):
+        ids.setdefault(p["position_id"], p["callsign"])
+    owners = {}
+    for s in read_airspace(secs.get("[AIRSPACE]", []))[1]:
+        if s["fir"] == "EPWW":
+            owners.setdefault(s["name"], [ids.get(x, x) for x in s["owners"].split(":") if x])
+    tab = coord["ep_sectors"]
+    assert {k for k, e in tab.items() if e.get("local")} == set(ESE_SECTOR)
+    for label, name in ESE_SECTOR.items():
+        lead = list(itertools.takewhile(lambda c: not cs.ACC_CS.match(c), owners[name]))
+        assert lead and tab[label]["local"] == lead, (label, name, lead)

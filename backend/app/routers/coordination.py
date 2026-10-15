@@ -46,6 +46,18 @@ def _exists(rel: str) -> bool:
     return p.is_relative_to(base) and p.is_file()
 
 
+def _files() -> list[str]:
+    """PDF-y z podfolderów LOA i LOP w data/docs (też zagnieżdżone; kategoria = pierwszy folder, jak w OTHER › DOCS)."""
+    base = settings.docs_dir
+    if not base.is_dir():
+        return []
+    out = []
+    for d in sorted(base.iterdir()):
+        if d.is_dir() and d.name.upper() in coord_service.TYPES:
+            out += sorted(p.relative_to(base).as_posix() for p in d.glob("**/*.pdf") if p.is_file())
+    return out
+
+
 @router.get("")
 def coordination(position: str = Query("", description="Znak stanowiska EPWW, np. EPWW_DBT_CTR (puste = wszystkie)"),
                  online: str = Query("", description="Stanowiska online po przecinku (kolejność przejmowania)"),
@@ -53,7 +65,8 @@ def coordination(position: str = Query("", description="Znak stanowiska EPWW, np
     """Wszystko do zakładki COORDINATION: dokumenty LOA/LOP z data/seed/coordination.json (nazwa, PDF, FIR-y,
     sektory, AIRAC – `current`, gdy to bieżący cykl), przekazania z loa.json i z dokumentów jako wiersze (COP,
     ADEP/ADES, FL, kierunek out = EPWW → sąsiad, in = sąsiad → EPWW, sektor polski `ep` i sąsiada `nb`), kolejności
-    przejmowania polskich sektorów (`chains`), stanowiska do wyboru i zasady z LOA (`notes`).
+    przejmowania polskich sektorów (`chains`), stanowiska do wyboru i zasady z LOA (`notes`). PDF z data/docs/LOA|LOP
+    bez wpisu w coordination.json: karta z nazwą pliku (`registered: false`) i uwaga w `errors`.
     `position` (+ `online`): sektory obsługiwane przez stanowisko i przy każdym wierszu `applies`."""
     if position and not CALLSIGN.fullmatch(position):
         raise HTTPException(400, "Znak stanowiska to litery, cyfry i podkreślenia (np. EPWW_DBT_CTR)")
@@ -62,5 +75,6 @@ def coordination(position: str = Query("", description="Znak stanowiska EPWW, np
         raise HTTPException(400, "online: znaki stanowisk po przecinku (litery, cyfry i podkreślenia)")
     coord = _seed("coordination.json", required=True)
     names = {p.callsign: {"name": p.name, "frequency": p.frequency} for p in db.scalars(select(AtcPosition))}
-    data = coord_service.build(coord, _seed("loa.json"), _seed("ownership.json"), names=names, file_exists=_exists)
+    data = coord_service.build(coord, _seed("loa.json"), _seed("ownership.json"), names=names, file_exists=_exists,
+                               files=_files())
     return coord_service.for_position(data, position.upper(), on) if position else data

@@ -1,6 +1,7 @@
 """COORDINATION (0.12.3): parsowanie przekazań z LOA, etykiety polskich sektorów → kolejność przejmowania, wybór
 stanowiska (kto obsługuje sektor) i GET /api/coordination."""
 import json
+import shutil
 
 import pytest
 from fastapi.testclient import TestClient
@@ -155,6 +156,25 @@ def test_build_documents(built):
     assert built["cops"] == ["ALUKA", "BINKA", "RASAN", "SOXER"]
 
 
+def test_build_unregistered_pdf():
+    """PDF w data/docs/LOA|LOP bez wpisu w coordination.json: karta z nazwą pliku i uwaga w errors (OTHER › DOCS
+    już go nie pokazuje, więc bez karty zniknąłby z aplikacji); plik z wpisem nie dostaje drugiej karty."""
+    d = cs.build(COORD, LOA, OWN, airac="2610", files=["LOA/x.pdf", "LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf",
+                                                         "LOP/nowy lop.PDF"])
+    ids = [x["id"] for x in d["documents"]]
+    assert ids == ["loa-x", "lop-epwa", "plik-loa-loa-epww-ummv-minsk-airac-2611-pdf", "plik-lop-nowy-lop-pdf"]
+    x, lop, ummv, new = d["documents"]
+    assert x["registered"] and lop["registered"]
+    assert (ummv["type"], ummv["name"], ummv["file"], ummv["firs"], ummv["count"], ummv["registered"], ummv["exists"]) == \
+        ("LOA", "LOA EPWW UMMV Minsk (AIRAC 2611)", "LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf", ["EPWW"], 0, False, True)
+    assert ummv["url"] == "/files/docs/LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf" and not ummv["current"]
+    assert (new["type"], new["name"]) == ("LOP", "nowy lop")
+    assert any(e.startswith("LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF bez wpisu") for e in d["errors"])
+    assert not any(e.startswith("LOA/x.pdf") for e in d["errors"])
+    # ten sam id już zajęty: kolejny numer
+    assert cs.unregistered_doc("LOA/a.pdf", {"plik-loa-a-pdf"})["id"] == "plik-loa-a-pdf-2"
+
+
 def test_build_rows(built):
     rows = {r["id"]: r for r in built["agreements"]}
     lop = rows["lop-epwa-0"]
@@ -202,7 +222,7 @@ def test_for_position(built):
 def test_endpoint(client):
     d = client.get("/api/coordination").json()
     assert d["errors"] == []
-    assert len(d["documents"]) == 7 and all(x["exists"] and x["type"] == "LOA" for x in d["documents"])
+    assert len(d["documents"]) == 7 and all(x["exists"] and x["type"] == "LOA" and x["registered"] for x in d["documents"])
     assert all(x["count"] > 0 for x in d["documents"])
     loa = json.loads((settings.seed_dir / "loa.json").read_text("utf-8"))["firs"]
     assert len(d["agreements"]) == sum(len(f["transfers"]) for f in loa.values())
@@ -239,6 +259,34 @@ def test_endpoint_position(client):
     assert d["selected"]["online"] == ["EPWW_D_CTR"]
 
 
+def test_endpoint_krakow_tma_west(client):
+    """LOA LKAA wymienia „TMA Kraków”: przy Czechach to TMA Kraków West (lista OWNER EPKK_TMA_W: tylko EPKK_APP).
+    Przy obu APP Kraków online przekazania z Pragą ma EPKK_APP, nie EPKK_E_APP."""
+    lkaa = lambda d: [r for r in d["agreements"] if r["fir"] == "LKAA" and r["applies"]]  # noqa: E731
+    d = client.get("/api/coordination?position=EPKK_APP&online=EPKK_E_APP").json()
+    assert lkaa(d) and "TMA Kraków" in d["selected"]["owned"]
+    d = client.get("/api/coordination?position=EPKK_E_APP&online=EPKK_APP").json()
+    assert not lkaa(d) and "TMA Kraków" not in d["selected"]["owned"]
+    # TMA Kraków East (LOA LZBB) zostaje przy EPKK_E_APP
+    assert any(r["applies"] and r["fir"] == "LZBB" for r in d["agreements"])
+
+
+def test_endpoint_unregistered_pdf(client, monkeypatch, tmp_path):
+    """Nowy PDF wrzucony do data/docs/LOA (bez wpisu w coordination.json) jest w COORDINATION › DOKUMENTY i w errors."""
+    docs = tmp_path / "docs"
+    shutil.copytree(settings.docs_dir, docs)
+    (docs / "LOA" / "LOA EPWW UMMV Minsk (AIRAC 2611).pdf").write_bytes(b"%PDF-1.4\n")
+    (docs / "ICAO" / "inny.pdf").parent.mkdir(exist_ok=True)
+    (docs / "ICAO" / "inny.pdf").write_bytes(b"%PDF-1.4\n")   # spoza LOA/LOP: zostaje w OTHER › DOCS
+    monkeypatch.setattr(settings, "docs_dir", docs)
+    d = client.get("/api/coordination").json()
+    extra = [x for x in d["documents"] if not x["registered"]]
+    assert [x["file"] for x in extra] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf"]
+    assert extra[0]["exists"] and extra[0]["type"] == "LOA" and extra[0]["name"] == "LOA EPWW UMMV Minsk (AIRAC 2611)"
+    assert d["errors"] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF bez wpisu w data/seed/coordination.json "
+                           "(dopisz nazwę, FIR-y i AIRAC)"]
+
+
 def test_endpoint_errors(client, monkeypatch, tmp_path):
     assert client.get("/api/coordination?position=EPWW%20CTR").status_code == 400
     assert client.get("/api/coordination?position=EPWW_D_CTR&online=a;b").status_code == 400
@@ -247,7 +295,8 @@ def test_endpoint_errors(client, monkeypatch, tmp_path):
     assert r.status_code == 404 and "coordination.json" in r.json()["detail"]
     (tmp_path / "coordination.json").write_text("{zepsuty", "utf-8")
     assert client.get("/api/coordination").status_code == 500
-    # bez loa.json i ownership.json: dokumenty są, przekazań brak
+    # bez loa.json i ownership.json: dokumenty są, przekazań brak (bez folderu data/docs: bez kart z samych PDF-ów)
+    monkeypatch.setattr(settings, "docs_dir", tmp_path / "brak")
     (tmp_path / "coordination.json").write_text(json.dumps(COORD), "utf-8")
     d = client.get("/api/coordination").json()
     assert [x["id"] for x in d["documents"]] == ["loa-x", "lop-epwa"] and not d["documents"][0]["exists"]

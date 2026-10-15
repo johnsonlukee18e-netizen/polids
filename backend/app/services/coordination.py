@@ -196,12 +196,29 @@ def _row(t: dict, *, doc: dict | None, fir: str, idx: str, aliases: dict, own: d
     }
 
 
+def unregistered_doc(file: str, taken: set[str]) -> dict:
+    """PDF z data/docs/LOA|LOP bez wpisu w coordination.json: karta z nazwą pliku, bez przekazań (OTHER › DOCS już
+    go nie pokazuje, więc bez tej karty zniknąłby z aplikacji)."""
+    typ = file.split("/", 1)[0].upper()
+    base = "plik-" + (re.sub(r"[^a-z0-9]+", "-", file.lower()).strip("-") or "pdf")
+    doc_id, n = base, 2
+    while doc_id in taken:
+        doc_id, n = f"{base}-{n}", n + 1
+    stem = file.rsplit("/", 1)[-1]
+    name = stem[:-4] if stem.lower().endswith(".pdf") else stem
+    return {"id": doc_id, "type": typ if typ in TYPES else "LOA", "name": name, "file": file, "firs": ["EPWW"],
+            "positions": [], "airac": "", "effective": "", "version": "", "loa": [],
+            "note":"brak wpisu w data/seed/coordination.json", "url": f"/files/docs/{file}", "current": False,
+            "exists": True, "count": 0, "registered": False}
+
+
 def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
-          names: dict[str, dict] | None = None, file_exists=None) -> dict:
+          names: dict[str, dict] | None = None, file_exists=None, files: list[str] | None = None) -> dict:
     """Cała odpowiedź GET /api/coordination (bez wyboru stanowiska).
 
     coord, loa, own: zawartość coordination.json, loa.json i ownership.json; airac: bieżący cykl (domyślnie dziś);
-    names: {znak: {name, frequency}} z bazy stanowisk; file_exists(ścieżka w data/docs) → bool."""
+    names: {znak: {name, frequency}} z bazy stanowisk; file_exists(ścieżka w data/docs) → bool; files: PDF-y
+    z podfolderów LOA i LOP w data/docs (ścieżki jak "file") – te bez wpisu dostają kartę i uwagę w errors."""
     airac = airac or current_airac()["ident"]
     aliases = coord.get("ep_sectors") if isinstance(coord.get("ep_sectors"), dict) else {}
     loa_firs = loa.get("firs") if isinstance(loa.get("firs"), dict) else {}
@@ -228,6 +245,7 @@ def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
         doc["url"] = f"/files/docs/{doc['file']}" if doc["file"] else ""
         doc["current"] = bool(doc["airac"]) and doc["airac"] == airac
         doc["exists"] = bool(doc["file"]) and (file_exists(doc["file"]) if file_exists else True)
+        doc["registered"] = True
         n = 0
         for key in doc["loa"]:
             if key not in loa_firs:
@@ -244,6 +262,12 @@ def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
             n += 1
         doc["count"] = n
         documents.append(doc)
+    known = {d["file"] for d in documents}
+    for f in files or []:
+        if f not in known:
+            known.add(f)
+            documents.append(unregistered_doc(f, {d["id"] for d in documents}))
+            errors.append(f"{f}: PDF bez wpisu w data/seed/coordination.json (dopisz nazwę, FIR-y i AIRAC)")
     notes = {}
     for key, f in loa_firs.items():
         if not isinstance(f, dict):

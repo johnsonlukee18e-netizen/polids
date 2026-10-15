@@ -50,6 +50,40 @@ out.view = {
   noEdww: ids(v({ off: new Set(["EDWW"]) })).filter((i) => i.startsWith("EDWW")).length,
   noLoa: v({ typesOff: new Set(["LOA"]) }).shown,
 };
+// kilka punktów naraz: pełne nazwy COP to alternatywy, reszta słów AND; przecinek i średnik też rozdzielają
+const cnt = (q) => v({ q }).shown;
+const multi = v({ q: "ALUKA BODLA EPKS" });
+out.multi = {
+  tokens: A.tokens(" aluka, bodla;epks  "),
+  aluka: cnt("ALUKA"), bodla: cnt("BODLA"), both: cnt("ALUKA BODLA"), comma: cnt("ALUKA, BODLA"), semi: cnt("aluka;bodla"),
+  tomti: cnt("TOMTI"), lagar: cnt("LAGAR"), tomtiLagar: cnt("TOMTI LAGAR"),
+  withAd: [...multi.out, ...multi.in].map((r) => [r.cop_key, r.traffic]),
+  withAdHit: [...multi.out, ...multi.in].every((r) => A.copHit(r, multi.toks)),
+  part: cnt("ALUKA BOD"),   // "BOD" to nie pełna nazwa COP: AND jak dotąd
+};
+// karta dokumentu → POROZUMIENIA: stanowisko bez sektorów z tego LOA → wszystkie, z sektorami → zostaje; zawsze wiersze
+const focus = (doc, pos) => A.docFocus(data, doc, { pos, typesOff: new Set(["LOA"]) });
+const f1 = focus("loa-uklv", "EPWW_DBT_CTR"), f2 = focus("loa-edww-eduu", "EPWW_DBT_CTR");
+const empty = [];
+for (const d of data.documents.filter((x) => x.count)) {
+  for (const p of ["", ...data.positions.map((x) => x.callsign)]) {
+    const f = focus(d.id, p);
+    const rows = [...A.view(data, { ...f }).out, ...A.view(data, { ...f }).in];
+    if (!rows.length || !rows.every((r) => r.doc === d.id)) empty.push([d.id, p]);
+  }
+}
+out.focus = { uklv: { ...f1, off: [...f1.off].sort(), typesOff: [...f1.typesOff] }, edww: { pos: f2.pos, q: f2.q, off: [...f2.off].length },
+  empty };
+const sum = (o) => A.sumHtml(all, { firs: data.firs, ...o });
+out.sum = {
+  none: sum({}), one: sum({ off: new Set(["EDWW"]) }), only: sum({ off: f1.off, pos: "EPWW_DBT_CTR" }),
+  allOff: sum({ off: new Set(data.firs) }), types: sum({ typesOff: new Set(["LOA"]) }),
+  evil: A.sumHtml({ ...all, toks: ["<B>"] }, { pos: "<i>", firs: ["<X>", "EDWW"], off: new Set(["<X>"]) }),
+};
+const unreg = { ...data.documents[0], id: "plik-loa-x", registered: false, count: 0, note: "brak wpisu w data/seed/coordination.json",
+  name: "LOA EPWW UMMV Minsk" };
+out.cards = { unreg: A.docCardHtml(unreg, {}), reg: A.docCardHtml(data.documents[0], {}) };
+out.coordFile = ["LOA/x.pdf", "lop/a/b.pdf", "LOA", "LOA/", "ICAO/doc.pdf", "", null, "LOAX/x.pdf"].map(docsMod.isCoordFile);
 const row = data.agreements.find((r) => r.fir === "LKAA");
 const evil = { ...data.agreements[0], cop: "<b>X", cop_key: "", traffic: "<i>t</i>", adep: [], ades: [], conditions: "<script>",
   level_text: "<u>FL1</u>", level: 1, ep: "<s>", nb: "<q>", ep_unknown: false, doc: "nope" };
@@ -150,6 +184,46 @@ def test_view_filter_and_order(out, data):
     assert v["noEdww"] == 0 and v["noLoa"] == 0
 
 
+def test_multi_point_filter(out):
+    """Kilka punktów naraz (issue #13: „wpisywać punkty by sprawdzić jakie ustalenia obowiązują”): pełne nazwy COP
+    to alternatywy, bo wiersz ma jeden COP; pozostałe słowa zawężają (AND)."""
+    m = out["multi"]
+    assert m["tokens"] == ["ALUKA", "BODLA", "EPKS"]
+    assert m["aluka"] == 10 and m["bodla"] == 11
+    assert m["both"] == m["comma"] == m["semi"] == m["aluka"] + m["bodla"] == 21
+    assert m["tomti"] and m["lagar"] and m["tomtiLagar"] == m["tomti"] + m["lagar"]
+    assert m["withAd"] and all(c in ("ALUKA", "BODLA") and "EPKS" in t for c, t in m["withAd"]) and m["withAdHit"]
+    assert m["part"] <= m["aluka"]
+
+
+def test_document_card_to_agreements(out, data):
+    """POROZUMIENIA › na karcie: tylko FIR-y dokumentu, bez filtra słów; stanowisko bez sektorów z tego LOA (DBT
+    a Lwów) → wszystkie stanowiska. Dla każdego dokumentu i każdego stanowiska tabela ma wiersze tego dokumentu."""
+    f = out["focus"]
+    assert f["uklv"]["pos"] == "" and f["uklv"]["q"] == "" and f["uklv"]["typesOff"] == []
+    assert f["uklv"]["off"] == sorted(x for x in data["firs"] if x != "UKLV")
+    assert f["edww"]["pos"] == "EPWW_DBT_CTR" and f["edww"]["off"] == len(data["firs"]) - 2   # EDWW i EDUU włączone
+    assert f["empty"] == []
+
+
+def test_summary_says_what_is_hidden(out, data):
+    s = out["sum"]
+    assert "ukryte" not in s["none"] and "tylko FIR" not in s["none"] and "wszystkie stanowiska" in s["none"]
+    assert "ukryte FIR-y <b>EDWW</b>" in s["one"]
+    assert "tylko FIR <b>UKLV</b>" in s["only"] and "stanowisko <b>EPWW_DBT_CTR</b>" in s["only"]
+    assert "wszystkie FIR-y wyłączone" in s["allOff"]
+    assert "ukryte <b>LOA</b>" in s["types"]
+    assert "<B>" not in s["evil"] and "<i>" not in s["evil"] and "<X>" not in s["evil"] and "&lt;X&gt;" in s["evil"]
+
+
+def test_unregistered_card_and_old_doc_addresses(out):
+    c = out["cards"]
+    assert 'class="cd-new"' in c["unreg"] and "brak wpisu w data/seed/coordination.json" in c["unreg"]
+    assert "cd-agr" not in c["unreg"] and "cd-agr" in c["reg"] and "cd-new" not in c["reg"]
+    # stary adres OTHER › DOCS z plikiem LOA/LOP → COORDINATION
+    assert out["coordFile"] == [True, True, False, False, False, False, False, False]
+
+
 def test_html(out):
     h = out["html"]
     assert 'class="cr-cop hit">ALUKA</b>' in h["hit"] and 'data-doc="loa-edww-eduu"' in h["hit"]
@@ -184,3 +258,15 @@ def test_documents_and_other_docs(out):
     assert out["tab"] == "function"
     # OTHER › DOCS: bez LOA i LOP (są w COORDINATION)
     assert out["other"] == ["ICAO", "INNE"]
+
+
+def test_tab_wiring():
+    """tabs/coordination.js (DOM, bez testu w Node): karta → porozumienia przez docFocus bez zapisu przełączników FIR
+    w localStorage; przewinięcie tabel we wpisie historii (← z DOKUMENTY wraca do tego samego wiersza)."""
+    src = (FRONTEND / "js" / "tabs" / "coordination.js").read_text("utf-8")
+    fn = src[src.index("function showAgreementsOf("):src.index("const refreshAll")]
+    assert "docFocus(data, d.id," in fn and "lsSet(" not in fn
+    assert 'stash("coordination", { top: main.scrollTop })' in src and 'const s = stashed("coordination");' in src
+    assert "main.scrollTop = wantTop" in src
+    assert "sumHtml(v, { pos: st.pos" in src and "data.errors" in src
+

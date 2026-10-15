@@ -52,16 +52,20 @@ export function rowApplies(row, owned, position) {
   return row.ep_chains.some((k) => owned.has(k));
 }
 
-// --- filtr: słowa (spacje) muszą pasować wszystkie; każde do COP, lotnisk, sektorów, warunków, FIR-u, ruchu lub FL
-export const tokens = (q) => U(q).split(/\s+/).filter(Boolean);
+// --- filtr: słowa (spacje, przecinki, średniki); każde do COP, lotnisk, sektorów, warunków, FIR-u, ruchu lub FL.
+// Pełne nazwy COP to alternatywy (wiersz ma jeden COP: "ALUKA BODLA" = ALUKA albo BODLA), pozostałe słowa muszą
+// pasować wszystkie: "ALUKA BODLA EPKS" = (ALUKA albo BODLA) i EPKS
+export const tokens = (q) => U(q).split(/[\s,;]+/).filter(Boolean);
 function haystack(r) {
   return [r.cop, ...r.adep, ...r.ades, r.traffic, r.from, r.to, r.conditions, r.fir, r.level_text, r.type, r.doc]
     .map(U);
 }
-export function matchRow(r, toks) {
+export function matchRow(r, toks, cops = new Set()) {
   if (!toks.length) return true;
   const hay = haystack(r);
-  return toks.every((t) => hay.some((x) => x.includes(t)));
+  const has = (t) => hay.some((x) => x.includes(t));
+  const alt = toks.filter((t) => cops.has(t));
+  return (!alt.length || alt.some(has)) && toks.every((t) => cops.has(t) || has(t));
 }
 export const copHit = (r, toks) => !!r.cop_key && toks.includes(r.cop_key);
 
@@ -69,11 +73,12 @@ export const copHit = (r, toks) => !!r.cop_key && toks.includes(r.cop_key);
 // z danych i COP alfabetycznie. opts: {pos ("" = wszystkie), q, off: Set wyłączonych FIR-ów, typesOff: Set, online: Set}
 export function view(data, { pos = "", q = "", off = new Set(), typesOff = new Set(), online = new Set() } = {}) {
   const toks = tokens(q);
+  const cops = new Set(data.cops || []);
   const owned = new Set(pos ? ownedKeys(data.chains, pos, online) : []);
   const order = new Map(data.firs.map((f, i) => [f, i]));
   const rank = new Map(data.agreements.map((r, i) => [r.id, i]));
   const rows = data.agreements.filter((r) => !off.has(r.fir) && !typesOff.has(r.type)
-    && (!pos || rowApplies(r, owned, pos)) && matchRow(r, toks));
+    && (!pos || rowApplies(r, owned, pos)) && matchRow(r, toks, cops));
   const key = (r) => [copHit(r, toks) ? 0 : 1, order.get(r.fir) ?? 99, r.cop_key ? 0 : 1, r.cop_key, rank.get(r.id)];
   const cmp = (a, b) => {
     const x = key(a), y = key(b);
@@ -83,6 +88,21 @@ export function view(data, { pos = "", q = "", off = new Set(), typesOff = new S
   rows.sort(cmp);
   return { out: rows.filter((r) => r.dir === "out"), in: rows.filter((r) => r.dir === "in"), toks, owned: [...owned],
     total: data.agreements.length, shown: rows.length };
+}
+
+// karta dokumentu → POROZUMIENIA: tylko FIR-y tego dokumentu, jego rodzaj włączony, bez filtra słów. Wybrane
+// stanowisko zostaje, gdy ma wiersze z tego dokumentu; inaczej wszystkie stanowiska (DBT nie obsługuje sektorów
+// z LOA ze Lwowem – zostałaby pusta tabela). Wynik: {off, typesOff, pos, q} do stanu zakładki (bez zapisu w localStorage)
+export function docFocus(data, docId, { pos = "", typesOff = new Set(), online = new Set() } = {}) {
+  const doc = data.documents.find((d) => d.id === docId);
+  const mine = new Set(data.agreements.filter((r) => r.doc === docId).map((r) => r.fir));
+  const off = new Set(data.firs.filter((f) => !mine.has(f)));
+  const types = new Set([...typesOff].filter((t) => t !== doc?.type));
+  const has = (p) => {
+    const v = view(data, { pos: p, off, typesOff: types, online });
+    return [...v.out, ...v.in].some((r) => r.doc === docId);
+  };
+  return { off, typesOff: types, pos: pos && has(pos) ? pos : "", q: "" };
 }
 
 // --- HTML
@@ -141,6 +161,20 @@ export function blockHtml(dir, rows, data, x = {}) {
     <tbody>${body}</tbody></table></div>`;
 }
 
+// podsumowanie nad tabelami: ile wierszy, stanowisko, filtr i co jest wyłączone po prawej (FIR-y, LOA/LOP) –
+// pusta tabela nie zostaje bez wyjaśnienia (przełączniki FIR zapamiętuje przeglądarka)
+export function sumHtml(v, { pos = "", firs = [], off = new Set(), typesOff = new Set() } = {}) {
+  const hidden = firs.filter((f) => off.has(f)), on = firs.filter((f) => !off.has(f));
+  const types = ["LOA", "LOP"].filter((t) => typesOff.has(t));
+  const firTxt = !hidden.length ? "" : !on.length ? " · <b>wszystkie FIR-y wyłączone</b>"
+    : hidden.length > on.length ? ` · tylko FIR <b>${esc(on.join(", "))}</b>` : ` · ukryte FIR-y <b>${esc(hidden.join(", "))}</b>`;
+  return `<b>${v.shown}</b> z ${v.total} przekazań`
+    + (pos ? ` · stanowisko <b>${esc(pos)}</b>` : " · wszystkie stanowiska")
+    + (v.toks.length ? ` · filtr <b>${esc(v.toks.join(" "))}</b>` : "")
+    + `<span class="cr-off">${firTxt}${types.length ? ` · ukryte <b>${esc(types.join(", "))}</b>` : ""}</span>`
+    + `<span class="hint"> · wyciąg z PDF (data/seed/loa.json), w razie wątpliwości obowiązuje PDF</span>`;
+}
+
 // zasady z LOA (przekazanie kontroli, VFR, inne) dla FIR-ów z tabeli
 export function notesHtml(data, firs) {
   const list = (title, items) => (items?.length ? `<h5>${esc(title)}</h5><ul>${items.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
@@ -170,7 +204,8 @@ export function docCardHtml(d, { selected = false, airac = "" } = {}) {
   if (d.airac) {
     tags.push(`<span class="cd-tag airac${d.current ? " cur" : ""}" title="${d.current ? "bieżący cykl AIRAC" : `bieżący cykl: ${esc(airac)}`}">AIRAC ${esc(d.airac)}</span>`);
   }
-  const meta = [dmy(d.effective) && `od ${dmy(d.effective)}`, d.version, `${d.count} przekazań`].filter(Boolean).map(esc).join(" · ");
+  const meta = [dmy(d.effective) && `od ${dmy(d.effective)}`, d.version, `${d.count} przekazań`].filter(Boolean).map(esc).join(" · ")
+    + (d.registered === false ? ` · <span class="cd-new">${esc(d.note || "brak wpisu w coordination.json")}</span>` : "");
   const url = String(d.url || "").startsWith("/files/docs/") && d.exists ? d.url : "";
   return `<div class="cd-card${selected ? " on" : ""}" data-doc="${esc(d.id)}" tabindex="0" title="${esc(d.note || d.name)}">
     <div class="cd-name">${esc(d.name)}</div>
@@ -179,7 +214,7 @@ export function docCardHtml(d, { selected = false, airac = "" } = {}) {
     ${d.positions.length ? `<div class="cd-pos">${d.positions.map(esc).join(" · ")}</div>` : ""}
     <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="${esc(d.file)}">PDF ↗</a>`
       : `<span class="error">brak pliku ${esc(d.file)}</span>`}
-      <button type="button" class="btn cd-agr" title="Porozumienia z tego dokumentu">POROZUMIENIA ›</button></div>
+      ${d.count ? `<button type="button" class="btn cd-agr" title="Porozumienia z tego dokumentu">POROZUMIENIA ›</button>` : ""}</div>
   </div>`;
 }
 export const docFilter = (docs, { fir = "", type = "" } = {}) => docs.filter((d) => (!fir || d.firs.includes(fir)) && (!type || d.type === type));

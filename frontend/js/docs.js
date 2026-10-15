@@ -6,6 +6,11 @@ import { api, esc, frameGo, h } from "./api.js";
 // dokumentu): start = dokument z adresu ("" = pierwszy z listy), onPick(plik) po kliknięciu dokumentu na liście.
 export const COORD_CATEGORIES = ["LOA", "LOP"];
 export const otherDocs = (list) => list.filter((d) => !COORD_CATEGORIES.includes(String(d.category).toUpperCase()));
+// plik z adresu OTHER › DOCS ("LOA/…pdf", "lop/…pdf") należy do COORDINATION: stare odnośniki tam przekierowujemy
+export function isCoordFile(file) {
+  const [cat, ...rest] = String(file ?? "").split("/");
+  return rest.join("/") !== "" && COORD_CATEGORIES.includes(cat.toUpperCase());
+}
 
 export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
   const wrap = h(`<div class="mapwrap">
