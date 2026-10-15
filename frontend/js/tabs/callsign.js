@@ -1,6 +1,8 @@
 import { api, debounce, esc, h, letterMenu } from "../api.js";
 
 const CATEGORY = { CARGO: "CARGO", MIL: "MILITARY" };
+// najwięcej wierszy na raz (ALL to ~7000 znaków wywoławczych): pełna lista = obcięta, z podpowiedzią jak w AIRCRAFT
+const LIMIT = 1000;
 
 export default {
   mount(root) {
@@ -21,9 +23,10 @@ export default {
     const load = async () => {
       const my = ++seq;
       try {
-        const rows = await api(`/api/callsigns?q=${encodeURIComponent(q.value.trim())}&prefix=${prefix}&category=${pane.querySelector(".cat").value}&limit=1000`);
+        const rows = await api(`/api/callsigns?q=${encodeURIComponent(q.value.trim())}&prefix=${prefix}&category=${pane.querySelector(".cat").value}&limit=${LIMIT}`);
         if (my !== seq) return;
-        pane.querySelector(".count").textContent = `${rows.length} wyników`;
+        pane.querySelector(".count").textContent = `${rows.length} wyników`
+          + (rows.length === LIMIT ? ` (pokazano pierwsze ${LIMIT} – wybierz literę lub wpisz szukany kod)` : "");
         body.innerHTML = rows.map((r) => `<tr><td class="icao">${esc(r.icao)}</td><td class="tel">${esc(r.telephony || "–")}</td>
           <td class="minor">${esc(r.name)}</td><td class="minor">${esc(r.country)}</td>
           <td>${r.category ? `<span class="tag ${r.category.toLowerCase()}">${CATEGORY[r.category] || esc(r.category)}</span>` : ""}</td></tr>`).join("");

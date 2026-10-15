@@ -7,11 +7,10 @@
 //   5. Airport Monitor vIFF (przepustowość, ruch, loty z CTOT) + liczby lotów z sieci VATSIM.
 // Filtr stanowiska u góry: ACC / APP / TWR. APP i ACC zawężają panele do swoich lotnisk i pokazują checklistę
 // otwarcia stanowiska, TWR przeskakuje od razu do PRZEGLĄDU danego lotniska (onGoto).
-import { api, choiceGet, choiceSet, esc, h, lvpState, lvpTip, ONLINE_EVENT } from "./api.js";
+import { api, choiceGet, choiceSet, esc, h, lvpState, lvpTip, ONLINE_EVENT, POS_KEY } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 import { renderChecklist } from "./checklist.js";
 
-const POS_KEY = "overview.position";
 const CHK_KEY = "checklist.overview.open-position";
 const REFRESH_MS = 60000;
 

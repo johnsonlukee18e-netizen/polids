@@ -5,7 +5,7 @@ import { esc } from "./api.js";
 // level_text, level, transfer C|D, from, to, ep (strona polska), nb (sąsiad), conditions, ep_chains[], ep_unknown, scope[]}.
 
 export const ALL = "ALL";            // adres "#coordination/agreements/ALL" = wszystkie stanowiska
-export const POS_KEY = "overview.position";   // stanowisko wybrane w AERODROME › OVERVIEW / HOME
+export { POS_KEY } from "./api.js";   // stanowisko wybrane w AERODROME › OVERVIEW / HOME (choiceGet w COORDINATION)
 const U = (s) => String(s ?? "").toLocaleUpperCase("pl");
 
 // --- adres: "agreements[/<STANOWISKO|ALL>[/<filtr>]]", "docs[/<id dokumentu | FIR | plik w data/docs>]"

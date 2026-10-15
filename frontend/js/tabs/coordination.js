@@ -1,4 +1,4 @@
-import { api, debounce, esc, frameGo, h, lsGet, lsSet, remember, stash, stashed, subtabs, vatsimOnline } from "../api.js";
+import { api, choiceGet, debounce, esc, frameGo, h, lsGet, lsSet, remember, stash, stashed, subtabs, vatsimOnline } from "../api.js";
 import {
   POS_KEY, agreementsArg, blockHtml, defaultPosition, docCardHtml, docFilter, docFocus, docRef, docSelect, docsArg, notesHtml,
   ownedKeys, parseArg, positionOptions, shortCs, sumHtml, view,
@@ -225,7 +225,8 @@ export default {
     const load = () => (loading ||= api("/api/coordination").then((d) => {
       data = d;
       err = "";
-      if (st.pos === undefined) st.pos = defaultPosition(d.positions, lsGet(POS_KEY));
+      // wybór z HOME / OVERVIEW tego okna (pamięć okna jak tam, nie localStorage: drugie okno, tryb prywatny)
+      if (st.pos === undefined) st.pos = defaultPosition(d.positions, choiceGet(POS_KEY));
       else if (st.pos && !d.positions.some((p) => p.callsign === st.pos)) st.pos = "";
       refreshAll();
       remember("coordination", argOf(), { replace: true });
@@ -249,7 +250,13 @@ export default {
             st.q = a.q || "";
             const s = stashed("coordination");   // ← / Wstecz: przewinięcie tabel z tego wpisu
             wantTop = Number.isFinite(s?.top) ? s.top : null;
-          } else if (a.doc) st.doc = data ? docRef(data.documents, a.doc)?.id || a.doc : a.doc;
+          } else if (a.doc) {
+            const d = data && docRef(data.documents, a.doc);
+            if (d) st.doc = d.id;
+            // przed danymi albo bez listy na ekranie: refresh() weźmie pierwszy dokument, a adres pójdzie za nim; nieznany id
+            // przy otwartych DOKUMENTACH: zostaje pokazany dokument, a remember() niżej poprawia adres na niego (replaceState)
+            else if (!data || !docs) st.doc = a.doc;
+          }
           if (sub.current() !== id) sub.show(id);
           else if (id === "docs" && a.doc) docs?.pick(st.doc);
           else agr?.refresh();

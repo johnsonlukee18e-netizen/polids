@@ -3,6 +3,7 @@ liczy się z cyklu na dziś (UTC), więc po 29.10.2026 zakładki nie pokazują p
 import asyncio
 import os
 import tempfile
+import time
 from datetime import date
 
 os.environ.setdefault("POLIDS_DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
@@ -210,3 +211,117 @@ def test_config_and_embed_check_use_fallback(pansa, monkeypatch):
         assert client.get(f"/api/embed-check/{link}").status_code == 200
     assert checked == [cfg["links"][k] for k in ("aip_ifr", "aip_vfr", "aip_mil")]
     assert all("12-25_2025_11_27" in u for u in checked)
+
+
+# --- /api/config nie czeka na PAŻP: jedno sprawdzenie naraz, limit czekania, twardy limit na sprawdzenie, start w tle
+DAY = date(2026, 10, 15)   # cykl 2610: katalogu 10-26 „nie ma”, 09-26 jest (cykl bez poprawki)
+FALLBACK = {"aip_ifr": "eaipifr/AIRAC%20AMDT%2009-26_2026_09_03/index-v2.html",
+            "aip_vfr": "eaipvfr/AIRAC%20AMDT%20VFR%2009-26_2026_09_03/index-v2.html",
+            "aip_mil": "eaipmil/AIRAC%20AMDT%20MIL%2009-26_2026_09_03/index-v2.html"}
+
+
+@pytest.fixture
+def slow_pansa(monkeypatch):
+    """PAŻP odpowiadający po srv["delay"] s: 404 dla katalogów 10-26, 200 dla pozostałych; liczy zapytania."""
+    srv = {"seen": [], "delay": 0.3}
+
+    async def handler(request):
+        srv["seen"].append(request.url.path)
+        await asyncio.sleep(srv["delay"])
+        return httpx.Response(404 if "10-26" in request.url.path else 200, text="eAIP")
+
+    monkeypatch.setattr(eaip, "_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(eaip, "utc_today", lambda: DAY)
+    return srv
+
+
+def strip(links):
+    return {k: v.removeprefix(PANSA) for k, v in links.items()}
+
+
+def test_concurrent_callers_share_one_check(slow_pansa):
+    """20 przeglądarek naraz po starcie albo po wygaśnięciu wpisu: tyle zapytań do PAŻP, co dla jednej (dawniej 20×)."""
+    async def run(n):
+        eaip.reset_cache()
+        slow_pansa["seen"].clear()
+        res = await asyncio.gather(*(eaip.resolved_links(DAY) for _ in range(n)))
+        return len(slow_pansa["seen"]), res
+
+    one, res1 = asyncio.run(run(1))
+    many, res20 = asyncio.run(run(20))
+    assert strip(res1[0]) == FALLBACK and all(strip(r) == FALLBACK for r in res20)
+    # na pakiet: bieżący cykl, potem BACK_CYCLES poprzednich naraz
+    assert one == many == 3 * (eaip.BACK_CYCLES + 1)
+
+
+def test_config_waits_at_most_config_wait(slow_pansa, monkeypatch):
+    """PAŻP wolniejszy niż limit: /api/config po CONFIG_WAIT z wyliczonym adresem, sprawdzenie kończy się w tle,
+    a następne /api/config ma już poprawkę z poprzedniego cyklu (bez ponownego pytania PAŻP)."""
+    from backend.app.routers import system
+
+    assert eaip.CONFIG_WAIT <= 2   # HOME i menu czekają na /api/config
+    monkeypatch.setattr(eaip, "CONFIG_WAIT", 0.3)
+    slow_pansa["delay"] = 0.8
+
+    async def run():
+        t = time.monotonic()
+        first = (await system.config())["links"]
+        took = time.monotonic() - t
+        await asyncio.gather(*list(eaip._inflight.values()))
+        t = time.monotonic()
+        second = (await system.config())["links"]
+        return took, first, second, time.monotonic() - t
+
+    took, first, second, took2 = asyncio.run(run())
+    assert took < 0.3 + 0.4, took
+    assert {k: first[k] for k in FALLBACK} == eaip.aip_links(DAY)
+    assert strip({k: second[k] for k in FALLBACK}) == FALLBACK and took2 < 0.1
+    assert len(slow_pansa["seen"]) == 3 * (eaip.BACK_CYCLES + 1)
+
+
+def test_expired_entry_answers_at_once_and_refreshes(slow_pansa):
+    """Po terminie ważności: od razu poprzedni wynik tego cyklu, nowe sprawdzenie w tle."""
+    async def run():
+        for link in eaip.PACKAGES:
+            eaip._resolved[(link, "2610")] = (time.monotonic() - 1, f"stary/{link}")
+        t = time.monotonic()
+        stale = await eaip.resolved_links(DAY)
+        took = time.monotonic() - t
+        await asyncio.gather(*list(eaip._inflight.values()))
+        return took, stale, await eaip.resolved_links(DAY)
+
+    took, stale, fresh = asyncio.run(run())
+    assert stale == {link: f"stary/{link}" for link in eaip.PACKAGES} and took < 0.1
+    assert strip(fresh) == FALLBACK
+
+
+def test_probe_has_hard_timeout(monkeypatch):
+    """Serwer, który przyjmuje połączenie i nie odpowiada (albo sączy bajty): limit na całe sprawdzenie, nie na fazę
+    httpx; wynik „nie wiadomo” → wyliczony adres na TTL_UNKNOWN."""
+    async def handler(request):
+        await asyncio.sleep(30)
+        return httpx.Response(200)
+
+    monkeypatch.setattr(eaip, "_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(eaip, "PROBE_TIMEOUT", 0.2)
+
+    async def run():
+        async with eaip._client() as client:
+            t = time.monotonic()
+            res = await eaip._resolve(client, "aip_ifr", current_airac(DAY))
+            return time.monotonic() - t, res
+
+    took, (url, ttl) = asyncio.run(run())
+    assert took < 1 and url == eaip.package_url("aip_ifr", current_airac(DAY)) and ttl == eaip.TTL_UNKNOWN
+
+
+def test_startup_checks_in_background(pansa, monkeypatch):
+    """main.lifespan startuje sprawdzenie (eaip.warm): pierwsze /api/config ma gotowy wynik i nie pyta PAŻP drugi raz."""
+    monkeypatch.setattr(eaip, "utc_today", lambda: DAY)
+    with TestClient(main.app) as client:
+        deadline = time.monotonic() + 5
+        while len(eaip._resolved) < 3 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert len(pansa["seen"]) == 3
+        assert strip({k: v for k, v in client.get("/api/config").json()["links"].items() if k in FALLBACK}) == folders(DAY)
+        assert len(pansa["seen"]) == 3
