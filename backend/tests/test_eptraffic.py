@@ -1,10 +1,17 @@
 """MAP: ruch EP (odloty z EP**, przyloty na EP**, tranzyt przez FIR EPWW) liczony na serwerze (services/eptraffic.py)."""
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from backend.app.services.eptraffic import EpTraffic, Outline, Plan, densify, dist_nm, epww_outline, path_hits
 
 AD = {"EDDF": (50.033, 8.570), "EYVI": (54.637, 25.288), "LOWW": (48.110, 16.570), "EPWA": (52.166, 20.967),
-      "EGLL": (51.471, -0.461), "EPKK": (50.078, 19.785), "EPGD": (54.378, 18.466)}
+      "EGLL": (51.471, -0.461), "EPKK": (50.078, 19.785), "EPGD": (54.378, 18.466), "EDDB": (52.362, 13.501),
+      "LKPR": (50.101, 14.260), "UHPP": (53.168, 158.454), "PADK": (51.878, -176.646)}
 # punkty tras na niby: P1, P2 w Polsce, P3 i TANNE w Niemczech, ALPEN w Austrii
 FIX = {"P1": (53.0, 21.0), "P2": (52.3, 17.0), "P3": (51.5, 12.0), "TANNE": (50.0, 12.0), "ALPEN": (48.5, 14.0),
        "NORIL": (69.3, 88.2)}  # NORIL: punkt o tej samej nazwie na Syberii (pomyłka w trasie)
@@ -137,3 +144,90 @@ def test_plan_build_fallback_marks(outline):
     assert Plan.build("EDDF", "DCT", "EYVI", fr, outline).pts is None
     plan = Plan.build("EDDF", "P2", "EYVI", fr, outline)
     assert plan.pts and plan.last >= 0 and plan.dest == AD["EYVI"]
+
+
+def test_round_trip_keeps_route_points(traffic):
+    """Lot po kręgu (ADEP = ADES): elipsa wokół lotnisk to koło o promieniu co najmniej 300 NM, a nie 125 NM."""
+    fr = FakeResolver()
+    rels = traffic.relations([pilot("OKABC", *AD["LKPR"], "LKPR", "LKPR", "DCT EPKK DCT"),   # ok. 210 NM od LKPR
+                              pilot("DEABC", *AD["EDDB"], "EDDB", "EDDB", "DCT EPWA DCT"),   # ok. 285 NM od EDDB
+                              pilot("DEXYZ", *AD["EDDB"], "EDDB", "EDDB", "DCT TANNE DCT")], fr)
+    assert rels == ["trn", "trn", None]
+
+
+def test_antimeridian_leg_does_not_touch_poland(traffic, outline):
+    """Odcinek przez południk 180° nie jest próbkowany wzdłuż 360° długości (przez Polskę)."""
+    a, b = (52.34, 179.67), (52.28, -179.80)
+    assert not outline.touches(a, b) and not any(path_hits([a, b], outline))
+    fr = FakeResolver()
+    assert traffic.relations([pilot("PAC2", 53.0, 165.0, "UHPP", "PADK", "DCT")], fr) == [None]
+
+
+class BrokenResolver(FakeResolver):
+    """Baza nawigacyjna niedostępna (np. zablokowana w trakcie importu danych)."""
+
+    def __init__(self, prefetch_fails=True):
+        super().__init__()
+        self.prefetch_fails = prefetch_fails
+
+    def prefetch(self, texts):
+        if self.prefetch_fails:
+            raise OperationalError("SELECT", {}, Exception("database is locked"))
+
+    def resolve(self, text):
+        self.resolved.append(text)
+        raise OperationalError("SELECT", {}, Exception("database is locked"))
+
+
+def test_nav_db_failure_is_soft(traffic):
+    """Błąd bazy przy rozpisywaniu trasy: relacja z lotnisk i pozycji, trasa nie zostaje w pamięci (następnym razem
+    rozpisana), a po pierwszym błędzie nie pytamy bazy o kolejne trasy (każde zapytanie to czekanie na blokadę)."""
+    flights = [pilot("LOT1", 52.1, 20.9, "EPWA", "EPKK"), pilot("SPABC", 52.0, 19.0),
+               pilot("DLH1", 50.3, 10.0, "EDDF", "EYVI", "TANNE DCT P3"), pilot("DLH2", 50.3, 10.0, "EDDF", "EYVI", "P2")]
+    for broken in (BrokenResolver(), BrokenResolver(prefetch_fails=False)):
+        assert traffic.relations(flights, broken) == ["dep", "trn", None, None]
+        assert traffic.cached() == 0 and len(broken.resolved) <= 1
+    assert traffic.relations(flights, FakeResolver()) == ["dep", "trn", "trn", "trn"] and traffic.cached() == 2
+
+
+NODE_VS = r"""
+globalThis.L = { CircleMarker: { extend: (o) => o } };
+const { climbRates } = await import(process.argv[2]);
+const out = [];
+let hist = new Map();
+for (const [t, list] of JSON.parse(process.argv[3])) {
+  hist = climbRates(list, hist, t);
+  out.push(Object.fromEntries(list.map((p) => [p.callsign, p.vs])));
+}
+console.log(JSON.stringify(out));
+"""
+
+
+def test_climb_rates_ignore_quick_reloads(tmp_path):
+    """MAP (airspace.js climbRates): wczytanie ruchu kilka sekund po poprzednim (wybór lotu, wykres vIFF) dostaje
+    z serwera ten sam feed; vs liczy się tylko względem odczytu sprzed co najmniej 25 s, inaczej zostaje poprzednie."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    js = Path(__file__).resolve().parents[2] / "frontend" / "js"
+    (tmp_path / "api.mjs").write_text((js / "api.js").read_text("utf-8"), "utf-8")
+    (tmp_path / "airspace.mjs").write_text((js / "airspace.js").read_text("utf-8").replace('"./api.js"', '"./api.mjs"'),
+                                           "utf-8")
+    (tmp_path / "run.mjs").write_text(NODE_VS, "utf-8")
+
+    def dom(alt):
+        return {"callsign": "DOM1", "altitude": alt}
+
+    steps = [(0, [dom(6000)]), (30000, [dom(4500)]), (35000, [dom(4500), {"callsign": "NEW1", "altitude": 3000}]),
+             (40000, [dom(4500), {"callsign": "NEW1", "altitude": 3000}]), (60000, [dom(3000)]),
+             (65000, [dom(None)]), (95000, [dom(2000)])]
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "airspace.mjs").as_uri(), json.dumps(steps)],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) == [
+        {"DOM1": None}, {"DOM1": -1500},
+        {"DOM1": -1500, "NEW1": None},   # 5 s po odczycie: poprzednie vs, a nie 0 (feed sprzed 5 s)
+        {"DOM1": -1500, "NEW1": None},
+        {"DOM1": -1500},                 # 30 s po odczycie z 30000: 4500 → 3000
+        {"DOM1": -1500},                 # 5 s później (bez wysokości): poprzednie vs
+        {"DOM1": -1000}]                 # względem odczytu z 60000

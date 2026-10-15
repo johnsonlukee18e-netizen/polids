@@ -15,9 +15,11 @@ odcinki to łuki koła wielkiego zagęszczone co ok. 20 NM, a każdy krótki odc
 samo DCT, same nieznane punkty), liczy się łuk od bieżącej pozycji do lotniska docelowego. Punkty daleko poza elipsą
 wokół lotnisk odlotu i celu (punkt albo droga o tej samej nazwie na innym kontynencie) pomijamy. Rozpisana trasa zostaje
 w pamięci (klucz: znak, lotniska, trasa), więc przy odświeżaniu co 30 s liczy się tylko, czy reszta trasy od bieżącej
-pozycji wchodzi w FIR."""
+pozycji wchodzi w FIR. Gdy trasy nie da się rozpisać (błąd bazy nawigacyjnej, np. w trakcie importu), lot ma relację
+tylko z lotnisk i pozycji, a trasę rozpisujemy przy następnym odświeżeniu."""
 
 import json
+import logging
 import math
 import re
 import threading
@@ -30,8 +32,10 @@ EP_AD = re.compile(r"^EP[A-Z]{2}$")
 STEP_NM = 20  # zagęszczenie łuków koła wielkiego
 CELL = 0.02  # komórka rastra FIR-u w stopniach
 KEEP_S = 900  # trasa lotu, którego nie ma w feedzie od tylu sekund, wypada z pamięci
-# punkt trasy dalej od lotnisk niż elipsa: odległość odlot–punkt–cel ≤ 1,5 × odlot–cel + 250 NM, to pomyłka
-CORRIDOR, CORRIDOR_NM = 1.5, 250
+# punkt trasy dalej od lotnisk niż elipsa: odległość odlot–punkt–cel ≤ 1,5 × odlot–cel + 250 NM, to pomyłka;
+# co najmniej 600 NM (lot po kręgu z powrotem na lotnisko startu, krótki lot z objazdem: do ok. 300 NM od lotnisk)
+CORRIDOR, CORRIDOR_NM, CORRIDOR_MIN = 1.5, 250, 600
+log = logging.getLogger("polids.eptraffic")
 
 Point = tuple[float, float]  # (lat, lon)
 
@@ -80,8 +84,11 @@ class Outline:
         return self.x0 - margin <= lon <= self.x1 + margin and self.y0 - margin <= lat <= self.y1 + margin
 
     def touches(self, a: Point, b: Point) -> bool:
-        """Krótki odcinek a-b (do ok. 20 NM, prosty w lon/lat) ma punkt w obszarze: próbki co ok. 0,7 komórki."""
+        """Krótki odcinek a-b (do ok. 20 NM, prosty w lon/lat) ma punkt w obszarze: próbki co ok. 0,7 komórki.
+        Odcinek przez południk 180° (skok długości o ponad 180°) jest po drugiej stronie Ziemi, obszaru nie dotyka."""
         (la1, lo1), (la2, lo2) = a, b
+        if abs(lo2 - lo1) > 180:
+            return False
         if max(lo1, lo2) < self.x0 or min(lo1, lo2) > self.x1 or max(la1, la2) < self.y0 or min(la1, la2) > self.y1:
             return False
         n = int(max(abs(lo2 - lo1), abs(la2 - la1)) / (self.cell * 0.7)) + 1
@@ -145,7 +152,7 @@ class Plan:
         if orig and dest:
             # punkt daleko poza elipsą wokół odcinka odlot–cel to pomyłka (punkt albo droga o tej samej nazwie na innym
             # kontynencie, np. A502 w Ameryce Środkowej), a nie objazd: pomijamy go
-            limit = CORRIDOR * dist_nm(orig, dest) + CORRIDOR_NM
+            limit = max(CORRIDOR * dist_nm(orig, dest) + CORRIDOR_NM, CORRIDOR_MIN)
             pts = [p for p in pts if dist_nm(orig, (p["lat"], p["lon"])) + dist_nm((p["lat"], p["lon"]), dest) <= limit]
         if not any(p["ident"] not in (dep, arr) for p in pts):
             return cls(None, dest, outline)  # nic poza lotniskami: łuk od bieżącej pozycji do lotniska docelowego
@@ -172,6 +179,11 @@ class Plan:
         return any(path_hits(densify([pos, self.pts[j]]), outline))
 
 
+def _first(exc: Exception) -> str:
+    """Pierwsza linijka błędu (SQLAlchemy dokłada treść zapytania i parametry)."""
+    return str(exc).split("\n", 1)[0]
+
+
 class EpTraffic:
     """Relacja samolotów z ruchem EP; rozpisane trasy w pamięci między odświeżeniami MAP."""
 
@@ -196,13 +208,26 @@ class EpTraffic:
                     todo.append((len(out), p.get("callsign") or "", key, (p["lat"], p["lon"])))
                 out.append(rel)
             new = {key for _, cs, key, _ in todo if (self._plans.get(cs) or (None,))[0] != key}
+            broken = False  # baza nawigacyjna zawiodła: nowych tras w tym odświeżeniu już nie rozpisujemy
             if new and hasattr(resolver, "prefetch"):
-                resolver.prefetch(" ".join(x for x in key if x) for key in new)
+                try:
+                    resolver.prefetch(" ".join(x for x in key if x) for key in new)
+                except Exception as exc:  # np. "database is locked" w trakcie importu danych
+                    broken = True
+                    log.warning("MAP, ruch EP: trasy nierozpisane (%s), relacja tylko z lotnisk i pozycji", _first(exc))
             now = time.monotonic()
             for i, cs, key, pos in todo:
                 hit = self._plans.get(cs)
                 if not hit or hit[0] != key:
-                    hit = self._plans[cs] = (key, Plan.build(*key, resolver, outline))
+                    if broken:
+                        continue  # relacja z _quick (None: poza FIR-em, lotniska spoza EP); trasa przy następnym razie
+                    try:
+                        plan = Plan.build(*key, resolver, outline)
+                    except Exception as exc:
+                        broken = True
+                        log.warning("MAP, ruch EP: trasa %s nierozpisana (%s)", cs, _first(exc))
+                        continue
+                    hit = self._plans[cs] = (key, plan)
                 hit[1].seen = now
                 out[i] = "trn" if hit[1].enters(pos, outline) else None
             if now - self._pruned > 60:

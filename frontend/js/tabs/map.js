@@ -1,6 +1,6 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel } from "../viffchart.js";
-import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, colorFor, controllerRows,
+import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates, colorFor, controllerRows,
   drawFirs, fl, loadFirs, loadVacs, sliceOwner, symbolFor, symbolSvg, vacsLayer } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
@@ -83,7 +83,8 @@ const LEGEND = [
     lg(`<span class="lg-line lg-flight"></span>`, "trasa wybranego samolotu"), lg(`<span class="lg-line lg-route"></span>`, "trasa wpisana ręcznie"),
     `<p class="lgx-note">Na mapie tylko ruch EP: odloty z lotnisk EP**, przyloty na EP** i tranzyt, czyli samolot w FIR EPWW
       albo taki, którego reszta trasy z planu lotu (od bieżącej pozycji do lotniska docelowego) wchodzi w FIR EPWW; bez planu lotu
-      tylko w FIR EPWW. Samolot, który z FIR-u już wyleciał, znika z mapy; wybrany lot zostaje (szczegóły lotu dalej się odświeżają).
+      tylko w FIR EPWW. Odloty z EP** i przyloty na EP** są na mapie przez cały lot; tranzyt, który z FIR EPWW już wyleciał
+      (i do niego nie wróci), znika z mapy. Wybrany lot zostaje (szczegóły lotu dalej się odświeżają).
       Granica FIR EPWW: obrys sektorów z pliku .ese, z przestrzenią nad Bałtykiem delegowaną do EPWW.</p>`,
     `<p class="lgx-note">Lot krajowy (EP → EP) jest odlotem na ziemi przy lotnisku startu, do 40 NM od niego i przy wznoszeniu,
       a przylotem przy zniżaniu i na drugiej połowie trasy (wznoszenie / zniżanie z porównania z poprzednim odczytem sprzed 30 s).</p>`].join("")],
@@ -1491,21 +1492,22 @@ function mainMap(ctx) {
     if (viffData) renderChart();
   };
   let trafficAt = "";
-  // liczba samolotów wg relacji (po wczytaniu listy lotnisk liczona od nowa: loty krajowe potrzebują ich współrzędnych)
+  // liczba samolotów wg relacji (po wczytaniu listy lotnisk liczona od nowa: loty krajowe potrzebują ich współrzędnych);
+  // bez kept = samolotów w odpowiedzi tylko dzięki keep (poza obszarem albo bez związku z EP)
   const trafficInfo = () => {
     if (!trafficAt) return;
-    const n = { dep: 0, arr: 0, trn: 0, out: 0 };
-    pilots.forEach((p) => { n[relation(p, adIdx)]++; });
-    $(".traffic-info").textContent = `${plural(pilots.length - n.out, "samolot", "samoloty", "samolotów")} w ruchu EP (odloty ${n.dep}, przyloty ${n.arr}, `
+    const n = { dep: 0, arr: 0, trn: 0, out: 0 }, ep = pilots.filter((p) => !p.kept);
+    ep.forEach((p) => { n[relation(p, adIdx)]++; });
+    $(".traffic-info").textContent = `${plural(ep.length, "samolot", "samoloty", "samolotów")} w ruchu EP (odloty ${n.dep}, przyloty ${n.arr}, `
       + `tranzyt przez EPWW ${n.trn}) · ${trafficAt}. Kliknij samolot: szczegóły lotu i trasa.`;
   };
   const drawTraffic = () => {
     layers.traffic.clearLayers();
     if (!$(".traffic").checked || map.getSize().x < 40) return;
     const z = map.getZoom(), b = map.getBounds().pad(0.2);
-    pilots.filter((p) => b.contains([p.lat, p.lon])).forEach((p) => {
+    // kept: z mapy tylko wybrany lot, reszta jest w tabeli wykresu vIFF
+    pilots.filter((p) => b.contains([p.lat, p.lon]) && (!p.kept || p.callsign === selected)).forEach((p) => {
       const rel = relation(p, adIdx);
-      if (rel === "out" && p.callsign !== selected) return;  // tylko w tabeli wykresu vIFF
       const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel })
         .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)} · ${esc(REL_TEXT[rel](p))}`)
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
@@ -1513,23 +1515,23 @@ function mainMap(ctx) {
     });
   };
   // Serwer odsiewa samoloty bez związku z ruchem EP (ep=1). Wybrany lot i loty z wykresu vIFF są w odpowiedzi zawsze
-  // (keep; bez relacji ep = null): panel lotu odświeża pozycję także po wylocie z FIR EPWW, a tabela wykresu ma ADEP,
-  // ADES i typ. Wykres i wybór lotu zmieniają listę keep: wtedy ruch wczytujemy od razu (sentKeep = ostatnio wysłana).
+  // (keep; bez relacji ep = null, a spoza ruchu EP w obszarze z kept = true): panel lotu odświeża pozycję także po
+  // wylocie z FIR EPWW, a tabela wykresu ma ADEP, ADES i typ. Wykres i wybór lotu zmieniają listę keep: wtedy ruch
+  // wczytujemy od razu (sentKeep = ostatnio wysłana; vsHist: wznoszenie / zniżanie, climbRates w airspace.js).
   const keepList = () => {
     const tv = $(".viff").checked && (viffData?.sectors || []).find((t) => t.id === viffSel);
     return [...new Set([selected, ...(tv?.flights || []).map((f) => f.callsign)].filter(Boolean))].sort().join(",");
   };
-  let sentKeep = "", trafficSeq = 0;
+  let sentKeep = "", trafficSeq = 0, vsHist = new Map();
   const keepTraffic = () => { if ($(".traffic").checked && keepList() !== sentKeep) loadTraffic(); };
   const loadTraffic = async () => {
     if (!$(".traffic").checked) { layers.traffic.clearLayers(); $(".traffic-info").textContent = ""; return; }
-    const prev = new Map(pilots.map((p) => [p.callsign, p.altitude]));  // poprzedni odczyt: wznoszenie / zniżanie
     const my = ++trafficSeq, keep = sentKeep = keepList();
     try {
       const list = await api(`/api/vatsim/pilots?bbox=44,5,60,35&ep=1${keep ? "&keep=" + encodeURIComponent(keep) : ""}`);
       if (my !== trafficSeq) return;  // nowsze zapytanie (zmiana wyboru) już w drodze
       pilots = list;
-      pilots.forEach((p) => { const a = prev.get(p.callsign); p.vs = a === undefined || a === null || p.altitude === null ? null : p.altitude - a; });
+      vsHist = climbRates(pilots, vsHist, Date.now());
       trafficAt = hhmm(new Date().toISOString());
       trafficInfo();
     } catch (e) {

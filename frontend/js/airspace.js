@@ -204,6 +204,21 @@ export function aircraftMarker(p, { label = true, detail = false, cls = "" } = {
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
 }
 
+// Wznoszenie / zniżanie (MAP, loty krajowe): p.vs = zmiana wysokości od odczytu sprzed co najmniej minAge ms.
+// hist: znak → {alt, t, vs} z poprzednich wczytań ruchu; wynik to nowa hist (tylko samoloty z listy). Wczytanie
+// częstsze niż co minAge (wybór lotu, wykres vIFF) nie przesuwa punktu odniesienia i zostawia poprzednie vs: serwer
+// trzyma feed VATSIM 30 s, więc odczyt sprzed kilku sekund ma tę samą wysokość (vs = 0 zrobiłoby z przylotu odlot).
+export function climbRates(pilots, hist, now, minAge = 25000) {
+  const out = new Map();
+  pilots.forEach((p) => {
+    const h = hist.get(p.callsign), alt = p.altitude ?? null;
+    if (h && now - h.t < minAge) { p.vs = h.vs; out.set(p.callsign, h); return; }
+    p.vs = h && h.alt !== null && alt !== null ? alt - h.alt : null;
+    out.set(p.callsign, { alt, t: now, vs: p.vs });
+  });
+  return out;
+}
+
 // Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).
 // Linie: [[x, y], ...] rysowane jako łamana; okrąg: {circle: promień}.
 export const SYMBOLS = {

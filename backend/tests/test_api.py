@@ -168,9 +168,65 @@ def test_vatsim_pilots_ep_relation(client):
     assert {"departure", "arrival", "route", "lat", "lon"} <= set(every[0])
     ep = client.get("/api/vatsim/pilots?bbox=44,5,60,35&ep=1").json()
     assert [x["callsign"] for x in ep] == ["LOT11", "DLH11", "SPXYZ"]
-    kept = client.get("/api/vatsim/pilots?bbox=44,5,60,35&ep=1&keep=aua11,IBE11,NOPE").json()
+    kept = client.get("/api/vatsim/pilots?bbox=44,5,60,35&ep=1&keep=aua11,IBE11,NOPE,LOT11").json()
     assert [(x["callsign"], x["ep"]) for x in kept] == [("LOT11", "dep"), ("DLH11", "trn"), ("AUA11", None),
                                                         ("SPXYZ", "trn"), ("IBE11", None)]
+    # kept: w odpowiedzi tylko dzięki keep (bez relacji albo poza bbox), MAP ich nie liczy; LOT11 i tak by w niej był
+    assert [x["callsign"] for x in kept if x.get("kept")] == ["AUA11", "IBE11"]
+    # bez ep=1 samolot bez relacji w bbox jest w odpowiedzi i bez keep
+    plain = client.get("/api/vatsim/pilots?bbox=44,5,60,35&keep=AUA11,IBE11").json()
+    assert [x["callsign"] for x in plain if x.get("kept")] == ["IBE11"]
+
+
+def test_vatsim_pilots_kept_outside_bbox(client):
+    """Lot z relacją EP spoza bbox (wybrany albo z wykresu vIFF) jest w odpowiedzi z kept, MAP go nie liczy."""
+    from backend.app.routers import vatsim
+
+    async def feed():
+        return {"general": {}, "controllers": [], "atis": [], "pilots": [
+            {"callsign": "LOT21", "latitude": 52.1, "longitude": 20.9, "altitude": 3000,
+             "flight_plan": {"departure": "EPWA", "arrival": "EPKK", "route": "DCT"}},
+            {"callsign": "BAW800", "latitude": 51.3, "longitude": 1.0, "altitude": 35000,
+             "flight_plan": {"departure": "EGLL", "arrival": "EPWA", "route": "DCT"}},
+            {"callsign": "RYR22", "latitude": 47.0, "longitude": -1.0, "altitude": 35000,
+             "flight_plan": {"departure": "LFRS", "arrival": "EPKK", "route": "DCT"}}]}
+    vatsim.get_feed = feed
+    url = "/api/vatsim/pilots?bbox=44,5,60,35&ep=1"
+    assert [(x["callsign"], x["ep"], x.get("kept")) for x in client.get(url).json()] == [("LOT21", "dep", None)]
+    assert [(x["callsign"], x["ep"], x.get("kept")) for x in client.get(url + "&keep=BAW800").json()] == [
+        ("LOT21", "dep", None), ("BAW800", "arr", True)]
+
+
+def test_vatsim_pilots_survive_nav_db_failure(client, monkeypatch):
+    """Baza nawigacyjna niedostępna (np. zablokowana przez import): MAP dostaje ruch EP z lotnisk i pozycji, nie 500."""
+    from sqlalchemy.exc import OperationalError
+
+    from backend.app.routers import vatsim
+
+    class Locked(vatsim.RouteResolver):
+        def prefetch(self, routes, chunk=500):
+            raise OperationalError("SELECT", {}, Exception("database is locked"))
+
+        def resolve(self, route):
+            raise OperationalError("SELECT", {}, Exception("database is locked"))
+
+    def fp(dep, arr):
+        return {"departure": dep, "arrival": arr, "route": "DCT"}
+
+    async def feed():
+        return {"general": {}, "controllers": [], "atis": [], "pilots": [
+            {"callsign": "LOT31", "latitude": 52.1, "longitude": 20.9, "flight_plan": fp("EPWA", "EGLL")},
+            {"callsign": "DLH31", "latitude": 50.3, "longitude": 10.0, "flight_plan": fp("EDDF", "EYVI")},
+            {"callsign": "DLH32", "latitude": 52.2, "longitude": 19.0, "flight_plan": fp("EDDF", "EYVI")},
+            {"callsign": "SPX31", "latitude": 52.0, "longitude": 19.0, "flight_plan": None}]}
+    vatsim.get_feed = feed
+    monkeypatch.setattr(vatsim, "RouteResolver", Locked)
+    r = client.get("/api/vatsim/pilots?bbox=44,5,60,35&ep=1")
+    assert r.status_code == 200
+    assert [(x["callsign"], x["ep"]) for x in r.json()] == [("LOT31", "dep"), ("DLH32", "trn"), ("SPX31", "trn")]
+    monkeypatch.undo()  # baza wróciła: trasa DLH31 rozpisana przy następnym odświeżeniu (łuk EDDF–EYVI przez Polskę)
+    assert [x["callsign"] for x in client.get("/api/vatsim/pilots?bbox=44,5,60,35&ep=1").json()] == [
+        "LOT31", "DLH31", "DLH32", "SPX31"]
 
 
 def test_route_prefetch_matches_single_lookups(client):
