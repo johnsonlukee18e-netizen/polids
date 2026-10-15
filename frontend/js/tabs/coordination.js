@@ -44,14 +44,19 @@ export default {
       notes.open = lsGet(NOTES_KEY) === "1";
       notes.addEventListener("toggle", () => lsSet(NOTES_KEY, notes.open ? "1" : "0"));
 
+      let built = null;   // dane, dla których są już podpowiedzi COP i lista stanowisk (bez przebudowy co minutę)
       const refresh = () => {
-        q.value = st.q;
+        if (q.value !== st.q) q.value = st.q;   // bez przestawiania kursora w trakcie pisania
         if (!data) {
           $(".cr-blocks").innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Wczytywanie porozumień…</p>`;
           return;
         }
-        $("#cr-cops").innerHTML = data.cops.map((c) => `<option value="${esc(c)}"></option>`).join("");
-        pos.innerHTML = positionOptions(data.positions, st.pos);
+        if (built !== data) {
+          built = data;
+          $("#cr-cops").innerHTML = data.cops.map((c) => `<option value="${esc(c)}"></option>`).join("");
+          pos.innerHTML = positionOptions(data.positions, st.pos);
+        }
+        if (pos.value !== (st.pos || "")) pos.value = st.pos || "";
         const counts = {};
         data.agreements.forEach((r) => { counts[r.fir] = (counts[r.fir] || 0) + 1; counts[r.type] = (counts[r.type] || 0) + 1; });
         $(".cr-firs").innerHTML = data.firs.map((f) => `<button type="button" class="gbtn cr-tg${st.off.has(f) ? "" : " on"}" data-fir="${esc(f)}"`
@@ -127,6 +132,12 @@ export default {
         st.doc = d.id;
         const url = d.exists ? d.url : "";
         if (url && viewer.getAttribute("src") !== url) viewer = frameGo(viewer, url);
+        else if (!url && viewer.getAttribute("src")) {   // brak pliku: nie zostawiamy na ekranie PDF-u poprzedniego dokumentu
+          const blank = viewer.cloneNode(false);
+          blank.removeAttribute("src");
+          viewer.replaceWith(blank);
+          viewer = blank;
+        }
         list.querySelectorAll(".cd-card").forEach((c) => c.classList.toggle("on", c.dataset.doc === d.id));
         list.querySelector(".cd-card.on")?.scrollIntoView({ block: "nearest" });
       };
