@@ -153,7 +153,16 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
 
 # --- frontend: czyste funkcje HOME w Node -----------------------------------------------------------------------
 NODE_SCRIPT = r"""
+// localStorage podstawiony przed pierwszym odczytem: `blocked` = tryb prywatny (każdy dostęp rzuca wyjątek)
+const store = new Map([["overview.position", "EPWA_APP"]]);
+let blocked = false;
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+  getItem(k) { if (blocked) throw new Error("SecurityError"); return store.has(k) ? store.get(k) : null; },
+  setItem(k, v) { if (blocked) throw new Error("SecurityError"); store.set(k, String(v)); },
+} });
 const home = await import(process.argv[2]);
+const ov = await import(process.argv[3]);
+const api = await import(new URL("./api.mjs", process.argv[2]));
 const now = new Date("2026-10-15T12:00:00Z");
 const list = [
   { callsign: "EPWW_DBT_CTR", goto: null }, { callsign: "EPWA_APP", goto: null },
@@ -161,8 +170,68 @@ const list = [
 ];
 const on = (callsign, extra = {}) => ({ callsign, frequency: "127.025", logon_time: "2026-10-15T10:12:30Z", facility: 6, ...extra });
 const bk = (callsign, start, end, extra = {}) => ({ callsign, start, end, type: "booking", active: false, ...extra });
+
+// HOME jak decide() i zmiana pola: kroki {net} (odpowiedź /api/vatsim/me, zostaje do następnej), {pick} (wybór ręczny
+// w polu, zapisany), {shared} (wybór zmieniony w OVERVIEW tego okna, potem pokazanie HOME); wynik: wartość pola po kroku
+const FEED_DOWN = { online: [], bookings: [], error: "VATSIM data feed niedostępny: timeout", online_error: "VATSIM data feed niedostępny: timeout" };
+const NO_SERVER = { online: [], bookings: [], error: "brak połączenia z serwerem PolIDS", online_error: "brak połączenia z serwerem PolIDS",
+                    bookings_error: "brak połączenia z serwerem PolIDS" };   // loadNet: wyjątek z api()
+const ONLINE = { online: [on("EPWW_CTR", { position: "EPWW_DBT_CTR" })], bookings: [] };
+const OFFLINE = { online: [], bookings: [] };
+const BOOKED = { online: [], bookings: [bk("EPWA_TWR", "2026-10-15T18:00:00+00:00", "2026-10-15T20:00:00+00:00")] };
+function homeRun(steps, seen = "") {
+  let state = { seen, picked: false, appliedOnline: "" }, shared = seen, net = null, sel = "";
+  const out = steps.map((s) => {
+    if ("pick" in s) { state = { ...state, picked: true, seen: s.pick }; shared = s.pick; return (sel = s.pick); }
+    if ("shared" in s) shared = s.shared;
+    if ("net" in s) net = s.net;
+    const { choose, ...next } = home.homeChoice(state, { net, shared, list });
+    state = next;
+    if (choose === "" || list.some((p) => p.callsign === choose)) sel = choose;
+    return sel;
+  });
+  return { sel: out, applied: state.appliedOnline };
+}
+
+// wybór w pamięci okna: z localStorage przy pierwszym odczycie, potem drugie okno go nie zmienia; bez localStorage w pamięci
+const choice = [api.choiceGet(home.POS_KEY)];
+store.set(home.POS_KEY, "EPKK_APP");                         // drugie okno PolIDS zapisuje swój wybór
+choice.push(api.choiceGet(home.POS_KEY));
+api.choiceSet(home.POS_KEY, "EPGD_APP");
+choice.push(api.choiceGet(home.POS_KEY), store.get(home.POS_KEY));
+blocked = true;
+choice.push(api.choiceGet("test.blocked"));
+api.choiceSet("test.blocked", "EPKK_APP");
+choice.push(api.choiceGet("test.blocked"));
+// tryb prywatny: wybór w OVERVIEW, inna zakładka, ponowne pokazanie PRZEGLĄDU: filtr zostaje
+const isFilter = (cs) => ["EPWW_DBT_CTR", "EPWA_APP", "EPKK_APP"].includes(cs);
+const privateSync = ov.syncPosition({ seen: "EPKK_APP", position: "EPKK_APP", loaded: true }, api.choiceGet("test.blocked"), isFilter);
+blocked = false;
+
 console.log(JSON.stringify({
   posKey: home.POS_KEY,
+  choice,
+  privateSync,
+  homeRuns: {
+    feedDown: homeRun([{ net: ONLINE }, { pick: "EPWA_APP" }, { net: FEED_DOWN }, { net: ONLINE }]),
+    noServer: homeRun([{ net: ONLINE }, { pick: "EPWA_APP" }, { net: NO_SERVER }, { net: ONLINE }]),
+    relogin: homeRun([{ net: ONLINE }, { pick: "EPWA_APP" }, { net: OFFLINE }, { net: ONLINE }]),
+    listFirst: homeRun([{ net: null }, { net: ONLINE }], "EPWA_APP"),
+    listFirstBooked: homeRun([{ net: null }, { net: BOOKED }, { net: BOOKED }]),
+    downAtStart: homeRun([{ net: { ...BOOKED, online_error: "x" } }, { net: ONLINE }, { net: ONLINE }]),
+    fromOverview: homeRun([{ net: ONLINE }, { shared: "EPWA_APP" }, { net: ONLINE }, { shared: "GONE_CTR" }]),
+    stored: homeRun([{ net: OFFLINE }, { net: BOOKED }, { net: OFFLINE }], "EPWA_APP"),
+  },
+  sync: [
+    [{ seen: "EPKK_APP", position: "EPKK_APP", loaded: true }, "EPKK_APP"],   // nic nowego: filtr zostaje
+    [{ seen: "EPWA_APP", position: "EPWA_APP", loaded: true }, "EPKK_APP"],   // nowy wybór w HOME
+    [{ seen: "EPWA_APP", position: "EPWA_APP", loaded: true }, "EPWA_TWR"],   // wieża z HOME: filtr bez zmian
+    [{ seen: "EPWA_TWR", position: "", loaded: true }, "EPWA_TWR"],            // wieża zapisana przy otwarciu: cały FIR zostaje
+    [{ seen: "EPWA_APP", position: "EPWA_APP", loaded: true }, ""],           // HOME: wszystkie lotniska
+    [{ seen: "EPWA_APP", position: "EPWA_APP", loaded: true }, "GONE_CTR"],   // spoza listy: bez zmian
+    [{ seen: "EPWA_APP", position: "", loaded: false }, "EPKK_APP"],          // lista jeszcze się wczytuje
+  ].map(([st, shared]) => ov.syncPosition(st, shared, isFilter)),
+  listPos: ["EPWA_APP", "EPWA_TWR", "GONE_CTR", ""].map((cs) => ov.listPosition(cs, isFilter)),
   rating: [
     { rating: 4, rating_short: "S3" }, { rating: 1 }, { rating: -1 }, { rating: 12, rating_short: "ADM" },
     { rating_short: "C1" }, { rating: 99, rating_short: "XX" }, { rating: 99 }, null, { rating: "constructor" },
@@ -213,9 +282,16 @@ def js(tmp_path_factory):
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
     (d / "home.mjs").write_text((FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
                                 .replace('"../api.js"', '"./api.mjs"'), "utf-8")
+    # overview.js bez METEO i checklisty (DOM): tylko czyste funkcje wspólnego stanowiska
+    (d / "meteo.mjs").write_text("export const colorize = (x) => x; export const wxLines = (k, x) => x;\n", "utf-8")
+    (d / "checklist.mjs").write_text("export const renderChecklist = () => {};\n", "utf-8")
+    (d / "overview.mjs").write_text((FRONTEND / "js" / "overview.js").read_text("utf-8")
+                                    .replace('"./api.js"', '"./api.mjs"').replace('"./tabs/meteo.js"', '"./meteo.mjs"')
+                                    .replace('"./checklist.js"', '"./checklist.mjs"'), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
-    r = subprocess.run([node, str(script), (d / "home.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    r = subprocess.run([node, str(script), (d / "home.mjs").as_uri(), (d / "overview.mjs").as_uri()],
+                       capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
@@ -270,16 +346,68 @@ def test_session_target(js):
                             {"arg": "EPWA", "label": "PRZYGOTUJ SESJĘ → AERODROME EPWA"}]
 
 
+def test_home_choice_sequences(js):
+    """Stanowisko w HOME przy kolejnych odświeżeniach VATSIM (co 60 s), wyborze ręcznym i zmianie w OVERVIEW."""
+    runs = js["homeRuns"]
+    # wybór ręczny zostaje mimo chwilowej awarii data feed albo serwera PolIDS; ten sam kontroler na tym samym
+    # połączeniu po powrocie feedu nie dostaje z powrotem stanowiska z sieci
+    assert runs["feedDown"] == {"sel": ["EPWW_DBT_CTR", "EPWA_APP", "EPWA_APP", "EPWA_APP"], "applied": "EPWW_DBT_CTR"}
+    assert runs["noServer"] == runs["feedDown"]
+    # wylogowanie (feed odpowiedział, nie ma go w sieci) i nowe zalogowanie: znowu stanowisko z sieci
+    assert runs["relogin"] == {"sel": ["EPWW_DBT_CTR", "EPWA_APP", "EPWA_APP", "EPWW_DBT_CTR"], "applied": "EPWW_DBT_CTR"}
+    # pole ustawione już po wczytaniu listy (zapisany wybór), zanim odpowie VATSIM
+    assert runs["listFirst"]["sel"] == ["EPWA_APP", "EPWW_DBT_CTR"]
+    assert runs["listFirstBooked"]["sel"] == ["", "EPWA_TWR", "EPWA_TWR"]
+    # feed niedostępny przy otwarciu: rezerwacja; potem pierwsze zalogowanie widziane w sieci
+    assert runs["downAtStart"] == {"sel": ["EPWA_TWR", "EPWW_DBT_CTR", "EPWW_DBT_CTR"], "applied": "EPWW_DBT_CTR"}
+    # wybór z OVERVIEW tego okna wygrywa z siecią, na której już ustawiono stanowisko; spoza listy: pole bez zmian
+    assert runs["fromOverview"]["sel"] == ["EPWW_DBT_CTR", "EPWA_APP", "EPWA_APP", "EPWA_APP"]
+    # zapisany wybór wygrywa z rezerwacją także przy kolejnych odświeżeniach
+    assert runs["stored"]["sel"] == ["EPWA_APP", "EPWA_APP", "EPWA_APP"]
+
+
+def test_position_choice_is_per_window(js):
+    """Wybór stanowiska w pamięci okna: z localStorage tylko przy pierwszym odczycie, bez localStorage też działa."""
+    # drugie okno zapisało EPKK_APP: to okno zostaje przy swoim; zapis idzie też do localStorage (następne otwarcie)
+    assert js["choice"] == ["EPWA_APP", "EPWA_APP", "EPGD_APP", "EPGD_APP", "", "EPKK_APP"]
+    # tryb prywatny: filtr wybrany w OVERVIEW zostaje po powrocie z innej zakładki
+    assert js["privateSync"] == {"seen": "EPKK_APP", "position": "EPKK_APP"}
+
+
+def test_overview_sync_rules(js):
+    """Otwarty PRZEGLĄD po ponownym pokazaniu: zmienia filtr tylko nowy wybór z HOME, który jest filtrem ACC / APP."""
+    assert js["sync"] == [
+        {"seen": "EPKK_APP", "position": "EPKK_APP"},
+        {"seen": "EPKK_APP", "position": "EPKK_APP"},
+        {"seen": "EPWA_TWR", "position": "EPWA_APP"},
+        {"seen": "EPWA_TWR", "position": ""},
+        {"seen": "", "position": ""},
+        {"seen": "GONE_CTR", "position": "EPWA_APP"},
+        {"seen": "EPKK_APP", "position": ""},
+    ]
+    # filtr po wczytaniu listy: wieża zapisana w HOME i stanowisko spoza listy to cały FIR
+    assert js["listPos"] == ["EPWA_APP", "", "", ""]
+
+
 def test_home_shares_position_with_overview(js):
-    """HOME zapisuje stanowisko pod kluczem OVERVIEW, a otwarty już PRZEGLĄD czyta go ponownie przy każdym pokazaniu."""
+    """HOME i OVERVIEW wymieniają stanowisko przez wybór w pamięci okna (choiceGet / choiceSet pod kluczem OVERVIEW)."""
     overview = (FRONTEND / "js" / "overview.js").read_text("utf-8")
     assert re.search(r'^const POS_KEY = "([^"]+)";$', overview, re.M).group(1) == js["posKey"]
-    assert "sync() {" in overview and "const want = lsGet(POS_KEY)" in overview
+    # otwarty PRZEGLĄD: reguły syncPosition; filtr dopiero z listą stanowisk (bez niej wieża z HOME nie jest filtrem)
+    assert "sync() {" in overview
+    assert "syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed)" in overview
+    assert "position = listPosition(seen, listed);" in overview and 'let position = "";' in overview
+    assert "choiceSet(POS_KEY, position);" in overview
     aerodrome = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
     assert 'if (mode === "ov" && ov) { ov.sync(); return; }' in aerodrome
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
-    # przycisk: OVERVIEW (0) albo strona lotniska wieży; HOME importuje tylko api.js (test powłoki wczytuje go w Node)
-    assert 'navigate("aerodrome", sessionTarget(current()).arg)' in home
+    assert "homeChoice(choice, { net, shared: choiceGet(POS_KEY), list })" in home
+    # bez localStorage wprost: inaczej tryb prywatny i drugie okno PolIDS znowu zmieniałyby wybór
+    for src in (overview, home):
+        assert "lsGet(POS_KEY)" not in src and "lsSet(POS_KEY" not in src
+    # przycisk: OVERVIEW (0) albo strona lotniska wieży, zapis dopiero z wczytaną listą (inaczej pusty wybór kasowałby
+    # zapisany); HOME importuje tylko api.js (test powłoki wczytuje go w Node)
+    assert re.search(r'if \(listLoaded\) save\(\);\s*navigate\("aerodrome", sessionTarget\(current\(\)\)\.arg\);', home)
     assert re.findall(r'^import .* from "([^"]+)";$', home, re.M) == ["../api.js"]
     # stopka: sama wersja i AIRAC
     assert "[ctx.config?.version, airacText(ctx.config?.airac)]" in home

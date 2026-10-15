@@ -1,4 +1,4 @@
-import { api, esc, h, lsGet, lsSet, navigate, ONLINE_EVENT } from "../api.js";
+import { api, choiceGet, choiceSet, esc, h, navigate, ONLINE_EVENT } from "../api.js";
 
 // HOME ("?" w menu, strona startowa): powitanie zalogowanego kontrolera (imię i nazwisko z CID z /auth/me) z ratingiem,
 // jego połączenie i rezerwacje w VATSIM (/api/vatsim/me), wybór stanowiska jak w AERODROME › OVERVIEW i przycisk
@@ -108,6 +108,28 @@ export function initialPosition({ online = [], bookings = [], stored = "", list 
   return { callsign: "", source: null };
 }
 
+// stanowisko w polu HOME po pokazaniu HOME, wczytaniu listy i każdej odpowiedzi VATSIM (czysta funkcja, testy w Node).
+// state: {seen, picked, appliedOnline}: wybór wspólny z OVERVIEW (choiceGet), jaki HOME ostatnio widział, czy wybrano
+// ręcznie (tu albo w OVERVIEW) i stanowisko z sieci już ustawione; net: odpowiedź /api/vatsim/me (null: jeszcze nie ma
+// albo tryb lokalny); shared: wspólny wybór teraz. Zwraca nowy stan i `choose`: stanowisko do ustawienia albo null.
+//  - wybór zmieniony w międzyczasie w OVERVIEW tego okna: ten wybór (jak ręczny);
+//  - zalogowany w sieci na stanowisku z listy: to stanowisko, ale raz na zalogowanie, potem wybór ręczny zostaje;
+//  - bez wyboru ręcznego: zapisany > rezerwacja > cały FIR (initialPosition);
+//  - awaria data feed (online_error, także brak odpowiedzi PolIDS) to nie wylogowanie: nic się nie zmienia, a po powrocie
+//    feedu kontroler dalej zalogowany na tym samym stanowisku nie dostaje go drugi raz w miejsce wyboru ręcznego.
+export function homeChoice({ seen = "", picked = false, appliedOnline = "" } = {},
+                           { net = null, shared = seen, list = [] } = {}) {
+  if (shared !== seen) return { seen: shared, picked: true, appliedOnline, choose: shared };
+  const known = Boolean(net) && !net.online_error;   // wiadomo, czy jest teraz w sieci
+  const start = initialPosition({ online: known ? net.online || [] : [], bookings: net?.bookings || [], stored: seen, list });
+  if (start.source === "online" && start.callsign !== appliedOnline) {
+    return { seen, picked: true, appliedOnline: start.callsign, choose: start.callsign };   // po wylogowaniu zostaje
+  }
+  // nie ma go w sieci: następne zalogowanie (także na to samo stanowisko) znowu je ustawi
+  const applied = start.source === "online" || !known ? appliedOnline : "";
+  return { seen, picked, appliedOnline: applied, choose: picked ? null : start.callsign };
+}
+
 // dokąd prowadzi przycisk: wieża (goto = ICAO) od razu do AERODROME lotniska, jak wybór TWR w OVERVIEW; reszta do OVERVIEW
 export function sessionTarget(p) {
   return p?.goto ? { arg: p.goto, label: `PRZYGOTUJ SESJĘ → AERODROME ${p.goto}` }
@@ -140,9 +162,9 @@ export default {
     let listLoaded = false;
     let net = null;           // ostatnia odpowiedź /api/vatsim/me
     let netAt = 0;
-    let picked = false;       // wybór ręczny (tu albo w OVERVIEW): odświeżenie VATSIM go nie zmienia
-    let appliedOnline = "";   // stanowisko z sieci już ustawione (drugi raz tylko po nowym zalogowaniu)
-    let seenStored = lsGet(POS_KEY) || "";   // zapisane stanowisko, jakie HOME ostatnio widział
+    // stan wyboru (homeChoice): wspólny wybór, jaki HOME ostatnio widział (z pamięci okna: działa bez localStorage,
+    // a drugie okno PolIDS go nie zmienia), wybór ręczny i stanowisko z sieci już ustawione
+    let choice = { seen: choiceGet(POS_KEY), picked: false, appliedOnline: "" };
 
     const current = () => list.find((p) => p.callsign === sel.value) || null;
     const drawChoice = () => {
@@ -172,17 +194,12 @@ export default {
       body.innerHTML = lines.join("");
     };
 
-    // stanowisko na start i po nowym zalogowaniu w sieci; wyboru ręcznego odświeżenie nie zmienia
+    // stanowisko na start, po zmianie w OVERVIEW i po nowym zalogowaniu w sieci; wyboru ręcznego odświeżenie nie zmienia
     const decide = () => {
       if (!listLoaded) return;
-      const start = initialPosition({ online: net?.online || [], bookings: net?.bookings || [], stored: seenStored, list });
-      if (start.source !== "online") appliedOnline = "";
-      if (start.source === "online" && start.callsign !== appliedOnline) {
-        appliedOnline = start.callsign;
-        picked = true;        // po wylogowaniu z sieci stanowisko zostaje
-        choose(start.callsign);
-      } else if (!picked) choose(start.callsign);
-      else drawChoice();
+      const { choose: cs, ...next } = homeChoice(choice, { net, shared: choiceGet(POS_KEY), list });
+      choice = next;
+      if (cs !== null) choose(cs); else drawChoice();
     };
 
     const loadList = async () => {
@@ -207,15 +224,18 @@ export default {
       try { net = await api("/api/vatsim/me"); } catch (e) { net = { online: [], bookings: [], error: e.message, online_error: e.message, bookings_error: e.message }; }
       drawNet();
     };
-    const save = () => { seenStored = sel.value; lsSet(POS_KEY, sel.value); };
+    // OVERVIEW tego okna dostaje wybór z pamięci okna (choiceGet), następne otwarcie strony z localStorage
+    const save = () => { choice = { ...choice, seen: sel.value }; choiceSet(POS_KEY, sel.value); };
 
     sel.addEventListener("change", () => {
-      picked = true;
+      choice = { ...choice, picked: true };
       save();
       drawChoice();
     });
     $(".home-go").addEventListener("click", () => {
-      save();                 // także wybór automatyczny (z sieci albo z rezerwacji): OVERVIEW otworzy to samo
+      // także wybór automatyczny (z sieci albo z rezerwacji): OVERVIEW otworzy to samo; przed wczytaniem listy pole jest
+      // puste, więc nic nie zapisujemy (OVERVIEW zostaje przy wyborze sprzed chwili)
+      if (listLoaded) save();
       navigate("aerodrome", sessionTarget(current()).arg);
     });
 
@@ -224,23 +244,20 @@ export default {
       if (user && root.classList.contains("active") && !document.hidden) loadNet().then(decide);
     }, REFRESH_MS);
 
+    // wybór w polu zaraz po wczytaniu listy (zapisany albo cały FIR), nie dopiero po odpowiedzi VATSIM; potem z siecią
+    const loadAll = () => Promise.all([loadList().then(decide), loadNet()]).then(decide);
     // łańcuch: kolejne pokazanie HOME czeka na poprzednie wczytanie (błąd jednego nie blokuje następnych)
-    let ready = Promise.all([loadList(), loadNet()]).then(decide).catch((e) => console.error(e));
+    let ready = loadAll().catch((e) => console.error(e));
     // serwer wrócił (lista stanowisk się nie wczytała): od razu, nie dopiero przy następnym pokazaniu HOME
     window.addEventListener(ONLINE_EVENT, () => {
-      if (!listLoaded) ready = ready.then(() => Promise.all([loadList(), loadNet()]).then(decide)).catch((e) => console.error(e));
+      if (!listLoaded) ready = ready.then(loadAll).catch((e) => console.error(e));
     });
     return {
       // każde pokazanie HOME: stanowisko zmienione w międzyczasie w OVERVIEW i świeży stan VATSIM (najwyżej co 30 s)
       activate() {
         ready = ready.then(() => {
-          if (!listLoaded) return Promise.all([loadList(), loadNet()]).then(decide);
-          const stored = lsGet(POS_KEY) || "";
-          if (stored !== seenStored) {
-            seenStored = stored;
-            picked = true;
-            choose(stored);
-          }
+          if (!listLoaded) return loadAll();
+          decide();
           return user && Date.now() - netAt > 30000 ? loadNet().then(decide) : undefined;
         }).catch((e) => console.error(e));
       },
