@@ -1,5 +1,6 @@
 """METEO (runda 10): SAT PL i SAT EUR (Windy z własnym środkiem i zoomem), TURB (8 klatek IMGW co 3 h, odtwarzacz)
-i SIGWX (mapa IMGW odświeżana co 15 min). Obrazy IMGW wczytuje przeglądarka użytkownika, nie serwer PolIDS."""
+i SIGWX (mapa IMGW odświeżana co 15 min). Obrazy IMGW wczytuje przeglądarka użytkownika, nie serwer PolIDS.
+0.12.3 (issue #13): kolejność podzakładek, GAMET (rejony A1–A5 i ALL), ICING (Windy z poziomem), SUN."""
 import json
 import re
 import shutil
@@ -28,6 +29,29 @@ console.log(JSON.stringify({
   frames: m.turbFrames(),
   steps: m.TURB_STEPS, ms: m.TURB_MS, refresh: P, sigwx: m.SIGWX_URL,
   windy: Object.fromEntries(Object.entries(m.WINDY_VIEWS).map(([k, v]) => [k, m.windyEmbedUrl(v)])),
+  icing: m.ICING_LEVELS.map(([l, fl]) => [fl, m.windyEmbedUrl({ ...m.WINDY_VIEWS.icing, level: l })]),
+  icingLevel: [m.icingLevel("300h"), m.icingLevel("surface"), m.icingLevel(null)],
+  gamet: {
+    area: [m.gametArea("A3"), m.gametArea("ALL"), m.gametArea("A9"), m.gametArea(null)],
+    shown: [m.gametShown({ A2: {}, A1: {}, A5: {} }, "ALL"), m.gametShown({ A1: {} }, "A4"), m.gametShown(null, "ALL")],
+    valid: [m.gametValidTxt({ valid: "150400/151000", valid_from: "2026-10-15T04:00Z", valid_to: "2026-10-15T10:00Z" }),
+            m.gametValidTxt({ valid: "152200/160400", valid_from: "2026-10-15T22:00Z", valid_to: "2026-10-16T04:00Z" }),
+            m.gametValidTxt({ valid: "150400/151000" }), m.gametValidTxt(null)],
+    expired: [m.gametExpired({ valid_to: "2026-10-12T12:00Z" }, T), m.gametExpired({ valid_to: "2026-10-12T16:00Z" }, T),
+              m.gametExpired({}, T)],
+    urls: [m.GAMET_MAP_URL, m.GAMET_PAGE, m.GAMET_REFRESH],
+  },
+  sun: {
+    icao: [m.sunIcao(" epwa "), m.sunIcao("EP/A"), m.sunIcao("LONGER"), m.sunIcao(null)],
+    cell: [m.sunCell("2026-10-15T05:00:52Z", "2026-10-15"), m.sunCell("2026-10-14T20:46:51Z", "2026-10-15"),
+           m.sunCell("2026-10-15T05:00:52Z", "2026-10-15", { hm: "07:01", tz: "CEST" }), m.sunCell(null, "2026-10-15"),
+           m.sunCell("2026-10-15T23:59:40Z", "2026-10-15")],
+    dur: [m.durTxt(641), m.durTxt(1440), m.durTxt(0), m.durTxt(45), m.durTxt(null)],
+    until: [m.untilTxt(30000), m.untilTxt(12 * 60000 + 59000), m.untilTxt(3 * 3600000 + 12 * 60000)],
+    polar: [m.polarTxt({ polar: "day" }), m.polarTxt({ polar: "night", civil_polar: "night" }),
+            m.polarTxt({ polar: "night" }), m.polarTxt({ civil_polar: "day" }), m.polarTxt({})],
+    ms: [m.SUN_TICK, m.SUN_REFRESH],
+  },
   stamp: [m.stamp(T, P), m.stamp(T + 7 * 60000, P), m.stamp(T + 8 * 60000, P), m.stamp(T, 1000)],
   bust: [m.bust(m.SIGWX_URL, "20261012121500"), m.bust("https://x/y?a=1", "1")],
   next: [m.nextFrame(st("oooooooo"), 7), m.nextFrame(st("oeeooooo"), 0), m.nextFrame(st("oooooooe"), 6),
@@ -51,7 +75,8 @@ def js(tmp_path_factory):
         pytest.skip("brak Node.js")
     d = tmp_path_factory.mktemp("meteo")
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
-    (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"'), "utf-8")
+    (d / "solar.mjs").write_text((FRONTEND / "js" / "solar.js").read_text("utf-8"), "utf-8")
+    (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"').replace('"../solar.js"', '"./solar.mjs"'), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "meteo.mjs").as_uri()], capture_output=True, text=True, timeout=60)
@@ -60,12 +85,17 @@ def js(tmp_path_factory):
 
 
 def test_submenu_order():
-    """Dotychczasowe podzakładki bez zmian, potem SAT PL, SAT EUR, TURB, SIGWX."""
+    """Kolejność z issue #13: METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN; METAR i TAF jak dotąd
+    (PL, MIL, INTL), WIND i RADAR (spoza listy w issue) po odstępie na końcu."""
     mount = METEO[METEO.index("export default {"):]
     items = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', mount)
     assert items == [("metar-pl", "METAR PL"), ("metar-mil", "METAR MIL"), ("metar-intl", "METAR INTL"), ("taf-pl", "TAF PL"),
-                     ("taf-intl", "TAF INTL"), ("qnh", "QNH"), ("wind", "WIND"), ("radar", "RADAR"), ("sat-pl", "SAT PL"),
-                     ("sat-eur", "SAT EUR"), ("turb", "TURB"), ("sigwx", "SIGWX")]
+                     ("taf-intl", "TAF INTL"), ("gamet", "GAMET"), ("sigwx", "SIGWX"), ("icing", "ICING"), ("qnh", "QNH"),
+                     ("sat-eur", "SAT EUR"), ("sat-pl", "SAT PL"), ("turb", "TURB"), ("sun", "SUN"), ("wind", "WIND"),
+                     ("radar", "RADAR")]
+    # odstępy: po grupie METAR/TAF i przed WIND/RADAR
+    seq = [i or "|" for i, _ in re.findall(r'\{ (?:id: "([^"]+)"|(sep): true)', mount)]
+    assert seq.index("|") == 5 and seq[-3:] == ["|", "wind", "radar"] and seq.count("|") == 2
     # id podzakładek są częścią adresu "#meteo/<id>": bez "/"
     assert all("/" not in i for i, _ in items)
 
@@ -75,8 +105,57 @@ def test_windy_views(js):
     assert w["radar"] == RADAR_URL
     assert "overlay=satellite" in w["sat-pl"] and "lat=52.0&lon=19.0&" in w["sat-pl"] and "&zoom=6&" in w["sat-pl"]
     assert "overlay=satellite" in w["sat-eur"] and "lat=50.0&lon=12.0&" in w["sat-eur"] and "&zoom=4&" in w["sat-eur"]
+    # SAT PL i SAT EUR bez zmian poza środkiem i zoomem (ten sam szablon co RADAR, przy ziemi)
+    assert w["sat-pl"] == RADAR_URL.replace("lon=19.3", "lon=19.0").replace("overlay=radar", "overlay=satellite")
     for url in w.values():
         assert url.startswith("https://embed.windy.com/embed2.html?") and "metricWind=kt" in url
+
+
+def test_icing_levels(js):
+    """ICING: warstwa Windy "icing" na poziomie ciśnienia, przyciski w FL (ISA), domyślnie 700 hPa ≈ FL100."""
+    assert [fl for fl, _ in js["icing"]] == ["FL050", "FL100", "FL140", "FL180", "FL240", "FL300"]
+    levels = ["850h", "700h", "600h", "500h", "400h", "300h"]
+    for (fl, url), lvl in zip(js["icing"], levels):
+        assert url == (RADAR_URL.replace("lon=19.3", "lon=19.0").replace("level=surface", f"level={lvl}")
+                       .replace("overlay=radar", "overlay=icing")), fl
+    assert "&level=700h&overlay=icing&" in js["windy"]["icing"]
+    assert js["icingLevel"] == ["300h", "700h", "700h"]
+    assert 'lsGet("meteo.icing.level")' in METEO and "frameGo(frame, windyEmbedUrl(" in METEO
+
+
+def test_gamet_helpers(js):
+    g = js["gamet"]
+    # wybór rejonu zapamiętany w localStorage; nieznany = ALL (wszystkie rejony jeden pod drugim)
+    assert g["area"] == ["A3", "ALL", "ALL", "ALL"] and 'lsGet("meteo.gamet.area")' in METEO
+    assert g["shown"] == [["A1", "A2", "A5"], ["A4"], []]
+    assert g["valid"] == ["15.10 04:00–10:00Z", "15.10 22:00 – 16.10 04:00Z", "150400/151000", ""]
+    assert g["expired"] == [True, False, False]
+    assert g["urls"] == ["https://awiacja.imgw.pl/assets/img/gamet-map.webp",
+                         "https://awiacja.imgw.pl/prognozy-lotnicze/gamet", 600000]
+    # przyciski A1–A5 i ALL, tekst z backendu w <pre>, odnośnik do strony IMGW przy błędzie
+    view = METEO[METEO.index("function gametTab("):METEO.index("// --- ICING")]
+    assert '[...GAMET_AREAS, "ALL"]' in view and "<pre>${esc(a.text)}</pre>" in view and 'api("/api/meteo/gamet")' in view
+    assert "awiacja.imgw.pl › GAMET ↗" in view and "imgEl(" in view and "clearInterval(timer)" in view
+    assert re.search(r"offsetParent\s*!==\s*null", view)
+
+
+def test_sun_helpers(js):
+    s = js["sun"]
+    assert s["icao"] == ["EPWA", "", "", ""]
+    # godzina zaokrąglona do minuty; data, gdy zdarzenie wypada innego dnia UTC niż kolumna; czas polski pod spodem
+    assert s["cell"][0] == "05:01Z"
+    assert s["cell"][1] == '20:47Z <small class="d">14.10</small>'
+    assert s["cell"][2] == '05:01Z<small class="loc">07:01 CEST</small>'
+    assert s["cell"][3] == "–" and s["cell"][4] == '00:00Z <small class="d">16.10</small>'
+    assert s["dur"] == ["10 h 41 min", "24 h", "0 min", "45 min", "–"]
+    assert s["until"] == ["za chwilę", "za 12 min", "za 3 h 12 min"]
+    assert s["polar"][0].startswith("dzień polarny") and s["polar"][1].startswith("noc polarna")
+    assert s["polar"][3].startswith("białe noce") and s["polar"][4] == ""
+    assert s["ms"] == [60000, 600000]
+    view = METEO[METEO.index("function sunTab("):METEO.index("export default {")]
+    assert 'lsGet("meteo.sun.icao")' in view and '"EPWA"' in view and "BASEMAPS.dark(L, ctx?.config?.carto_api_key)" in view
+    assert "/api/meteo/sun?" in view and "map.remove()" in view and "ro.disconnect()" in view
+    assert re.search(r"offsetParent\s*!==\s*null", view)
 
 
 def test_turb_frames(js):
@@ -113,7 +192,13 @@ def test_images_loaded_by_browser():
     # wszystkie <img> klatek (także te wczytywane w tle przy odświeżaniu) powstają w jednym miejscu, bez Referer
     assert re.search(r"referrerPolicy\s*=\s*[\"']no-referrer[\"']", METEO)
     assert len(re.findall(r"createElement\([\"']img[\"']\)", METEO)) == 1
-    assert "aviation-api" not in "".join(p.read_text("utf-8").lower() for p in (ROOT_DIR / "backend" / "app").rglob("*.py"))
+    # obrazy nie przez serwer PolIDS: aviation-api.imgw.pl zna tylko services/gamet.py (tekst GAMET w JSON, bez obrazów)
+    app = ROOT_DIR / "backend" / "app"
+    assert "aviation-api" not in "".join(p.read_text("utf-8").lower() for p in app.rglob("*.py") if p.name != "gamet.py")
+    gamet = (app / "services" / "gamet.py").read_text("utf-8")
+    urls = re.findall(r"https://aviation-api\.imgw\.pl[^\"\s]*", gamet)
+    assert urls and all(u.startswith("https://aviation-api.imgw.pl/data/last") for u in urls)
+    assert "/image" not in gamet and "webp" not in gamet.lower()
     assert not re.search(r"api\([^)]*imgw", METEO, re.I)
     # błąd klatki: odnośnik do obrazu w nowej karcie; obraz dopasowany do okna
     assert re.search(r"otwórz w nowej karcie", METEO) and 'rel="noopener noreferrer"' in METEO
