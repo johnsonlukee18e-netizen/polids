@@ -17,15 +17,16 @@ router = APIRouter(prefix="/api", tags=["system"])
 
 
 @router.get("/config")
-def config():
-    # cykl AIRAC i adresy eAIP z daty UTC przy każdym zapytaniu: nowy cykl bez restartu serwera
+async def config():
+    # cykl AIRAC i adresy eAIP z daty UTC przy każdym zapytaniu: nowy cykl bez restartu serwera; katalog poprawki
+    # sprawdzony u PAŻP (cykl bez poprawki → poprzednia), wynik w pamięci na cykl
     today = eaip.utc_today()
     return {
         "name": settings.name, "tagline": settings.tagline, "version": VERSION, "auth_mode": settings.auth_mode,
         "airac": current_airac(today),
         "default_aerodrome": settings.default_aerodrome,
         "links": {
-            **eaip.aip_links(today),
+            **await eaip.resolved_links(today),
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
             "phraseology": settings.phraseology_url, "performance_db": settings.performance_db_url,
         },
@@ -44,8 +45,9 @@ async def embed_check(link: str):
     """Czy strona z linków aplikacji pozwala wyświetlić się w ramce (X-Frame-Options / CSP frame-ancestors)."""
     if link not in EMBED_LINKS:
         raise HTTPException(404, f"Nieznany link: {link}")
-    # eAIP: ten sam adres co w /api/config (z .env albo z bieżącego cyklu AIRAC)
-    return await embed.check(eaip.aip_url(link) if link in eaip.PACKAGES else getattr(settings, EMBED_LINKS[link]))
+    # eAIP: ten sam adres co w /api/config (z .env albo sprawdzona poprawka bieżącego cyklu AIRAC)
+    url = await eaip.resolved_url(link) if link in eaip.PACKAGES else getattr(settings, EMBED_LINKS[link])
+    return await embed.check(url)
 
 
 @router.get("/emergency")

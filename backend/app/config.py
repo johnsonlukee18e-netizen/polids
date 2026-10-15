@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     notam_suffix: str = "&read=true"
 
     # Zewnętrzne strony osadzane w zakładkach. eAIP PAŻP: puste = katalog poprawki bieżącego cyklu AIRAC, liczony przy
-    # każdym zapytaniu (services/eaip.py, np. eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html); wpisany adres
-    # wygrywa bez zmian (np. gdy PAŻP zmieni nazwy katalogów)
+    # każdym zapytaniu (services/eaip.py, np. eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html) i sprawdzony
+    # na serwerze PAŻP (cykl bez poprawki → poprzednia); wpisany adres wygrywa bez zmian (np. gdy PAŻP zmieni nazwy)
     aip_ifr_url: str = ""
     aip_vfr_url: str = ""
     aip_mil_url: str = ""

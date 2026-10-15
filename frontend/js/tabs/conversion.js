@@ -146,14 +146,16 @@ export function plToUtc(day, time) {
 export const nowUtc = (now = new Date()) => ({ date: now.toISOString().slice(0, 10), time: `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}` });
 
 // --- Widok
-const row = (u, name = "", ph = "") => `<label class="conv-row">${name ? `<span class="conv-name">${esc(name)}</span>` : ""}
+// name: etykieta przed polem; "" = wiersz bez kolumny etykiet, null = pusta kolumna etykiet (pola w jednej linii
+// z wierszami z etykietą w tej samej karcie)
+const row = (u, name = "", ph = "") => `<label class="conv-row">${name !== "" ? `<span class="conv-name">${esc(name ?? "")}</span>` : ""}
   <input class="field" data-u="${esc(u.id)}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"${ph ? ` placeholder="${esc(ph)}"` : ""}>
   <span class="conv-unit">${esc(u.label)}</span></label>`;
 const card = (key, title, body, note) => `<section class="card conv-card" data-k="${key}"><h3>${esc(title)}</h3>
   <div class="conv-rows">${body}</div><div class="conv-out"></div><p class="conv-note">${note}</p></section>`;
 const U = (id, label) => ({ id, label });
 
-const CARDS = [
+export const CARDS = [
   card("pressure", "Ciśnienie", GROUPS.pressure.map((u) => row(u)).join(""), "1 inHg = 33.8639 hPa · 1 mmHg = 1.333224 hPa"),
   card("height", "Wysokość", GROUPS.height.map((u) => row(u)).join(""),
     "1 ft = 0.3048 m · FL = ft / 100 (wysokość ciśnieniowa przy 1013.25 hPa)"),
@@ -169,7 +171,7 @@ const CARDS = [
     + " CAS z ciśnienia dynamicznego (przepływ ściśliwy, M &lt; 1). Bez odchyłki od ISA i bez wiatru."),
   card("vs", "Prędkość pionowa", GROUPS.vs.map((u) => row(u)).join(""), "1 ft/min = 0.00508 m/s · 1000 ft/min ≈ 5.08 m/s"),
   card("gradient", "Gradient wznoszenia / zniżania",
-    GROUPS.gradient.map((u) => row(u)).join("") + row(U("gs", "kt"), "GS") + row(U("fpm", "ft/min"), "VS"),
+    GROUPS.gradient.map((u, i) => row(u, i ? null : "Grad")).join("") + row(U("gs", "kt"), "GS") + row(U("fpm", "ft/min"), "VS"),
     "ft/NM = % × 60.76 · kąt = atan(% / 100) · ft/min = ft/NM × GS / 60 (3° ≈ 5.24 % ≈ 318 ft/NM ≈ 5.3 × GS)"),
   card("temperature", "Temperatura", GROUPS.temperature.map((u) => row(u)).join(""), "°F = °C × 9/5 + 32 · K = °C + 273.15"),
   card("mass", "Masa", GROUPS.mass.map((u) => row(u)).join(""), "1 lb = 0.45359237 kg · 1 t = 1000 kg"),
@@ -196,7 +198,7 @@ function fields(el) {
 }
 
 // zwykła grupa jednostek: wpis w jednym polu przelicza pozostałe; puste pole czyści kartę
-function linkGroup(el, units, after = () => {}) {
+export function linkGroup(el, units, after = () => {}) {
   const { val, put } = fields(el);
   el.addEventListener("input", (e) => {
     const id = e.target.dataset.u;
@@ -209,16 +211,16 @@ function linkGroup(el, units, after = () => {}) {
   });
 }
 
-function linkQnh(el) {
+export function linkQnh(el) {
   const { f, val, put, ok, out } = fields(el);
   let src = "fl";   // ostatnio wpisane: ALT albo FL; zmiana QNH przelicza drugie z nich
   const update = () => {
     const q = val("qnh");
-    const bad = ok(q) && (q < 850 || q > 1100);
+    const bad = Number.isNaN(q) || (ok(q) && (q < 850 || q > 1100));
     f("qnh").classList.toggle("bad", bad);
     if (!ok(q) || bad) {
       put(src === "alt" ? "fl" : "alt", null);
-      out.textContent = q === null ? "Wpisz QNH." : "QNH poza zakresem 850–1100 hPa.";
+      out.textContent = q === null ? "Wpisz QNH." : Number.isNaN(q) ? "Zła wartość QNH." : "QNH poza zakresem 850–1100 hPa.";
       return;
     }
     const lvl = qnhLevelFt(q);
@@ -238,7 +240,7 @@ function linkQnh(el) {
   update();
 }
 
-function linkMach(el) {
+export function linkMach(el) {
   const { val, put, ok, out } = fields(el);
   let src = "mach";   // ostatnio wpisana prędkość; zmiana FL przelicza pozostałe z niej
   const update = () => {
@@ -267,23 +269,22 @@ function linkMach(el) {
 }
 
 // gradient (%, ft/NM, °) i VS przy danej GS: wpisany gradient liczy VS, wpisana VS liczy gradient; zmiana GS
-// przelicza to z nich, które nie było wpisane ostatnio
-function linkGradient(el) {
+// przelicza to z nich, które nie było wpisane ostatnio. Bez poprawnej GS (VS: GS > 0) wynik znika, a nie zostaje
+// policzony z poprzedniej GS
+export function linkGradient(el) {
   const { val, put, ok } = fields(el);
   const units = GROUPS.gradient;
   let src = "grad";
   const update = () => {
     const gs = val("gs");
-    if (Number.isNaN(gs)) return;
     if (src === "grad") {
       const p = val("pct");
-      if (!Number.isNaN(p)) put("fpm", ok(p) && ok(gs) ? fpmOf(p, gs) : null, 0);
+      put("fpm", ok(p) && ok(gs) ? fpmOf(p, gs) : null, 0);
       return;
     }
     const fpm = val("fpm");
-    if (!ok(fpm) || !ok(gs) || gs <= 0) return;
-    const all = convert(units, "pct", pctOf(fpm, gs));
-    units.forEach((u) => put(u.id, all[u.id], u.dp));
+    const all = ok(fpm) && ok(gs) && gs > 0 ? convert(units, "pct", pctOf(fpm, gs)) : null;
+    units.forEach((u) => put(u.id, all ? all[u.id] : null, u.dp));
   };
   linkGroup(el, units, () => { src = "grad"; update(); });
   el.addEventListener("input", (e) => {
@@ -293,7 +294,7 @@ function linkGradient(el) {
   });
 }
 
-function linkTime(el) {
+export function linkTime(el) {
   const { f, out } = fields(el);
   // pod polami strefa czasu w Polsce w tej chwili i ewentualna uwaga o zmianie czasu
   const show = (r, from) => {
