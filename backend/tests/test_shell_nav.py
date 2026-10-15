@@ -59,7 +59,7 @@ def test_docs_moved_to_other():
             'phraseology: () => ["other", "phraseology"] };') in APP
     assert "if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);" in APP
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
-    assert 'import { mountDocs } from "../docs.js";' in other and "soon(" not in other
+    assert 'import { isCoordFile, mountDocs } from "../docs.js";' in other and "soon(" not in other
     subs = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', other)
     assert subs == [("docs", "DOCS"), ("phraseology", "PHRASEOLOGY")]
     assert 'remember("other", argOf())' in other and "activate(arg)" in other and "SUBS" not in other
@@ -67,6 +67,10 @@ def test_docs_moved_to_other():
     assert "export function mountDocs(" in docs and "remember(" not in docs and "frameGo(" in docs
     # plik spoza listy (wpisany ręcznie, stary odnośnik) = pierwszy dokument, nigdy pusty podgląd
     assert "docs.find((x) => argOf(x.url) === arg) || docs[0];" in docs
+    # 0.12.3: stary adres z plikiem LOA/LOP (#docs/LOA/<plik>, #other/docs/LOA/<plik>) otwiera COORDINATION › DOKUMENTY,
+    # a przekierowanie z activate() dziedziczy krok historii (Wstecz nie wraca na przekierowanie)
+    assert 'if (isCoordFile(f)) return navigate("coordination", "docs/" + f);' in other
+    assert "if (activating) push = activating.push;" in APP and "const me = { tab, push };" in APP
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     # 0.12.3: LOA z panelu RADIO otwiera się w COORDINATION › DOKUMENTY (OTHER › DOCS pokazuje pozostałe dokumenty)
     assert 'navigate("coordination", "docs/" + doc.dataset.coord)' in radio and 'navigate("docs"' not in radio

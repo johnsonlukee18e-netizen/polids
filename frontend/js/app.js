@@ -63,12 +63,15 @@ function write(tab, arg, push) {
 // arg: undefined = przycisk menu (zakładka zostaje w swoim stanie), napis = stan z adresu ("" = domyślny).
 // Zakładka z activate(arg) sama czyta arg; bez activate() arg to ścieżka podzakładek (subtabs w api.js).
 function open(tab, arg, push = false) {
+  // activate() innej zakładki od razu przenosi tutaj (stary adres, np. LOA z OTHER do COORDINATION): krok historii jak
+  // tamto otwarcie; Wstecz/Dalej i wpisany adres podmieniają wpis, inaczej Wstecz wracałby na przekierowanie
+  if (activating) push = activating.push;
   if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);   // adres zapisuje już nowa zakładka (bez martwego ekranu)
   if (!TABS[tab]) { tab = "home"; arg = undefined; }
   document.querySelectorAll("#tabs button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   views.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   current = tab;
-  const me = { tab };
+  const me = { tab, push };
   activating = me;
   try {
     if (!mounted[tab]) {

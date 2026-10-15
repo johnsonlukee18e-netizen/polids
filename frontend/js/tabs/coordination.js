@@ -1,7 +1,7 @@
-import { api, debounce, esc, frameGo, h, lsGet, lsSet, remember, subtabs, vatsimOnline } from "../api.js";
+import { api, debounce, esc, frameGo, h, lsGet, lsSet, remember, stash, stashed, subtabs, vatsimOnline } from "../api.js";
 import {
-  POS_KEY, agreementsArg, blockHtml, defaultPosition, docCardHtml, docFilter, docRef, docsArg, notesHtml, ownedKeys,
-  parseArg, positionOptions, shortCs, view,
+  POS_KEY, agreementsArg, blockHtml, defaultPosition, docCardHtml, docFilter, docFocus, docRef, docsArg, notesHtml, ownedKeys,
+  parseArg, positionOptions, shortCs, sumHtml, view,
 } from "../agreements.js";
 
 // COORDINATION (0.12.3): wszystkie LOA i LOP, jak „Agreements” w ATCISS (VATSIM Germany). Podmenu:
@@ -20,6 +20,7 @@ export default {
     const st = { pos: undefined, q: "", doc: "", off: lsSetOf(OFF_KEY), typesOff: lsSetOf(TYPES_KEY), dfir: "", dtype: "" };
     let data = null, err = "", online = new Set(), onInfo = {}, net = null;   // net: true/false = dane VATSIM są/nie ma
     let agr = null, docs = null, sub = null;
+    let wantTop = null;   // przewinięcie tabel z wpisu historii (← / Wstecz z DOKUMENTY), ustawiane po narysowaniu wierszy
     const argOf = (id = sub?.current()) => (id === "docs" ? docsArg(st.doc) : agreementsArg(st.pos, st.q));
     const freq = (cs) => onInfo[cs]?.frequency || data?.positions.find((p) => p.callsign === cs)?.frequency || "";
 
@@ -32,7 +33,7 @@ export default {
           <div class="ms-card"><h4>Punkty / filtr</h4>
             <input type="search" class="field cr-q" list="cr-cops" placeholder="np. ALUKA EPKS" autocomplete="off" spellcheck="false" aria-label="Punkty i filtr">
             <datalist id="cr-cops"></datalist>
-            <p class="hint">Słowa oddzielone spacją muszą pasować wszystkie (COP, lotnisko, sektor, FIR, FL, warunki). Pełna nazwa COP – te wiersze na górze.</p></div>
+            <p class="hint">Kilka pełnych nazw COP: którykolwiek z nich (ALUKA BODLA). Pozostałe słowa muszą pasować wszystkie (lotnisko, sektor, FIR, FL, warunki). Pełna nazwa COP – te wiersze na górze.</p></div>
           <div class="ms-card"><h4>Stanowisko</h4><select class="field cr-pos" aria-label="Stanowisko"><option value="">Wszystkie</option></select>
             <p class="hint cr-own"></p></div>
           <div class="ms-card"><h4>FIR</h4><div class="cr-tgs cr-firs"></div></div>
@@ -40,7 +41,7 @@ export default {
         </div></div>`);
       pane.append(el);
       const $ = (s) => el.querySelector(s);
-      const q = $(".cr-q"), pos = $(".cr-pos"), notes = $(".cr-notes");
+      const q = $(".cr-q"), pos = $(".cr-pos"), notes = $(".cr-notes"), main = $(".cr-main");
       notes.open = lsGet(NOTES_KEY) === "1";
       notes.addEventListener("toggle", () => lsSet(NOTES_KEY, notes.open ? "1" : "0"));
 
@@ -67,10 +68,7 @@ export default {
         const v = view(data, { pos: st.pos || "", q: st.q, off: st.off, typesOff: st.typesOff, online });
         const x = { online, pos: st.pos || "", toks: v.toks, freq };
         $(".cr-blocks").innerHTML = blockHtml("out", v.out, data, x) + blockHtml("in", v.in, data, x);
-        $(".cr-sum").innerHTML = `<b>${v.shown}</b> z ${v.total} przekazań`
-          + (st.pos ? ` · stanowisko <b>${esc(st.pos)}</b>` : " · wszystkie stanowiska")
-          + (v.toks.length ? ` · filtr <b>${esc(v.toks.join(" "))}</b>` : "")
-          + `<span class="hint"> · wyciąg z PDF (data/seed/loa.json), w razie wątpliwości obowiązuje PDF</span>`;
+        $(".cr-sum").innerHTML = sumHtml(v, { pos: st.pos || "", firs: data.firs, off: st.off, typesOff: st.typesOff });
         // kto obsługuje: sektory wybranego stanowiska przy obecnych zalogowanych
         const own = $(".cr-own");
         if (st.pos) {
@@ -83,6 +81,7 @@ export default {
         const firs = [...new Set([...v.out, ...v.in].map((r) => r.fir))];
         $(".cr-notes summary").textContent = `Zasady z LOA: przekazanie kontroli, VFR, inne${firs.length ? " – " + firs.join(", ") : ""}`;
         $(".cr-notes-b").innerHTML = notesHtml(data, firs) || `<p class="hint">Brak zasad dla wybranych FIR-ów.</p>`;
+        if (wantTop !== null) { main.scrollTop = wantTop; wantTop = null; }
       };
       const saveQ = debounce(() => remember("coordination", argOf(), { replace: true }), 400);
       q.addEventListener("input", () => { st.q = q.value; refresh(); saveQ(); });
@@ -108,7 +107,13 @@ export default {
         if (doc) openDoc(doc.dataset.doc);
       });
       refresh();
-      return { refresh, destroy() { if (agr?.el === el) agr = null; }, el };
+      // wyjście do DOKUMENTY (podmenu, znacznik dokumentu w wierszu): przewinięcie zostaje we wpisie historii tej tabeli,
+      // ← / Wstecz wraca do tego samego wiersza (stash poza activate(), więc nie trafi do wpisu, do którego wracamy)
+      const destroy = () => {
+        if (data) stash("coordination", { top: main.scrollTop });
+        if (agr?.el === el) agr = null;
+      };
+      return { refresh, destroy, el };
     }
 
     // --- DOKUMENTY
@@ -121,11 +126,13 @@ export default {
             <div class="cd-list"><p class="hint">Wczytywanie…</p></div></div>
           <p class="hint">Nazwy, tagi i AIRAC: <span class="mono">data/seed/coordination.json</span>; PDF-y w
             <span class="mono">data/docs/LOA</span> i <span class="mono">data/docs/LOP</span>.</p>
+          <div class="cd-errs" hidden></div>
         </div>
         <iframe class="embed viewer" style="background:#333" title="Dokument"></iframe>
       </div>`);
       pane.append(el);
       const list = el.querySelector(".cd-list"), fir = el.querySelector(".cd-fir"), type = el.querySelector(".cd-type");
+      const errs = el.querySelector(".cd-errs");
       let viewer = el.querySelector(".viewer");
       const show = (d) => {
         if (!d) return;
@@ -146,6 +153,9 @@ export default {
           list.innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Wczytywanie…</p>`;
           return;
         }
+        // uwagi do danych (PDF bez wpisu, nieznany sektor): dla tego, kto utrzymuje coordination.json
+        errs.hidden = !data.errors?.length;
+        errs.innerHTML = data.errors?.length ? `<h4>Do poprawienia w danych</h4><ul>${data.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : "";
         const firs = [...new Set(data.documents.flatMap((d) => d.firs))].sort();
         fir.innerHTML = `<option value="">Wszystkie FIR-y</option>` + firs.map((f) => `<option${f === st.dfir ? " selected" : ""}>${esc(f)}</option>`).join("");
         type.value = st.dtype;
@@ -184,14 +194,12 @@ export default {
       else docs?.pick(id);
       remember("coordination", argOf());
     }
+    // jednorazowe zawężenie bez zapisu w localStorage: po przeładowaniu wracają zapisane przełączniki FIR, a do tego
+    // czasu podsumowanie nad tabelami mówi, które FIR-y są ukryte
     function showAgreementsOf(id) {
       const d = docRef(data.documents, id);
       if (!d) return;
-      const mine = new Set(data.agreements.filter((r) => r.doc === d.id).map((r) => r.fir));
-      st.off = new Set(data.firs.filter((f) => !mine.has(f)));
-      st.typesOff.delete(d.type);
-      lsSet(OFF_KEY, JSON.stringify([...st.off]));
-      lsSet(TYPES_KEY, JSON.stringify([...st.typesOff]));
+      Object.assign(st, docFocus(data, d.id, { pos: st.pos || "", typesOff: st.typesOff, online }));
       st.doc = d.id;
       sub.show("agreements");
       remember("coordination", argOf());
@@ -230,6 +238,8 @@ export default {
           if (id === "agreements") {
             if (a.pos !== undefined) st.pos = data && a.pos && !data.positions.some((p) => p.callsign === a.pos) ? "" : a.pos;
             st.q = a.q || "";
+            const s = stashed("coordination");   // ← / Wstecz: przewinięcie tabel z tego wpisu
+            wantTop = Number.isFinite(s?.top) ? s.top : null;
           } else if (a.doc) st.doc = data ? docRef(data.documents, a.doc)?.id || a.doc : a.doc;
           if (sub.current() !== id) sub.show(id);
           else if (id === "docs" && a.doc) docs?.pick(st.doc);

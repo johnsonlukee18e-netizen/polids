@@ -1,10 +1,11 @@
-import { remember, subtabs } from "../api.js";
-import { mountDocs } from "../docs.js";
+import { navigate, remember, subtabs } from "../api.js";
+import { isCoordFile, mountDocs } from "../docs.js";
 import { mountPhraseology } from "../phraseology.js";
 
 // OTHER: podmenu jak w METEO: DOCS (PDF-y z data/docs/) i PHRASEOLOGY (do 0.12.2 osobna zakładka menu).
 // Adresy "#other/docs/<plik w data/docs>" (bez pliku: pierwszy dokument) i "#other/phraseology";
-// stare "#docs/<plik>" i "#phraseology" przekierowuje app.js.
+// stare "#docs/<plik>" i "#phraseology" przekierowuje app.js. LOA i LOP (do 0.12.2 w DOCS, np. z RADIO) otwiera
+// COORDINATION › DOKUMENTY: "#other/docs/LOA/<plik>" i "#docs/LOA/<plik>" → "#coordination/docs/LOA/<plik>".
 export default {
   mount(root, ctx) {
     let docs = null, file = "";   // file: dokument z adresu albo kliknięty na liście ("" = pierwszy)
@@ -24,7 +25,10 @@ export default {
           if (arg.split("/")[0] === "phraseology") {
             if (sub.current() !== "phraseology") sub.show("phraseology");
           } else {
-            file = arg.startsWith("docs/") ? arg.slice("docs/".length) : "";
+            const f = arg.startsWith("docs/") ? arg.slice("docs/".length) : "";
+            // przekierowanie w activate(): app.js zapisuje adres COORDINATION w tym samym kroku historii
+            if (isCoordFile(f)) return navigate("coordination", "docs/" + f);
+            file = f;
             if (sub.current() === "docs" && docs) docs.pick(file);
             else sub.show("docs");   // render otwiera DOCS od razu z tym plikiem
           }
