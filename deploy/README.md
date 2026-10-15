@@ -185,5 +185,8 @@ Test z zewnątrz: `curl -s https://polids.pl/healthz`.
 cd /opt/polids && sh deploy/update.sh
 ```
 
+Gdy `/healthz` nie odpowiada (wdrożenie kończy się „healthz nie odpowiada”), stan kontenera, log aplikacji, pamięć
+i dysk pokazuje `sh deploy/diagnose.sh`; workflow „Deploy (VPS)” uruchamia go sam po nieudanym `update.sh`.
+
 Lista dostępu (wolumen `polids_state`) i zdjęcia zostają między buildami. Rollback: `git checkout <commit>` i
 `docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d --build`.

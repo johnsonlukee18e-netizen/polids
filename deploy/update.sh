@@ -9,9 +9,10 @@ docker compose -f docker-compose.yml -f docker-compose.nginx.yml build --pull
 docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
 docker image prune -f >/dev/null
 
-for _ in $(seq 1 30); do
+# na VPS start po buildzie trwa nawet pół minuty: czekamy do 3 min
+for _ in $(seq 1 90); do
     if curl -fsS http://127.0.0.1:1337/healthz; then echo; exit 0; fi
     sleep 2
 done
-echo "healthz nie odpowiada - docker compose logs app" >&2
+echo "healthz nie odpowiada od 3 min - stan i log kontenera: sh deploy/diagnose.sh" >&2
 exit 1

@@ -24,3 +24,11 @@ jobs:
         run: |
           cd "$DEPLOY_PATH"
           sh deploy/update.sh
+      # po git pull w update.sh skrypt jest już w nowej wersji; log aplikacji bez IP i CID (log Actions jest publiczny)
+      - name: Diagnostyka, gdy aplikacja nie wstała
+        if: failure()
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/polids' }}
+        run: |
+          cd "$DEPLOY_PATH"
+          if [ -f deploy/diagnose.sh ]; then sh deploy/diagnose.sh; fi
