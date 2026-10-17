@@ -19,18 +19,22 @@ COPY data ./data
 # bez tego build się przerywa, a działający kontener zostaje
 RUN python -m backend.app.importers.sectors_geojson --check
 
-# baza budowana w obrazie, przy starcie kontenera nic się już nie importuje
+# baza budowana w obrazie, przy starcie kontenera nic się już nie importuje.
+# COPY zostawia prawa plików z checkoutu na serwerze: git pull z restrykcyjnym umask (np. 077) zapisuje zmienione pliki
+# jako 600 (w obrazie właściciel root), a aplikacja działa jako polids i nie może ich czytać (po 0.12.3 na VPS:
+# PermissionError: /app/backend/app/main.py)
 RUN useradd --system --uid 10001 --no-create-home --home-dir /app polids \
  && python -m backend.app.importers.seed \
  && mkdir -p /app/data/state \
- && chown -R polids:polids /app/data
+ && chown -R polids:polids /app/data \
+ && chmod -R a+rX /app/backend /app/frontend
 
 
 FROM base AS test
 COPY requirements-dev.txt .
 RUN pip install -r requirements-dev.txt
 # test_aip_data sprawdza skrypt aktualizacji airports.csv (reszta scripts/ nie trafia do obrazu, .dockerignore)
-COPY scripts/fetch_ourairports.py ./scripts/
+COPY --chmod=644 scripts/fetch_ourairports.py ./scripts/
 USER polids
 CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "backend/tests"]
 

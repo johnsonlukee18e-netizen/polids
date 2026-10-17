@@ -1,6 +1,7 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["17.10.2026", "0.12.4 – polids.pl znowu startuje: obraz Dockera nadaje plikom aplikacji prawo odczytu, więc zmienione pliki z serwera (zapisane bez odczytu dla innych) nie blokują już startu jak po wdrożeniu 0.12.3."],
   ["15.10.2026", "0.12.3 – według issue #13: nowe zakładki COORDINATION, CONVERSION i SQUAWK; PHRASEOLOGY przeniesione do OTHER jako podzakładka po DOCS (stary adres #phraseology przekierowuje). Ukryty przycisk ADMIN nie zajmuje już miejsca w menu."],
   ["15.10.2026", "HOME: rating zalogowanego kontrolera, stanowisko, na którym jest zalogowany w VATSIM, i jego rezerwacje na najbliższą dobę; wybór stanowiska wspólny z AERODROME › OVERVIEW i przycisk PRZYGOTUJ SESJĘ (OVERVIEW albo lotnisko dla TWR); na dole wersja i bieżący AIRAC z datami."],
   ["15.10.2026", "METEO: kolejność METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN (WIND i RADAR na końcu). GAMET IMGW dla rejonów A1–A5 albo wszystkich, z ważnością i mapą rejonów; ICING: oblodzenie z Windy na FL050–FL300; SUN: mapa dnia i nocy na Ziemi oraz wschód, zachód, górowanie, BMCT i EECT dla dowolnego lotniska albo punktu na mapie (UTC i czas polski). Godziny słońca liczone poprawnie także daleko od Greenwich."],
