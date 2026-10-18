@@ -16,7 +16,7 @@
   border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
 .wnd-bar label, .wnd-rwyl { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .wnd-rwyl[hidden] { display: none; }
-.wnd-aero { max-width: 250px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 3px; padding: 3px 6px; font: 12px var(--mono); outline: none; }
+.wnd-aero { max-width: 250px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 0; padding: 3px 6px; font: 12px var(--mono); outline: none; }
 .wnd-aero:focus { border-color: var(--green-hi); }
 .wnd-seg { display: inline-flex; border: 1px solid var(--line); }
 .wnd-seg button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 12px; cursor: pointer;

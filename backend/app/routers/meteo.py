@@ -29,20 +29,20 @@ def _ids(ids: str) -> list[str]:
     # idą dalej w URL do metar.vatsim.net / AWC, więc tylko litery i cyfry
     out = list(dict.fromkeys(i.strip().upper() for i in ids.replace(" ", ",").split(",") if i.strip()))
     if not out or len(out) > 50:
-        raise HTTPException(400, "Podaj od 1 do 50 kodów ICAO")
+        raise HTTPException(400, "Enter 1 to 50 ICAO codes")
     bad = [i for i in out if not re.fullmatch(r"[A-Z0-9]{3,4}", i)]
     if bad:
-        raise HTTPException(400, f"Niepoprawny kod ICAO: {bad[0][:10]}")
+        raise HTTPException(400, f"Invalid ICAO code: {bad[0][:10]}")
     return out
 
 
 @router.get("/metar")
-async def metar(ids: str = Query(..., description="Kody ICAO rozdzielone przecinkami")):
+async def metar(ids: str = Query(..., description="Comma-separated ICAO codes")):
     icaos = _ids(ids)
     try:
         raw = await get_metars(icaos)
     except UpstreamError as exc:
-        raise HTTPException(502, f"Źródło METAR niedostępne: {exc}") from exc
+        raise HTTPException(502, f"METAR source unavailable: {exc}") from exc
     return [{"icao": i, "raw": raw.get(i), "parsed": parse_metar(raw[i]).to_dict() if raw.get(i) else None}
             for i in icaos]
 
@@ -53,7 +53,7 @@ async def taf(ids: str = Query(...)):
     try:
         raw = await get_tafs(icaos)
     except UpstreamError as exc:
-        raise HTTPException(502, f"Źródło TAF niedostępne: {exc}") from exc
+        raise HTTPException(502, f"TAF source unavailable: {exc}") from exc
     return [{"icao": i, "raw": raw.get(i)} for i in icaos]
 
 
@@ -231,13 +231,13 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     found = upperwind.approach_points(db, icao)
     if not found:
         ad = db.get(Aerodrome, icao.upper())
-        raise HTTPException(404, f"Brak danych o pasach lotniska {ad.icao}" if ad else f"Nie znam lotniska {icao}")
+        raise HTTPException(404, f"No runway data for aerodrome {ad.icao}" if ad else f"Unknown aerodrome {icao}")
     ad = found[0]
     metar, metar_error = None, None
     try:
         metar = (await get_metars([ad["icao"]])).get(ad["icao"])
     except UpstreamError as exc:
-        metar_error = f"METAR niedostępny: {exc}"
+        metar_error = f"METAR unavailable: {exc}"
     p = parse_metar(metar) if metar else None
     metar_wind = {"dir": p.wind_dir, "speed": p.wind_speed, "gust": p.wind_gust, "variable": p.wind_variable,
                   "var_from": p.wind_var_from, "var_to": p.wind_var_to, "time": p.time} if p else None
@@ -245,7 +245,7 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     try:
         model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]])
     except UpstreamError as exc:
-        model_error = f"Prognoza Open-Meteo niedostępna: {exc}"
+        model_error = f"Open-Meteo forecast unavailable: {exc}"
     surface_model = model[0]["surface"] if model else None
     runways = []
     for i, r in enumerate(ad["runways"]):
@@ -265,7 +265,7 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
 # --- SUN: słońce nad lotniskiem albo punktem mapy (METEO › SUN)
 
 @router.get("/sun")
-def sun(icao: str | None = Query(None, description="Kod ICAO lotniska"),
+def sun(icao: str | None = Query(None, description="Aerodrome ICAO code"),
         lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180),
         db: Session = Depends(get_db)):
     """Wschód i zachód słońca, zmierzch cywilny (BMCT/EECT) dziś i jutro (UTC) oraz słońce teraz: dla lotniska
@@ -273,15 +273,15 @@ def sun(icao: str | None = Query(None, description="Kod ICAO lotniska"),
     if icao:
         code = icao.strip().upper()
         if not re.fullmatch(r"[A-Z0-9]{3,4}", code):
-            raise HTTPException(400, f"Niepoprawny kod ICAO: {code[:10]}")
+            raise HTTPException(400, f"Invalid ICAO code: {code[:10]}")
         ad = airport_entry(db, code)
         if not ad or ad.get("lat") is None or ad.get("lon") is None:
-            raise HTTPException(404, f"Nie znam lotniska {code}")
+            raise HTTPException(404, f"Unknown aerodrome {code}")
         place = {"icao": ad["icao"], "name": ad["name"], "lat": ad["lat"], "lon": ad["lon"]}
     elif lat is not None and lon is not None:
         place = {"icao": None, "name": None, "lat": lat, "lon": lon}
     else:
-        raise HTTPException(400, "Podaj kod ICAO lotniska albo współrzędne (lat, lon)")
+        raise HTTPException(400, "Enter an aerodrome ICAO code or coordinates (lat, lon)")
     polish = bool(place["icao"] and place["icao"].startswith("EP"))
     return {**place, "polish": polish, **sun_svc.report(place["lat"], place["lon"], polish=polish)}
 

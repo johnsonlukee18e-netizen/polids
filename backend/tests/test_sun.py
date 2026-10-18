@@ -221,9 +221,13 @@ def test_sun_endpoint(client):
     assert d["state"] in ("day", "civil", "night")
     p = client.get("/api/meteo/sun", params={"lat": 35.55, "lon": 139.78}).json()
     assert p["icao"] is None and p["polish"] is False and "local" not in p["days"][0]
-    assert client.get("/api/meteo/sun", params={"icao": "ZZZZ"}).status_code == 404
-    assert client.get("/api/meteo/sun", params={"icao": "EP/A"}).status_code == 400
-    assert client.get("/api/meteo/sun").status_code == 400
+    # błędy po angielsku (issue #18), widoczne w karcie SUN
+    r = client.get("/api/meteo/sun", params={"icao": "ZZZZ"})
+    assert r.status_code == 404 and r.json()["detail"] == "Unknown aerodrome ZZZZ"
+    r = client.get("/api/meteo/sun", params={"icao": "EP/A"})
+    assert r.status_code == 400 and r.json()["detail"] == "Invalid ICAO code: EP/A"
+    r = client.get("/api/meteo/sun")
+    assert r.status_code == 400 and "ICAO code or coordinates" in r.json()["detail"]
     assert client.get("/api/meteo/sun", params={"lat": 95, "lon": 0}).status_code == 422
 
 

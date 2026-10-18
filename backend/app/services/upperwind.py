@@ -36,7 +36,7 @@ MIN_RWY_M = 1200
 # nawierzchnia miękka albo pas awaryjny ("GRASS", "Grass", "GRS", "GRE", "G", "grassy", "GRS Emergency Strip")
 SOFT_SURFACE = re.compile(r"gras|grs|\bgre\b|grv|gravel|turf|emergency|^g$", re.I)
 EARTH_NM = 3440.065
-METHOD_LABEL = {"procedure": "FAF z procedury", "centreline": "na przedłużeniu osi, 3°"}
+METHOD_LABEL = {"procedure": "FAF from procedure", "centreline": "extended centreline, 3°"}
 
 
 # --- geometria na kuli
@@ -96,16 +96,16 @@ def approach_point(icao: str, elev_ft: float | None, runway: dict, fix_pos: dict
     for fix, info in star_end_fixes(icao, des, procs).items():
         pos = [(distance_nm(thr_lat, thr_lon, la, lo), la, lo) for la, lo in fix_pos.get(fix, [])]
         if not pos:
-            rejected.append(f"{fix}: brak współrzędnych")
+            rejected.append(f"{fix}: no coordinates")
             continue
         dist, la, lo = min(pos)
         off = angle_diff(bearing(la, lo, thr_lat, thr_lon), hdg)
         if dist < MIN_NM:
-            rejected.append(f"{fix}: {dist:.2f} NM od progu (< {MIN_NM:g} NM)")
+            rejected.append(f"{fix}: {dist:.2f} NM from THR (< {MIN_NM:g} NM)")
         elif dist > MAX_NM:
-            rejected.append(f"{fix}: {dist:.1f} NM od progu (> {MAX_NM:g} NM)")
+            rejected.append(f"{fix}: {dist:.1f} NM from THR (> {MAX_NM:g} NM)")
         elif off > MAX_OFF_DEG:
-            rejected.append(f"{fix}: {off:.0f}° od kursu podejścia")
+            rejected.append(f"{fix}: {off:.0f}° off the final approach course")
         else:
             cands.append((-len(info["stars"]), abs(dist - glide), fix, la, lo, dist, info))
     base = {"designator": des, "heading": hdg, "threshold": [round(thr_lat, 5), round(thr_lon, 5)],
@@ -218,7 +218,7 @@ def parse_forecast(text: str, now: datetime | None = None) -> list[dict]:
     godziny UTC w każdym punkcie, w kolejności zapytania."""
     data = json.loads(text)
     if isinstance(data, dict) and data.get("error"):
-        raise UpstreamError(f"Open-Meteo: {data.get('reason') or 'błąd'}")
+        raise UpstreamError(f"Open-Meteo: {data.get('reason') or 'error'}")
     now = now or datetime.now(timezone.utc)
     stamp = now.strftime("%Y-%m-%dT%H:00")
     out = []
@@ -270,7 +270,7 @@ async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
     try:
         res = parse_forecast(text)
     except (ValueError, KeyError, TypeError, IndexError) as exc:
-        raise UpstreamError(f"Open-Meteo: nieczytelna odpowiedź ({exc})") from exc
+        raise UpstreamError(f"Open-Meteo: unreadable response ({exc})") from exc
     if len(res) != len(points):
-        raise UpstreamError(f"Open-Meteo: {len(res)} punktów w odpowiedzi zamiast {len(points)}")
+        raise UpstreamError(f"Open-Meteo: {len(res)} points in the response instead of {len(points)}")
     return res

@@ -110,16 +110,16 @@ def _rwy(des):
 
 def test_approach_point_from_procedure():
     p = uw.approach_point("EPXX", 362, _rwy("29"), _fixes(), PROCS)
-    assert p["method"] == "procedure" and p["method_label"] == "FAF z procedury" and p["fix"] == "XX701"
+    assert p["method"] == "procedure" and p["method_label"] == "FAF from procedure" and p["fix"] == "XX701"
     assert p["dist_nm"] == pytest.approx(7.0, abs=0.05) and p["stars"] == ["AAAAA1A", "BBBBB1A"]
     assert p["approaches"] == ["ILS Z", "RNP"] and p["rejected"] == []
     assert p["path_ft"] == pytest.approx(362 + 7 * uw.FT_PER_NM, abs=10)
 
 
-@pytest.mark.parametrize("des, why", [("11", "NM od progu"), ("15", "od kursu podejścia")])
+@pytest.mark.parametrize("des, why", [("11", "NM from THR"), ("15", "off the final approach course")])
 def test_approach_point_fallback_on_centreline(des, why):
     p = uw.approach_point("EPXX", 362, _rwy(des), _fixes(), PROCS)
-    assert p["method"] == "centreline" and p["method_label"] == "na przedłużeniu osi, 3°" and p["fix"] is None
+    assert p["method"] == "centreline" and p["method_label"] == "extended centreline, 3°" and p["fix"] is None
     assert len(p["rejected"]) == 1 and why in p["rejected"][0]
     lat, lon, hdg = THR[des]
     assert p["dist_nm"] == pytest.approx(8.3, abs=0.05) and p["path_ft"] == pytest.approx(3000, abs=10)
@@ -132,7 +132,7 @@ def test_approach_point_without_procedures_or_coordinates():
     p = uw.approach_point("EPYY", 100, _rwy("29"), {}, PROCS)
     assert p["method"] == "centreline" and p["rejected"] == []
     p = uw.approach_point("EPXX", 100, _rwy("29"), {}, PROCS)
-    assert p["method"] == "centreline" and all("brak współrzędnych" in r for r in p["rejected"])
+    assert p["method"] == "centreline" and all("no coordinates" in r for r in p["rejected"])
 
 
 def test_approach_point_faf_just_inside_3nm():
@@ -141,9 +141,9 @@ def test_approach_point_faf_just_inside_3nm():
     fixes = {"XX701": [uw.destination(lat, lon, hdg + 180, 2.99)], "XX702": [uw.destination(lat, lon, hdg + 180, 2.3)]}
     p = uw.approach_point("EPXX", 192, _rwy("29"), fixes, PROCS)
     assert uw.MIN_NM == 2.5 and p["method"] == "procedure" and p["fix"] == "XX701" and p["dist_nm"] == 3.0
-    assert p["rejected"] == ["XX702: 2.30 NM od progu (< 2.5 NM)"]
+    assert p["rejected"] == ["XX702: 2.30 NM from THR (< 2.5 NM)"]
     far = {"XX701": [uw.destination(lat, lon, hdg + 180, 16.0)]}
-    assert uw.approach_point("EPXX", 192, _rwy("29"), far, PROCS)["rejected"][0] == "XX701: 16.0 NM od progu (> 15 NM)"
+    assert uw.approach_point("EPXX", 192, _rwy("29"), far, PROCS)["rejected"][0] == "XX701: 16.0 NM from THR (> 15 NM)"
 
 
 def _r(des, surface="CON", length=2500.0, coords=True, hdg=None):
@@ -225,7 +225,7 @@ def test_approach_points_endpoint(client):
     if HAVE_ESE:
         epwa = {r["designator"]: r for r in ads["EPWA"]["runways"]}
         assert {k: v["fix"] for k, v in epwa.items()} == {"11": "WA409", "15": "WA612", "29": "WA728", "33": "WA529"}
-        assert all(v["method_label"] == "FAF z procedury" for v in epwa.values())
+        assert all(v["method_label"] == "FAF from procedure" for v in epwa.values())
     if "EPRZ" in ads:
         # bez trawiastych 08L/26R, 08R/26L bez współrzędnych progu i pasów awaryjnych 09ES/27ES
         assert [r["designator"] for r in ads["EPRZ"]["runways"]] == ["09", "27"]
@@ -260,7 +260,8 @@ def test_approach_wind_degrades_without_open_meteo(client, monkeypatch):
     monkeypatch.setattr(uw, "fetch_text", down)
     monkeypatch.setattr(meteo, "get_metars", no_metar)
     d = client.get("/api/meteo/approach-wind/EPKK").json()
-    assert "Open-Meteo" in d["model_error"] and "brak sieci" in d["model_error"] and "METAR" in d["metar_error"]
+    assert d["model_error"].startswith("Open-Meteo forecast unavailable: ") and "brak sieci" in d["model_error"]
+    assert d["metar_error"].startswith("METAR unavailable: ")
     assert d["valid"] is None and d["model_surface"] is None and d["runways"]
     for r in d["runways"]:
         assert r["w3000"] is None and r["c3000"] == {"hw": None, "xw": None} and r["lat"] and r["method"]
@@ -285,4 +286,4 @@ def test_upstream_reason_short_without_query():
 
 def test_approach_wind_unknown_aerodrome(client):
     r = client.get("/api/meteo/approach-wind/XXXX")
-    assert r.status_code == 404 and "XXXX" in r.json()["detail"]
+    assert r.status_code == 404 and r.json()["detail"] == "Unknown aerodrome XXXX"

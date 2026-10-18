@@ -38,7 +38,7 @@
 /* komunikat na środku: wczytywanie albo błąd z odnośnikiem do obrazu w nowej karcie */
 .mimg-msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100% - 32px));
   display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 3px; font: 13px/1.45 var(--mono); color: var(--muted); text-align: center; }
+  border-radius: 0; font: 13px/1.45 var(--mono); color: var(--muted); text-align: center; }
 .mimg-msg[hidden] { display: none; }
 .mimg-msg.err { border-color: #7a2a22; }
 .mimg-msg.err b { color: var(--bad); }
@@ -63,7 +63,7 @@
 .gmt-img { width: 100%; height: 100%; object-fit: contain; }
 .gmt-img[hidden] { display: none; }
 .gmt-imgmsg { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; max-width: 360px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 3px; font: 12px/1.45 var(--mono); color: var(--muted); text-align: center; }
+  border: 1px solid var(--line); border-radius: 0; font: 12px/1.45 var(--mono); color: var(--muted); text-align: center; }
 .gmt-imgmsg[hidden] { display: none; }
 .gmt-imgmsg a { color: var(--green-text); font-weight: 700; }
 .gmt-map.off { flex: 0 0 300px; align-items: flex-start; padding-top: 10px; }
@@ -74,7 +74,7 @@
 
 /* --- SUN (0.12.3): mapa świata z granicą dnia i nocy, obok karta lotniska (godziny UTC, pod nimi czas polski) */
 .sun-l { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.sun-icao { width: 64px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 3px; padding: 3px 6px;
+.sun-icao { width: 64px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 0; padding: 3px 6px;
   font: 700 13px var(--mono); text-transform: uppercase; outline: none; }
 .sun-icao:focus { border-color: var(--green-hi); }
 .sun-body { flex: 1; min-height: 0; display: flex; }
@@ -111,6 +111,9 @@
 .sun-map .sun-night { fill: #000208; fill-opacity: .45; }
 .sun-map .sun-subsolar { fill: var(--yellow); fill-opacity: 1; stroke: #000; stroke-width: 2; }
 .sun-map .sun-place { fill: var(--green-hi); fill-opacity: 1; stroke: #000; stroke-width: 2; }
-.sun-map .leaflet-tooltip.sun-tip { background: #111; color: #fff; border: 1px solid var(--green-hi); font: 700 12px var(--mono);
-  padding: 1px 5px; box-shadow: none; }
+.sun-map .leaflet-tooltip.sun-tip { background: #111; color: #fff; border: 1px solid var(--green-hi); border-radius: 0;
+  font: 700 12px var(--mono); padding: 1px 5px; box-shadow: none; }
 .sun-map .leaflet-tooltip.sun-tip::before { display: none; }
+/* przyciski +/− mapy bez zaokrągleń, z ostrymi krawędziami jak w PANDORZE (0.12.5) */
+.sun-map .leaflet-bar, .sun-map .leaflet-bar a, .sun-map .leaflet-bar a:first-child, .sun-map .leaflet-bar a:last-child,
+.sun-map.leaflet-touch .leaflet-bar a:first-child, .sun-map.leaflet-touch .leaflet-bar a:last-child { border-radius: 0; }

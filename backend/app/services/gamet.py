@@ -156,13 +156,13 @@ def parse(text: str, now: datetime | None = None) -> dict:
     try:
         data = json.loads(text)
     except ValueError:
-        return {"areas": empty, "error": "Nieczytelna odpowiedź serwera IMGW (to nie JSON)"}
+        return {"areas": empty, "error": "Unreadable IMGW server response (not JSON)"}
     regions = _regions(data)
     if not regions:
-        return {"areas": empty, "error": "Nieznany format odpowiedzi IMGW: brak rejonów A1–A5"}
+        return {"areas": empty, "error": "Unknown IMGW response format: no areas A1–A5"}
     keys = list(AREAS) + sorted({k for r in regions for k in r if _AREA_KEY.match(str(k)) and k not in AREAS})
     areas = {k: pick([t for r in regions for t in _messages(r.get(k))], now) for k in keys}
-    error = None if any(a["text"] for a in areas.values()) else "Brak komunikatów GAMET w odpowiedzi IMGW"
+    error = None if any(a["text"] for a in areas.values()) else "No GAMET messages in the IMGW response"
     return {"areas": areas, "error": error}
 
 
@@ -174,7 +174,7 @@ async def get_gamet(now: datetime | None = None) -> dict:
     try:
         text, params = await _fetch()
     except UpstreamError as exc:
-        return {**base, "areas": {a: area_info(None, now) for a in AREAS}, "error": f"Serwer IMGW nie odpowiada: {exc}"}
+        return {**base, "areas": {a: area_info(None, now) for a in AREAS}, "error": f"IMGW server not responding: {exc}"}
     hit = peek(GAMET_URL, params)
     age = hit[0] if hit else 0.0
     out = {**base, **parse(text, now), "fetched_at": (now - timedelta(seconds=age)).strftime("%Y-%m-%dT%H:%M:%SZ"),
