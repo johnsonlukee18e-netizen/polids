@@ -421,17 +421,29 @@ def test_region_airports_inside():
 
 # --- układ napisów (qnhmap.js, qnh.css): model rozmiarów w services/qnh.py
 
-@pytest.mark.parametrize("view", qnh.VIEWS)
-def test_label_layout(view):
+# każdy zoom widoku domyślnego od okna 1024x600 (6,4) do 2560x1440 (8,2) i trochę dalej (zoomSnap 0,1)
+LAYOUT_ZOOMS = sorted(set(qnh.FIT_ZOOMS) | {round(7.5 + i / 10, 1) for i in range(11)})
+# rodzaje napisów na każdym poziomie (FAR: bez rombów lotnisk bez METAR-u, symbole 'sym' zostają przy lotniskach z METAR-em)
+KINDS = {qnh.FULL: {"num", "qnh", "cap", "code", "des", "sym", "aero"},
+         qnh.MID: {"num", "qnh", "cap", "code", "sym", "aero"}, qnh.FAR: {"num", "qnh", "sym"}}
+# poziom napisów widoku domyślnego przy oknach z qnh.VIEWS: wszystkie napisy od 1366x657 (zoom 7,0) w górę; przy
+# 1366x627, 1366x600 i 1280x609 (zoom 6,9) bez szarych oznaczeń (kody lotnisk zostają); przy 1024x600 (6,4) tylko
+# numery rejonów z QNH i lotniska z METAR-em
+VIEW_TIERS = {"2560x1440": qnh.FULL, "1920x1080": qnh.FULL, "1600x900": qnh.FULL, "1600x789": qnh.FULL,
+              "1366x768": qnh.FULL, "1366x657": qnh.FULL, "1280x649": qnh.FULL, "1366x627": qnh.MID,
+              "1366x600": qnh.MID, "1280x609": qnh.MID, "1024x600": qnh.FAR}
+
+
+@pytest.mark.parametrize("zoom", LAYOUT_ZOOMS)
+def test_label_layout(zoom):
     """Napisy mapy (numery rejonów z ramką QNH, opisy BELOW … QNH FROM z QNH, kody 'code', szare oznaczenia,
-    symbole i kody lotnisk) nie nachodzą na siebie w każdym domyślnym widoku (także przy oknie przeglądarki
-    1366x657 i 1600x789, czyli ekranie 1366x768 i 1600x900 z paskami przeglądarki). Miejsca poprawia się ręcznie
-    w qnh_regions.json albo skryptem (python scripts/trace_qnh_regions.py --layout); ten test pilnuje układu."""
-    zoom = qnh.VIEWS[view]
-    assert not qnh.far(zoom, zoom)   # domyślny widok ma wszystkie napisy
-    boxes = qnh.label_boxes(CFG, _drawn(), zoom)
+    symbole i kody lotnisk) nie nachodzą na siebie w widoku domyślnym przy każdym oknie od 1024x600 do 2560x1440
+    (na poziomie napisów tego widoku, qnh.tier()). Miejsca poprawia się ręcznie w qnh_regions.json albo skryptem
+    (python scripts/trace_qnh_regions.py --layout); ten test pilnuje układu."""
+    level = qnh.tier(zoom, zoom)
+    boxes = qnh.label_boxes(CFG, _drawn(), zoom, level)
     kinds = {k for k, _, _ in boxes}
-    assert kinds == {"num", "qnh", "cap", "code", "des", "sym", "aero"}
+    assert kinds == KINDS[level]
     assert qnh.overlaps(boxes) == []
     # numer rejonu i ramka z QNH rejonu w swoim rejonie (ramka po drugiej stronie linii czytałaby się jako QNH
     # sąsiedniego rejonu): środek i co najmniej 3 narożniki prostokąta w rejonie
@@ -441,26 +453,59 @@ def test_label_layout(view):
             if n == str(r["id"]) and k in ("num", "qnh"):
                 pts = [((x0 + x1) / 2, (y0 + y1) / 2), (x0, y0), (x1, y0), (x0, y1), (x1, y1)]
                 inside = [sum(_inside(x, y, ring) for ring in rings) % 2 == 1 for x, y in pts]
-                assert inside[0] and sum(inside[1:]) >= 3, (view, r["id"], k)
+                assert inside[0] and sum(inside[1:]) >= 3, (zoom, r["id"], k)
     # wspólny opis (TMA Kraków: BELOW TMA / QNH FROM) nad kodami z QNH: każdy kod w całości pod opisem, żeby
     # nie czytał się w jednym wierszu z "QNH FROM" (jak EPKT / EPKK pod opisem na mapie PAŻP)
     caps = {n: r for k, n, r in boxes if k == "cap"}
-    for t in CFG["tmas"]:
+    for t in CFG["tmas"] if caps else []:
         for code in [t["icao"], *t.get("join", [])] if t.get("join") else []:
             r = next(r for k, n, r in boxes if k == "code" and n == code)
-            assert r[1] >= caps[t["icao"]][3], (view, code)
+            assert r[1] >= caps[t["icao"]][3], (zoom, code)
+
+
+@pytest.mark.parametrize("view", qnh.VIEWS)
+def test_label_views(view):
+    """Widok domyślny przy oknach z qnh.VIEWS (pełne ekrany, te same z paskami przeglądarki, małe okna laptopów):
+    poziom napisów jak w VIEW_TIERS, bez nakładania; przybliżanie przywraca napisy krok po kroku, oddalenie o jedno
+    "−" (0,5) od widoku domyślnego, a na dużym ekranie od widoku 1600x900 (QR_ZOOM), zmniejsza liczbę napisów (o ile
+    nie jest już widokiem "z daleka"); przy zoomie 7,3 i większym wszystkie napisy przy każdym oknie."""
+    fit = qnh.VIEWS[view]
+    top = min(fit, qnh.QR_ZOOM)
+    level = qnh.tier(fit, fit)
+    assert level == VIEW_TIERS[view] and qnh.far(fit, fit) == (level == qnh.FAR)
+    assert qnh.overlaps(qnh.label_boxes(CFG, _drawn(), fit, level)) == []
+    assert qnh.tier(top - 0.5, fit) > level or level == qnh.FAR
+    assert qnh.tier(top - 1.0, fit) == qnh.FAR and qnh.tier(fit + 0.5, fit) <= level
+    # co 0,1 (zoomSnap, kółko myszy) od fit − 2 do fit + 1: im bliżej, tym więcej napisów, poziom zmienia się o jeden
+    zooms = [round(fit - 2 + i / 10, 1) for i in range(31)]
+    tiers = [qnh.tier(z, fit) for z in zooms]
+    assert all(0 <= a - b <= 1 for a, b in zip(tiers, tiers[1:])), tiers
+    assert tiers[0] == qnh.FAR and tiers[-1] == qnh.FULL
+    assert all(t == qnh.FULL for z, t in zip(zooms, tiers) if z >= 7.3), tiers
+
+
+# (zoom, zoom widoku domyślnego) -> poziom napisów: widoki domyślne (7,0: wszystkie, 6,9 i 6,8: bez szarych oznaczeń,
+# 6,7 i mniej: "z daleka"), jedno i dwa "−" od widoku domyślnego (1600x900: 7,0 bez szarych oznaczeń, 6,5 "z daleka";
+# na dużym ekranie od widoku 1600x900: przy 8,2 zoom 7,7 wszystkie, 7,2 bez szarych oznaczeń, 6,7 "z daleka"), małe
+# kroki (0,2) i przybliżanie od widoku domyślnego
+TIER_CASES = [(7.0, 7.0), (6.9, 6.9), (6.8, 6.8), (6.7, 6.7), (6.4, 6.4), (7.0, 7.5), (6.5, 7.5), (6.5, 7.0),
+              (6.4, 6.9), (7.3, 7.5), (7.1, 7.5), (7.2, 7.7), (6.7, 7.7), (8.0, 8.2), (7.7, 8.2), (7.2, 8.2),
+              (6.7, 8.2), (6.9, 6.4), (7.4, 6.4), (7.4, 6.9), (5.9, 6.4), (8.7, 8.2)]
+TIER_WANT = [0, 1, 1, 2, 2, 1, 2, 2, 2, 0, 1, 1, 2, 0, 0, 1, 2, 1, 0, 0, 2, 0]
 
 
 def test_label_model():
     """Model napisów: skala jak labelScale() w qnhmap.js, ramki po stronach numeru / symbolu, kolizje."""
     assert qnh.scale(7.5) == 1 and qnh.scale(8.5) == 1
     assert qnh.scale(7.2) == pytest.approx(2 ** -0.3) and qnh.scale(7.0) == pytest.approx(2 ** -0.5)
-    assert qnh.scale(6.9) == qnh.QR_MIN == 0.7 and qnh.scale(5.5) == qnh.QR_MIN
-    # widok "z daleka" względem zoomu dopasowanego do okna (nie wyżej niż 7,5): przy 1366x657 (zoom 7,0) domyślny
-    # widok ma napisy, jedno "−" (0,5) już nie; na dużym ekranie (7,7) dopiero poniżej 7,2
-    assert not qnh.far(7.0, 7.0) and qnh.far(6.5, 7.0) and not qnh.far(6.75, 7.0)
-    assert not qnh.far(7.2, 7.5) and qnh.far(7.0, 7.5)
-    assert not qnh.far(7.4, 7.7) and not qnh.far(7.2, 7.7) and qnh.far(7.1, 7.7)
+    assert qnh.scale(6.8) == pytest.approx(2 ** -0.7) and qnh.scale(6.7) == qnh.QR_MIN == 0.6
+    assert qnh.scale(5.5) == qnh.QR_MIN
+    # poziomy napisów: przypadki wspólne z testem qnhmap.js w Node (TIER_CASES)
+    assert [qnh.tier(z, f) for z, f in TIER_CASES] == TIER_WANT
+    assert [qnh.far(z, f) for z, f in TIER_CASES] == [t == qnh.FAR for t in TIER_WANT]
+    assert qnh.label_boxes(CFG, _drawn(), 7.0, qnh.FAR) == [b for b in qnh.label_boxes(CFG, _drawn(), 7.0)
+                                                            if b[0] in ("num", "qnh") or b[0] == "sym" and b[1] in
+                                                            {a["icao"] for a in _drawn() if a["metar"]}]
     x0, y0, x1, y1 = qnh._side(0, 0, 10, 5, 30, 12, "e", 2)
     assert (x0, y0, x1, y1) == (12, -6, 42, 6)
     assert qnh._side(0, 0, 10, 5, 30, 12, "n", 2) == (-15, -19, 15, -7)
@@ -494,8 +539,18 @@ def test_label_model_matches_css():
     assert re.search(r"\.qr-aero\.ctl i \{[^}]*width: 9px; height: 9px", css) and qnh.SYM == 9
     assert ".qr-aero.s-e span, .qr-aero.s-ne span, .qr-aero.s-se span { left: 6.5px; }" in css   # 4,5 + 2 px
     js = (FRONT / "js" / "qnhmap.js").read_text("utf-8")
-    m = re.search(r"const QR_ZOOM = ([\d.]+), QR_FAR = ([\d.]+), QR_MIN = ([\d.]+);", js)
-    assert m and tuple(map(float, m.groups())) == (qnh.QR_ZOOM, qnh.QR_FAR, qnh.QR_MIN)
+    m = re.search(r"const QR_ZOOM = ([\d.]+), QR_MIN = ([\d.]+), QR_TIERS = \[([\d., ]+)\], QR_OUT = \[([\d., ]+)\];", js)
+    assert m and (float(m[1]), float(m[2])) == (qnh.QR_ZOOM, qnh.QR_MIN)
+    assert tuple(map(float, m[3].split(","))) == qnh.QR_TIERS and tuple(map(float, m[4].split(","))) == qnh.QR_OUT
+    # poziomy napisów w CSS: qr-mid i qr-far ukrywają te rodzaje napisów, które model pomija (HIDDEN; w qr-far także
+    # romby lotnisk bez METAR-u)
+    sel = {"des": ".qr-des", "aero": ".qr-aero span", "cap": ".qr-cap", "code": ".qr-cap"}
+    bare = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    for level, cls in ((qnh.MID, "qr-mid"), (qnh.FAR, "qr-far")):
+        hidden = {x.strip()[len(f".qrwrap.{cls} "):] for r in re.findall(r"([^{}]*)\{ display: none; \}", bare)
+                  for x in r.split(",") if x.strip().startswith(f".qrwrap.{cls} ")}
+        assert hidden == {sel[k] for k in qnh.HIDDEN[level]} | ({".qr-aero:not(.ctl)"} if level == qnh.FAR else set())
+    assert 'wrap.classList.toggle("qr-mid", t === 1);' in js and 'wrap.classList.toggle("qr-far", t === 2);' in js
 
 
 def test_fir_line_and_band_count_css():
@@ -515,8 +570,9 @@ QNHMAP_SCRIPT = r"""
 const m = await import(process.argv[2]);
 const t = { icao: "EPGD", below: "TMA", qnh: 1012 };
 console.log(JSON.stringify({
-  scale: [7.5, 8.5, 7.2, 7.0, 6.9, 5.5].map(m.labelScale),
-  far: [[7.0, 7.0], [6.5, 7.0], [6.75, 7.0], [7.2, 7.5], [7.0, 7.5], [7.4, 7.7], [7.1, 7.7]].map(([z, f]) => m.isFar(z, f)),
+  scale: [7.5, 8.5, 7.2, 7.0, 6.9, 6.8, 6.7, 5.5].map(m.labelScale),
+  tier: JSON.parse(process.argv[3]).map(([z, f]) => m.labelTier(z, f)),
+  far: JSON.parse(process.argv[3]).map(([z, f]) => m.isFar(z, f)),
   cap: [m.captionHtml(t), m.captionHtml({ ...t, qnh: null, stack: true }), m.captionHtml({ ...t, code: [19, 50] })],
   code: m.codeHtml({ icao: "EPKT", qnh: 1013 }),
 }));
@@ -524,7 +580,7 @@ console.log(JSON.stringify({
 
 
 def test_qnhmap_js(tmp_path):
-    """qnhmap.js w Node: skala napisów jak w modelu services/qnh.py, opisy BELOW … QNH FROM z QNH w ramce."""
+    """qnhmap.js w Node: skala i poziomy napisów jak w modelu services/qnh.py, opisy BELOW … QNH FROM z QNH w ramce."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -532,13 +588,14 @@ def test_qnhmap_js(tmp_path):
     (tmp_path / "qnhmap.mjs").write_text((FRONT / "js" / "qnhmap.js").read_text("utf-8")
                                          .replace('"./api.js"', '"./api.mjs"'), "utf-8")
     (tmp_path / "run.mjs").write_text(QNHMAP_SCRIPT, "utf-8")
-    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "qnhmap.mjs").as_uri()], capture_output=True,
-                       text=True, timeout=60)
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "qnhmap.mjs").as_uri(), json.dumps(TIER_CASES)],
+                       capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
-    assert out["scale"] == pytest.approx([qnh.scale(z) for z in (7.5, 8.5, 7.2, 7.0, 6.9, 5.5)])
-    far = [(7.0, 7.0), (6.5, 7.0), (6.75, 7.0), (7.2, 7.5), (7.0, 7.5), (7.4, 7.7), (7.1, 7.7)]
-    assert out["far"] == [qnh.far(z, f) for z, f in far] == [False, True, False, False, True, False, True]
+    assert out["scale"] == pytest.approx([qnh.scale(z) for z in (7.5, 8.5, 7.2, 7.0, 6.9, 6.8, 6.7, 5.5)])
+    # poziomy napisów jak tier() w modelu (ta sama reguła, te same progi)
+    assert out["tier"] == [qnh.tier(z, f) for z, f in TIER_CASES] == TIER_WANT
+    assert out["far"] == [qnh.far(z, f) for z, f in TIER_CASES]
     assert out["cap"] == ['<span>BELOW TMA</span><span>QNH FROM EPGD <b class="q">1012</b></span>',
                           '<span>BELOW TMA</span><span>QNH FROM EPGD</span><span><b class="q nil">----</b></span>',
                           "<span>BELOW TMA</span><span>QNH FROM</span>"]

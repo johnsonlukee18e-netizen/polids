@@ -121,14 +121,34 @@ async def regions(db: Session, get_metars) -> dict:
 # Odwzorowanie jak lccCrs() w qnhmap.js: stożkowe Lamberta na kuli R, stała stożka 0,798, południk 19°E,
 # r0 na 52°N, skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
 LCC_R, LCC_N = 6378137, 0.798
-# zoom domyślnego widoku (cały FIR dopasowany do mapy, fitBounds w qnhmap.js) przy oknie przeglądarki 1600x900
-# i 1366x768 (pełny ekran) oraz 1600x789 i 1366x657 (ekran 1600x900 i 1366x768 z paskami przeglądarki); skala napisów
-# jak labelScale() w qnhmap.js (--k w CSS: 2^(zoom − 7,5), nie mniej niż 70%, więc w każdym z tych widoków napisy
-# maleją razem z mapą); widok "z daleka" (bez kodów lotnisk, opisów BELOW i szarych oznaczeń) dopiero QR_FAR poniżej
-# zoomu dopasowanego do okna (far(), isFar() w qnhmap.js), więc domyślny widok ma zawsze wszystkie napisy;
+# skala napisów jak labelScale() w qnhmap.js (--k w CSS): 2^(zoom − 7,5), czyli przy zoomie mniejszym od QR_ZOOM
+# (cały FIR przy oknie 1600x900) napisy maleją razem z mapą, ale nie mniej niż QR_MIN (60%: poniżej zoomu 6,76 mapa
+# maleje dalej, a napisy już nie)
+QR_ZOOM, QR_MIN = 7.5, 0.6
+# poziomy napisów (tier(), labelTier() w qnhmap.js, klasy qr-mid i qr-far w qnh.css): FULL = wszystkie napisy;
+# MID = bez szarych oznaczeń (najmniejsze napisy: przy skali poniżej 70% mają niecałe 5 px i pierwsze nachodzą
+# na inne; kody lotnisk przy zoomie 6,9 i 6,8 jeszcze się mieszczą); FAR = numery rejonów z ramką QNH i symbole
+# lotnisk z METAR-em (bez opisów BELOW, kodów i rombów lotnisk bez METAR-u: gdy napisy przestają maleć z mapą, opisy
+# BELOW nachodzą na numery i lotniska). Poziom = wyższy z dwóch: zoom poniżej progu z QR_TIERS (każdy próg to poziom
+# wyżej, więc przybliżanie przywraca napisy krok po kroku) i zoom ponad próg z QR_OUT poniżej zoomu widoku domyślnego
+# (cały FIR dopasowany do okna), nie wyższego niż QR_ZOOM: jedno "−" (0,5) albo ząbek kółka od widoku domyślnego to
+# poziom wyżej, dwa "−" to FAR; na dużym ekranie (2560x1440: 8,2) liczy się od QR_ZOOM, bo od QR_ZOOM w górę
+# mieszczą się wszystkie napisy (jak w widoku domyślnym przy oknie 1600x900 i 1920x1080), więc oddalenie do QR_ZOOM
+# ich nie ukrywa
+FULL, MID, FAR = 0, 1, 2
+QR_TIERS, QR_OUT = (6.95, 6.75), (0.25, 0.75)
+HIDDEN = {FULL: (), MID: ("des",), FAR: ("des", "aero", "cap", "code")}   # rodzaje napisów (label_boxes)
+# zoom domyślnego widoku (cały FIR dopasowany do mapy, fitBounds w qnhmap.js) przy oknach przeglądarki (zmierzone
+# w Chromium; mapa = okno bez menu z lewej i panelu tabel): pełne ekrany 2560x1440, 1920x1080, 1600x900 i 1366x768,
+# te same ekrany z paskami przeglądarki (1600x789, 1366x657, 1366x627 z paskiem zakładek) i małe okna (1280x649,
+# 1280x609, 1366x600, 1024x600)
+VIEWS = {"2560x1440": 8.2, "1920x1080": 7.7, "1600x900": 7.5, "1600x789": 7.3, "1366x768": 7.2, "1366x657": 7.0,
+         "1280x649": 7.0, "1366x627": 6.9, "1366x600": 6.9, "1280x609": 6.9, "1024x600": 6.4}
+# każdy zoom widoku domyślnego od okna 1024x600 do 1600x900 (zoomSnap 0,1), od QR_ZOOM w dół: test nakładania
+# i skrypt (--layout; pierwszy zoom = skala przesunięć); powyżej QR_ZOOM napisy już nie rosną, a mapa tak, więc
+# odstępy między napisami tylko się zwiększają
+FIT_ZOOMS = [round(QR_ZOOM - i / 10, 1) for i in range(12)]
 # odstęp między napisami w px
-VIEWS = {"1600x900": 7.5, "1600x789": 7.3, "1366x768": 7.2, "1366x657": 7.0}
-QR_ZOOM, QR_FAR, QR_MIN = 7.5, 0.3, 0.7
 GAP = 1.0
 # czcionka o stałej szerokości: Consolas 0,55 em, zastępcze Liberation Mono / DejaVu Sans Mono 0,6 em (model bierze
 # szerszą, więc w Consolas odstępy tylko rosną)
@@ -159,10 +179,15 @@ def scale(zoom: float) -> float:
     return min(1.0, max(QR_MIN, 2 ** (zoom - QR_ZOOM)))
 
 
+def tier(zoom: float, fit: float) -> int:
+    """Poziom napisów (FULL, MID, FAR) przy zoomie, gdy widok domyślny ma zoom fit; jak labelTier() w qnhmap.js."""
+    fit = min(fit, QR_ZOOM)
+    return max(sum(zoom < t for t in QR_TIERS), sum(zoom < fit - d for d in QR_OUT))
+
+
 def far(zoom: float, fit: float) -> bool:
-    """Widok "z daleka" jak isFar() w qnhmap.js: zoom ponad QR_FAR poniżej dopasowanego do okna (nie wyżej niż
-    QR_ZOOM, więc na dużym ekranie dopiero poniżej widoku 1600x900)."""
-    return zoom < min(fit, QR_ZOOM) - QR_FAR
+    """Widok "z daleka" (FAR) jak isFar() w qnhmap.js."""
+    return tier(zoom, fit) == FAR
 
 
 def _side(cx: float, cy: float, hw: float, hh: float, w: float, h: float, side: str, gap: float) -> tuple:
@@ -199,9 +224,10 @@ def caption_lines(t: dict) -> tuple[list[str], bool]:
     return [f"BELOW {t['below']}", f"QNH FROM {t['icao']} 1013"], True
 
 
-def label_boxes(cfg: dict, aerodromes: list[dict], zoom: float) -> list[tuple[str, str, tuple]]:
+def label_boxes(cfg: dict, aerodromes: list[dict], zoom: float, level: int = FULL) -> list[tuple[str, str, tuple]]:
     """Prostokąty napisów mapy w pikselach przy zoomie: (rodzaj, nazwa, (x0, y0, x1, y1)); rodzaje: num, qnh, cap,
-    code, des, sym (symbol lotniska), aero (kod lotniska)."""
+    code, des, sym (symbol lotniska), aero (kod lotniska). level: poziom napisów (tier()), bez rodzajów ukrytych na
+    tym poziomie (HIDDEN), w FAR także bez lotnisk bez METAR-u."""
     out = []
     k = scale(zoom)
     for r in cfg["regions"]:
@@ -225,12 +251,14 @@ def label_boxes(cfg: dict, aerodromes: list[dict], zoom: float) -> list[tuple[st
         x, y = px(*c["lonlat"], zoom)
         out.append(("des", " ".join(c["lines"]), (x - w / 2, y - h / 2, x + w / 2, y + h / 2)))
     for a in aerodromes:
+        if level == FAR and not a.get("metar"):
+            continue
         x, y = px(a["lon"], a["lat"], zoom)
         s = SYM * k / 2
         out.append(("sym", a["icao"], (x - s, y - s, x + s, y + s)))
         w, h = text_box([a["icao"]], AERO, k)
         out.append(("aero", a["icao"], _side(x, y, s, s, w, h, a.get("label", "e"), SIDE_GAP * k)))
-    return out
+    return [b for b in out if b[0] not in HIDDEN[level]]
 
 
 def clash(a: tuple, b: tuple, gap: float = GAP) -> bool:
