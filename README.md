@@ -10,10 +10,10 @@ frontend w czystym JS, całość w Dockerze.
 |---|---|
 | RADIO | jedna strona jak w PANDORZE: kolory jak w pliku sektorowym (obszar bez nikogo jasnoszary, obsadzony ciemny, tak samo w LOW, MID i HIGH), przyciski i kafelki stanowisk jak na zdjęciu PANDORY; u góry pasek ATIS polskich lotnisk, podglądy FIR EPWW LOW (przekrój FL095–FL330 suwakiem wysokości), mały MID i HIGH z obszarami stanowisk ACC: sektory obsługiwane przez to samo stanowisko (kolejność przejmowania z om.plvacc.pl) jako jeden obszar z nazwą stanowiska i częstotliwością, sektory bez nikogo jasnoszare z samym ID; granice sektorów ACC sąsiadów na podglądach (wg poziomu) i obszary APP/TWR lotnisk przy granicy FIR (np. LZTT, LKMT, EDDB); stosy sektorów sąsiadów graniczących z EPWW jak w VACS, bez FMP (ESAA, EDWW, EDUU, EDMM, LKAA po lewej; UMKK, EYVL, UMMV, UKLV, LZBB po prawej): częstotliwość tylko, gdy ktoś obsługuje sektor, bez nikogo w stosie ADVISORY 122.800, granice FL raz, między polami; warstwy ATIS, LOW MID HIGH, APP (część TMA na stanowisko: WA APP, WA N APP, WA S APP; TMA bez APP z wieżą), TWR, TWR/ATIS i FIS – etykiety obok obrysów TMA i CTR, z linią do punktu, częstotliwość tylko, gdy ktoś obsługuje; kliknięcie nazwy FIR-u sąsiada otwiera wyciąg z LOA (tabele przekazań, zasady, stanowiska, przycisk COORDINATION › do dokumentu) |
 | METEO | kolejno METAR (PL, MIL, INTL), TAF (PL, INTL), WIND z wiatrem 0 ft / 3000 ft na podejściu do każdego pasa (zawsze otwiera się na 0 ft) i RADAR, GAMET (IMGW, rejony A1–A5 albo wszystkie, z mapą rejonów; tekst pobiera serwer PolIDS), SIGWX (IMGW), ICING (oblodzenie z Windy, FL050–FL300), mapa QNH regionalnego rysowana jak mapa rejonów QNH PAŻP z obrysami TMA i CTR z plików sektorowych `.sct`/`.ese` (`scripts/trace_qnh_regions.py` → `data/seed/qnh_regions.json`), SAT EUR i SAT PL, TURB (mapy turbulencji IMGW +0…+21 h z odtwarzaniem), SUN (mapa dnia i nocy na Ziemi z punktem podsłonecznym; wschód, zachód, górowanie, BMCT i EECT dla dowolnego lotniska albo punktu na mapie, UTC i czas polski) |
-| AERODROME | podzakładki jak w PANDORZE: 0 = OVERVIEW całego FIR EPWW (jeden TL dla kraju: FL080, a FL090, gdy na którymkolwiek lotnisku QNH ≤ 995 hPa; METAR/TAF ze stanem LVP, aktywne NOTAM-y, restrykcje ECFMP i vIFF, Airport Monitor vIFF; filtr stanowiska: APP/ACC zawęża lotniska i pokazuje checklistę otwarcia, TWR przenosi do lotniska); EPWW, ESAA, ED, ET, LKAA, LZBB, UMKK, EYVL, UMMV, UKLV = listy lotnisk FIR-u (także VFR i MIL) z wyszukiwarką SHOW / CLEAR; lotnisko zagraniczne: karta z METAR, TAF, ATIS i stanowiskami APP/TWR/GND/DEL/ATIS; lotnisko polskie: INFO (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), AWOS (wiatr co 5 s, RVR z METAR albo symulowany, układ 1 RWY / 2 RWY z osobnym pasem DEP i ARR) i TRAFFIC jak DMAN/AMAN (bez lotów OFFLINE znanych tylko z vIFF; drabiny TSAT, TTOT i ELDT, na lotniskach bez A-CDM EOBT i ETOT; widok AMAN z punktami wejścia i odstępem FLOW) |
+| AERODROME | podzakładki jak w PANDORZE: 0 = OVERVIEW całego FIR EPWW (jeden TL dla kraju: FL080, a FL090, gdy na którymkolwiek lotnisku QNH ≤ 995 hPa; METAR/TAF ze stanem LVP, aktywne NOTAM-y, restrykcje ECFMP i vIFF, Airport Monitor vIFF; filtr stanowiska: APP/ACC zawęża lotniska i pokazuje checklistę otwarcia, TWR przenosi do lotniska); EPWW, ESAA, ED, ET, LKAA, LZBB, UMKK, EYVL, UMMV, UKLV = listy lotnisk FIR-u (także VFR i MIL) z wyszukiwarką SHOW / CLEAR; lotnisko zagraniczne: karta z METAR, TAF, ATIS i stanowiskami APP/TWR/GND/DEL/ATIS; lotnisko polskie: INFO (wiatr, pasy, ATIS, LVP, NOTAM, częstotliwości, wiatr na podejściu), AWOS (wiatr co 5 s, RVR z METAR albo symulowany, układ 1 RWY / 2 RWYS z osobnym pasem DEP i ARR) i TRAFFIC jak DMAN/AMAN (bez lotów OFFLINE znanych tylko z vIFF; drabiny TSAT, TTOT i ELDT, na lotniskach bez A-CDM EOBT i ETOT; widok AMAN z punktami wejścia i odstępem FLOW) |
 | AD CIV / AD MIL / AD VFR, INOP | eAIP PAŻP; w AD CIV przyciski 15 lotnisk AD 2 (lista map lotniska z AD 2.24 eAIP, `GET /api/docs/charts/<ICAO>`, adres `#adciv/EPWA`); linki eAIP same przechodzą na poprawkę bieżącego cyklu AIRAC; INOP: om.plvacc.pl (procedury operacyjne PL vACC) |
 | CALLSIGN, AIRCRAFT | callsigny, typy samolotów tylko z `data/import/ICAO_Aircraft.json`, jeden rekord na oznaczenie ICAO (dane osiągów z `aircraft.csv` dołączone jako zakresy; WTC, RECAT-EU, wymiary, zdjęcia, przyciski producentów); przycisk ALL i litery w dwóch kolumnach |
-| MAP | etykiety samolotów jak P21 PAŻP (callsign i GS; poziom, poniżej TL „A 53”, ze strzałką wznoszenia/zniżania; typ i WTC z lotniskiem docelowym albo punktem wyjścia z FIR; „h s r” i RFL w dziesiątkach), mniejsze symbole, lotniska jako zamknięte sześciokąty; ruch VATSIM związany z Polską: odloty z lotnisk EP, przyloty do nich i tranzyt przez FIR EPWW (samolot w FIR albo dalsza trasa z planu lotu wchodzi do FIR; bez planu lotu tylko w FIR), wybrany lot zostaje na mapie; przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF; ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska, lista sąsiednich FIR-ów domyślnie zwinięta; obsada wg kontrolerów online: sektory jednego stanowiska jako jeden obszar z jedną etykietą (granica tylko tam, gdzie zmienia się obsługujący), przestrzeni bez nikogo nie rysujemy; sekcja Pozycje: drzewo FIR → ACC / FIS / lotniska → stanowiska, w którym można włączyć stanowisko offline (symulacja logowania, SYM) albo ukryć zalogowane – sektoryzacja, plakietki lotnisk i plakietki CTR FIR-ów wg tego wyboru |
+| MAP | etykiety samolotów jak P21 PAŻP (callsign i GS; poziom, poniżej TL „A 53”, ze strzałką wznoszenia/zniżania; typ i WTC z lotniskiem docelowym albo punktem wyjścia z FIR; „h s r” i RFL w dziesiątkach), mniejsze symbole, lotniska jako zamknięte sześciokąty; ruch VATSIM związany z Polską: odloty z lotnisk EP, przyloty do nich i tranzyt przez FIR EPWW (samolot w FIR albo dalsza trasa z planu lotu wchodzi do FIR; bez planu lotu tylko w FIR), wybrany lot zostaje na mapie; przestrzeń na wybranym poziomie FL (ACC, TMA, CTA, CTR, FIS, sektory sąsiadów z ich plików `.ese`), przepustowość i szczegóły lotów z vIFF; ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska, lista sąsiednich FIR-ów domyślnie zwinięta; obsada wg kontrolerów online: sektory jednego stanowiska jako jeden obszar z jedną etykietą (granica tylko tam, gdzie zmienia się obsługujący), przestrzeni bez nikogo nie rysujemy; sekcja Positions: drzewo FIR → ACC / FIS / lotniska → stanowiska, w którym można włączyć stanowisko offline (symulacja logowania, SYM) albo ukryć zalogowane – sektoryzacja, plakietki lotnisk i plakietki CTR FIR-ów wg tego wyboru |
 | COORDINATION | porozumienia LOA i LOP jak w ATCISS: LoA (tabele EXIT/COPX i ENTRY/COPN, filtr po punktach, wybór stanowiska z sektorami, które obsługuje wg kolejności przejmowania i kontrolerów online, FIR-y, LOA/LOP; adres `#coordination/agreements/<stanowisko>/<filtr>`) i DOCUMENTS (7 LOA z `data/docs/LOA` i 20 LOP z podfolderów `data/docs/LOP` (LOP ACC, LOP APP, LOP TWR); nazwy, tagi AIRAC/FIR/sektory, PDF obok; `#coordination/docs/<id>`); rejestr dokumentów `data/seed/coordination.json`, przekazania z `data/seed/loa.json` |
 | CONVERSION | u góry zegary UTC i czasu polskiego (CET/CEST), bez paska przewijania; kalkulator jednostek: hPa/inHg/mmHg, ft/m/FL, wysokość a FL przy QNH (ISA), NM/km/SM, kt/km/h/m/s/mph, Mach/TAS/CAS (ISA), ft/min a m/s, gradient, °C/°F/K, kg/lb/t |
 | CHECKLIST, EMERGENCY | checklisty stanowiska, procedury awaryjne EUROCONTROL |
@@ -74,7 +74,7 @@ Kto może wejść:
 
 - administratorzy z `POLIDS_AUTH_ADMIN_CIDS` - zawsze, i tylko oni widzą zakładkę ADMIN,
 - CID-y dodane przez admina w zakładce ADMIN (dodaj, usuń, opis). Usunięcie odcina dostęp od razu,
-- reszta dostaje "Brak dostępu dla CID ...", a próba ląduje w ADMIN -> Odmowy dostępu, skąd można ją dodać jednym klikiem.
+- reszta dostaje "No access for CID ...", a próba ląduje w ADMIN -> Denied logins, skąd można ją dodać jednym klikiem.
 
 Lista jest w osobnej bazie `data/state/polids-state.db` (w Dockerze wolumen `state`), bo `polids.db` jest
 przebudowywana z repo przy każdym obrazie. Bez logowania dostępne jest tylko `/auth/*`, `/healthz` i pliki PWA.
@@ -91,8 +91,9 @@ do `main`. Instrukcja: [deploy/README.md](deploy/README.md).
 
 ## Aktualizacja danych
 
-- nowa sektorówka: podmienić pliki w `data/import/`, odświeżyć sektory (`python -m backend.app.importers.sectors_geojson`)
-  i przebudować obraz (na serwerze wystarczy push)
+- nowa sektorówka: podmienić pliki w `data/import/`, odświeżyć sektory (`python -m backend.app.importers.sectors_geojson`),
+  potem mapę QNH (`python scripts/trace_qnh_regions.py`: obrysy TMA/CTR/FIR z `.sct`/`.ese` do `data/seed/qnh_regions.json`;
+  potrzebuje numpy i shapely z `requirements-dev.txt`) i przebudować obraz (na serwerze wystarczy push)
 - sektory EPWW i sąsiadów (MAP, RADIO): aplikacja bierze je z `data/seed/sectors.geojson`, a ten plik generuje
   `python -m backend.app.importers.sectors_geojson` z plików `.ese` (`--check`: czy plik pasuje do plików `.ese`
   i ustawień generatora; po podmianie pliku przypomina o tym test, ostrzeżenie w logu przy starcie, a build obrazu
@@ -104,7 +105,8 @@ do `main`. Instrukcja: [deploy/README.md](deploy/README.md).
   w `data/seed/runways.csv` (metry), `frequencies.csv`, `runway_config.json`, `lvp.json`; każdy wiersz/wpis ma źródło
   (sekcja AIP albo serwis dla lotnisk VFR). Po zmianie CSV podbić `SCHEMA_VERSION` w `backend/app/database.py`
   (przy starcie pełny import danych)
-- typy samolotów: `python scripts/build_aircraft_seed.py <ścieżka do aircraft-db>`
+- typy samolotów: lista typów to `data/import/ICAO_Aircraft.json` (podmienić plik); `python scripts/build_aircraft_seed.py
+  <ścieżka do aircraft-db>` odświeża tylko dane osiągów w `data/seed/aircraft.csv`
 - logo i ikony: `frontend/icons/` (paczka logo PolIDS, opcja „FIR EPWW”)
 - sąsiedzi: nowszy plik `.ese` vACC sąsiada do `data/import/neighbours/` (lista w `data/import/README.md`), potem generator
   `sectors.geojson` jak wyżej
@@ -144,13 +146,13 @@ nie oceniamy.
 Progi z AIP AD 2.22 i AIP MIL AD 4.20 w `data/seed/lvp.json`: przygotowanie, wprowadzenie i odwołanie (RVR, widzialność,
 podstawa chmur; lotniska wojskowe: widzialność z odpowiednikiem RVR, tylko odloty). LVP po wprowadzeniu trwa do spełnienia
 warunków odwołania (histereza w pamięci procesu, po restarcie albo przerwie w METAR-ach ponad 90 min od zera; starszy
-METAR z innego zapytania dostaje stan z nowszego), potem przez 30 min od godziny odwołania „LVP ODWOŁANE”. Lotniska, dla
-których AIP nie przewiduje LVP (VFR, część wojskowych, EPRA, EPZG), mają „nie dotyczy”. EPWA i EPPO: z tekstu AD 2.22
+METAR z innego zapytania dostaje stan z nowszego), potem przez 30 min od godziny odwołania „LVP CANCELLED”. Lotniska, dla
+których AIP nie przewiduje LVP (VFR, część wojskowych, EPRA, EPZG), mają „LVP not applicable”. EPWA i EPPO: z tekstu AD 2.22
 wklejonego przez Marka (strony eAIP urywały się przy pobieraniu).
 
 ## Znane ograniczenia
 
-- PAŻP, om.plvacc.pl i EUROCONTROL Learning Zone blokują ramki (`X-Frame-Options`) - zostaje przycisk "otwórz w nowej karcie".
+- PAŻP, om.plvacc.pl i EUROCONTROL Learning Zone blokują ramki (`X-Frame-Options`) - zostaje przycisk otwierający stronę w nowej karcie (↗).
 - Format NOTAM z cv.plvacc.pl nie jest udokumentowany, parser dzieli tekst po nagłówkach `A1234/26 NOTAMN`.
 - Parser ATIS obsługuje typowe formaty vATIS.
 - vIFF nie publikuje schematów odpowiedzi; TOBT/TSAT/TTOT są tylko, gdy ktoś prowadzi CDM na EPWA. Godziny w vIFF
@@ -158,8 +160,8 @@ wklejonego przez Marka (strony eAIP urywały się przy pobieraniu).
 - AWOS nie ma czujników - wiatr chwilowy, średnia 2 min i min/max są symulowane z METAR (oznaczenie SYM). RVR bez grupy w METAR
   jest symulowany z widzialności (zakładamy światła HI, więc w nocy na małych lotniskach może wyjść za wysoki).
 - QFE liczone w przybliżeniu z QNH i elewacji.
-- Rejony QNH 1-14 i obszary TMA/MTMA w `qnh_regions.json` odrysowane ze zrzutu mapy z AIP Polska (`data/import/qnh_pansa.png`,
-  `scripts/trace_qnh_regions.py`, ok. 0,5 km). QNH rejonu = najniższe QNH z METAR jego lotnisk (oficjalne liczy IMGW z modelu);
+- Mapa QNH (`qnh_regions.json`, `scripts/trace_qnh_regions.py`): granica FIR i obrysy TMA/CTR z plików sektorowych `.sct`/`.ese`;
+  ze zrzutu mapy z AIP Polska (`data/import/qnh_pansa.png`, ok. 0,5 km) odrysowane są tylko linie rejonów QNH 1-14 i wojskowe MTMA/MCTR. QNH rejonu = najniższe QNH z METAR jego lotnisk (oficjalne liczy IMGW z modelu);
   pasy 15-17 (53°N, 51°N) = najniższe QNH z lotnisk pasa.
 - OVERVIEW: TL liczony z QNH 15 kontrolowanych lotnisk z METAR (lotnisko bez METAR nie jest liczone); próg 995 hPa
   włącznie (OM PL vACC pisze „poniżej 995”). TA 6500 ft niesprawdzone w eAIP. Część pól vIFF (przepustowość lotniska, przyloty
@@ -178,7 +180,7 @@ wklejonego przez Marka (strony eAIP urywały się przy pobieraniu).
 
 ## Licencje danych
 
-- typy samolotów: [aircraft-database.com](https://aircraft-database.com) (ODC-By), progi WTC/RECAT z
+- typy samolotów: `data/import/ICAO_Aircraft.json` (lista typów ICAO); dane osiągów z [aircraft-database.com](https://aircraft-database.com) (ODC-By), progi WTC/RECAT z
   [vatger/atciss](https://github.com/vatger/atciss) (MIT)
 - lotniska, pomoce: [OurAirports](https://ourairports.com/data/) (public domain)
 - pasy, częstotliwości, elewacje, pasy preferowane i progi LVP: AIP Polska i AIP MIL (PAŻP, eAIP, AIRAC AMDT 10-26);
@@ -195,7 +197,7 @@ wklejonego przez Marka (strony eAIP urywały się przy pobieraniu).
   [vatger/atciss](https://github.com/vatger/atciss) (MIT), kod napisany od nowa
 - kody SSR: EUROCONTROL, ICAO EUR SSR Code Allocation List (CAL) wyd. 4.13 z 04.03.2026
 - GAMET: IMGW-PIB (awiacja.imgw.pl)
-- mapa rejonów QNH: AIP Polska (PAŻP), zrzut `data/import/qnh_pansa.png`
+- mapa rejonów QNH: linie rejonów i MTMA/MCTR z AIP Polska (PAŻP), zrzut `data/import/qnh_pansa.png`; TMA/CTR z plików sektorowych
 - sektory i stanowiska FIR-ów sąsiednich: pliki `.ese` pakietów sektorowych vACC sąsiadów (`data/import/neighbours/`)
 - łańcuchy sektorów i etykiety sąsiadów: [vacs-data](https://github.com/vacs-project/vacs-data)
   ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), commit c5aa4bd), wyciąg

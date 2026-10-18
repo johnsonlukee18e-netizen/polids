@@ -9,7 +9,8 @@ from .config import settings
 # 5: sąsiedzi – jeden układ pasów na lotnisko, bez sektorów bez OWNER. 6: połączenie z wersją serwerową.
 # 7: stanowiska lotnisk z plików sąsiadów (karty lotnisk), pakiet EDGG. 8: sektory z data/seed/sectors.geojson.
 # 9: pasy, częstotliwości (godziny, źródło, uwaga) i elewacje lotnisk z AIP.
-SCHEMA_VERSION = 9
+# 10: 0.12.5 – kategoria dokumentów OTHER i angielskie tytuły DOCS, typy samolotów z ICAO_Aircraft.json.
+SCHEMA_VERSION = 10
 
 
 class Base(DeclarativeBase):
