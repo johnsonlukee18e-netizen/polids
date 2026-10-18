@@ -1132,3 +1132,17 @@ def test_frontend_imports_resolve():
     assert "sectors.css" not in index and not (FRONTEND / "css" / "sectors.css").exists()
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     assert "subtabs(" not in radio and "text-shadow" not in (FRONTEND / "css" / "radio.css").read_text("utf-8")
+
+
+def test_layer_column_buttons_fit_label():
+    """Runda 14 (przegląd): "TWR/ATIS" w jednej trzeciej rzędu LOW MID HIGH był ucięty przy 1280–1600 px. Przyciski
+    kolumny (APP, TWR, TWR/ATIS, FIS) mają szerokość jednej trzeciej, ale nie mniej niż napis z odstępem po bokach
+    (sprawdzone w przeglądarce: scrollWidth ≤ clientWidth przy 1280×720, 1366×768, 1366×657, 1600×900, 1920×1080)."""
+    css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
+    rule = re.search(r"\.rb-btns button:is\(([^)]*)\) \{([^}]*)\}", css)
+    assert rule, "reguła przycisków kolumny"
+    assert re.findall(r'data-ly="(\w+)"', rule.group(1)) == ["app", "twr", "twra", "fis"]
+    body = rule.group(2)
+    assert "min-width: max-content" in body and "grid-column: 1 / -1" in body and "justify-self: center" in body
+    assert re.search(r"padding: \d+px [1-9]\d*px", body)  # odstęp po bokach napisu
+    assert "border-radius: 0" in re.search(r"\.rb-btns button \{([^}]*)\}", css).group(1)

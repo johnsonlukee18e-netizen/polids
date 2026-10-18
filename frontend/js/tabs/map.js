@@ -77,8 +77,9 @@ const LEGEND = [
     lg(`<span class="p21-sample">${P21_SAMPLE.map((l, i) => `<i class="l${i + 1}">${esc(l)}</i>`).join("")}</span>`,
       `label as in PEGASUS_21: 1. callsign, ground speed (kt); 2. Mode C: A + altitude in hundreds of ft below the
       transition level (FL080), above it the FL; ↑ / ↓ climbing / descending since the previous update; 3. type + wake
-      category, destination (transit: FIR exit point from the flight plan route); 4. h s r = assigned heading, speed
-      and rate (not available on VATSIM), then the requested level from the flight plan in tens (24 = FL240)`, "w p21"),
+      category, destination (transit or departure to a foreign aerodrome: FIR exit point from the flight plan route);
+      4. h s r = assigned heading, speed and rate (not available on VATSIM), then the requested level from the flight
+      plan in tens (24 = FL240, 08 = FL080; below the transition level A + hundreds of ft, A 45 = 4500 ft)`, "w p21"),
     `<p class="lgx-note">Only EP traffic on the map: departures from EP** aerodromes, arrivals to EP** and transits, i.e. aircraft
       in FIR EPWW or aircraft whose remaining flight plan route (from the current position to the destination) enters FIR EPWW;
       without a flight plan only in FIR EPWW. Departures from and arrivals to EP** stay on the map for the whole flight; a transit
@@ -344,7 +345,7 @@ function mainMap(ctx) {
       <div class="aeroc-sec">METAR</div><div class="aeroc-metar">${metar === undefined ? '<span class="muted">loading…</span>' : metar ? esc(metar) : '<span class="muted">no data</span>'}</div>
       <div class="aeroc-sec">Control</div>${ctrls.length ? `<table>${ctrls.map((c) => `<tr><td><span class="ab ab-${c.k.toLowerCase()}">${c.l}</span></td>
         <td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td><td>${who(c)}</td><td class="muted">since ${hhmm(c.logon_time)}</td></tr>`).join("")}</table>`
-        : '<div class="muted">no controller logged in</div>'}
+        : '<div class="muted">unstaffed – nobody logged in</div>'}
       ${atis.map((a) => `<div class="aeroc-sec">ATIS ${esc(a.atis_code || "")} <span class="muted">${esc(a.callsign)} ${esc(a.frequency)}</span></div>
         <div class="aeroc-who">published by: ${who(a)} · since ${hhmm(a.logon_time)}</div>
         <div class="aeroc-atis">${atisHtml(a.text_atis)}</div>`).join("")}`;
@@ -774,7 +775,7 @@ function mainMap(ctx) {
     const nm = (x) => `<span class="muted">${esc(x.name || "")}${x.logon_time ? ` · since ${hhmm(x.logon_time)}` : ""}</span>`;
     if (c) return `<span class="fq">${esc(c.frequency)}</span> <b>${esc(displayName(c.callsign))}</b> ${nm(c)}`;
     if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> ${nm(top)}`;
-    return `<span class="muted">no controller</span>`;
+    return `<span class="muted">unstaffed</span>`;
   };
   // TMA / CTA / CTR: wszystkie stanowiska w kolejności przejmowania (chains.js, jak w RADIO) z częstotliwością,
   // a zalogowane z nazwiskiem kontrolera. Obsługujący na zielonym tle, zalogowani na zielono, niezalogowani szarzy;
@@ -1502,8 +1503,10 @@ function mainMap(ctx) {
     // kept: z mapy tylko wybrany lot, reszta jest w tabeli wykresu vIFF
     pilots.filter((p) => b.contains([p.lat, p.lon]) && (!p.kept || p.callsign === selected)).forEach((p) => {
       const rel = relation(p, adIdx);
-      // etykieta PEGASUS_21 (airspace.js); tranzyt: punkt wyjścia z FIR-u z serwera zamiast lotniska docelowego
-      const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel, exit: rel === "trn" ? p.exit : null })
+      // etykieta PEGASUS_21 (airspace.js); tranzyt i odlot z EP** za granicę: punkt wyjścia z FIR-u z serwera zamiast
+      // lotniska docelowego (serwer podaje exit tylko dla nich; lot krajowy, przylot: lotnisko docelowe)
+      const exit = rel === "trn" || rel === "dep" ? p.exit || null : null;
+      const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel, exit })
         .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)} · ${esc(REL_TEXT[rel](p))}`)
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
       if (p.callsign === selected) m.getElement()?.classList.add("sel");

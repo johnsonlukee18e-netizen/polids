@@ -211,7 +211,7 @@ TAB_BY_PREFIX = (("LK", "LKAA"), ("LZ", "LZBB"), ("UK", "UKLV"), ("UM", "UMMV"),
 
 
 def neighbour_tab(p: dict) -> str | None:
-    """Zakładka sąsiada: EDWW, EDMM, EDUU (EDUU/EDYY), LKAA, LZBB, UKLV, UMMV, UMKK, EYVL, ESAA, EKDK albo INNE;
+    """Zakładka sąsiada: EDWW, EDMM, EDUU (EDUU/EDYY), LKAA, LZBB, UKLV, UMMV, UMKK, EYVL, ESAA, EKDK albo OTHER;
     None = stanowisko polskie (EP**). Najpierw EDUU/EDYY (prefiks, katalog vacs-data albo początek znaku), potem
     katalog FIR-u z vacs-data, bez niego prefiks stanowiska."""
     cs = (p.get("callsign") or "").upper()
@@ -223,12 +223,12 @@ def neighbour_tab(p: dict) -> str | None:
     if UPPER_DE & {pre, head, fir}:
         return "EDUU"
     if fir:
-        return TAB_BY_DIR.get(fir, "INNE")
+        return TAB_BY_DIR.get(fir, "OTHER")
     if pre.startswith("ED"):
         return "EDWW" if pre in EDWW_PREFIXES else "EDMM"
     if pre == "UMKK" or pre.startswith("RU-"):
         return "UMKK"
-    return next((tab for start, tab in TAB_BY_PREFIX if pre.startswith(start)), "INNE")
+    return next((tab for start, tab in TAB_BY_PREFIX if pre.startswith(start)), "OTHER")
 
 
 # --- znaki radiowe i nazwy sektorów stanowisk sąsiadów

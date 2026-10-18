@@ -215,3 +215,32 @@ def test_sharp_edges():
     # przełącznik .sw: kwadratowy tor i kwadratowa gałka
     assert re.search(r"\.sw input \{[^}]*border-radius: 0;", css)
     assert re.search(r"\.sw input::after \{[^}]*border-radius: 0;", css)
+
+
+def test_square_native_controls_and_no_drop_shadows():
+    """Runda 14 (przegląd): natywne pola wyboru i suwak HORIZON (AMAN) Chromium rysuje z zaokrągleniami mimo
+    border-radius 0, więc jeden globalny kwadratowy checkbox (appearance: none, jak .sw) i suwak jak .rb-cut w RADIO.
+    Dymki i okienka Leafleta, dymki [data-tip] i panele bez cieni (płasko jak w PANDORZE)."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
+    base = re.search(r"(?m)^input\[type=checkbox\] \{([^}]*)\}", css)
+    assert base and "appearance: none" in base.group(1) and "border-radius: 0" in base.group(1)
+    assert re.search(r"input\[type=checkbox\]:checked::after \{", css)
+    assert re.search(r"input\[type=checkbox\]:indeterminate::after \{", css)
+    # przełącznik .sw (ta sama waga selektora, później w pliku) zeruje obramowanie i ptaszek z reguły globalnej
+    assert css.index("input[type=checkbox] {") < css.index(".sw input {")
+    assert re.search(r"\.sw input \{[^}]*border: 0;", css) and re.search(r"\.sw input::after \{[^}]*transform: none;", css)
+    dman = (FRONTEND / "css" / "dman.css").read_text("utf-8")
+    assert re.search(r"\.am-hor input \{[^}]*appearance: none;", dman)
+    for part in ("-webkit-slider-runnable-track", "-webkit-slider-thumb", "-moz-range-track", "-moz-range-thumb"):
+        assert re.search(r"\.am-hor input::" + part + r" \{[^}]*border-radius: 0;", dman), part
+    # accent-color przy appearance: none nic nie daje (zostaje tylko przy polach radio w pasku narzędzi)
+    for name in ("style.css", "map.css", "dman.css"):
+        text = (FRONTEND / "css" / name).read_text("utf-8")
+        assert not re.search(r"(checkbox\]|\.chk-row > input|\.am-hor input) \{[^}]*accent-color", text), name
+    # cienie: tylko none, wewnętrzne (inset) albo obrys bez rozmycia (0 0 0 Npx)
+    for name in ("style.css", "map.css", "dman.css", "radio.css"):
+        text = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / name).read_text("utf-8"), flags=re.S)
+        bad = [v.strip() for v in re.findall(r"box-shadow:\s*([^;}]+)", text)
+               if not (v.strip() == "none" or v.strip().startswith("inset") or re.match(r"0 0 0 \d+px", v.strip()))]
+        assert not bad, (name, bad)
+    assert ".leaflet-tooltip, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-bar, .leaflet-control-layers { box-shadow: none; }" in css

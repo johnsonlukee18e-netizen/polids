@@ -174,7 +174,18 @@
 .am-thin .hit { fill: transparent; }
 .am-thin.sel text { fill: #fff; font-weight: 700; }
 .am-hor { flex: none; display: flex; align-items: center; gap: 6px; font-size: 10px; color: #cfcfcf; }
-.am-hor input { flex: 1; min-width: 0; accent-color: var(--green); }
+.am-hor input { flex: 1; min-width: 0; height: 16px; margin: 0; padding: 0; background: transparent; cursor: pointer;
+  -webkit-appearance: none; appearance: none; }
+/* suwak HORIZON kwadratowy jak suwak wysokości w RADIO (.rb-cut): tor 4 px, prostokątny uchwyt, bez zaokrągleń */
+.am-hor input::-webkit-slider-runnable-track { height: 4px; background: #111; border: 1px solid #5a5a5a; border-radius: 0; }
+.am-hor input::-webkit-slider-thumb { width: 9px; height: 14px; margin-top: -6px; background: var(--green); border: 1px solid #000;
+  border-radius: 0; -webkit-appearance: none; appearance: none; }
+.am-hor input::-moz-range-track { height: 4px; background: #111; border: 1px solid #5a5a5a; border-radius: 0; }
+.am-hor input::-moz-range-thumb { width: 9px; height: 14px; background: var(--green); border: 1px solid #000; border-radius: 0; }
+.am-hor input:hover::-webkit-slider-thumb { background: var(--green-hi); }
+.am-hor input:hover::-moz-range-thumb { background: var(--green-hi); }
+.am-hor input:focus { outline: none; }
+.am-hor input:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 .am-hor span { width: 30px; text-align: right; font-size: 12px; color: #fff; }
 .am-info, .am-rest { overflow: auto; border: 1px solid #9a9a9a; padding: 3px; }
 .am-info { flex: none; }
