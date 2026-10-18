@@ -226,7 +226,9 @@ def pilot_info(p: dict) -> dict:
             "route": fp.get("route"), "rfl": fp.get("altitude"), "rules": fp.get("flight_rules"),
             # paski postępu lotu (AERODROME › RUCH)
             "deptime": fp.get("deptime"), "aircraft_icao": fp.get("aircraft"), "wake": fp_wake(fp.get("aircraft")),
-            "assigned_squawk": assigned_squawk(fp), "remarks": fp.get("remarks")}
+            "assigned_squawk": assigned_squawk(fp), "remarks": fp.get("remarks"),
+            # okno lotu w STRIP (Extended Label SDD): lotnisko zapasowe
+            "alternate": fp.get("alternate") or None}
 
 
 # Odczyt pasa z ATIS. Każdą wzmiankę o pasie ("RWY 33", "RUNWAYS 25L AND 25C", "RWY24", albo goły numer tuż przy
@@ -462,7 +464,8 @@ def airport_traffic(feed: dict, icao: str, lat: float | None = None, lon: float 
                                     "arrival": fp.get("arrival"), "deptime": fp.get("deptime"),
                                     "rfl": fp.get("altitude"), "rules": fp.get("flight_rules"),
                                     "route": fp.get("route"), "aircraft_icao": fp.get("aircraft"),
-                                    "wake": fp_wake(fp.get("aircraft")), "remarks": fp.get("remarks")})
+                                    "wake": fp_wake(fp.get("aircraft")), "remarks": fp.get("remarks"),
+                                    "alternate": fp.get("alternate") or None})
     out["arrivals"].sort(key=lambda x: (x["dist_nm"] is None, x["dist_nm"] or 0))
     out["departures"].sort(key=lambda x: (x["state"] != "ground", x["dist_nm"] or 0))
     out["prefiles"].sort(key=lambda x: x.get("deptime") or "")

@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..config import settings
 from ..database import get_db
-from ..models import Aerodrome, AircraftType, AtcPosition
+from ..models import Aerodrome, AircraftType, AtcPosition, Callsign
 from ..services import dman as dman_service
 from ..services import viff as viff_service
 from ..services.aerolist import FIR_KEYS, FIR_LABELS, airport_entry, airport_positions, fir_key, fir_lists
@@ -201,6 +201,22 @@ async def status(icao: str, db: Session = Depends(get_db)):
     }
 
 
+RADIO_CS = re.compile(r"([A-Z]{3})(\d[A-Z0-9]{0,4})")
+
+
+def _radio_callsigns(db: Session, board: dict) -> None:
+    """Pełny znak wywoławczy do okna lotu (Extended Label SDD, wiersz 1): telefonia linii z ICAO_Airlines + numer lotu,
+    np. DLH4AB → "LUFTHANSA 4AB". Znak bez prefiksu linii (SPKAT) albo prefiks bez telefonii: telephony = None."""
+    strips = [s for k in ("departures", "arrivals", "local", "planned") for s in board.get(k, [])]
+    parts = {s["callsign"]: m.groups() for s in strips if (m := RADIO_CS.fullmatch(str(s.get("callsign") or "")))}
+    prefixes = {p for p, _ in parts.values()}
+    tel = dict(db.execute(select(Callsign.icao, Callsign.telephony)
+                          .where(Callsign.icao.in_(prefixes), Callsign.telephony.is_not(None), Callsign.telephony != "")).all()) if prefixes else {}
+    for s in strips:
+        p, n = parts.get(s.get("callsign"), (None, None))
+        s["telephony"] = f"{tel[p].strip().upper()} {n}" if p in tel else None
+
+
 @router.get("/{icao}/strips")
 async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
     """Paski postępu lotu do STRIP i AERODROME › TRAFFIC (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
@@ -239,6 +255,7 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
     use, atis = st["runway_in_use"], st["atis"]
     now = datetime.now(timezone.utc)
     board = strip_board(ad.icao, traffic, viff, use, wtc, now)
+    _radio_callsigns(db, board)
     procs = procedures().get(ad.icao, {})
     viff_etas = None
     if dman and not viff_error:

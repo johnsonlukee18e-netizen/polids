@@ -164,23 +164,39 @@ PL = re.compile("[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
 NODE_SCRIPT = r"""
 const m = await import(process.argv[2]);
 const d = { icao: "EPWA", atis: { letter: "K" }, network_error: null, states: {} };
-const dep = { kind: "dep", callsign: "LOT3827", aircraft: "B38M", wake: "M", rules: "I", registration: "SPLVA",
-  departure: "EPWA", arrival: "EPGD", rfl_ft: 22000, state: "ground", altitude: 362, groundspeed: 0, squawk: "2000",
-  assigned_squawk: "4613", runway: "29", runway_source: "CDM", eobt: "1023", eobt_source: "vIFF", route: "OLILA L621",
-  remarks: "/V/", proc: { name: "OLILA6G", fixes: ["WA901", "OLILA"], approaches: [] },
-  viff: { state: "SI", ctot: "1043", delay: 20, regulation: "EPWA29A", tobt: "1025", tsat: "1025", ttot: "1039" } };
-const arr = { kind: "arr", callsign: "DLH1612", aircraft: "A20N", wake: "M", rules: "I", departure: "EDDF", arrival: "EPWA",
-  rfl_ft: 37000, state: "air", altitude: 11000, groundspeed: 330, dist_nm: 38, eta: "1018", eldt: "1022", eta_min: 7,
-  runway: "33", runway_source: "ATIS", proc: { name: "BIMPA6U", fixes: ["BIMPA", "WA529"], approaches: ["RNP", "ILS Z"] },
-  entry_fix: { fix: "BIMPA" }, viff: null, route: "SOBRA Y180 BIMPA" };
-const loc = { kind: "local", callsign: "SPKAT", aircraft: "C172", wake: "L", rules: "V", departure: "EPWA", arrival: "EPWA",
-  state: "air", altitude: 1300, groundspeed: 85, squawk: "6201", viff: null, route: "VFR CIRCUITS" };
+const dep = { kind: "dep", callsign: "LOT3827", telephony: "LOT 3827", aircraft: "B38M", wake: "M", rules: "I",
+  aircraft_icao: "B38M/M-SDE2E3FGHIJ1RWXY/LB1", departure: "EPWA", arrival: "EPGD", alternate: "EPKK", rfl_ft: 22000,
+  state: "ground", altitude: 362, groundspeed: 0, heading: 290, squawk: "2000", assigned_squawk: "4613", runway: "29",
+  runway_source: "CDM", route: "N0450F220 OLILA6G OLILA L621 BOKSU DCT GRUDA",
+  remarks: "PBN/A1B1C1D1L1O1S1S2 DOF/261018 REG/SPLVA STS/HOSP RVR/200 RMK/TCAS SIMBRIEF EXTRA TEXT /V/",
+  proc: { name: "OLILA6G", fixes: ["WA901", "OLILA"], approaches: [] }, viff: null };
+const arr = { kind: "arr", callsign: "DLH1612", telephony: null, aircraft: "A20N", wake: "M", rules: "I",
+  aircraft_icao: "A20N/M-SDE3FGHIJ1RY/H", departure: "EDDF", arrival: "EPWA", rfl_ft: 37000, state: "air", altitude: 11000,
+  groundspeed: 330, heading: 87, squawk: "4615", assigned_squawk: "4615", runway: "33", proc: { name: "BIMPA6U", fixes: [] },
+  route: "ANEKI Y163 NATOR UN850 TOSTU DCT ERNAS T720 SUI DCT KOPAG DCT 5230N02000E DCT BIMPA BIMPA6U", remarks: "/v/ NEW PILOT" };
+const loc = { kind: "local", callsign: "SPKAT", aircraft: "C172", wake: "L", rules: "V", aircraft_icao: "C172",
+  departure: "EPWA", arrival: "EPWA", state: "air", altitude: 1300, groundspeed: 85, heading: 120, squawk: "6201",
+  route: "VFR CIRCUITS", remarks: "STS/NONRVSM" };
 const pln = { kind: "dep", planned: "viff", callsign: "SAS1748", departure: "EPWA", arrival: "ESSA", state: "offline",
-  eobt: "0941", viff: { state: "SU", suspension: "FLS-NRA" } };
+  squawk: null, groundspeed: null, viff: { state: "SU", suspension: "FLS-NRA" } };
 const out = {};
-for (const [k, s] of Object.entries({ dep, arr, loc, pln })) out[k] = m.extLabel(s, d);
-out.cols = m.XL_COLS;
-out.fields = m.XL_FIELDS.map((f) => ({ k: f.k, row: f.row, col: f.col, span: f.span || 1 }));
+const flat = (lines) => Object.fromEntries(lines.flatMap((ln) => ln.f.map((f) => [f.k, { ...f, line: ln.line,
+  t: f.parts ? f.parts.map((p) => p.t).join("") : null, cls: f.parts ? f.parts.map((p) => p.cls).join(",") : null }])));
+out.dep = flat(m.extLabel(dep, d, { vv: 0 }));
+out.arr = flat(m.extLabel(arr, d, { vv: -840 }));
+out.loc = flat(m.extLabel(loc, d, { vv: 1260 }));
+out.pln = flat(m.extLabel(pln, d));
+out.lines = m.extLabel(dep, d).map((ln) => ({ keys: ln.f.map((f) => f.k), gap: ln.gap, indent: ln.indent }));
+out.width = m.XL_WIDTH;
+out.eq = ["B738/M-SDE2E3FGHIJ1RWXY/LB1D1", "C172/L-G/C", "A320", "H/B738/L", "", null].map((v) => m.equipment(v));
+out.f18 = ["PBN/A1B1C1D1L1O1S1 DOF/261018 REG/SPLVA EET/EPWW0010 RMK/TCAS SIMBRIEF /V/", "/v/ NEW PILOT",
+  "STS/HOSP MEDEVAC RMK/MEDICAL FLIGHT", "", null].map((v) => m.field18(v));
+out.pts = {
+  dep: m.routePoints({ kind: "dep", departure: "EPWA", arrival: "EGLL",
+    route: "N0450F350 SOXER3G SOXER DCT ABUDA L621 LOGDA/N0440F360 UL613 MOBRU DCT 5230N02000E DCT EGLL" }),
+  long: m.routePoints({ kind: "dep", route: "AAA BBB CCC DDD EEE FFF GGG HHH III" }),
+  arr: m.routePoints({ kind: "arr", route: "AAA BBB CCC DDD EEE FFF GGG HHH III" }),
+};
 // pasek 1000..1046 px, okno 432 x 400, ekran 1600 x 900
 out.place = {
   below: m.placeWin({ x: 600, top: 200, bottom: 246 }, 432, 400, 1600, 900),
@@ -209,44 +225,58 @@ def xl(tmp_path_factory):
     return json.loads(r.stdout)
 
 
-def _by_key(fields):
-    return {f["k"]: f for f in fields}
+def test_extended_label_lines_follow_sdd(xl):
+    # SDD 2014 Figure 2-6 / Table 2-13: osiem wierszy, odstęp nad wierszem 3 i nad danymi Mode S, wcięcie wiersza 2
+    assert [ln["keys"] for ln in xl["lines"]] == [
+        ["cs", "wy", "tel", "xpdr"], ["type", "sts", "orcam"], ["adep", "ades", "altn", "proc", "rwy"], ["rules", "route"],
+        ["cfl", "rfl", "free", "rvr"], ["navcom", "surv", "pbn"], ["addr", "sel", "hdg", "ias", "mach", "tas"], ["gs", "vv"]]
+    assert [ln["gap"] for ln in xl["lines"]] == [False, False, True, False, False, False, True, False]
+    assert xl["lines"][1]["indent"] == 3 and xl["width"] >= 44
 
 
-def test_extended_label_layout_is_data_driven(xl):
-    # jedna tablica pól: każde pole ma wiersz i kolumnę w siatce XL_COLS, bez nakładania się pól tego samego rodzaju lotu
-    cols = xl["cols"]
-    assert cols == 4
-    for f in xl["fields"]:
-        assert 1 <= f["col"] and f["col"] + f["span"] - 1 <= cols, f
-    for kind in ("dep", "arr", "loc", "pln"):
-        cells = set()
-        rows = sorted({f["row"] for f in xl[kind]})
-        assert rows == list(range(1, len(rows) + 1)), kind   # wiersze bez pól znikają, numeracja ciągła
-        for f in xl[kind]:
-            for c in range(f["col"], f["col"] + f["span"]):
-                assert (f["row"], c) not in cells, (kind, f)
-                cells.add((f["row"], c))
+def test_extended_label_values_departure(xl):
+    f = xl["dep"]
+    assert (f["cs"]["t"], f["cs"]["cls"]) == ("LOT3827", "g")
+    assert (f["wy"]["t"], f["wy"]["cls"]) == ("WY", "g,g")             # W i Y w NAV/COM: RVSM i 8.33
+    assert (f["tel"]["t"], f["xpdr"]["t"]) == ("LOT 3827", "S/2000")  # L w dozorowaniu = Mode S, kod nadawany
+    assert (f["orcam"]["t"], f["orcam"]["cls"]) == ("4613", "y")         # przydzielony inny niż nadawany
+    assert (f["type"]["t"], f["sts"]["t"]) == ("B38M/M", "HOSP")
+    assert (f["adep"]["t"], f["ades"]["t"], f["altn"]["t"], f["proc"]["l"], f["proc"]["t"], f["rwy"]["t"]) == (
+        "EPWA", "EPGD", "(EPKK)", "SID", "OLILA6G", "RWY29")
+    assert (f["rules"]["t"], f["rules"]["cls"], f["route"]["t"]) == ("I", "y", "OLILA BOKSU GRUDA")
+    assert (f["cfl"]["t"], f["rfl"]["t"], f["rfl"]["cls"]) == (None, "220", "y")
+    assert (f["free"]["t"], f["rvr"]["t"]) == ("TCAS SIMBRIEF EXTRA ", "200")   # tekst RMK najwyżej 20 znaków
+    assert (f["navcom"]["t"], f["surv"]["t"], f["pbn"]["t"]) == ("SDE2E3FGHIJ1RWXY", "LB1", "A1B1C1D1L1O1S1S2")
+    # na ziemi: bez HDG; GS i VV z sieci
+    assert (f["hdg"]["t"], f["gs"]["t"], f["vv"]["t"]) == (None, "000", "0")
+    assert all(f[k]["t"] is None for k in ("addr", "sel", "ias", "mach", "tas"))
 
 
-def test_extended_label_fields_per_flight_kind(xl):
-    dep, arr, loc, pln = (_by_key(xl[k]) for k in ("dep", "arr", "loc", "pln"))
-    assert (dep["ssr"]["t"], dep["ssr"]["sub"]) == ("4613", "XPDR 2000")
-    assert (dep["type"]["t"], dep["rules"]["t"], dep["reg"]["t"]) == ("B38M/M", "IFR", "SPLVA")
-    assert (dep["adep"]["t"], dep["ades"]["t"], dep["rfl"]["t"], dep["lvl"]["t"]) == ("EPWA", "EPGD", "F220", "GND")
-    assert (dep["proc"]["l"], dep["proc"]["t"], dep["rwy"]["t"], dep["rwy"]["sub"]) == ("SID", "OLILA6G", "29", "CDM")
-    assert (dep["eobt"]["t"], dep["tsat"]["t"], dep["ttot"]["t"]) == ("1023", "1025", "1039")
-    assert (dep["ctot"]["t"], dep["ctot"]["sub"]) == ("1043", "+20' EPWA29A") and "d30" in dep["ctot"]["cls"]
-    assert dep["fls"]["t"] == "SI" and dep["status"]["t"] == "PARKED" and dep["stand"]["t"] is None
-    assert dep["route"]["t"] == "OLILA L621" and dep["pts"]["l"] == "SID OLILA6G" and dep["rmk"]["t"] == "/V/"
-    # przylot: ETA, ELDT, odległość, minuty, punkt wejścia i podejścia zamiast czasów A-CDM
-    assert "tsat" not in arr and "ctot" not in arr and "rmk" not in arr
-    assert (arr["eta"]["t"], arr["eldt"]["t"], arr["dist"]["t"], arr["in"]["t"]) == ("1018", "1022", "38 NM", "7'")
-    assert (arr["proc"]["l"], arr["entry"]["t"], arr["apch"]["t"]) == ("STAR", "BIMPA", "RNP, ILS Z")
-    assert (arr["lvl"]["t"], arr["status"]["t"], arr["gs"]["t"]) == ("F110", "AIRBORNE 330 KT", "330 KT")
-    # lot lokalny VFR: bez wierszy pustych czasów vIFF; lot planowany: brak danych = None ("–")
-    assert "tobt" not in loc and "ctot" not in loc and loc["eobt"]["t"] is None and loc["lvl"]["t"] == "A013"
-    assert (pln["status"]["t"], pln["fls"]["t"], pln["ssr"]["t"], pln["lvl"]["t"]) == ("OFFLINE", "SU NRA", None, None)
+def test_extended_label_values_other_kinds(xl):
+    a, loc, pln = xl["arr"], xl["loc"], xl["pln"]
+    assert a["orcam"]["t"] is None and a["tel"]["t"] is None and a["xpdr"]["t"] == "S/4615"   # H = Mode S
+    assert (a["proc"]["l"], a["rfl"]["t"], a["free"]["t"], a["hdg"]["t"], a["vv"]["t"]) == ("STAR", "370", "NEW PILOT", "087", "-8")
+    assert a["route"]["t"] == "NATOR TOSTU ERNAS SUI KOPAG 5230N02000E BIMPA"   # przylot: 7 ostatnich punktów
+    # VFR bez wyposażenia w planie: W żółte (STS/NONRVSM), Y czerwone, transponder bez typu
+    assert (loc["wy"]["cls"], loc["xpdr"]["t"], loc["type"]["t"], loc["vv"]["t"]) == ("y,r", "6201", "C172/L", "+13")
+    assert loc["route"]["t"] is None and loc["altn"]["t"] is None        # "VFR CIRCUITS": brak punktów znaczących
+    # lot planowany (vIFF, pilot niepołączony): bez transpondera i danych Mode S
+    assert all(pln[k]["t"] is None for k in ("xpdr", "orcam", "hdg", "gs", "vv", "tel", "type"))
+    assert (pln["cs"]["t"], pln["adep"]["t"], pln["ades"]["t"]) == ("SAS1748", "EPWA", "ESSA")
+
+
+def test_extended_label_flight_plan_parsers(xl):
+    eq = xl["eq"]
+    assert eq[0] == {"type": "B738", "wake": "M", "navcom": "SDE2E3FGHIJ1RWXY", "surv": "LB1D1"}
+    assert eq[1] == {"type": "C172", "wake": "L", "navcom": "G", "surv": "C"}
+    assert eq[2] == {"type": "A320", "wake": None, "navcom": None, "surv": None}
+    assert all(e == {"type": None, "wake": None, "navcom": None, "surv": None} for e in eq[3:])
+    f = xl["f18"]
+    assert (f[0]["PBN"], f[0]["REG"], f[0]["RMK"], f[0]["EET"]) == ("A1B1C1D1L1O1S1", "SPLVA", "TCAS SIMBRIEF", "EPWW0010")
+    assert f[1] == {"RMK": "NEW PILOT"} and f[2] == {"STS": "HOSP MEDEVAC", "RMK": "MEDICAL FLIGHT"} and f[3] == {} == f[4]
+    p = xl["pts"]
+    assert p["dep"] == ["SOXER", "ABUDA", "LOGDA", "MOBRU", "5230N02000E"]
+    assert p["long"] == ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"] and p["arr"] == ["CCC", "DDD", "EEE", "FFF", "GGG", "HHH", "III"]
 
 
 def test_extended_label_window_stays_in_viewport(xl):
@@ -256,6 +286,27 @@ def test_extended_label_window_stays_in_viewport(xl):
     assert p["right"] == {"left": 1600 - 432 - 6, "top": 249}
     assert p["left"]["left"] == 6
     assert p["tall"]["top"] == 768 - 700 - 6 and p["tall"]["top"] >= 6
+
+
+def test_radio_callsign_from_airline_telephony():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from backend.app.database import Base
+    from backend.app.models import Callsign
+    from backend.app.routers.aerodromes import _radio_callsigns
+
+    eng = create_engine("sqlite://")
+    Base.metadata.create_all(eng)
+    with Session(eng) as db:
+        db.add_all([Callsign(icao="LOT", name="LOT - POLSKIE LINIE LOTNICZE", telephony="lot "),
+                    Callsign(icao="XXX", name="No telephony", telephony="")])
+        db.commit()
+        board = {"departures": [{"callsign": "LOT3PC"}, {"callsign": "SPKAT"}], "arrivals": [{"callsign": "XXX123"}],
+                 "local": [], "planned": [{"callsign": "LOT1"}]}
+        _radio_callsigns(db, board)
+    assert [s["telephony"] for s in board["departures"] + board["arrivals"] + board["planned"]] == [
+        "LOT 3PC", None, None, "LOT 1"]
 
 
 def _code(src):
@@ -274,6 +325,11 @@ def test_strips_click_window_not_hover_and_english():
     # 0.12.5: najechanie na pasek niczego nie otwiera; kliknięcie otwiera okno, Esc / × / klik obok zamyka
     assert "mousemove" not in js and "sx-tip" not in js and "mouseleave" not in js
     assert 'root.addEventListener("click"' in js and 'e.key === "Escape"' in js and 'class="xw-x"' in js
+    # klawiatura: pasek ma fokus i otwiera okno Enterem / spacją; notatka pola po stałym kluczu data-f, nie po indeksie
+    assert 'tabindex="0" role="button"' in js and 'e.key !== "Enter"' in js and "EXTENDED LABEL WINDOW" in js
+    tags = re.findall(r"<[^<>]*data-h=[^<>]*>", js)
+    assert len(tags) == js.count("data-h=") and all('data-f="' in t for t in tags), [t for t in tags if 'data-f="' not in t]
+    assert 'querySelectorAll("[data-h]")[' not in js
     assert 'document.addEventListener("click", onDocClick)' in js and 'document.removeEventListener("click", onDocClick)' in js
     assert "if (open) drawWin();" in js   # odświeżenie: nowe dane w oknie albo zamknięcie, gdy lotu już nie ma
     for src in (js, STRIP_TAB_JS.read_text("utf-8")):
