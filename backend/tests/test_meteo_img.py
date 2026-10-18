@@ -1,7 +1,7 @@
 """METEO (runda 10): SAT PL i SAT EUR (Windy z własnym środkiem i zoomem), TURB (8 klatek IMGW co 3 h, odtwarzacz)
 i SIGWX (mapa IMGW odświeżana co 15 min). Obrazy IMGW wczytuje przeglądarka użytkownika, nie serwer PolIDS.
 0.12.3 (issue #13): kolejność podzakładek, GAMET (rejony A1–A5 i ALL), ICING (Windy z poziomem), SUN.
-0.12.5 (issue #18): WIND i RADAR jako środkowa grupa podzakładek, WIND zawsze od 0 ft."""
+0.12.5 (issue #18): WIND i RADAR jako środkowa grupa podzakładek, WIND zawsze od 0 ft, napisy po angielsku."""
 import json
 import re
 import shutil
@@ -166,11 +166,12 @@ def test_sun_helpers(js):
     assert s["cell"][2] == '05:01Z<small class="loc">07:01 CEST</small>'
     assert s["cell"][3] == "–" and s["cell"][4] == '00:00Z <small class="d">16.10</small>'
     assert s["dur"] == ["10 h 41 min", "24 h", "0 min", "45 min", "–"]
-    assert s["until"] == ["za chwilę", "za 12 min", "za 3 h 12 min"]
-    assert s["polar"][0].startswith("dzień polarny") and s["polar"][1].startswith("noc polarna")
-    assert s["polar"][3].startswith("białe noce") and s["polar"][4] == ""
-    assert s["edge"][0].startswith("początek dnia polarnego") and s["edge"][1].startswith("koniec dnia polarnego")
-    assert s["edge"][2].startswith("początek białych nocy") and s["edge"][3].startswith("koniec białych nocy")
+    assert s["until"] == ["in <1 min", "in 12 min", "in 3 h 12 min"]
+    assert s["polar"][0].startswith("polar day:") and s["polar"][1].startswith("polar night:")
+    assert "more than 6°" in s["polar"][1] and "more than 6°" not in s["polar"][2]
+    assert s["polar"][3].startswith("white nights:") and s["polar"][4] == ""
+    assert s["edge"][0].startswith("polar day begins") and s["edge"][1].startswith("polar day ends")
+    assert s["edge"][2].startswith("white nights begin") and s["edge"][3].startswith("white nights end")
     assert s["edge"][4] == ""
     # "Następne": pierwsze nieminione z listy, więc po zachodzie od razu EECT (bez czekania 10 min na serwer)
     assert s["next"] == ["sunset", "civil_dusk", "civil_dawn", None, "sunset", None, None]
@@ -242,7 +243,7 @@ def test_images_loaded_by_browser():
     assert "/image" not in gamet and "webp" not in gamet.lower()
     assert not re.search(r"api\([^)]*imgw", METEO, re.I)
     # błąd klatki: odnośnik do obrazu w nowej karcie; obraz dopasowany do okna
-    assert re.search(r"otwórz w nowej karcie", METEO) and 'rel="noopener noreferrer"' in METEO
+    assert re.search(r"open in new tab", METEO) and 'rel="noopener noreferrer"' in METEO
     assert re.search(r"object-fit:\s*contain", CSS)
     # timery odtwarzacza i odświeżania zatrzymywane przy zamknięciu podzakładki
     view = METEO[METEO.index("function imgView("):METEO.index("// --- WIND")]
@@ -263,7 +264,22 @@ def test_wind_opens_at_0ft():
     # pozostałe wybory WIND (lotnisko, pas lotniska) nadal zapamiętane
     assert 'lsGet("meteo.wind.ad")' in view and "lsGet(rwyKey())" in view
     # przyciski 0 ft / 3000 ft: 0 ft pierwszy
-    assert '<button data-m="0">0 ft</button><button data-m="3000">3000 ft (podejście)</button>' in view
+    assert '<button data-m="0">0 ft</button><button data-m="3000">3000 ft (approach)</button>' in view
+
+
+def test_strings_in_english():
+    """Issue #18: interfejs po angielsku: w kodzie METEO (bez komentarzy) nie ma polskich liter. Mapa QNH regionalnego
+    (przenoszona do qnhmap.js) ma własne testy."""
+    src = METEO
+    a, b = src.find("// Mapa QNH regionalnego"), src.find("// --- RADAR, SAT PL")
+    if 0 <= a < b:
+        src = src[:a] + src[b:]
+    code = "\n".join(re.sub(r"(^|\s)//.*$", "", line) for line in src.splitlines())
+    assert not re.findall(r".{0,30}[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ].{0,30}", code)
+    for txt in ("Updated ", ">Show</button>", "refresh every 2 min", ">FIT</button>", "image failed to load", ">Retry</button>",
+                "Loading GAMET…", "No GAMET for area", "approach wind 3000 ft", "surface wind", "Main aerodromes",
+                "CIVIL TWILIGHT", "Point on map"):
+        assert txt in METEO, txt
 
 
 def test_no_glow():
