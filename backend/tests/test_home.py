@@ -149,7 +149,7 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
     monkeypatch.setattr(vatsim_api, "get_feed", as_list)
     d = client.get("/api/vatsim/me").json()
     # komunikat o data feed (tekst z routers/vatsim.py), nie 500
-    assert d["online"] == [] and d["online_error"].startswith("VATSIM data feed ")
+    assert d["online"] == [] and d["online_error"].startswith("VATSIM data feed unavailable")
 
 
 # --- frontend: czyste funkcje HOME w Node -----------------------------------------------------------------------

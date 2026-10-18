@@ -36,7 +36,7 @@ def test_slice_kind(fir, name, expected):
 
 def test_labels():
     assert group_label("tma", "EPWA") == "TMA Warszawa" and group_label("ctr", "EPKK") == "CTR Kraków"
-    assert group_label("acc", "B") == "Sektor B" and group_label("fis", "GDN") == "FIS Gdańsk"
+    assert group_label("acc", "B") == "Sector B" and group_label("fis", "GDN") == "FIS Gdańsk"
     assert group_label("atz", "EPTR28") == "TRA EPTR28" and group_label("nb", "EDWW") == "EDWW Bremen"
     assert slice_label("LZBB", "CTR") == "LZBB CTR" and slice_label("EDWW", "EDWWFLG1") == "EDWWFLG1"
     # TMA Poznań N i S osobno (klucze tma_topdown w ownership.json), wspólna część z Gdańskiem jako TMA Poznań

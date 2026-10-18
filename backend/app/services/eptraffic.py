@@ -16,7 +16,11 @@ samo DCT, same nieznane punkty), liczy się łuk od bieżącej pozycji do lotnis
 wokół lotnisk odlotu i celu (punkt albo droga o tej samej nazwie na innym kontynencie) pomijamy. Rozpisana trasa zostaje
 w pamięci (klucz: znak, lotniska, trasa), więc przy odświeżaniu co 30 s liczy się tylko, czy reszta trasy od bieżącej
 pozycji wchodzi w FIR. Gdy trasy nie da się rozpisać (błąd bazy nawigacyjnej, np. w trakcie importu), lot ma relację
-tylko z lotnisk i pozycji, a trasę rozpisujemy przy następnym odświeżeniu."""
+tylko z lotnisk i pozycji, a trasę rozpisujemy przy następnym odświeżeniu.
+
+Punkt wyjścia z FIR-u (etykieta tranzytu na MAP, trzecia linijka jak w PEGASUS_21): nazwany punkt trasy najbliżej
+miejsca, w którym trasa ostatni raz opuszcza FIR EPWW (do EXIT_NM od niego); bez takiego punktu (długi odcinek DCT
+przez granicę, trasa nierozpisana, łuk do lotniska docelowego) MAP pokazuje lotnisko docelowe."""
 
 import json
 import logging
@@ -35,6 +39,8 @@ KEEP_S = 900  # trasa lotu, którego nie ma w feedzie od tylu sekund, wypada z p
 # punkt trasy dalej od lotnisk niż elipsa: odległość odlot–punkt–cel ≤ 1,5 × odlot–cel + 250 NM, to pomyłka;
 # co najmniej 600 NM (lot po kręgu z powrotem na lotnisko startu, krótki lot z objazdem: do ok. 300 NM od lotnisk)
 CORRIDOR, CORRIDOR_NM, CORRIDOR_MIN = 1.5, 250, 600
+EXIT_NM = 30  # punkt wyjścia z FIR-u: nazwany punkt trasy najdalej tyle od miejsca, w którym trasa opuszcza FIR
+NAMED = re.compile(r"^[A-Z]{2,5}$")  # punkt nawigacyjny z nazwą (bez współrzędnych 5230N01500E i kodów lotnisk)
 log = logging.getLogger("polids.eptraffic")
 
 Point = tuple[float, float]  # (lat, lon)
@@ -133,16 +139,33 @@ def path_hits(pts: list[Point], outline: Outline) -> list[bool]:
     return out
 
 
+def exit_point(pts: list[Point], last: int, named: list[tuple[str, Point]], outline: Outline) -> str | None:
+    """Nazwany punkt trasy najbliżej miejsca, w którym trasa (punkty co ok. 20 NM) ostatni raz opuszcza obszar:
+    odcinek pts[last] → pts[last + 1] (pts[last] to ostatni punkt, od którego trasa jeszcze dotyka obszaru) próbkowany
+    co ok. 0,5 NM. Trasa kończy się w obszarze albo go nie dotyka: None."""
+    if last < 0 or last + 1 >= len(pts) or not named:
+        return None
+    (la1, lo1), (la2, lo2) = pts[last], pts[last + 1]
+    n = max(1, int(dist_nm(pts[last], pts[last + 1]) * 2))
+    k = max((i for i in range(n + 1) if outline.contains(la1 + (la2 - la1) * i / n, lo1 + (lo2 - lo1) * i / n)), default=0)
+    cross = (la1 + (la2 - la1) * k / n, lo1 + (lo2 - lo1) * k / n)
+    d, ident = min((dist_nm(cross, p), ident) for ident, p in named)
+    return ident if d <= EXIT_NM else None
+
+
 class Plan:
     """Trasa z planu lotu rozpisana i sprawdzona raz: punkty co ok. 20 NM i ostatni punkt, od którego trasa jeszcze
-    dotyka FIR-u. Bez punktów trasy (`pts` None) liczy się łuk od pozycji do lotniska docelowego (`dest`)."""
+    dotyka FIR-u. Bez punktów trasy (`pts` None) liczy się łuk od pozycji do lotniska docelowego (`dest`).
+    exit: nazwany punkt trasy, przez który trasa ostatni raz opuszcza FIR (exit_point), albo None."""
 
-    __slots__ = ("pts", "last", "dest", "seen")
+    __slots__ = ("pts", "last", "dest", "seen", "exit")
 
-    def __init__(self, pts: list[Point] | None, dest: Point | None, outline: Outline):
+    def __init__(self, pts: list[Point] | None, dest: Point | None, outline: Outline,
+                 named: list[tuple[str, Point]] | None = None):
         self.pts, self.dest, self.seen = pts, dest, time.monotonic()
         hits = path_hits(pts, outline) if pts else []
         self.last = max((i for i, h in enumerate(hits) if h), default=-1)
+        self.exit = exit_point(pts, self.last, named or [], outline) if pts else None
 
     @classmethod
     def build(cls, dep: str, route: str, arr: str, resolver, outline: Outline) -> "Plan":
@@ -156,7 +179,9 @@ class Plan:
             pts = [p for p in pts if dist_nm(orig, (p["lat"], p["lon"])) + dist_nm((p["lat"], p["lon"]), dest) <= limit]
         if not any(p["ident"] not in (dep, arr) for p in pts):
             return cls(None, dest, outline)  # nic poza lotniskami: łuk od bieżącej pozycji do lotniska docelowego
-        return cls(densify([(p["lat"], p["lon"]) for p in pts]), dest, outline)
+        named = [(p["ident"], (p["lat"], p["lon"])) for p in pts
+                 if p.get("kind") != "AD" and p["ident"] not in (dep, arr) and NAMED.match(p["ident"])]
+        return cls(densify([(p["lat"], p["lon"]) for p in pts]), dest, outline, named)
 
     def enters(self, pos: Point, outline: Outline) -> bool:
         """Czy reszta trasy od pozycji `pos` (poza obszarem) wchodzi w obszar."""
@@ -198,16 +223,21 @@ class EpTraffic:
 
         resolver: RouteResolver (resolve(tekst) → {"points": [...]}, prefetch(teksty) = punkty i drogi wszystkich
         nowych tras naraz)."""
+        return [rel for rel, _ in self.classify(pilots, resolver)]
+
+    def classify(self, pilots: list[dict], resolver) -> list[tuple[str | None, str | None]]:
+        """Jak relations, z punktem wyjścia z FIR-u tranzytu: [(relacja, punkt wyjścia albo None)]. Tranzyt w FIR-ze
+        z planem lotu też ma rozpisaną trasę (tylko po punkt wyjścia; relacja zostaje "trn")."""
         outline = self._outline()
         with self._lock:
-            out: list[str | None] = []
-            todo = []  # (indeks, znak, klucz planu, pozycja): loty, o których decyduje trasa
+            out: list[tuple[str | None, str | None]] = []
+            todo = []  # (indeks, znak, klucz planu, pozycja, relacja bez trasy): loty z trasą do rozpisania
             for p in pilots:
                 rel, key = self._quick(p, outline)
                 if key:
-                    todo.append((len(out), p.get("callsign") or "", key, (p["lat"], p["lon"])))
-                out.append(rel)
-            new = {key for _, cs, key, _ in todo if (self._plans.get(cs) or (None,))[0] != key}
+                    todo.append((len(out), p.get("callsign") or "", key, (p["lat"], p["lon"]), rel))
+                out.append((rel, None))
+            new = {key for _, cs, key, _, _ in todo if (self._plans.get(cs) or (None,))[0] != key}
             broken = False  # baza nawigacyjna zawiodła: nowych tras w tym odświeżeniu już nie rozpisujemy
             if new and hasattr(resolver, "prefetch"):
                 try:
@@ -216,7 +246,7 @@ class EpTraffic:
                     broken = True
                     log.warning("MAP, ruch EP: trasy nierozpisane (%s), relacja tylko z lotnisk i pozycji", _first(exc))
             now = time.monotonic()
-            for i, cs, key, pos in todo:
+            for i, cs, key, pos, rel in todo:
                 hit = self._plans.get(cs)
                 if not hit or hit[0] != key:
                     if broken:
@@ -229,7 +259,9 @@ class EpTraffic:
                         continue
                     hit = self._plans[cs] = (key, plan)
                 hit[1].seen = now
-                out[i] = "trn" if hit[1].enters(pos, outline) else None
+                if rel is None:
+                    rel = "trn" if hit[1].enters(pos, outline) else None
+                out[i] = (rel, hit[1].exit if rel == "trn" else None)
             if now - self._pruned > 60:
                 self._pruned = now
                 self._plans = {cs: v for cs, v in self._plans.items() if now - v[1].seen < KEEP_S}
@@ -237,7 +269,8 @@ class EpTraffic:
 
     @staticmethod
     def _quick(p: dict, outline: Outline) -> tuple[str | None, tuple | None]:
-        """Relacja bez trasy albo klucz planu (lotnisko odlotu, trasa, lotnisko docelowe), gdy decyduje trasa."""
+        """Relacja bez trasy albo klucz planu (lotnisko odlotu, trasa, lotnisko docelowe), gdy decyduje trasa
+        (w FIR-ze: relacja "trn" i klucz planu do punktu wyjścia z FIR-u)."""
         dep, arr = (p.get("departure") or "").upper(), (p.get("arrival") or "").upper()
         if EP_AD.match(dep):
             return "dep", None
@@ -247,7 +280,8 @@ class EpTraffic:
         if lat is None or lon is None:
             return None, None
         if outline.contains(lat, lon):
-            return "trn", None
+            # w FIR-ze to zawsze tranzyt; trasa z planu lotu tylko po punkt wyjścia z FIR-u (etykieta na MAP)
+            return "trn", ((dep, (p.get("route") or "").upper(), arr) if dep or arr else None)
         if not dep and not arr:
             return None, None  # bez planu lotu liczy się tylko pozycja w FIR EPWW
         return None, (dep, (p.get("route") or "").upper(), arr)

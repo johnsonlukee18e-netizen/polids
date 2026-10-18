@@ -143,14 +143,14 @@ class RouteResolver:
                     points.extend(path[1:])
                     i += 2
                     continue
-                warnings.append(f"Nie udało się rozwinąć drogi {tok} między {points[-1]['ident']} a {tokens[i + 1]}")
+                warnings.append(f"Could not expand airway {tok} between {points[-1]['ident']} and {tokens[i + 1]}")
                 i += 1
                 continue
             p = self._point(tok, near)
             if p:
                 points.append(p)
             else:
-                warnings.append(f"Nieznany punkt lub procedura: {tok}")
+                warnings.append(f"Unknown point or procedure: {tok}")
             i += 1
         total = sum(dist_nm((a["lat"], a["lon"]), (b["lat"], b["lon"])) for a, b in zip(points, points[1:]))
         return {"points": points, "distance_nm": round(total, 1), "warnings": warnings}

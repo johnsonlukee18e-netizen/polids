@@ -78,6 +78,6 @@ def test_controller_rows(js):
     # etykieta stanowiska: rodzaj ze znaku (ESGG_GND → G), dane kontrolera i jego opis linijka po linijce
     g = js["gnd"]
     assert 'class="ab ab-gnd">G<' in g and "ESGG_GND" in g and "121.705" in g and "Johan Lindqvist" in g and "S1" in g
-    assert "od 12:00Z" in g and '<div class="atl">Charts: www.lfv.se</div>' in g and 'class="atis ci"' in g
+    assert "since 12:00Z" in g and '<div class="atl">Charts: www.lfv.se</div>' in g and 'class="atis ci"' in g
     assert "Charts" not in js["gndPlain"]  # bez info: sam wiersz kontrolera
     assert 'class="ab ab-twr">T<' in js["twr"] and "atis ci" not in js["twr"]  # text_atis = null: bez wiersza opisu

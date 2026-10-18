@@ -7,13 +7,14 @@ from pathlib import Path
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from backend.app.services.eptraffic import EpTraffic, Outline, Plan, densify, dist_nm, epww_outline, path_hits
+from backend.app.services.eptraffic import EpTraffic, Outline, Plan, densify, dist_nm, epww_outline, exit_point, path_hits
 
 AD = {"EDDF": (50.033, 8.570), "EYVI": (54.637, 25.288), "LOWW": (48.110, 16.570), "EPWA": (52.166, 20.967),
       "EGLL": (51.471, -0.461), "EPKK": (50.078, 19.785), "EPGD": (54.378, 18.466), "EDDB": (52.362, 13.501),
       "LKPR": (50.101, 14.260), "UHPP": (53.168, 158.454), "PADK": (51.878, -176.646)}
-# punkty tras na niby: P1, P2 w Polsce, P3 i TANNE w Niemczech, ALPEN w Austrii
+# punkty tras na niby: P1, P2 w Polsce, P3 i TANNE w Niemczech, ALPEN w Austrii, BORDA na granicy z Litwą
 FIX = {"P1": (53.0, 21.0), "P2": (52.3, 17.0), "P3": (51.5, 12.0), "TANNE": (50.0, 12.0), "ALPEN": (48.5, 14.0),
+       "BORDA": (54.0, 23.55),
        "NORIL": (69.3, 88.2)}  # NORIL: punkt o tej samej nazwie na Syberii (pomyłka w trasie)
 
 
@@ -231,3 +232,30 @@ def test_climb_rates_ignore_quick_reloads(tmp_path):
         {"DOM1": -1500},                 # 30 s po odczycie z 30000: 4500 → 3000
         {"DOM1": -1500},                 # 5 s później (bez wysokości): poprzednie vs
         {"DOM1": -1000}]                 # względem odczytu z 60000
+
+
+def test_exit_point_near_boundary_crossing():
+    """Punkt wyjścia: nazwany punkt trasy najbliżej miejsca, w którym trasa ostatni raz opuszcza obszar (do 30 NM)."""
+    square = Outline([[(20, 52), (21, 52), (21, 53), (20, 53)]])
+    pts = densify([(52.5, 20.2), (52.5, 21.5)])
+    last = max(i for i, h in enumerate(path_hits(pts, square)) if h)
+    assert exit_point(pts, last, [("INNER", (52.5, 20.2)), ("EDGEX", (52.5, 21.05)), ("FARXX", (52.5, 21.5))], square) == "EDGEX"
+    assert exit_point(pts, last, [("INNER", (52.5, 20.05))], square) is None  # ok. 35 NM od granicy, za daleko
+    assert exit_point(pts, len(pts) - 1, [("FARXX", (52.5, 21.5))], square) is None  # trasa kończy się w obszarze
+    assert exit_point(pts, -1, [("FARXX", (52.5, 21.5))], square) is None  # trasa obszaru nie dotyka
+
+
+def test_transit_exit_point(traffic):
+    """Tranzyt ma punkt wyjścia z FIR-u (trzecia linijka etykiety na MAP), także w FIR-ze (trasa rozpisana tylko po to);
+    bez nazwanego punktu przy granicy (długi odcinek do EYVI) None: MAP pokazuje lotnisko docelowe. Odlot bez punktu."""
+    fr = FakeResolver()
+    east = "TANNE DCT P3 DCT P2 DCT P1 DCT BORDA"
+    out = traffic.classify([
+        pilot("DLH1", 50.3, 10.0, "EDDF", "EYVI", east),                         # przed FIR-em
+        pilot("DLH2", 52.3, 17.0, "EDDF", "EYVI", east),                         # w FIR-ze, przy P2
+        pilot("DLH3", 52.3, 17.0, "EDDF", "EYVI", "TANNE DCT P3 DCT P2 DCT P1"),  # od P1 do EYVI bez punktów
+        pilot("LOT1", 52.1, 20.9, "EPWA", "EYVI", east),
+        pilot("SPABC", 52.0, 19.0)], fr)
+    assert out == [("trn", "BORDA"), ("trn", "BORDA"), ("trn", None), ("dep", None), ("trn", None)]
+    assert len(fr.resolved) == 3 and traffic.cached() == 3
+    assert traffic.relations([pilot("DLH2", 53.5, 22.5, "EDDF", "EYVI", east)], fr) == ["trn"] and len(fr.resolved) == 3
