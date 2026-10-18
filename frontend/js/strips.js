@@ -157,12 +157,15 @@ function statusHint(s, d) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Okno lotu po kliknięciu paska: "EXTENDED LABEL WINDOW" z instrukcji SDD 2014 (rozdz. 2.1.2.3, Figure 2-6, Table 2-13).
 // Osiem wierszy jak w SDD: 1 callsign, W (RVSM), Y (8.33), pełny znak radiowy, typ transpondera / kod A;
-// 2 typ / WTC, STS, ORCAM SSR; 3 ADEP ADES (zapasowe) STAR/SID RWY; 4 reguły, trasa (do 7 punktów);
-// 5 CFL RFL, tekst RMK, RVR; 6 NAV/COM, wyposażenie dozorowania, PBN; 7-8 dane Mode S (z VATSIM tylko HDG, GS, VV).
-// Pola bez danych są puste jak w SDD; przycisk KEY w belce pokazuje nad wartościami nazwy pól.
+// 2 typ / WTC, STS, ORCAM SSR; 3 ADEP ADES (zapasowe) STAR/SID RWY, następna częstotliwość; 4 reguły, trasa (do 7
+// punktów), poziom wyjścia z FIR; 5 CFL RFL, tekst RMK, RVR; 6 NAV/COM, wyposażenie dozorowania, PBN; 7-8 dane Mode S
+// (z VATSIM tylko HDG, GS, VV). Pola bez danych są puste jak w SDD; przycisk KEY w belce pokazuje nad wartościami nazwy pól.
 // Cały układ jest w XL_LINES: wiersz = { indent, gap (odstęp nad), f: pola }; pole = { k, l (nazwa w KEY), w (szerokość
-// w znakach), right (do prawej krawędzi), v(s, d, x) = tekst, { t, cls } albo [{ t, cls }, ...] (kolorowe części) albo null }.
-export const XL_WIDTH = 52;   // szerokość okna w znakach (najdłuższy wiersz SDD: 6 pól dozorowania/PBN)
+// z Table 2-13 w znakach: kolumna i limit wartości), max (dłuższy limit, tylko callsign), right (do prawej krawędzi),
+// v(s, d, x) = tekst, { t, cls, full } albo [{ t, cls }, ...] (kolorowe części) albo null }.
+// Wartość dłuższa niż limit jest ucięta z "…" (clip); pełna jest w title pola i w opisie pod oknem po kliknięciu pola.
+// szerokość okna w znakach: najdłuższy wiersz SDD to 6 (NAV/COM 18 + SUR 15 + PBN 16 + odstępy = 51)
+export const XL_WIDTH = 52;
 const STS_KEYS = new Set(["STS", "PBN", "NAV", "COM", "DAT", "SUR", "DEP", "DEST", "DOF", "REG", "EET", "SEL", "TYP", "CODE",
   "DLE", "OPR", "ORGN", "PER", "ALTN", "RALT", "TALT", "RIF", "RMK", "RVR", "RFP", "EUR", "IFP"]);
 
@@ -214,15 +217,39 @@ const AIRWAY = /^[A-Z]{1,2}\d{1,3}[A-Z]?$/;
 const PROC_NAME_RE = /^[A-Z]{2,5}\d[A-Z]$/;
 const SPEED_LEVEL = /^[NKM]\d{3,4}(?:[FAMS]\d{3,4}|VFR)?$/;
 const LATLON = /^\d{2,4}[NS]\d{3,5}[EW]$/;
-// punkty znaczące trasy (bez DCT, dróg lotniczych, SID/STAR, grup prędkość/poziom i lotnisk ADEP/ADES), najwyżej 7:
-// dla przylotu ostatnie (najbliżej lotniska), dla odlotu i lotu lokalnego pierwsze
+// pas startowy w trasie VFR: "RWY29", "RW11", "R29", "29L"
+const RUNWAY = /^(?:RWY?|RY|R)?\d{2}[LRC]?$/;
+// słowa z opisowych tras VFR / lotów lokalnych ("VFR CIRCUITS RWY 29", "LOCAL TRAINING OVER CITY"), które nie są punktami;
+// sprawdzone z punktami pliku sektorów EPWW (VOR, NDB, FIXES), navaids.csv i isec.txt: żadne nie jest punktem w pobliżu
+// Polski (dlatego bez NO, OR, NE, NW, NORTH, SOUTH: takie punkty są w Polsce i w Danii)
+const NOT_FIX = new Set(["DCT", "SID", "STAR", "IFR", "VFR", "SVFR", "OAT", "GAT", "IFPSTOP", "IFPSTART",
+  "IN", "TO", "GO", "ON", "OF", "AT", "BY", "UP",
+  "RWY", "RWYS", "RUNWAY", "LOCAL", "CIRCUIT", "CIRCUITS", "CCT", "CCTS", "CIRC", "TRAINING", "TRAIN", "TRNG", "TNG",
+  "OVER", "CITY", "AREA", "ZONE", "STAY", "HOLD", "HOLDS", "HOLDING", "TOUCH", "LOW", "PASS", "LAND", "FULL", "STOP",
+  "BACK", "THEN", "AND", "FROM", "VIA", "WITH", "THE", "LEFT", "RIGHT", "BASE", "HOME", "SAME", "ROUTE", "FILED", "RADAR",
+  "VECTORS", "TOUR", "TEST", "CHECK", "FLIGHT", "FLT", "NAV", "GPS", "RNAV", "VMC", "APP", "APCH", "ILS", "RNP", "VOR",
+  "NDB", "DME", "LOC", "CTR", "TMA", "CTA", "ATZ", "MATZ", "ATC"]);
+// punkty znaczące trasy (bez DCT, dróg lotniczych, SID/STAR, grup prędkość/poziom, pasów, słów opisowych
+// i lotnisk ADEP/ADES), najwyżej 7: dla przylotu ostatnie (najbliżej lotniska), dla odlotu i lotu lokalnego pierwsze
 export function routePoints(s, max = 7) {
-  const skip = new Set(["DCT", "SID", "STAR", "IFR", "VFR", "OAT", "GAT", "IFPSTOP", "IFPSTART", s.departure, s.arrival]);
   const pts = String(s.route || "").toUpperCase().split(/\s+/).map((t) => t.split("/")[0])
-    .filter((t) => t && !skip.has(t) && !AIRWAY.test(t) && !PROC_NAME_RE.test(t) && !SPEED_LEVEL.test(t)
-      && (/^[A-Z]{2,5}$/.test(t) || LATLON.test(t)));
+    .filter((t) => t && !NOT_FIX.has(t) && t !== s.departure && t !== s.arrival && !RUNWAY.test(t) && !AIRWAY.test(t)
+      && !PROC_NAME_RE.test(t) && !SPEED_LEVEL.test(t) && (/^[A-Z]{2,5}$/.test(t) || LATLON.test(t)));
   const out = pts.filter((t, i) => t !== pts[i - 1]);
   return s.kind === "arr" ? out.slice(-max) : out.slice(0, max);
+}
+
+// punkty w polu trasy (41 znaków): bez cięcia nazw, nadmiarowe odpadają z dalszego końca (przylot: z początku) z "…"
+export function fitPoints(pts, max, fromEnd = false) {
+  const all = pts.join(" ");
+  if (all.length <= max) return all;
+  const p = fromEnd ? [...pts].reverse() : [...pts];
+  const keep = [];
+  for (const t of p) {
+    if ([...keep, t, "…"].join(" ").length > max) break;
+    keep.push(t);
+  }
+  return (fromEnd ? ["…", ...keep.reverse()] : [...keep, "…"]).join(" ");
 }
 
 const fl3 = (ft) => (has(ft) ? String(Math.max(0, Math.round(ft / 100))).padStart(3, "0") : null);
@@ -231,9 +258,10 @@ const live = (s) => !s.planned && s.state !== "offline";
 
 export const XL_LINES = [
   { f: [
-    { k: "cs", l: "CALLSIGN", w: 7, v: (s) => ({ t: s.callsign || "", cls: "g" }) },
+    // callsign: kolumna 7 znaków jak w SDD, ale znak VATSIM bywa dłuższy, więc limit 10 (wiersz dalej mieści się w XL_WIDTH)
+    { k: "cs", l: "CALLSIGN", w: 7, max: 10, v: (s) => ({ t: s.callsign || "", cls: "g" }) },
     { k: "wy", l: "W Y", w: 2, v: (s, d, x) => [{ t: "W", cls: rvsm(x.eq.navcom, x.f18.STS) }, { t: "Y", cls: vhf833(x.eq.navcom) }] },
-    { k: "tel", l: "FULL CALLSIGN", w: 1, v: (s) => (s.telephony ? { t: s.telephony, cls: "g" } : null) },
+    { k: "tel", l: "FULL CALLSIGN", w: 28, v: (s) => (s.telephony ? { t: s.telephony, cls: "g" } : null) },
     { k: "xpdr", l: "XPDR/A", w: 6, right: true, v: (s, d, x) => (live(s) && s.squawk ? xpdrType(x.eq.surv) + s.squawk : null) },
   ] },
   { indent: 3, f: [
@@ -242,7 +270,7 @@ export const XL_LINES = [
       const w = s.wake || x.eq.wake;
       return t ? `${t}${w ? "/" + w : ""}` : null;
     } },
-    { k: "sts", l: "STS", w: 1, v: (s, d, x) => x.f18.STS || null },
+    { k: "sts", l: "STS", w: 20, v: (s, d, x) => x.f18.STS || null },
     // ORCAM SSR: kod przydzielony, tylko gdy różni się od nadawanego
     { k: "orcam", l: "ORCAM SSR", w: 4, right: true,
       v: (s) => (s.assigned_squawk && s.assigned_squawk !== s.squawk ? { t: s.assigned_squawk, cls: "y" } : null) },
@@ -256,22 +284,31 @@ export const XL_LINES = [
     } },
     { k: "proc", l: (s) => (s.kind === "arr" ? "STAR" : "SID"), w: 7, v: (s) => s.proc?.name || null },
     { k: "rwy", l: "RWY", w: 6, v: (s) => (s.runway ? `RWY${s.runway}` : null) },
+    // NEXT FREQ: częstotliwość następnego sektora; VATSIM nie podaje, który kontroler prowadzi lot ani komu go przekaże,
+    // więc tej częstotliwości nie da się ustalić: pole zostaje puste jak CFL
+    { k: "nfq", l: "NEXT FREQ", w: 7, v: () => null },
   ] },
   { f: [
     { k: "rules", l: "FR", w: 1, v: (s) => (s.rules ? { t: s.rules, cls: "y" } : null) },
-    { k: "route", l: "ROUTE (MAX 7 POINTS)", w: 1, v: (s) => routePoints(s).join(" ") || null },
+    { k: "route", l: "ROUTE (MAX 7 POINTS)", w: 41, v: (s) => {
+      const pts = routePoints(s);
+      return pts.length ? { t: fitPoints(pts, 41, s.kind === "arr"), full: pts.join(" ") } : null;
+    } },
+    // FIR EXIT: poziom wyjścia z FIR ("/" + 3 cyfry) to poziom skoordynowany z sąsiednim ośrodkiem; na VATSIM nie ma
+    // takiej koordynacji w danych sieci, więc pole zostaje puste jak CFL
+    { k: "xfl", l: "FIR EXIT", w: 4, right: true, v: () => null },
   ] },
   { f: [
-    // CFL: sieć VATSIM nie podaje poziomu zezwolenia, pole zostaje puste
+    // CFL: sieć VATSIM nie podaje poziomu zezwolenia, pole zostaje puste (tak samo NEXT FREQ w wierszu 3 i FIR EXIT w 4)
     { k: "cfl", l: "CFL", w: 3, v: () => null },
     { k: "rfl", l: "RFL", w: 3, v: (s) => (s.rfl_ft ? { t: fl3(s.rfl_ft), cls: "y" } : null) },
-    { k: "free", l: "FREE TEXT (RMK)", w: 20, v: (s, d, x) => (x.f18.RMK ? x.f18.RMK.slice(0, 20) : null) },
-    { k: "rvr", l: "RVR", w: 3, right: true, v: (s, d, x) => (x.f18.RVR ? { t: x.f18.RVR.slice(0, 6), cls: "y" } : null) },
+    { k: "free", l: "FREE TEXT (RMK)", w: 20, v: (s, d, x) => x.f18.RMK || null },
+    { k: "rvr", l: "RVR", w: 6, right: true, v: (s, d, x) => (x.f18.RVR ? { t: x.f18.RVR, cls: "y" } : null) },
   ] },
   { f: [
     { k: "navcom", l: "NAV/COM", w: 18, v: (s, d, x) => x.eq.navcom || null },
     { k: "surv", l: "SUR", w: 15, v: (s, d, x) => x.eq.surv || null },
-    { k: "pbn", l: "PBN", w: 1, v: (s, d, x) => x.f18.PBN?.slice(0, 16) || null },
+    { k: "pbn", l: "PBN", w: 16, v: (s, d, x) => x.f18.PBN || null },
   ] },
   // Mode S: adres ICAO, wybrana wysokość, IAS, Mach, TAS, zmiana i przechylenie nie istnieją w danych VATSIM
   { gap: true, f: [
@@ -283,34 +320,63 @@ export const XL_LINES = [
     { k: "tas", l: "TAS", w: 3, v: () => null },
   ] },
   { f: [
-    { k: "gs", l: "GS", w: 3, v: (s) => (live(s) && has(s.groundspeed) ? pad3(s.groundspeed) : null) },
+    { k: "gs", l: "GS", w: 4, v: (s) => (live(s) && has(s.groundspeed) ? pad3(s.groundspeed) : null) },
     // VV: zmiana wysokości między dwoma odczytami sieci (co 30 s), setki ft/min ze znakiem
-    { k: "vv", l: "VV ×100", w: 3, v: (s, d, x) => (has(x.vv) ? (x.vv > 0 ? "+" : x.vv < 0 ? "-" : "") + Math.abs(Math.round(x.vv / 100)) : null) },
+    { k: "vv", l: "VV ×100", w: 4, v: (s, d, x) => (has(x.vv) ? (x.vv > 0 ? "+" : x.vv < 0 ? "-" : "") + Math.abs(Math.round(x.vv / 100)) : null) },
   ] },
 ];
 
-// pola okna: [{ line, indent, gap, f: [{ k, l, w, right, parts: [{ t, cls }] | null }] }]
+// wartość dłuższa niż limit pola: początek i "…" (razem najwyżej max znaków), kolory części zostają
+export function clip(parts, max) {
+  if (parts.reduce((n, p) => n + p.t.length, 0) <= max) return parts;
+  const out = [];
+  let room = max - 1;
+  for (const p of parts) {
+    if (room <= 0) break;
+    out.push({ t: p.t.slice(0, room), cls: p.cls });
+    room -= p.t.length;
+  }
+  const last = out[out.length - 1];
+  if (last) last.t = last.t.trimEnd();
+  return [...out.filter((p) => p.t), { t: "…", cls: "more" }];
+}
+
+// pola okna: [{ line, indent, gap, f: [{ k, l, w, max, right, parts: [{ t, cls }] | null, full }] }];
+// full = pełna wartość, gdy w oknie jest skrócona (inaczej null)
 export function extLabel(s, d, ctx = {}) {
   const x = { eq: equipment(s.aircraft_icao), f18: field18(s.remarks), vv: ctx.vv ?? null };
   return XL_LINES.map((ln, i) => ({ line: i + 1, indent: ln.indent || 0, gap: !!ln.gap, f: ln.f.map((f) => {
     const raw = f.v(s, d, x);
-    const parts = raw === null || raw === undefined || raw === "" ? null
+    const max = f.max || f.w;
+    const all = raw === null || raw === undefined || raw === "" ? null
       : (Array.isArray(raw) ? raw : [typeof raw === "object" ? raw : { t: String(raw) }]).map((p) => ({ t: String(p.t), cls: p.cls || "" }));
-    return { k: f.k, l: typeof f.l === "function" ? f.l(s, d) : f.l, w: f.w, right: !!f.right, parts };
+    const parts = all && clip(all, max);
+    const shown = parts ? parts.map((p) => p.t).join("") : null;
+    const full = all ? String(raw.full ?? all.map((p) => p.t).join("")) : null;
+    return { k: f.k, l: typeof f.l === "function" ? f.l(s, d) : f.l, w: f.w, max, right: !!f.right, parts,
+      full: full !== null && full !== shown ? full : null };
   }) }));
 }
 
-function winHtml(s, d, note, ctx, key) {
+// okno lotu; ctx = { vv, xf (pole okna z pełną wartością w opisie pod oknem) }; note = opis klikniętego pola paska
+export function winHtml(s, d, note, ctx = {}, key = false) {
   const kind = s.planned ? "PLANNED" : { dep: "DEPARTURE", arr: "ARRIVAL", local: "LOCAL" }[s.kind] || "";
-  const lines = extLabel(s, d, ctx).map((ln) => `<div class="xw-ln${ln.gap ? " gap" : ""}"${ln.indent ? ` style="padding-left:${ln.indent}ch"` : ""}>${ln.f.map((f) => {
+  const xl = extLabel(s, d, ctx);
+  const lines = xl.map((ln) => `<div class="xw-ln${ln.gap ? " gap" : ""}"${ln.indent ? ` style="padding-left:${ln.indent}ch"` : ""}>${ln.f.map((f) => {
     const val = f.parts ? f.parts.map((p) => `<span${p.cls ? ` class="${esc(p.cls)}"` : ""}>${esc(p.t)}</span>`).join("") : "";
-    return `<span class="xw-f${f.right ? " rt" : ""}${f.parts ? "" : " nil"}" data-f="${esc(f.k)}" style="min-width:${f.w}ch">${key ? `<i>${esc(f.l)}</i>` : ""}<b>${val}</b></span>`;
+    // skrócona wartość: pełna w title, a klik albo Enter pokazuje ją pod oknem
+    const cut = f.full !== null ? ` title="${esc(`${f.l}: ${f.full}`)}" tabindex="0" role="button"` : "";
+    return `<span class="xw-f${f.right ? " rt" : ""}${f.parts ? "" : " nil"}${cut ? " cut" : ""}" data-f="${esc(f.k)}" style="min-width:${f.w}ch"${cut}>`
+      + `${key ? `<i>${esc(f.l)}</i>` : ""}<b>${val}</b></span>`;
   }).join("")}</div>`).join("");
-  const foot = s.planned ? "Planned flight: pilot not connected yet." : "Double-click the strip: show on map.";
+  const full = ctx.xf ? xl.flatMap((ln) => ln.f).find((f) => f.k === ctx.xf && f.full !== null) : null;
+  const [nl, nt] = full ? [full.l, full.full] : ["FIELD", note];
+  const more = xl.some((ln) => ln.f.some((f) => f.full !== null)) ? " Click a field ending in … for its full value." : "";
+  const foot = (s.planned ? "Planned flight: pilot not connected yet." : "Double-click the strip: show on map.") + more;
   return `<div class="xw-head"><span class="xw-t">EXTENDED LABEL WINDOW</span>
       <button type="button" class="xw-key${key ? " on" : ""}" aria-pressed="${key}">KEY</button><button type="button" class="xw-x" aria-label="Close">×</button></div>
     <div class="xw-body${key ? " key" : ""}" style="width:${XL_WIDTH}ch">${lines}</div>
-    ${note ? `<div class="xw-note"><i>FIELD</i><span>${esc(note)}</span></div>` : ""}
+    ${nt ? `<div class="xw-note${full ? " full" : ""}"><i>${esc(nl)}</i><span>${esc(nt)}</span></div>` : ""}
     <div class="xw-foot"><b>${kind}</b> · ${foot}</div>`;
 }
 
@@ -320,6 +386,29 @@ export function placeWin(a, w, h, vw, vh, m = 6) {
   let top = a.bottom + 3;
   if (top + h > vh - m) top = a.top - h - 3 >= m ? a.top - h - 3 : vh - h - m;
   return { left, top: Math.max(m, top) };
+}
+
+// fokus przed przerysowaniem (odświeżenie co 30 s zastępuje paski i okno nowymi elementami): pasek po data-k,
+// w oknie skrócone pole po data-f albo przycisk KEY / ×; fokus poza STRIP daje null i zostaje nietknięty
+export function focusSpot(el, root) {
+  if (!el || !root || el === root || !root.contains(el)) return null;
+  if (el.classList.contains("strip")) return { strip: el.dataset.k };
+  if (!el.closest(".sx-win")) return null;
+  if (el.classList.contains("xw-f")) return { field: el.dataset.f };
+  const btn = ["xw-key", "xw-x"].find((c) => el.classList.contains(c));
+  return btn ? { btn } : null;
+}
+
+// po przerysowaniu fokus na nowy element w tym samym miejscu, bez przewijania zatoki; pole, które przestało być
+// skrócone, oddaje fokus przyciskowi ×; zwraca element z fokusem albo null (pasek zniknął, okno zamknięte)
+export function restoreFocus(spot, root) {
+  if (!spot) return null;
+  const el = spot.strip !== undefined ? [...root.querySelectorAll(".strip")].find((x) => x.dataset.k === spot.strip)
+    : (spot.field && [...root.querySelectorAll(".sx-win .xw-f.cut")].find((x) => x.dataset.f === spot.field))
+      || root.querySelector(`.sx-win .${spot.btn || "xw-x"}`);
+  if (!el) return null;
+  el.focus({ preventScroll: true });
+  return el;
 }
 
 const BAYS = [
@@ -361,8 +450,9 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
   </div>`;
   const root = el.querySelector(".strips");
   const win = root.querySelector(".sx-win");
-  // open = { key, dx (miejsce kliknięcia względem lewej krawędzi paska), note (data-f klikniętego pola), kb (z klawiatury) }
-  let data = null, byKey = new Map(), open = null, timer = null, dead = false, seq = 0;
+  // open = { key, dx (miejsce kliknięcia względem lewej krawędzi paska), note (data-f klikniętego pola), kb (z klawiatury),
+  //   xf (data-f skróconego pola okna, którego pełna wartość jest pod oknem) }; drawn = HTML okna na ekranie
+  let data = null, byKey = new Map(), open = null, timer = null, dead = false, seq = 0, drawn = "";
   // prędkość pionowa do okna (wiersz Mode S): wysokość z poprzedniego odczytu sieci VATSIM, ft/min
   const alts = new Map(), vv = new Map();
   // przycisk KEY (nazwy pól w oknie) zapamiętany w przeglądarce; bez localStorage zostaje wyłączony
@@ -398,6 +488,7 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
     open = null;
     win.hidden = true;
     win.innerHTML = "";
+    drawn = "";
     markSel();
     if (focusStrip && key) stripEl(key)?.focus();
   };
@@ -419,7 +510,12 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
     const st = open && stripEl(open.key);
     if (!s || !st) return closeWin();
     const note = open.note ? st.querySelector(`[data-f="${CSS.escape(open.note)}"]`)?.dataset.h || "" : "";
-    win.innerHTML = winHtml(s, data, note, { vv: vv.get(open.key) }, keyMode);
+    // te same dane: okno zostaje jak jest (fokus i zaznaczenie w nim nie znikają przy odświeżeniu)
+    const html = winHtml(s, data, note, { vv: vv.get(open.key), xf: open.xf }, keyMode);
+    if (win.hidden || html !== drawn) {
+      win.innerHTML = html;
+      drawn = html;
+    }
     win.setAttribute("aria-label", `Flight ${s.callsign || ""}`);
     win.hidden = false;
     markSel();
@@ -444,6 +540,8 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
 
   const render = () => {
     const d = data;
+    // fokus wraca na swoje miejsce po przerysowaniu
+    const spot = focusSpot(document.activeElement, root);
     byKey = new Map();
     ["departures", "arrivals", "local", "planned"].forEach((k) => d[k].forEach((s) => byKey.set(s.kind + ":" + s.callsign, s)));
     trackVv(d);
@@ -459,6 +557,7 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
     });
     // okno lotu: nowe dane tego samego lotu albo zamknięcie, gdy lotu już nie ma
     if (open) drawWin();
+    restoreFocus(spot, root);
   };
 
   const refresh = async () => {
@@ -487,6 +586,14 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
   const onVis = () => { if (!document.hidden && !timer && visible()) { refresh(); schedule(); } };
   document.addEventListener("visibilitychange", onVis);
 
+  // skrócone pole okna: pełna wartość pod oknem (drugi raz: z powrotem opis pola paska); fokus zostaje na polu
+  const showFull = (k) => {
+    if (!open) return;
+    open.xf = open.xf === k ? null : k;
+    drawWin();
+    restoreFocus({ field: k }, root);
+  };
+
   // klik: okno lotu (jedno naraz); ten sam pasek, przycisk ×, Esc albo klik poza oknem i paskami zamyka
   root.addEventListener("click", (e) => {
     if (e.target.closest(".xw-x")) return closeWin(open?.kb);
@@ -496,6 +603,8 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
       drawWin();
       return win.querySelector(".xw-key")?.focus();
     }
+    const cut = e.target.closest(".xw-f.cut");
+    if (cut && win.contains(cut)) return showFull(cut.dataset.f);
     if (win.contains(e.target)) return;
     const st = e.target.closest(".strip");
     if (!st) return closeWin();
@@ -505,8 +614,13 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
     open = { key: st.dataset.k, dx: e.clientX - r.left - 24, note: e.target.closest("[data-f]")?.dataset.f || null, kb: false };
     drawWin();
   });
-  // klawiatura: Enter / spacja na pasku otwiera i zamyka okno (fokus na ×), Esc wraca na pasek
+  // klawiatura: Enter / spacja na pasku otwiera i zamyka okno (fokus na ×), Esc wraca na pasek;
+  // Enter / spacja na skróconym polu okna pokazuje jego pełną wartość
   root.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("cut") && win.contains(e.target)) {
+      e.preventDefault();
+      return showFull(e.target.dataset.f);
+    }
     const st = e.target.classList?.contains("strip") ? e.target : null;
     if (!st || (e.key !== "Enter" && e.key !== " ")) return;
     e.preventDefault();

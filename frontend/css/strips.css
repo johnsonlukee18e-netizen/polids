@@ -172,6 +172,11 @@
 .sx-win .xw-f .g { color: var(--xl-g); }
 .sx-win .xw-f .y { color: var(--xl-y); }
 .sx-win .xw-f .r { color: var(--xl-r); }
+/* wartość skrócona do szerokości pola z Table 2-13: blady znak "…", klik albo Enter pokazuje pełną pod oknem */
+.sx-win .xw-f .more { color: #a8c8bc; }
+.sx-win .xw-f.cut { cursor: pointer; }
+.sx-win .xw-f.cut:hover b { background: #555; }
+.sx-win .xw-f.cut:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 /* KEY: nazwy pól nad wartościami, puste pola z kreską */
 .sx-win .xw-body.key .xw-ln { margin-top: 2px; }
 .sx-win .xw-body.key .xw-f i { font: 9px/1.2 var(--mono); font-style: normal; letter-spacing: .3px; color: #a8c8bc; white-space: nowrap; }
@@ -180,6 +185,7 @@
 .sx-win .xw-note, .sx-win .xw-foot { box-sizing: border-box; width: 0; min-width: 100%; }
 .sx-win .xw-note { display: flex; gap: 8px; padding: 4px 8px; border-top: 1px solid #5a5a5a; font-size: 12px; white-space: normal; }
 .sx-win .xw-note i { flex: none; font: 700 10px/16px var(--mono); font-style: normal; letter-spacing: .6px; color: #a8c8bc; }
+.sx-win .xw-note span { min-width: 0; overflow-wrap: anywhere; }
 .sx-win .xw-foot { padding: 3px 8px; border-top: 1px solid #5a5a5a; color: #c8c8c8; font-size: 11px; }
 .sx-win .xw-foot b { font-weight: 700; color: #fff; }
 .strip:focus-visible { outline: 2px solid var(--green-hi); outline-offset: -2px; }

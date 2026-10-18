@@ -197,6 +197,89 @@ out.pts = {
   long: m.routePoints({ kind: "dep", route: "AAA BBB CCC DDD EEE FFF GGG HHH III" }),
   arr: m.routePoints({ kind: "arr", route: "AAA BBB CCC DDD EEE FFF GGG HHH III" }),
 };
+// długie pola planu: UAE180 z przeglądu (NAV/COM 26 znaków + PBN) i lot ze skrajnymi wartościami w każdym polu
+const uae = { kind: "dep", callsign: "UAE180", aircraft: "A388", wake: "J", rules: "I", departure: "EPWA", arrival: "OMDB",
+  aircraft_icao: "A388/J-SADE2E3FGHIJ3J4J5M1M2RWXYZ/LB1D1", rfl_ft: 39000, state: "ground", groundspeed: 0, squawk: "2000",
+  route: "N0490F390 SOXER7G SOXER DCT ABUDA L621 LOGDA", remarks: "PBN/A1B1C1D1L1O1S2 DOF/261018 RMK/TCAS" };
+const big = { kind: "dep", callsign: "UAE180XYZW1", telephony: "EMIRATES ONE EIGHT ZERO HEAVY EXTRA", aircraft: "A388",
+  wake: "J", rules: "I", aircraft_icao: "A388/J-SADE2E3FGHIJ3J4J5M1M2RWXYZ/LB1B2D1G1U1U2V1V2", departure: "EPWA",
+  arrival: "OMDB", alternate: "OMAA", rfl_ft: 39000, state: "air", altitude: 23000, groundspeed: 1015, heading: 145,
+  squawk: "2000", assigned_squawk: "4621", runway: "29", proc: { name: "SOXER7GLONG" },
+  route: "5230N02000E 5200N02100E 5130N02200E 5100N02300E 5030N02400E 5000N02500E 4930N02600E",
+  remarks: "PBN/A1B1C1D1L1O1S2T1T2 STS/HOSP MEDEVAC STATE ATFMX ALTN/OMAL RVR/1200750 RMK/TCAS EQUIPPED SIMBRIEF LONG REMARK TEXT" };
+out.uae = flat(m.extLabel(uae, d));
+out.big = flat(m.extLabel(big, d, { vv: -60000 }));
+out.bigArr = flat(m.extLabel({ ...big, kind: "arr" }, d));
+out.html = [false, true].map((key) => m.winHtml(big, d, "strip note", { vv: -60000, xf: "navcom" }, key));
+// nic nieskrócone: zostaje opis pola paska
+out.htmlNote = m.winHtml(loc, d, "strip note", { xf: "navcom" });
+out.htmlAll = [dep, arr, loc, pln, uae, big].flatMap((s) => [false, true].map((key) => m.winHtml(s, d, "", { vv: 1260 }, key)));
+out.spec = m.XL_LINES.map((ln) => ({ indent: ln.indent || 0, f: ln.f.map((f) => ({ k: f.k, w: f.w, max: f.max || f.w,
+  l: typeof f.l === "function" ? f.l({ kind: "dep" }) : f.l })) }));
+out.clip = [
+  m.clip([{ t: "ABCDEFGH", cls: "g" }], 5), m.clip([{ t: "W", cls: "g" }, { t: "Y", cls: "r" }], 2),
+  m.clip([{ t: "AB ", cls: "" }, { t: "CD", cls: "y" }], 4), m.clip([{ t: "AB", cls: "" }], 1),
+];
+const ll = ["5230N02000E", "5200N02100E", "5130N02200E", "5100N02300E", "5030N02400E", "5000N02500E", "4930N02600E"];
+out.fit = [m.fitPoints(["SOXER", "ABUDA"], 41), m.fitPoints(ll, 41), m.fitPoints(ll, 41, true),
+  m.fitPoints(["AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF", "GGGGG"], 41)];
+// trasy VFR / lotów lokalnych: słowa i pasy nie są punktami, prawdziwe punkty (też NDB 2-literowe) zostają
+const vfr = (route, kind = "local") => m.routePoints({ kind, departure: "EPWA", arrival: "EPWA", route });
+out.vfr = [vfr("VFR CIRCUITS RWY 29"), vfr("VFR CIRCUITS"), vfr("LOCAL TRAINING OVER CITY AREA STAY IN CTR HOLD AT WAR"),
+  vfr("VFR EPWA RWY29 SOXER BACK TO EPWA"), vfr("N0100VFR WAR R29 29L RW11 RWY11 OKC"), vfr("AY NO OR NE NW"),
+  vfr("TOUCH AND GO LOW PASS RWY 33 FULL STOP", "dep")];
+
+// atrapa DOM do focusSpot / restoreFocus: element = klasy, data-*, rodzic; root szuka po "A B.c" (potomek z klasami)
+const board = (keys, cut, open = true) => {
+  const all = [];
+  const match = (e, part) => part.split(".").filter(Boolean).every((c) => e.classList.contains(c));
+  const mk = (cls, ds, parent) => {
+    const set = new Set(cls.split(" "));
+    const e = { cls, dataset: ds || {}, parent, focused: null, classList: { contains: (c) => set.has(c) },
+      closest: (q) => { for (let x = e; x; x = x.parent) if (match(x, q)) return x; return null; },
+      focus: (o) => { e.focused = o; } };
+    all.push(e);
+    return e;
+  };
+  const root = mk("strips", {}, null);
+  const list = mk("sx-list", {}, root);
+  keys.forEach((k) => mk("strip dep", { k }, list));
+  const win = mk("sx-win", {}, root);
+  // okno zamknięte = puste .sx-win
+  if (open) {
+    mk("xw-key", {}, win);
+    mk("xw-x", {}, win);
+    const body = mk("xw-body", {}, win);
+    ["navcom", "surv", "pbn"].forEach((f) => mk(cut.includes(f) ? "xw-f cut" : "xw-f", { f }, body));
+  }
+  const sel = (q) => all.filter((e) => {
+    const p = q.split(" ");
+    return match(e, p[p.length - 1]) && (p.length === 1 || !!e.parent?.closest(p[0]));
+  });
+  root.contains = (x) => { for (let e = x; e; e = e.parent) if (e === root) return true; return false; };
+  root.querySelectorAll = sel;
+  root.querySelector = (q) => sel(q)[0] || null;
+  return { root, q: (q) => root.querySelector(q), strip: (k) => sel(".strip").find((e) => e.dataset.k === k), all };
+};
+const b1 = board(["dep:LOT3827", "arr:DLH1612"], ["navcom"]);
+const away = board(["dep:X"], []);
+const spots = {
+  strip: m.focusSpot(b1.strip("arr:DLH1612"), b1.root), x: m.focusSpot(b1.q(".sx-win .xw-x"), b1.root),
+  key: m.focusSpot(b1.q(".sx-win .xw-key"), b1.root), field: m.focusSpot(b1.q(".sx-win .xw-f.cut"), b1.root),
+  body: m.focusSpot(b1.q(".sx-win .xw-body"), b1.root), list: m.focusSpot(b1.q(".sx-list"), b1.root),
+  root: m.focusSpot(b1.root, b1.root), outside: m.focusSpot(away.strip("dep:X"), b1.root), none: m.focusSpot(null, b1.root),
+};
+// po odświeżeniu: nowe elementy (b2 ma navcom skrócone, b3 już nie, b4 bez okna i bez paska DLH1612)
+const b2 = board(["arr:DLH1612", "dep:LOT3827"], ["navcom"]);
+const b3 = board(["dep:LOT3827", "arr:DLH1612"], []);
+const b4 = board(["dep:LOT3827"], [], false);
+const desc = (e, b) => (e ? { cls: e.cls, k: e.dataset.k || e.dataset.f || null, opts: e.focused, fresh: b.all.includes(e) } : null);
+out.focus = { spots, restored: {
+  strip: desc(m.restoreFocus(spots.strip, b2.root), b2), x: desc(m.restoreFocus(spots.x, b2.root), b2),
+  key: desc(m.restoreFocus(spots.key, b2.root), b2), field: desc(m.restoreFocus(spots.field, b2.root), b2),
+  fieldGone: desc(m.restoreFocus(spots.field, b3.root), b3), stripGone: desc(m.restoreFocus(spots.strip, b4.root), b4),
+  winGone: desc(m.restoreFocus(spots.x, b4.root), b4), none: m.restoreFocus(null, b2.root),
+} };
 // pasek 1000..1046 px, okno 432 x 400, ekran 1600 x 900
 out.place = {
   below: m.placeWin({ x: 600, top: 200, bottom: 246 }, 432, 400, 1600, 900),
@@ -228,8 +311,9 @@ def xl(tmp_path_factory):
 def test_extended_label_lines_follow_sdd(xl):
     # SDD 2014 Figure 2-6 / Table 2-13: osiem wierszy, odstęp nad wierszem 3 i nad danymi Mode S, wcięcie wiersza 2
     assert [ln["keys"] for ln in xl["lines"]] == [
-        ["cs", "wy", "tel", "xpdr"], ["type", "sts", "orcam"], ["adep", "ades", "altn", "proc", "rwy"], ["rules", "route"],
-        ["cfl", "rfl", "free", "rvr"], ["navcom", "surv", "pbn"], ["addr", "sel", "hdg", "ias", "mach", "tas"], ["gs", "vv"]]
+        ["cs", "wy", "tel", "xpdr"], ["type", "sts", "orcam"], ["adep", "ades", "altn", "proc", "rwy", "nfq"],
+        ["rules", "route", "xfl"], ["cfl", "rfl", "free", "rvr"], ["navcom", "surv", "pbn"],
+        ["addr", "sel", "hdg", "ias", "mach", "tas"], ["gs", "vv"]]
     assert [ln["gap"] for ln in xl["lines"]] == [False, False, True, False, False, False, True, False]
     assert xl["lines"][1]["indent"] == 3 and xl["width"] >= 44
 
@@ -245,7 +329,12 @@ def test_extended_label_values_departure(xl):
         "EPWA", "EPGD", "(EPKK)", "SID", "OLILA6G", "RWY29")
     assert (f["rules"]["t"], f["rules"]["cls"], f["route"]["t"]) == ("I", "y", "OLILA BOKSU GRUDA")
     assert (f["cfl"]["t"], f["rfl"]["t"], f["rfl"]["cls"]) == (None, "220", "y")
-    assert (f["free"]["t"], f["rvr"]["t"]) == ("TCAS SIMBRIEF EXTRA ", "200")   # tekst RMK najwyżej 20 znaków
+    # tekst RMK najwyżej 20 znaków: skrócony z "…", pełny w "full"
+    assert (f["free"]["t"], f["free"]["full"], f["rvr"]["t"]) == ("TCAS SIMBRIEF EXTRA…", "TCAS SIMBRIEF EXTRA TEXT", "200")
+    # NEXT FREQ i FIR EXIT: VATSIM nie zna następnego sektora ani skoordynowanego poziomu wyjścia, puste jak CFL
+    assert (f["nfq"]["t"], f["nfq"]["w"], f["nfq"]["line"], f["xfl"]["t"], f["xfl"]["w"], f["xfl"]["line"]) == (
+        None, 7, 3, None, 4, 4)
+    assert f["xfl"]["right"] and f["nfq"]["l"] == "NEXT FREQ" and f["xfl"]["l"] == "FIR EXIT"
     assert (f["navcom"]["t"], f["surv"]["t"], f["pbn"]["t"]) == ("SDE2E3FGHIJ1RWXY", "LB1", "A1B1C1D1L1O1S1S2")
     # na ziemi: bez HDG; GS i VV z sieci
     assert (f["hdg"]["t"], f["gs"]["t"], f["vv"]["t"]) == (None, "000", "0")
@@ -256,10 +345,13 @@ def test_extended_label_values_other_kinds(xl):
     a, loc, pln = xl["arr"], xl["loc"], xl["pln"]
     assert a["orcam"]["t"] is None and a["tel"]["t"] is None and a["xpdr"]["t"] == "S/4615"   # H = Mode S
     assert (a["proc"]["l"], a["rfl"]["t"], a["free"]["t"], a["hdg"]["t"], a["vv"]["t"]) == ("STAR", "370", "NEW PILOT", "087", "-8")
-    assert a["route"]["t"] == "NATOR TOSTU ERNAS SUI KOPAG 5230N02000E BIMPA"   # przylot: 7 ostatnich punktów
+    # przylot: 7 ostatnich punktów; z punktem współrzędnych nie mieszczą się w 41 znakach, więc pierwszy odpada z "…"
+    assert a["route"]["full"] == "NATOR TOSTU ERNAS SUI KOPAG 5230N02000E BIMPA"
+    assert a["route"]["t"] == "… TOSTU ERNAS SUI KOPAG 5230N02000E BIMPA" and len(a["route"]["t"]) <= 41
     # VFR bez wyposażenia w planie: W żółte (STS/NONRVSM), Y czerwone, transponder bez typu
     assert (loc["wy"]["cls"], loc["xpdr"]["t"], loc["type"]["t"], loc["vv"]["t"]) == ("y,r", "6201", "C172/L", "+13")
     assert loc["route"]["t"] is None and loc["altn"]["t"] is None        # "VFR CIRCUITS": brak punktów znaczących
+    assert xl["dep"]["route"]["full"] is None                            # trasa zmieściła się w całości
     # lot planowany (vIFF, pilot niepołączony): bez transpondera i danych Mode S
     assert all(pln[k]["t"] is None for k in ("xpdr", "orcam", "hdg", "gs", "vv", "tel", "type"))
     assert (pln["cs"]["t"], pln["adep"]["t"], pln["ades"]["t"]) == ("SAS1748", "EPWA", "ESSA")
@@ -277,6 +369,118 @@ def test_extended_label_flight_plan_parsers(xl):
     p = xl["pts"]
     assert p["dep"] == ["SOXER", "ABUDA", "LOGDA", "MOBRU", "5230N02000E"]
     assert p["long"] == ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"] and p["arr"] == ["CCC", "DDD", "EEE", "FFF", "GGG", "HHH", "III"]
+
+
+LN_RE = re.compile(r'<div class="xw-ln[^"]*"(?: style="padding-left:(\d+)ch")?>(.*?)</div>', re.S)
+F_RE = re.compile(r'<span class="xw-f([^"]*)" data-f="(\w+)" style="min-width:(\d+)ch"([^>]*)>(?:<i>([^<]*)</i>)?<b>(.*?)</b></span>',
+                  re.S)
+KEY_CH = 0.7   # nazwa pola w KEY: 9 px przy 14 px wartości (0,64 znaku) plus odstęp liter
+
+
+def _line_chars(html, key):
+    """Szerokość każdego wiersza okna w znakach (14 px): wcięcie, pola (min-width, wartość, nazwa w KEY), odstępy 1ch."""
+    out = []
+    for indent, body in LN_RE.findall(html):
+        fields = F_RE.findall(body)
+        assert fields, body
+        width = int(indent or 0) + len(fields) - 1
+        for _cls, _k, minw, _attrs, label, val in fields:
+            text = re.sub(r"<[^>]+>", "", val)
+            width += max(int(minw), len(text), -(-len(label) * 7 // 10) if key else 0)
+        out.append(width)
+    return out
+
+
+def test_extended_label_lines_fit_window(xl):
+    # każdy wiersz w XL_WIDTH dla każdej wartości: limity pól (Table 2-13) + odstępy, także z nazwami pól (KEY)
+    for ln in xl["spec"]:
+        chars = ln["indent"] + len(ln["f"]) - 1 + sum(max(f["max"], -(-len(f["l"]) * 7 // 10)) for f in ln["f"])
+        assert chars <= xl["width"], (ln, chars)
+    w = {f["k"]: (f["w"], f["max"]) for ln in xl["spec"] for f in ln["f"]}
+    # szerokości z SDD 2014 Table 2-13
+    assert (w["cs"], w["tel"], w["xpdr"], w["type"], w["sts"], w["orcam"]) == ((7, 10), (28, 28), (6, 6), (6, 6), (20, 20), (4, 4))
+    assert (w["adep"], w["ades"], w["altn"], w["proc"], w["rwy"], w["nfq"]) == ((4, 4), (4, 4), (11, 11), (7, 7), (6, 6), (7, 7))
+    assert (w["route"], w["xfl"], w["cfl"], w["rfl"], w["free"], w["rvr"]) == ((41, 41), (4, 4), (3, 3), (3, 3), (20, 20), (6, 6))
+    assert (w["navcom"], w["surv"], w["pbn"]) == ((18, 18), (15, 15), (16, 16))
+    # wyrenderowane okna (6 lotów, z KEY i bez): 8 wierszy, żaden szerszy niż XL_WIDTH, żadna wartość ponad limit pola
+    assert len(xl["htmlAll"]) == 12
+    for i, html in enumerate(xl["htmlAll"]):
+        chars = _line_chars(html, key=i % 2 == 1)
+        assert len(chars) == 8 and max(chars) <= xl["width"], (i, chars)
+        for _cls, k, _minw, _attrs, _label, val in F_RE.findall(html):
+            assert len(re.sub(r"<[^>]+>", "", val)) <= w[k][1], (i, k, val)
+
+
+def test_extended_label_long_flight_plan_fields(xl):
+    # UAE180 z przeglądu: NAV/COM 26 znaków skrócone do 18, PBN widoczne w całości
+    u = xl["uae"]
+    assert (u["navcom"]["t"], u["navcom"]["full"]) == ("SADE2E3FGHIJ3J4J5…", "SADE2E3FGHIJ3J4J5M1M2RWXYZ")
+    assert u["navcom"]["cls"].endswith("more") and len(u["navcom"]["t"]) == 18
+    assert (u["surv"]["t"], u["surv"]["full"], u["pbn"]["t"], u["pbn"]["full"]) == ("LB1D1", None, "A1B1C1D1L1O1S2", None)
+    assert u["wy"]["t"] == "WY" and u["wy"]["cls"] == "g,g"     # W i Y liczone z pełnego NAV/COM
+    # skrajne wartości: każde pole w swoim limicie, pełna wartość w "full"
+    b = xl["big"]
+    expect = {
+        "cs": ("UAE180XYZ…", "UAE180XYZW1"), "tel": ("EMIRATES ONE EIGHT ZERO HEA…", "EMIRATES ONE EIGHT ZERO HEAVY EXTRA"),
+        "sts": ("HOSP MEDEVAC STATE…", "HOSP MEDEVAC STATE ATFMX"), "proc": ("SOXER7…", "SOXER7GLONG"),
+        "navcom": ("SADE2E3FGHIJ3J4J5…", "SADE2E3FGHIJ3J4J5M1M2RWXYZ"), "surv": ("LB1B2D1G1U1U2V…", "LB1B2D1G1U1U2V1V2"),
+        "pbn": ("A1B1C1D1L1O1S2T…", "A1B1C1D1L1O1S2T1T2"), "free": ("TCAS EQUIPPED SIMBR…", "TCAS EQUIPPED SIMBRIEF LONG REMARK TEXT"),
+        "rvr": ("12007…", "1200750"),
+        "route": ("5230N02000E 5200N02100E 5130N02200E …",
+                  "5230N02000E 5200N02100E 5130N02200E 5100N02300E 5030N02400E 5000N02500E 4930N02600E"),
+    }
+    for k, (t, full) in expect.items():
+        assert (b[k]["t"], b[k]["full"]) == (t, full), k
+        assert len(b[k]["t"]) <= b[k]["max"], k
+    assert xl["bigArr"]["route"]["t"] == "… 5030N02400E 5000N02500E 4930N02600E"   # przylot: ostatnie punkty
+    assert (b["altn"]["t"], b["altn"]["full"], b["gs"]["t"], b["vv"]["t"], b["type"]["t"]) == ("(OMAA OMAL)", None, "1015", "-600", "A388/J")
+    assert all(b[k]["full"] is None for k in ("adep", "ades", "rwy", "xpdr", "orcam", "hdg", "gs", "vv", "rfl"))
+    # okno: skrócone pola z pełną wartością w title i fokusem; xf = pole z pełną wartością pod oknem zamiast opisu paska
+    for html in xl["html"]:
+        assert 'class="xw-f cut" data-f="navcom" style="min-width:18ch" title="NAV/COM: SADE2E3FGHIJ3J4J5M1M2RWXYZ" tabindex="0" role="button"' in html
+        assert '<div class="xw-note full"><i>NAV/COM</i><span>SADE2E3FGHIJ3J4J5M1M2RWXYZ</span></div>' in html
+        assert "strip note" not in html and "Click a field ending in … for its full value." in html
+        assert 'data-f="adep" style="min-width:4ch">' in html     # pole nieskrócone: bez title i tabindex
+        assert html.count('tabindex="0"') == sum(1 for k in b if b[k]["full"] is not None)
+    assert '<div class="xw-note"><i>FIELD</i><span>strip note</span></div>' in xl["htmlNote"]
+    assert "Click a field ending in" not in xl["htmlNote"]
+
+
+def test_extended_label_clip_and_fit_helpers(xl):
+    c = xl["clip"]
+    assert c[0] == [{"t": "ABCD", "cls": "g"}, {"t": "…", "cls": "more"}]
+    assert c[1] == [{"t": "W", "cls": "g"}, {"t": "Y", "cls": "r"}]          # mieści się: bez zmian
+    assert c[2] == [{"t": "AB", "cls": ""}, {"t": "…", "cls": "more"}]       # bez spacji przed "…"
+    assert c[3] == [{"t": "…", "cls": "more"}]
+    f = xl["fit"]
+    assert f[0] == "SOXER ABUDA"
+    assert f[1] == "5230N02000E 5200N02100E 5130N02200E …" and f[2] == "… 5030N02400E 5000N02500E 4930N02600E"
+    assert f[3] == "AAAAA BBBBB CCCCC DDDDD EEEEE FFFFF GGGGG" and len(f[3]) == 41   # 7 punktów 5-literowych = 41 znaków
+
+
+def test_route_points_skip_vfr_words_and_runways(xl):
+    v = xl["vfr"]
+    assert v[0] == [] and v[1] == []                                   # "VFR CIRCUITS RWY 29" nie daje "RWY"
+    assert v[2] == ["WAR"]                                             # słowa opisowe odpadają, VOR WAR zostaje
+    assert v[3] == ["SOXER"]                                           # pas RWY29 i ADEP/ADES odpadają
+    assert v[4] == ["WAR", "OKC"]                                      # R29, 29L, RW11, RWY11: pasy, nie punkty
+    assert v[5] == ["AY", "NO", "OR", "NE", "NW"]                      # polskie NDB 2-literowe zostają
+    assert v[6] == []
+
+
+def test_strip_focus_survives_refresh(xl):
+    sp, r = xl["focus"]["spots"], xl["focus"]["restored"]
+    assert sp["strip"] == {"strip": "arr:DLH1612"} and sp["x"] == {"btn": "xw-x"} and sp["key"] == {"btn": "xw-key"}
+    assert sp["field"] == {"field": "navcom"}
+    # fokus poza STRIP albo na elemencie bez fokusu: nic nie zapamiętujemy, odświeżenie go nie rusza
+    assert all(sp[k] is None for k in ("body", "list", "root", "outside", "none"))
+    # po przerysowaniu: nowy element w tym samym miejscu, focus({ preventScroll: true })
+    assert r["strip"] == {"cls": "strip dep", "k": "arr:DLH1612", "opts": {"preventScroll": True}, "fresh": True}
+    assert r["x"] == {"cls": "xw-x", "k": None, "opts": {"preventScroll": True}, "fresh": True}
+    assert r["key"]["cls"] == "xw-key" and r["field"] == {"cls": "xw-f cut", "k": "navcom", "opts": {"preventScroll": True},
+                                                         "fresh": True}
+    assert r["fieldGone"]["cls"] == "xw-x"                          # pole już nieskrócone: fokus na ×
+    assert r["stripGone"] is None and r["winGone"] is None and r["none"] is None
 
 
 def test_extended_label_window_stays_in_viewport(xl):
@@ -332,6 +536,11 @@ def test_strips_click_window_not_hover_and_english():
     assert 'querySelectorAll("[data-h]")[' not in js
     assert 'document.addEventListener("click", onDocClick)' in js and 'document.removeEventListener("click", onDocClick)' in js
     assert "if (open) drawWin();" in js   # odświeżenie: nowe dane w oknie albo zamknięcie, gdy lotu już nie ma
+    # odświeżenie co 30 s: fokus (pasek, przycisk okna, skrócone pole) wraca po przerysowaniu; okno bez zmian zostaje
+    render = js[js.index("const render = () => {"):js.index("const refresh = async")]
+    assert render.index("focusSpot(document.activeElement, root)") < render.index('.innerHTML = bar(d)')
+    assert render.index("if (open) drawWin();") < render.index("restoreFocus(spot, root)")
+    assert "html !== drawn" in js and "const REFRESH_MS = 30000;" in js
     for src in (js, STRIP_TAB_JS.read_text("utf-8")):
         assert not PL.search(_code(src)), PL.findall(_code(src))
     for word in ("Odloty", "Przyloty", "Planowane", "Lokalne", "KOŁUJE", "POSTÓJ", "W POW.", "NA ZIEMI", "najedź", "Aktualizacja"):
