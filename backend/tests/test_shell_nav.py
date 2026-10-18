@@ -202,3 +202,16 @@ def test_shell_in_english():
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
     assert "PREPARE SESSION → AERODROME" in home and "<h3>Position</h3>" in home
 
+
+def test_sharp_edges():
+    """0.12.5 (issue #18): ostre krawędzie jak w PANDORZE: w style.css i na stronach logowania / offline żadnych
+    zaokrągleń (border-radius tylko 0); kontrolki i dymki Leafleta też bez zaokrągleń z leaflet.css."""
+    for name in ("css/style.css", "login.html", "offline.html"):
+        text = re.sub(r"/\*.*?\*/", "", (FRONTEND / name).read_text("utf-8"), flags=re.S)
+        radii = re.findall(r"border(?:-[a-z]+)*-radius:\s*([^;}]+)", text)
+        assert radii and all(r.strip() == "0" for r in radii), (name, radii)
+    css = (FRONTEND / "css" / "style.css").read_text("utf-8")
+    assert ".leaflet-bar, .leaflet-control-layers, .leaflet-tooltip, .leaflet-popup-content-wrapper," in css
+    # przełącznik .sw: kwadratowy tor i kwadratowa gałka
+    assert re.search(r"\.sw input \{[^}]*border-radius: 0;", css)
+    assert re.search(r"\.sw input::after \{[^}]*border-radius: 0;", css)
