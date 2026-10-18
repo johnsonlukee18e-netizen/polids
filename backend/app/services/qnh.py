@@ -126,16 +126,18 @@ LCC_R, LCC_N = 6378137, 0.798
 # maleje dalej, a napisy już nie)
 QR_ZOOM, QR_MIN = 7.5, 0.6
 # poziomy napisów (tier(), labelTier() w qnhmap.js, klasy qr-mid i qr-far w qnh.css): FULL = wszystkie napisy;
-# MID = bez szarych oznaczeń i kodów lotnisk (najmniejsze napisy: przy skali poniżej 70% mają ok. 5 px i pierwsze
-# nachodzą na inne); FAR = numery rejonów z ramką QNH i symbole lotnisk z METAR-em (bez opisów BELOW, kodów i rombów
-# lotnisk bez METAR-u: gdy napisy przestają maleć z mapą, opisy BELOW nachodzą na numery i lotniska). Poziom = wyższy
-# z dwóch: zoom poniżej progu z QR_TIERS (każdy próg to poziom wyżej, więc przybliżanie przywraca napisy krok po
-# kroku) i zoom ponad próg z QR_OUT poniżej zoomu widoku domyślnego (cały FIR dopasowany do okna): jedno "−" (0,5)
-# albo ząbek kółka od widoku domyślnego to poziom wyżej, dwa "−" to FAR, więc oddalenie zawsze zmniejsza liczbę
-# napisów
+# MID = bez szarych oznaczeń (najmniejsze napisy: przy skali poniżej 70% mają niecałe 5 px i pierwsze nachodzą
+# na inne; kody lotnisk przy zoomie 6,9 i 6,8 jeszcze się mieszczą); FAR = numery rejonów z ramką QNH i symbole
+# lotnisk z METAR-em (bez opisów BELOW, kodów i rombów lotnisk bez METAR-u: gdy napisy przestają maleć z mapą, opisy
+# BELOW nachodzą na numery i lotniska). Poziom = wyższy z dwóch: zoom poniżej progu z QR_TIERS (każdy próg to poziom
+# wyżej, więc przybliżanie przywraca napisy krok po kroku) i zoom ponad próg z QR_OUT poniżej zoomu widoku domyślnego
+# (cały FIR dopasowany do okna), nie wyższego niż QR_ZOOM: jedno "−" (0,5) albo ząbek kółka od widoku domyślnego to
+# poziom wyżej, dwa "−" to FAR; na dużym ekranie (2560x1440: 8,2) liczy się od QR_ZOOM, bo od QR_ZOOM w górę
+# mieszczą się wszystkie napisy (jak w widoku domyślnym przy oknie 1600x900 i 1920x1080), więc oddalenie do QR_ZOOM
+# ich nie ukrywa
 FULL, MID, FAR = 0, 1, 2
 QR_TIERS, QR_OUT = (6.95, 6.75), (0.25, 0.75)
-HIDDEN = {FULL: (), MID: ("des", "aero"), FAR: ("des", "aero", "cap", "code")}   # rodzaje napisów (label_boxes)
+HIDDEN = {FULL: (), MID: ("des",), FAR: ("des", "aero", "cap", "code")}   # rodzaje napisów (label_boxes)
 # zoom domyślnego widoku (cały FIR dopasowany do mapy, fitBounds w qnhmap.js) przy oknach przeglądarki (zmierzone
 # w Chromium; mapa = okno bez menu z lewej i panelu tabel): pełne ekrany 2560x1440, 1920x1080, 1600x900 i 1366x768,
 # te same ekrany z paskami przeglądarki (1600x789, 1366x657, 1366x627 z paskiem zakładek) i małe okna (1280x649,
@@ -179,6 +181,7 @@ def scale(zoom: float) -> float:
 
 def tier(zoom: float, fit: float) -> int:
     """Poziom napisów (FULL, MID, FAR) przy zoomie, gdy widok domyślny ma zoom fit; jak labelTier() w qnhmap.js."""
+    fit = min(fit, QR_ZOOM)
     return max(sum(zoom < t for t in QR_TIERS), sum(zoom < fit - d for d in QR_OUT))
 
 

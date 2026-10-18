@@ -12,17 +12,18 @@ const QR_LAYERS = [["tma", "TMA/MTMA"], ["ctr", "CTR/MCTR"], ["ad", "Aerodromes"
   ["des", "Designators"]];
 // zoom, dla którego dobrano miejsca napisów z JSON-a (mapa 960x900 przy oknie 1600x900, cały FIR): przy mniejszym
 // napisy maleją razem z mapą (--k w CSS), ale nie mniej niż QR_MIN (60%, poniżej zoomu 6,76). Poziomy napisów
-// (klasy qr-mid i qr-far w qnh.css): 0 = wszystkie; 1 = bez szarych oznaczeń i kodów lotnisk (najmniejsze napisy
-// pierwsze nachodzą na inne); 2 = "z daleka": numery rejonów z ramką QNH i symbole lotnisk z METAR-em. Poziom to
-// wyższy z dwóch: zoom poniżej progu z QR_TIERS (każdy próg to poziom wyżej, więc przybliżanie przywraca napisy krok
-// po kroku; domyślny widok przy oknie 1366x657 i większym ma wszystkie napisy, przy 1366x627 i 1280x609 poziom 1,
-// przy 1024x600 poziom 2) i oddalenie od widoku domyślnego ponad próg z QR_OUT (jedno "−" albo ząbek kółka to poziom
-// wyżej, dwa "−" to widok "z daleka"). Ten sam model rozmiarów i poziomów: services/qnh.py (test nakładania).
+// (klasy qr-mid i qr-far w qnh.css): 0 = wszystkie; 1 = bez szarych oznaczeń (najmniejsze napisy pierwsze nachodzą
+// na inne); 2 = "z daleka": numery rejonów z ramką QNH i symbole lotnisk z METAR-em. Poziom to wyższy z dwóch: zoom
+// poniżej progu z QR_TIERS (każdy próg to poziom wyżej, więc przybliżanie przywraca napisy krok po kroku; domyślny
+// widok przy oknie 1366x657 i większym ma wszystkie napisy, przy 1366x627 i 1280x609 poziom 1, przy 1024x600
+// poziom 2) i oddalenie ponad próg z QR_OUT od widoku domyślnego (jedno "−" albo ząbek kółka to poziom wyżej, dwa "−"
+// to widok "z daleka"), na dużym ekranie liczone od QR_ZOOM (od QR_ZOOM w górę mieszczą się wszystkie napisy). Ten sam
+// model rozmiarów i poziomów: services/qnh.py (test nakładania).
 const QR_ZOOM = 7.5, QR_MIN = 0.6, QR_TIERS = [6.95, 6.75], QR_OUT = [0.25, 0.75];
 export const labelScale = (z) => Math.min(1, Math.max(QR_MIN, 2 ** (z - QR_ZOOM)));
 // fit: zoom widoku domyślnego, przy którym cały FIR mieści się w oknie mapy
 export const labelTier = (z, fit) => Math.max(QR_TIERS.filter((t) => z < t).length,
-  QR_OUT.filter((d) => z < fit - d).length);
+  QR_OUT.filter((d) => z < Math.min(fit, QR_ZOOM) - d).length);
 export const isFar = (z, fit) => labelTier(z, fit) === 2;
 
 // odwzorowanie stożkowe wiernokątne Lamberta (kula) jak na mapie AIP: południk środkowy 19°E, stała stożka 0,798
