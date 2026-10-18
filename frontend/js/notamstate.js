@@ -6,16 +6,16 @@ function span(ms) {
   if (min < 1) return "<1 min";
   if (min < 60) return `${min} min`;
   if (min < 48 * 60) return `${Math.floor(min / 60)} h ${min % 60} min`;
-  return `${Math.round(min / 1440)} dni`;
+  return `${Math.round(min / 1440)} days`;
 }
 export function notamState(n, now = Date.now()) {
   const s = n.start ? Date.parse(n.start) : null, e = n.end ? Date.parse(n.end) : null;
   const endTxt = n.perm ? "PERM" : e ? `${dm(n.end)}${n.est ? " EST" : ""}` : "?";
-  if (e && e < now && !n.perm) return { cls: "expired", txt: `WYGASŁ ${dm(n.end)}` };
-  if (s && s > now) return { cls: "future", txt: `AKTYWNY OD ${dm(n.start)} (za ${span(s - now)}) do ${endTxt}` };
-  if (n.perm) return { cls: "active", txt: `AKTYWNY od ${s ? dm(n.start) : "?"} · PERM` };
-  if (e) return { cls: "active", txt: `AKTYWNY DO ${endTxt} (jeszcze ${span(e - now)})` };
-  if (s) return { cls: "active", txt: `AKTYWNY od ${dm(n.start)}` };
+  if (e && e < now && !n.perm) return { cls: "expired", txt: `EXPIRED ${dm(n.end)}` };
+  if (s && s > now) return { cls: "future", txt: `ACTIVE FROM ${dm(n.start)} (in ${span(s - now)}) until ${endTxt}` };
+  if (n.perm) return { cls: "active", txt: `ACTIVE from ${s ? dm(n.start) : "?"} · PERM` };
+  if (e) return { cls: "active", txt: `ACTIVE UNTIL ${endTxt} (${span(e - now)} left)` };
+  if (s) return { cls: "active", txt: `ACTIVE from ${dm(n.start)}` };
   // bez B) i C) (nieznany format, uszkodzone pola): bez zielonego "aktywny", żółty jak domyślny NOTAM
-  return { cls: "", txt: "ważność nieznana (brak pól B/C)" };
+  return { cls: "", txt: "validity unknown (no B/C fields)" };
 }

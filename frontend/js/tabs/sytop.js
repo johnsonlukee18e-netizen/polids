@@ -9,12 +9,12 @@ import { notamState } from "../notamstate.js";
 const FIR = "EPWW";
 const REFRESH_MS = 10 * 60 * 1000;
 const RETRY_MS = 2 * 60 * 1000;       // po błędzie (także części lokalizacji) próbujemy ponownie po 2 min
-const SORTS = [["loc", "lokalizacja"], ["id", "numer"], ["start", "początek"], ["end", "koniec"]];
+const SORTS = [["loc", "location"], ["id", "number"], ["start", "start"], ["end", "end"]];
 const SORT_TITLES = {
-  loc: "Najpierw FIR EPWW, potem lotniska alfabetycznie; w każdej grupie po numerze",
-  id: "Po numerze NOTAM (seria, rok, numer)",
-  start: "Po początku ważności (pole B), od najstarszych",
-  end: "Po końcu ważności (pole C), najpierw kończące się najwcześniej; PERM na końcu",
+  loc: "FIR EPWW first, then aerodromes alphabetically; by number within each group",
+  id: "By NOTAM number (series, year, number)",
+  start: "By start of validity (field B), oldest first",
+  end: "By end of validity (field C), earliest ending first; PERM last",
 };
 
 // opis ważności wspólny z AERODROME (notamstate.js)
@@ -64,8 +64,8 @@ function grouped(rows, label) {
   rows.forEach((r) => { const k = label(r); by.set(k, [...(by.get(k) || []), r.icao]); });
   return [...by].map(([k, ls]) => `<b>${ls.map(esc).join(", ")}</b> – ${esc(k)}`).join("; ");
 }
-const failedHtml = (failed) => grouped(failed, (f) => f.error || "błąd");
-const staleHtml = (stale) => grouped(stale, (f) => `pobrane ${hm(f.since)}`);
+const failedHtml = (failed) => grouped(failed, (f) => f.error || "error");
+const staleHtml = (stale) => grouped(stale, (f) => `fetched ${hm(f.since)}`);
 const limits = (n) => (n.lower_limit || n.upper_limit ? `${n.lower_limit || "?"} – ${n.upper_limit || "?"}` : "");
 const subjectText = (n) => [n.subject_text, n.condition_text].filter(Boolean).join(" ");
 
@@ -73,21 +73,21 @@ export default {
   mount(root) {
     const pane = h(`<div class="pane fill sytop-pane">
       <div class="sytop-head">
-        <h2 class="title">SYT OP – aktywne NOTAM FIR EPWW</h2>
-        <span class="hint sytop-src" title="Serwer NOTAM PL vACC (cv.plvacc.pl): FIR EPWW i główne lotniska">źródło: PL vACC · odświeżanie co 10 min</span>
+        <h2 class="title">SYT OP – active NOTAMs FIR EPWW</h2>
+        <span class="hint sytop-src" title="PL vACC NOTAM server (cv.plvacc.pl): FIR EPWW and the main aerodromes">source: PL vACC · refresh every 10 min</span>
         <span class="sytop-gap"></span>
         <span class="hint sytop-upd"></span>
-        <button class="btn sytop-refresh" title="Pobierz listę ponownie">ODŚWIEŻ</button>
+        <button class="btn sytop-refresh" title="Fetch the list again">REFRESH</button>
       </div>
       <div class="toolbar sytop-bar">
-        <input class="sytop-search" type="search" placeholder="Szukaj: numer, lokalizacja, treść…" aria-label="Szukaj w NOTAM-ach" spellcheck="false">
-        <button class="btn sytop-clear" title="Wyczyść filtr i pokaż wszystkie lokalizacje">WYCZYŚĆ</button>
-        <label class="sytop-loc-pick">Lokalizacja <select class="sytop-locsel" aria-label="Lokalizacja"></select></label>
-        <span class="sytop-sort">Sortuj: ${SORTS.map(([k, l]) => `<button class="btn" data-sort="${k}" title="${esc(SORT_TITLES[k])}">${esc(l)}</button>`).join("")}</span>
+        <input class="sytop-search" type="search" placeholder="Search: number, location, text…" aria-label="Search NOTAMs" spellcheck="false">
+        <button class="btn sytop-clear" title="Clear the filter and show all locations">CLEAR</button>
+        <label class="sytop-loc-pick">Location <select class="sytop-locsel" aria-label="Location"></select></label>
+        <span class="sytop-sort">Sort: ${SORTS.map(([k, l]) => `<button class="btn" data-sort="${k}" title="${esc(SORT_TITLES[k])}">${esc(l)}</button>`).join("")}</span>
         <span class="sytop-count"></span>
       </div>
       <div class="sytop-msg" role="status"></div>
-      <div class="sytop-list" tabindex="0"><div class="hint sytop-empty">Ładowanie NOTAM…</div></div>
+      <div class="sytop-list" tabindex="0"><div class="hint sytop-empty">Loading NOTAMs…</div></div>
     </div>`);
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
@@ -113,7 +113,7 @@ export default {
       const count = (c) => (data && !allDown(data) ? ` (${c ? all.filter((n) => (n.locations || [n.location]).includes(c)).length : all.length})` : "");
       const codes = [...new Set(all.flatMap((n) => n.locations || [n.location]))].filter((c) => c !== FIR).sort();
       if (loc && loc !== FIR && !codes.includes(loc)) codes.push(loc);
-      const html = [["", `Wszystkie${count("")}`], [FIR, `${FIR} – FIR${count(FIR)}`],
+      const html = [["", `All${count("")}`], [FIR, `${FIR} – FIR${count(FIR)}`],
         ...codes.map((c) => [c, `${c}${nameOf(c) ? " – " + nameOf(c) : ""}${count(c)}`])]
         .map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
       // bez zmian bez przebudowy (przerysowanie co minutę nie zamyka rozwiniętej listy)
@@ -124,17 +124,17 @@ export default {
     const item = (n, odd, main) => {
       const s = notamState(n);
       const locs = (n.locations || [n.location]).map((c) => (main.has(c) && c !== FIR
-        ? `<a class="sytop-loc" href="#aerodrome/${esc(c)}" title="${esc(nameOf(c) || c)} – otwórz AERODROME">${esc(c)}</a>`
+        ? `<a class="sytop-loc" href="#aerodrome/${esc(c)}" title="${esc(nameOf(c) || c)} – open AERODROME">${esc(c)}</a>`
         : `<span class="sytop-loc${c === FIR ? " fir" : ""}" title="${esc(nameOf(c) || c)}">${esc(c)}</span>`)).join(" ");
       const subj = subjectText(n), lim = limits(n), k = key(n), open = opened.has(k);
       return `<div class="notam${s.cls ? " " + s.cls : ""} sytop-item${odd ? " odd" : ""}">
         <div class="sytop-side"><b class="sytop-id">${esc(n.id || "–")}</b><span class="sytop-locs">${locs}</span></div>
         <div class="sytop-main">
           <div class="nhead"><span class="valid">${esc(s.txt)}</span>
-            ${n.schedule ? `<span class="hint">harmonogram: ${esc(n.schedule)}</span>` : ""}
-            ${lim ? `<span class="hint" title="Granice pionowe (pola F i G)">${esc(lim)}</span>` : ""}
-            ${n.qcode ? `<span class="sytop-subj" title="Kod Q ${esc(n.qcode)}${subj ? ": " + esc(subj) : ""}">${esc(n.qcode)}${subj ? " · " + esc(subj) : ""}</span>` : ""}
-            ${n.text ? `<button class="sytop-rawbtn" data-key="${esc(k)}" aria-expanded="${open}" title="Cały NOTAM z polami Q) A) B) C) D) E) F) G)">${open ? "▾" : "▸"} pełny NOTAM</button>` : ""}
+            ${n.schedule ? `<span class="hint">schedule: ${esc(n.schedule)}</span>` : ""}
+            ${lim ? `<span class="hint" title="Vertical limits (fields F and G)">${esc(lim)}</span>` : ""}
+            ${n.qcode ? `<span class="sytop-subj" title="Q code ${esc(n.qcode)}${subj ? ": " + esc(subj) : ""}">${esc(n.qcode)}${subj ? " · " + esc(subj) : ""}</span>` : ""}
+            ${n.text ? `<button class="sytop-rawbtn" data-key="${esc(k)}" aria-expanded="${open}" title="Whole NOTAM with fields Q) A) B) C) D) E) F) G)">${open ? "▾" : "▸"} full NOTAM</button>` : ""}
           </div>
           <pre class="sytop-text">${esc(n.text || n.raw)}</pre>
           ${n.text && open ? `<pre class="sytop-raw">${esc(n.raw)}</pre>` : ""}
@@ -145,8 +145,8 @@ export default {
       drawnAt = Date.now();
       pane.querySelectorAll(".sytop-sort [data-sort]").forEach((b) => b.classList.toggle("primary", b.dataset.sort === sort));
       if (!data) {
-        list.innerHTML = error ? `<div class="error sytop-empty">Nie udało się pobrać NOTAM-ów: ${esc(error)}</div>`
-          : `<div class="hint sytop-empty">Ładowanie NOTAM…</div>`;
+        list.innerHTML = error ? `<div class="error sytop-empty">Could not fetch NOTAMs: ${esc(error)}</div>`
+          : `<div class="hint sytop-empty">Loading NOTAMs…</div>`;
         $(".sytop-count").textContent = "";
         return;
       }
@@ -154,17 +154,18 @@ export default {
       const shown = filterNotams(all, { q: search.value, loc })
         .sort(sort === "loc" ? (a, b) => gcmp(gkey(a), gkey(b)) || SORT_FN.id(a, b) : SORT_FN[sort]);
       const down = allDown(data);
-      $(".sytop-count").textContent = down ? "– NOTAM" : shown.length === all.length ? `${all.length} NOTAM` : `${shown.length} z ${all.length} NOTAM`;
+      const nNotams = (n) => `${n} NOTAM${n === 1 ? "" : "s"}`;
+      $(".sytop-count").textContent = down ? "– NOTAMs" : shown.length === all.length ? nNotams(all.length) : `${shown.length} of ${nNotams(all.length)}`;
       const scroll = list.scrollTop;
       if (!all.length) {
         list.innerHTML = down
-          ? `<div class="error sytop-empty">Serwer NOTAM PL vACC nie odpowiada – brak danych z żadnej lokalizacji.
-              <div class="sytop-why">${failedHtml(data.failed)}</div><div class="hint">Kolejna próba za 2 min albo przyciskiem ODŚWIEŻ.</div></div>`
-          : `<div class="hint sytop-empty">Brak NOTAM-ów obowiązujących teraz w FIR EPWW${data.failed.length ? " (bez lokalizacji, które nie odpowiedziały)" : ""}.</div>`;
+          ? `<div class="error sytop-empty">The PL vACC NOTAM server does not respond – no data from any location.
+              <div class="sytop-why">${failedHtml(data.failed)}</div><div class="hint">Next attempt in 2 min, or press REFRESH.</div></div>`
+          : `<div class="hint sytop-empty">No NOTAMs in force now in FIR EPWW${data.failed.length ? " (excluding the locations that did not respond)" : ""}.</div>`;
         return;
       }
       if (!shown.length) {
-        list.innerHTML = `<div class="hint sytop-empty">Żaden NOTAM nie pasuje do filtra.</div>`;
+        list.innerHTML = `<div class="hint sytop-empty">No NOTAM matches the filter.</div>`;
         return;
       }
       let html = "", group = null, odd = false;
@@ -179,7 +180,7 @@ export default {
           const also = shown.filter((x) => gkey(x) !== group && (x.locations || []).includes(group));
           const where = [...new Set(also.map(gkey))].map(esc).join(", ");
           html += `<section class="sytop-grp"><div class="sytop-group"><b>${esc(group)}</b>${nameOf(group) ? ` <span>${esc(nameOf(group))}</span>` : ""} <i>· ${cnt}</i>${also.length
-            ? ` <i class="sytop-also" title="NOTAM-y z kilkoma lokalizacjami w polu A) stoją w grupie pierwszej z nich">+${also.length} w grupie ${where}</i>` : ""}</div>`;
+            ? ` <i class="sytop-also" title="NOTAMs with several locations in field A) are listed in the group of the first one">+${also.length} in group ${where}</i>` : ""}</div>`;
         }
         html += item(n, odd, main);
         odd = !odd;
@@ -195,15 +196,15 @@ export default {
       // czas pobrania z serwera NOTAM (najstarsze dane na liście; cache 10 min), a nie czas odpowiedzi PolIDS
       const at = hm(data?.updated || data?.now);
       upd.classList.toggle("stale", !!(data && (error || down || stale.length)));
-      upd.textContent = !data ? "" : down ? `próba ${hm(data.now)} · brak danych`
-        : `aktualizacja ${at}${error ? " · odświeżenie nieudane" : ""}`;
-      upd.title = !data ? "" : error ? `Ostatnia próba odświeżenia: ${error}`
-        : down ? "Czas UTC ostatniej próby – serwer NOTAM PL vACC nie odpowiedział"
-          : `Czas UTC pobrania NOTAM-ów z serwera PL vACC (najstarsze dane na liście); sprawdzono ${hm(data.now)}`;
+      upd.textContent = !data ? "" : down ? `attempt ${hm(data.now)} · no data`
+        : `updated ${at}${error ? " · refresh failed" : ""}`;
+      upd.title = !data ? "" : error ? `Last refresh attempt: ${error}`
+        : down ? "UTC time of the last attempt – the PL vACC NOTAM server did not respond"
+          : `UTC time the NOTAMs were fetched from the PL vACC server (oldest data on the list); checked ${hm(data.now)}`;
       const parts = [];
-      if (data && error) parts.push(`Lista z ${at} – nie udało się jej odświeżyć: ${esc(error)}`);
-      if (data?.failed.length && !down) parts.push(`Brak danych z: ${failedHtml(data.failed)}. Lista bez tych lokalizacji.`);
-      if (stale.length && !down) parts.push(`Serwer NOTAM nie odpowiada – na liście starsze dane: ${staleHtml(stale)}.`);
+      if (data && error) parts.push(`List from ${at} – could not refresh it: ${esc(error)}`);
+      if (data?.failed.length && !down) parts.push(`No data from: ${failedHtml(data.failed)}. The list is without these locations.`);
+      if (stale.length && !down) parts.push(`NOTAM server does not respond – older data on the list: ${staleHtml(stale)}.`);
       msg.innerHTML = parts.map((p) => `<div>${p}</div>`).join("");
     };
 
@@ -218,7 +219,7 @@ export default {
         const d = await api("/api/notam/fir/EPWW");
         if (my !== seq) return;
         // nic nie odpowiedziało, a mamy wcześniejszą listę: zostaje ona, z ostrzeżeniem (lepsze starsze dane niż nic)
-        if (allDown(d) && data && !allDown(data)) error = d.error || "serwer NOTAM nie odpowiada";
+        if (allDown(d) && data && !allDown(data)) error = d.error || "NOTAM server does not respond";
         else { data = d; error = ""; }
         nextAt = Date.now() + (d.failed.length || d.stale?.length ? RETRY_MS : REFRESH_MS);
       } catch (e) {

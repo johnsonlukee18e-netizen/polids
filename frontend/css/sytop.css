@@ -48,7 +48,7 @@ a.sytop-loc:hover { text-decoration: underline; }
 .sytop-main .nhead { gap: 4px 14px; }
 .sytop-subj { color: var(--muted); font-size: 12px; }
 .sytop-text { margin: 3px 0 0; font: 13px/1.4 var(--mono); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-.sytop-rawbtn { margin-left: auto; padding: 0 6px; background: none; border: 1px solid transparent; border-radius: 2px;
+.sytop-rawbtn { margin-left: auto; padding: 0 6px; background: none; border: 1px solid transparent; border-radius: 0;
   color: var(--muted); font-size: 11px; cursor: pointer; white-space: nowrap; }
 .sytop-rawbtn:hover, .sytop-rawbtn[aria-expanded="true"] { color: var(--green-text); border-color: var(--line); }
 .sytop-raw { margin-top: 4px; padding: 5px 8px; background: #000; border: 1px solid var(--line); color: #c9d2c9;
@@ -63,3 +63,5 @@ a.sytop-loc:hover { text-decoration: underline; }
   .sytop-bar .sytop-search { width: 220px; }
   .sytop-list .notam.sytop-item { grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
 }
+/* 0.12.5: ostre krawędzie jak w PANDORZE (przyciski, pole szukania, lista lokalizacji, wpisy NOTAM) */
+.view[data-tab="sytop"] :is(.btn, .field, input, select, .notam, .sytop-raw) { border-radius: 0; }

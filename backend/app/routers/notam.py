@@ -14,11 +14,11 @@ router = APIRouter(prefix="/api/notam", tags=["notam"])
 @router.get("/fir/{fir}")
 async def fir(fir: str, db: Session = Depends(get_db),
               include_all: bool = Query(False, alias="all",
-                                        description="także NOTAM-y nieobowiązujące teraz (przyszłe, wygasłe)")):
+                                        description="also NOTAMs not in force now (future, expired)")):
     """SYT OP: NOTAM-y FIR EPWW i głównych lotnisk obowiązujące teraz, bez duplikatów. Awaria części lokalizacji
     nie psuje odpowiedzi: lista z pozostałych, a nieudane w `failed` (i opis w `error`)."""
     if fir.upper() != FIR:
-        raise HTTPException(404, f"Lista NOTAM jest dostępna tylko dla FIR {FIR}")
+        raise HTTPException(404, f"The NOTAM list is available only for FIR {FIR}")
     data = await fir_notams(include_inactive=include_all)
     codes = sorted({c for n in data["notams"] for c in n["locations"]} | set(data["locations"]))
     # krótkie nazwy jak w PANDORZE i na listach AERODROME (ta sama funkcja): navdata (icao.txt), dla części lotnisk z miastem
@@ -34,8 +34,8 @@ async def fir(fir: str, db: Session = Depends(get_db),
 @router.get("/{icao}")
 async def notams(icao: str):
     if len(icao) != 4 or not icao.isalpha():
-        raise HTTPException(400, "Kod ICAO musi mieć 4 litery")
+        raise HTTPException(400, "ICAO code must have 4 letters")
     try:
         return await get_notams(icao)
     except UpstreamError as exc:
-        raise HTTPException(502, f"Serwer NOTAM niedostępny ({notam_url(icao)}): {exc}") from exc
+        raise HTTPException(502, f"NOTAM server unavailable ({notam_url(icao)}): {exc}") from exc
