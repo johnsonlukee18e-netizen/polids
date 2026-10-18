@@ -151,7 +151,7 @@ def test_fir_notams(fake_server):
     # awaria części lokalizacji: lista z pozostałych i nieudane lokalizacje z komunikatem bez adresu
     assert {f["icao"] for f in d["failed"]} == {"EPKK", "EPGD"}
     assert all(f["error"] == "timeout" for f in d["failed"])
-    assert d["error"] == "Serwer NOTAM: EPGD, EPKK: timeout"
+    assert d["error"] == "NOTAM server: EPGD, EPKK: timeout"
     assert d["locations"][0] == "EPWW" and len(d["locations"]) == 16 and d["fir"] == "EPWW"
 
 
@@ -175,7 +175,7 @@ def test_fir_notams_all_down(fake_server):
     fake_server["down"] = set(notam.FIR_LOCATIONS)
     d = asyncio.run(notam.fir_notams(NOW))
     assert d["notams"] == [] and len(d["failed"]) == 16
-    assert d["error"].startswith("Serwer NOTAM: EPWW, EPBY") and d["error"].endswith(": timeout")
+    assert d["error"].startswith("NOTAM server: EPWW, EPBY") and d["error"].endswith(": timeout")
 
 
 def test_fir_notams_unknown_format(fake_server):
@@ -198,22 +198,22 @@ def _upstream(cause: Exception) -> UpstreamError:
 
 
 def test_error_text_real_httpx_messages():
-    """Prawdziwe komunikaty httpx: pusty przy timeout, adres i link MDN przy HTTP 5xx – krótko, po polsku, bez adresu."""
+    """Prawdziwe komunikaty httpx: pusty przy timeout, adres i link MDN przy HTTP 5xx – krótko, po angielsku, bez adresu."""
     req = httpx.Request("GET", notam.notam_url("EPGD"))
-    assert notam._error_text(_upstream(httpx.ReadTimeout("", request=req))) == "brak odpowiedzi (timeout)"
-    assert notam._error_text(_upstream(httpx.ConnectTimeout("", request=req))) == "brak odpowiedzi (timeout)"
+    assert notam._error_text(_upstream(httpx.ReadTimeout("", request=req))) == "no response (timeout)"
+    assert notam._error_text(_upstream(httpx.ConnectTimeout("", request=req))) == "no response (timeout)"
     status = httpx.HTTPStatusError("Server error '503 Service Unavailable' for url '...'\nFor more information check: "
                                    "https://developer.mozilla.org/", request=req, response=httpx.Response(503, request=req))
     assert notam._error_text(_upstream(status)) == "HTTP 503"
     assert notam._error_text(_upstream(httpx.ConnectError("All connection attempts failed", request=req))) == \
-        "brak połączenia"
+        "no connection"
     assert notam._error_text(_upstream(httpx.RemoteProtocolError("Server disconnected", request=req))) == \
-        "połączenie przerwane"
+        "connection interrupted"
     # inne: pierwsza linia, bez adresów, najwyżej 80 znaków; pusty komunikat – nazwa błędu
     long = notam._error_text(UpstreamError(f"{notam.notam_url('EPKK')}: bad thing at https://x.test/a?b=1 " + "x" * 200
                                            + "\nsecond line"))
     assert long.startswith("bad thing at") and "http" not in long and "second" not in long and len(long) <= 80
-    assert notam._error_text(UpstreamError(f"{notam.notam_url('EPKK')}: ")) == "błąd (UpstreamError)"
+    assert notam._error_text(UpstreamError(f"{notam.notam_url('EPKK')}: ")) == "error (UpstreamError)"
 
 
 @pytest.fixture
@@ -244,10 +244,10 @@ def test_fir_notams_real_upstream_errors_grouped(upstream):
     upstream["mode"] = {"EPWW": "timeout", "EPBY": "timeout", "EPGD": 503, "EPKK": 503, "EPKT": "refused"}
     d = asyncio.run(notam.fir_notams(NOW))
     errors = {f["icao"]: f["error"] for f in d["failed"]}
-    assert errors == {"EPWW": "brak odpowiedzi (timeout)", "EPBY": "brak odpowiedzi (timeout)", "EPGD": "HTTP 503",
-                      "EPKK": "HTTP 503", "EPKT": "brak połączenia"}
-    assert d["error"] == ("Serwer NOTAM: EPWW, EPBY: brak odpowiedzi (timeout); EPGD, EPKK: HTTP 503; "
-                          "EPKT: brak połączenia")
+    assert errors == {"EPWW": "no response (timeout)", "EPBY": "no response (timeout)", "EPGD": "HTTP 503",
+                      "EPKK": "HTTP 503", "EPKT": "no connection"}
+    assert d["error"] == ("NOTAM server: EPWW, EPBY: no response (timeout); EPGD, EPKK: HTTP 503; "
+                          "EPKT: no connection")
     assert "http" not in d["error"] and d["stale"] == []
     # pozostałe lokalizacje dały listę (EPWA, EPMO), z czasem pobrania z serwera
     assert {n["location"] for n in d["notams"]} >= {"EPWA", "EPMO"} and d["updated"] is not None
@@ -260,7 +260,7 @@ def test_fir_notams_failures_remembered(upstream):
     upstream["calls"].clear()
     d = asyncio.run(notam.fir_notams(NOW))
     assert "EPGD" not in upstream["calls"] and "EPKK" not in upstream["calls"]
-    assert {f["icao"]: f["error"] for f in d["failed"]} == {"EPGD": "HTTP 503", "EPKK": "brak odpowiedzi (timeout)"}
+    assert {f["icao"]: f["error"] for f in d["failed"]} == {"EPGD": "HTTP 503", "EPKK": "no response (timeout)"}
     # po FIR_FAIL_SECONDS – znowu pytamy (i serwer już działa)
     for icao, (t0, err) in list(notam._fir_failed.items()):
         notam._fir_failed[icao] = (t0 - notam.FIR_FAIL_SECONDS - 1, err)
@@ -397,7 +397,7 @@ def test_api_aerodrome_notams_unchanged(client):
     assert set(d["notams"][0]) == {"id", "raw", "fields", "start", "end", "perm", "est", "schedule"}
     assert d["other"] == 3
     r = client.get("/api/notam/EPKK")
-    assert r.status_code == 502 and "Serwer NOTAM niedostępny" in r.json()["detail"]
+    assert r.status_code == 502 and "NOTAM server unavailable" in r.json()["detail"]
 
 
 # --- frontend: czyste funkcje zakładki SYT OP (Node, bez przeglądarki) -------------------------------------------
