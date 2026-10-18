@@ -168,7 +168,7 @@ def test_moved_docs(js):
 
 
 def test_home_greeting(js):
-    assert js["hello"] == ["Witaj", "Witaj", "Witaj, Jan Kowalski (1234567)", "Witaj, 1234567", "Witaj, <b>X</b> (7)"]
+    assert js["hello"] == ["Welcome", "Welcome", "Welcome, Jan Kowalski (1234567)", "Welcome, 1234567", "Welcome, <b>X</b> (7)"]
     # HOME pokazuje powitanie przez esc() (imię z VATSIM to dane z zewnątrz)
     assert "${esc(greeting(ctx.me))}" in (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
     assert js["noop"] == [None, None, None, None]
@@ -180,3 +180,25 @@ def test_aerodrome_uses_navigation_api():
     assert "history.replaceState" not in src and 'remember("aerodrome", a)' in src
     assert "mountDman(" in src and "mountStrips(" not in src
     assert "export function mountDman(" in (FRONTEND / "js" / "dman.js").read_text("utf-8")
+
+
+SHELL_JS = ["js/app.js", "js/api.js", "js/tabs/home.js", "js/tabs/admin.js", "js/tabs/soon.js", "sw.js"]
+POLISH = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+
+
+def test_shell_in_english():
+    """0.12.5 (issue #18): cała aplikacja po angielsku. Strony powłoki z lang="en", a w kodzie powłoki (bez komentarzy
+    i logów konsoli) żadnych polskich napisów; komentarze w kodzie zostają po polsku."""
+    for name in ("index.html", "login.html", "offline.html"):
+        html = (FRONTEND / name).read_text("utf-8")
+        assert '<html lang="en">' in html, name
+        text = re.sub(r"<!--.*?-->|/\*.*?\*/", "", html, flags=re.S)
+        assert not POLISH.search(text), name
+    for name in SHELL_JS:
+        src = re.sub(r"/\*.*?\*/", "", (FRONTEND / name).read_text("utf-8"), flags=re.S)
+        src = re.sub(r"(^|\s)//.*$", r"\1", src, flags=re.M)
+        bad = [line.strip() for line in src.splitlines() if POLISH.search(line) and "console." not in line]
+        assert not bad, f"{name}: {bad}"
+    home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
+    assert "PREPARE SESSION → AERODROME" in home and "<h3>Position</h3>" in home
+

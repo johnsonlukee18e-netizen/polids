@@ -3,7 +3,7 @@ import { api, choiceGet, choiceSet, esc, h, navigate, ONLINE_EVENT, POS_KEY } fr
 // HOME ("?" w menu, strona startowa): powitanie zalogowanego kontrolera (imię i nazwisko z CID z /auth/me) z ratingiem,
 // jego połączenie i rezerwacje w VATSIM (/api/vatsim/me), wybór stanowiska jak w AERODROME › OVERVIEW i przycisk
 // przejścia tam przed sesją; na dole wersja aplikacji i bieżący AIRAC z datami.
-// Bez logowania (tryb lokalny) samo "Witaj" i wybór stanowiska, bez ratingu i bez VATSIM.
+// Bez logowania (tryb lokalny) samo "Welcome" i wybór stanowiska, bez ratingu i bez VATSIM.
 
 // POS_KEY z api.js (ten sam w overview.js): stanowisko wybrane tutaj AERODROME › OVERVIEW otwiera od razu
 // (moduł importuje tylko api.js, bo test powłoki wczytuje go w Node)
@@ -11,9 +11,9 @@ const REFRESH_MS = 60000;    // stan VATSIM odświeżany, gdy HOME jest na ekran
 
 export function greeting(me) {
   const u = me?.user;
-  if (!u || (!u.name && !u.cid)) return "Witaj";
-  if (!u.name) return `Witaj, ${u.cid}`;
-  return u.cid ? `Witaj, ${u.name} (${u.cid})` : `Witaj, ${u.name}`;
+  if (!u || (!u.name && !u.cid)) return "Welcome";
+  if (!u.name) return `Welcome, ${u.cid}`;
+  return u.cid ? `Welcome, ${u.name} (${u.cid})` : `Welcome, ${u.name}`;
 }
 
 // ratingi VATSIM: numer z VATSIM Connect, skrót i oficjalna pełna nazwa
@@ -44,7 +44,7 @@ export function airacText(airac) {
   const from = ymd(airac.effective);
   const next = /^\d{4}-\d{2}-\d{2}/.test(airac.next || "") ? new Date(airac.next.slice(0, 10) + "T00:00:00Z") : null;
   const to = next && !isNaN(next) ? ymd(new Date(next.getTime() - 86400000).toISOString()) : "";
-  return `AIRAC ${airac.ident}` + (from && to ? ` · ${from} – ${to}` : from ? ` · od ${from}` : "");
+  return `AIRAC ${airac.ident}` + (from && to ? ` · ${from} – ${to}` : from ? ` · from ${from}` : "");
 }
 
 // "10:12Z" (pusty napis dla złej daty: dane z zewnątrz, toISOString rzuciłby wyjątek)
@@ -61,22 +61,22 @@ export function bookingTime(b, now = new Date()) {
   return `${day}${utcHm(b?.start).replace("Z", "")}–${utcHm(b?.end)}`;
 }
 
-// "Rezerwacja: EPWA_TWR 18:00–20:00Z", z rodzajem innym niż zwykła rezerwacja (event, training…) i "trwa"
+// "Booking: EPWA_TWR 18:00–20:00Z", z rodzajem innym niż zwykła rezerwacja (event, training…) i "in progress"
 export function bookingText(b, now = new Date()) {
   const type = b?.type && b.type !== "booking" ? ` (${b.type})` : "";
-  return `Rezerwacja: ${b?.callsign || "?"} ${bookingTime(b, now)}${type}${b?.active ? " · trwa" : ""}`;
+  return `Booking: ${b?.callsign || "?"} ${bookingTime(b, now)}${type}${b?.active ? " · in progress" : ""}`;
 }
 
 // obserwator i ATIS to też połączenia z CID kontrolera, ale nie stanowiska
 export const isPosition = (c) => !/_(ATIS|OBS)$/i.test(c?.callsign || "") && c?.facility !== 0;
 
-// "Jesteś zalogowany na VATSIM jako EPWW_DBT_CTR (127.025) od 10:12Z"; ATIS i obserwator osobnymi słowami
+// "You are connected to VATSIM as EPWW_DBT_CTR (127.025) since 10:12Z"; ATIS i obserwator osobnymi słowami
 export function onlineText(c) {
-  const since = utcHm(c.logon_time) ? ` od ${utcHm(c.logon_time)}` : "";
+  const since = utcHm(c.logon_time) ? ` since ${utcHm(c.logon_time)}` : "";
   const freq = c.frequency ? ` (${c.frequency})` : "";
-  if (/_ATIS$/i.test(c.callsign || "")) return `ATIS ${c.callsign}${freq}${since}${c.atis_code ? ` · litera ${c.atis_code}` : ""}`;
-  if (!isPosition(c)) return `Jesteś zalogowany na VATSIM jako obserwator (${c.callsign})${since}`;
-  return `Jesteś zalogowany na VATSIM jako ${c.callsign}${freq}${since}`;
+  if (/_ATIS$/i.test(c.callsign || "")) return `ATIS ${c.callsign}${freq}${since}${c.atis_code ? ` · information ${c.atis_code}` : ""}`;
+  if (!isPosition(c)) return `You are connected to VATSIM as an observer (${c.callsign})${since}`;
+  return `You are connected to VATSIM as ${c.callsign}${freq}${since}`;
 }
 
 // stanowisko z listy OVERVIEW dla znaku z sieci: dokładnie ten znak, stanowisko dopasowane przez serwer (`alt`, jak
@@ -131,11 +131,11 @@ export function homeChoice({ seen = "", picked = false, appliedOnline = "" } = {
 
 // dokąd prowadzi przycisk: wieża (goto = ICAO) od razu do AERODROME lotniska, jak wybór TWR w OVERVIEW; reszta do OVERVIEW
 export function sessionTarget(p) {
-  return p?.goto ? { arg: p.goto, label: `PRZYGOTUJ SESJĘ → AERODROME ${p.goto}` }
-    : { arg: "0", label: "PRZYGOTUJ SESJĘ → AERODROME OVERVIEW" };
+  return p?.goto ? { arg: p.goto, label: `PREPARE SESSION → AERODROME ${p.goto}` }
+    : { arg: "0", label: "PREPARE SESSION → AERODROME OVERVIEW" };
 }
 
-const lotnisk = (n) => (n === 1 ? "lotnisko" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "lotniska" : "lotnisk");
+const aerodromes = (n) => (n === 1 ? "aerodrome" : "aerodromes");
 
 export default {
   mount(root, ctx) {
@@ -146,9 +146,9 @@ export default {
       <div class="home-main">
         <h1 class="home-hello">${esc(greeting(ctx.me))}</h1>
         ${rating ? `<div class="home-rating">${esc(rating)}</div>` : ""}
-        ${user ? `<div class="card home-card"><h3>VATSIM</h3><div class="home-net"><span class="hint">Sprawdzanie…</span></div></div>` : ""}
-        <div class="card home-card"><h3>Stanowisko</h3>
-          <select class="field home-pos" disabled><option value="">Wszystkie lotniska FIR EPWW</option></select>
+        ${user ? `<div class="card home-card"><h3>VATSIM</h3><div class="home-net"><span class="hint">Checking…</span></div></div>` : ""}
+        <div class="card home-card"><h3>Position</h3>
+          <select class="field home-pos" disabled><option value="">All aerodromes FIR EPWW</option></select>
           <div class="hint home-pos-note"></div>
           <button class="gbtn home-go" type="button">${esc(sessionTarget(null).label)}</button>
         </div>
@@ -170,10 +170,10 @@ export default {
       const p = current();
       $(".home-go").textContent = sessionTarget(p).label;
       const booked = p && (net?.bookings || []).find((b) => listedPosition(b.callsign, list) === p.callsign);
-      $(".home-pos-note").innerHTML = !p ? (listLoaded ? "wszystkie kontrolowane lotniska FIR EPWW" : "")
+      $(".home-pos-note").innerHTML = !p ? (listLoaded ? "all controlled aerodromes FIR EPWW" : "")
         : esc([p.name, p.frequency].filter(Boolean).join(" · "))
-          + (p.goto ? "" : ` · lotniska: <b>${p.airports.map(esc).join(", ")}</b>`)
-          + (booked ? ` · <span class="home-ok">rezerwacja ${booked.callsign !== p.callsign ? esc(booked.callsign) + " " : ""}${esc(bookingTime(booked))}</span>` : "");
+          + (p.goto ? "" : ` · aerodromes: <b>${p.airports.map(esc).join(", ")}</b>`)
+          + (booked ? ` · <span class="home-ok">booking ${booked.callsign !== p.callsign ? esc(booked.callsign) + " " : ""}${esc(bookingTime(booked))}</span>` : "");
     };
     const choose = (cs) => {
       if (cs === "" || list.some((p) => p.callsign === cs)) sel.value = cs;
@@ -186,9 +186,9 @@ export default {
       const online = net.online || [], books = net.bookings || [];
       const line = (text, cls = "") => `<div class="home-line${cls ? " " + cls : ""}">${esc(text)}</div>`;
       const lines = online.map((c) => line(onlineText(c), isPosition(c) ? "home-on" : ""));
-      if (!online.length && !net.online_error) lines.push(line("Nie jesteś teraz zalogowany na VATSIM jako kontroler.", "muted"));
+      if (!online.length && !net.online_error) lines.push(line("You are not connected to VATSIM as a controller.", "muted"));
       lines.push(...books.map((b) => line(bookingText(b))));
-      if (!books.length && !net.bookings_error) lines.push(line("Brak rezerwacji na najbliższe 24 h.", "muted"));
+      if (!books.length && !net.bookings_error) lines.push(line("No bookings in the next 24 h.", "muted"));
       if (net.error) lines.push(line(net.error, "error"));
       body.innerHTML = lines.join("");
     };
@@ -212,7 +212,7 @@ export default {
         const og = document.createElement("optgroup");
         og.label = g.label;
         og.innerHTML = g.positions.map((p) => `<option value="${esc(p.callsign)}">${esc(p.callsign)}${p.frequency ? ` · ${esc(p.frequency)}` : ""}${p.goto
-          ? ` → AERODROME ${esc(p.goto)}` : ` · ${p.airports.length} ${lotnisk(p.airports.length)}`}</option>`).join("");
+          ? ` → AERODROME ${esc(p.goto)}` : ` · ${p.airports.length} ${aerodromes(p.airports.length)}`}</option>`).join("");
         sel.append(og);
       });
       sel.disabled = false;

@@ -7,22 +7,22 @@ export default {
   mount(root, ctx) {
     const pane = h(`<div class="pane admin">
       <div class="card">
-        <h3>Dostęp - CID z VATSIM</h3>
+        <h3>Access – VATSIM CIDs</h3>
         <form class="toolbar add">
           <input class="cid" placeholder="CID" required pattern="[0-9]{6,8}" size="10" inputmode="numeric">
-          <input class="note" placeholder="Opis (np. imię, stanowisko)" maxlength="120" size="36">
-          <button class="btn primary" type="submit">Dodaj</button>
+          <input class="note" placeholder="Note (e.g. name, position)" maxlength="120" size="36">
+          <button class="btn primary" type="submit">Add</button>
           <span class="hint msg"></span>
         </form>
         <p class="hint admins"></p>
-        <table class="data users"><thead><tr><th>CID</th><th>Opis</th><th>Imię (VATSIM)</th><th>Dodany</th>
-          <th>Ostatnie logowanie</th><th></th></tr></thead><tbody></tbody></table>
+        <table class="data users"><thead><tr><th>CID</th><th>Note</th><th>Name (VATSIM)</th><th>Added</th>
+          <th>Last login</th><th></th></tr></thead><tbody></tbody></table>
       </div>
       <div class="card">
-        <h3>Odmowy dostępu</h3>
-        <div class="toolbar"><span class="hint">Osoby, które próbowały się zalogować, a nie ma ich na liście.</span>
-          <span style="flex:1"></span><button class="btn clear" type="button">Wyczyść</button></div>
-        <table class="data denied"><thead><tr><th>CID</th><th>Imię</th><th>Rating</th><th>Prób</th><th>Ostatnia</th><th></th>
+        <h3>Denied logins</h3>
+        <div class="toolbar"><span class="hint">People who tried to log in but are not on the list.</span>
+          <span style="flex:1"></span><button class="btn clear" type="button">Clear</button></div>
+        <table class="data denied"><thead><tr><th>CID</th><th>Name</th><th>Rating</th><th>Attempts</th><th>Last</th><th></th>
           </tr></thead><tbody></tbody></table>
       </div>
     </div>`);
@@ -34,20 +34,20 @@ export default {
       try {
         const [data, denied] = await Promise.all([api("/api/admin/users"), api("/api/admin/denied")]);
         $(".admins").textContent = data.admins.length
-          ? `Administratorzy (z konfiguracji, zawsze mają dostęp): ${data.admins.join(", ")}`
-          : "Brak administratorów w POLIDS_AUTH_ADMIN_CIDS.";
+          ? `Administrators (from configuration, always have access): ${data.admins.join(", ")}`
+          : "No administrators in POLIDS_AUTH_ADMIN_CIDS.";
         $(".users tbody").innerHTML = data.users.length ? data.users.map((u) => `<tr data-cid="${esc(u.cid)}">
           <td class="mono">${esc(u.cid)}</td>
           <td><input class="field note-edit" value="${esc(u.note || "")}" maxlength="120" placeholder="-"></td>
           <td>${esc(u.name || "–")}</td><td class="mono">${when(u.added_at)}${u.added_by ? ` <span class="hint">(${esc(u.added_by)})</span>` : ""}</td>
           <td class="mono">${when(u.last_login)}</td>
-          <td class="actions"><button class="btn danger del" type="button">Usuń</button></td></tr>`).join("")
-          : `<tr><td colspan="6" class="hint">Lista jest pusta - zalogować mogą się tylko administratorzy.</td></tr>`;
+          <td class="actions"><button class="btn danger del" type="button">Remove</button></td></tr>`).join("")
+          : `<tr><td colspan="6" class="hint">The list is empty – only administrators can log in.</td></tr>`;
         $(".denied tbody").innerHTML = denied.length ? denied.map((d) => `<tr data-cid="${esc(d.cid)}" data-name="${esc(d.name || "")}">
           <td class="mono">${esc(d.cid)}</td><td>${esc(d.name || "–")}</td><td>${esc(d.rating || "–")}</td>
           <td class="num">${d.count}</td><td class="mono">${when(d.last)}</td>
-          <td class="actions"><button class="btn allow" type="button">Dodaj</button></td></tr>`).join("")
-          : `<tr><td colspan="6" class="hint">Brak.</td></tr>`;
+          <td class="actions"><button class="btn allow" type="button">Add</button></td></tr>`).join("")
+          : `<tr><td colspan="6" class="hint">None.</td></tr>`;
       } catch (e) {
         $(".users tbody").innerHTML = `<tr><td colspan="6" class="error">${esc(e.message)}</td></tr>`;
       }
@@ -56,7 +56,7 @@ export default {
     const add = async (cid, note) => {
       try {
         await api("/api/admin/users", json("POST", { cid, note }));
-        msg(`Dodano ${cid}`);
+        msg(`Added ${cid}`);
         await load();
         return true;
       } catch (e) {
@@ -79,10 +79,10 @@ export default {
       if (!row) return;
       const cid = row.dataset.cid;
       if (e.target.closest(".del")) {
-        if (!confirm(`Usunąć CID ${cid} z listy? Straci dostęp od razu.`)) return;
+        if (!confirm(`Remove CID ${cid} from the list? Access is revoked immediately.`)) return;
         try {
           await api(`/api/admin/users/${cid}`, { method: "DELETE" });
-          msg(`Usunięto ${cid}`);
+          msg(`Removed ${cid}`);
         } catch (err) {
           msg(err.message, true);
         }
@@ -98,7 +98,7 @@ export default {
       const cid = input.closest("tr").dataset.cid;
       try {
         await api(`/api/admin/users/${cid}`, json("PATCH", { note: input.value.trim() }));
-        msg(`Zapisano opis ${cid}`);
+        msg(`Note saved for ${cid}`);
       } catch (err) {
         msg(err.message, true);
       }
