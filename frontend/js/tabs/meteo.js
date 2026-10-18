@@ -1007,7 +1007,8 @@ function sunTab(ctx) {
       twi.setLatLngs(nightRings(now, SR_ALT).map((r) => [r]));
       night.setLatLngs(nightRings(now, CIVIL_ALT).map((r) => [r]));
       sub.setLatLng([s.lat, s.lon]);
-      sub.unbindTooltip().bindTooltip(`Sun at zenith: ${latLonTxt(s.lat, s.lon)}`, { direction: "top", offset: [0, -6] });
+      sub.unbindTooltip().bindTooltip(`Sun at zenith: ${latLonTxt(s.lat, s.lon)}`, { direction: "top", offset: [0, -6],
+        className: "sun-tip" });
       const hint = $(".sun-hint");
       hint.textContent = `${new Date(now).toISOString().slice(11, 16)}Z · sun at zenith ${latLonTxt(s.lat, s.lon)}`;
       hint.title = "Day/night boundary every minute (sun position computed in the browser). Click the map: sun at that point.";

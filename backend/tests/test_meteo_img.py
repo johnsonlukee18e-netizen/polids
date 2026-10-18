@@ -282,5 +282,16 @@ def test_strings_in_english():
         assert txt in METEO, txt
 
 
+def test_sharp_edges():
+    """Issue #18: ostre krawędzie jak w PANDORZE: zaokrąglenia tylko na prawdziwych kółkach (legenda słońca)."""
+    wind = (FRONTEND / "css" / "wind.css").read_text("utf-8")
+    for name, css in (("meteoimg.css", CSS), ("wind.css", wind)):
+        radii = re.findall(r"([^{}]*)\{[^}]*border-radius:\s*([^;}]+)", css)
+        assert radii, name
+        for sel, val in radii:
+            assert val.strip() == "0" or (val.strip() == "50%" and "lg-sub" in sel), (name, sel.strip(), val)
+    assert re.search(r"\.sun-tip \{[^}]*border-radius: 0", CSS)
+
+
 def test_no_glow():
     assert "text-shadow" not in CSS and "glow" not in CSS.lower().replace("bez poświaty", "")
