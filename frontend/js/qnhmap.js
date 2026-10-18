@@ -11,15 +11,19 @@ import { api, esc, h, ONLINE_EVENT } from "./api.js";
 const QR_LAYERS = [["tma", "TMA/MTMA"], ["ctr", "CTR/MCTR"], ["ad", "Aerodromes"], ["cap", "Captions"],
   ["des", "Designators"]];
 // zoom, dla którego dobrano miejsca napisów z JSON-a (mapa 960x900 przy oknie 1600x900, cały FIR): przy mniejszym
-// napisy maleją razem z mapą (--k w CSS, nie mniej niż QR_MIN: przy oknie 1366x657, czyli ekranie 1366x768 z paskami
-// przeglądarki, zoom 7,0 i napisy 71%, jak mapa); widok "z daleka" (bez kodów lotnisk, opisów BELOW i szarych
-// oznaczeń) dopiero ponad QR_FAR poniżej zoomu dopasowanego do okna (jedno "−" albo ząbek kółka od widoku
-// domyślnego), więc domyślny widok przy każdym oknie ma wszystkie napisy. Ten sam model rozmiarów: services/qnh.py
-// (test nakładania).
-const QR_ZOOM = 7.5, QR_FAR = 0.3, QR_MIN = 0.7;
+// napisy maleją razem z mapą (--k w CSS), ale nie mniej niż QR_MIN (60%, poniżej zoomu 6,76). Poziomy napisów
+// (klasy qr-mid i qr-far w qnh.css): 0 = wszystkie; 1 = bez szarych oznaczeń i kodów lotnisk (najmniejsze napisy
+// pierwsze nachodzą na inne); 2 = "z daleka": numery rejonów z ramką QNH i symbole lotnisk z METAR-em. Poziom to
+// wyższy z dwóch: zoom poniżej progu z QR_TIERS (każdy próg to poziom wyżej, więc przybliżanie przywraca napisy krok
+// po kroku; domyślny widok przy oknie 1366x657 i większym ma wszystkie napisy, przy 1366x627 i 1280x609 poziom 1,
+// przy 1024x600 poziom 2) i oddalenie od widoku domyślnego ponad próg z QR_OUT (jedno "−" albo ząbek kółka to poziom
+// wyżej, dwa "−" to widok "z daleka"). Ten sam model rozmiarów i poziomów: services/qnh.py (test nakładania).
+const QR_ZOOM = 7.5, QR_MIN = 0.6, QR_TIERS = [6.95, 6.75], QR_OUT = [0.25, 0.75];
 export const labelScale = (z) => Math.min(1, Math.max(QR_MIN, 2 ** (z - QR_ZOOM)));
-// fit: zoom, przy którym cały FIR mieści się w oknie mapy (na dużym ekranie liczy się widok 1600x900)
-export const isFar = (z, fit) => z < Math.min(fit, QR_ZOOM) - QR_FAR;
+// fit: zoom widoku domyślnego, przy którym cały FIR mieści się w oknie mapy
+export const labelTier = (z, fit) => Math.max(QR_TIERS.filter((t) => z < t).length,
+  QR_OUT.filter((d) => z < fit - d).length);
+export const isFar = (z, fit) => labelTier(z, fit) === 2;
 
 // odwzorowanie stożkowe wiernokątne Lamberta (kula) jak na mapie AIP: południk środkowy 19°E, stała stożka 0,798
 // (styczne na ok. 53°N, wartość dopasowana do siatki mapy PAŻP); skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
@@ -71,7 +75,7 @@ export function qnhMap(pane) {
     </div></div>`);
   pane.append(wrap);
   const $ = (s) => wrap.querySelector(s);
-  // minZoom: dalej FIR to kilka pikseli, a napisy (nie mniejsze niż 70%) zlewają się w jeden stos
+  // minZoom: dalej FIR to kilka pikseli, a napisy (nie mniejsze niż 60%) zlewają się w jeden stos
   const map = L.map($(".qrmap"), { crs: lccCrs(), minZoom: 5.5, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 120,
     attributionControl: false });
   // kolejność warstw jak na mapie AIP: siatka i brzeg, TMA (wypełnienie, części wspólne, CTR, cienkie linie, obrysy),
@@ -125,8 +129,10 @@ export function qnhMap(pane) {
   const PAD = [4, 4];
   const scaleLabels = () => {
     const z = map.getZoom(), fit = map.getBoundsZoom(home, false, L.point(PAD).multiplyBy(2));
+    const t = labelTier(z, fit);
     wrap.style.setProperty("--k", labelScale(z).toFixed(3));
-    wrap.classList.toggle("qr-far", isFar(z, fit));
+    wrap.classList.toggle("qr-mid", t === 1);
+    wrap.classList.toggle("qr-far", t === 2);
   };
   map.on("zoomend", scaleLabels);
 
@@ -249,7 +255,7 @@ export function qnhMap(pane) {
   const timer = setInterval(load, 300000);
   const online = () => $(".qr-err").textContent && load();   // serwer wrócił, a na mapie jest komunikat błędu
   window.addEventListener(ONLINE_EVENT, online);
-  // zmiana okna: inny zoom dopasowany do FIR, więc i granica widoku "z daleka"
+  // zmiana okna: inny zoom dopasowany do FIR, więc i poziom napisów
   const ro = new ResizeObserver(() => { map.invalidateSize(); grat(); scaleLabels(); });
   ro.observe($(".qrmap"));
   return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); ro.disconnect(); map.remove(); } };

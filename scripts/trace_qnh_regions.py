@@ -26,8 +26,9 @@ biegnie tą granicą (krótszą drogą).
 Układ napisów (wszystko [lon, lat], środek napisu) jest ręczny i skrypt przenosi go z dotychczasowego pliku:
 'num' i 'qnh_at' rejonów (duży numer i ramka z QNH obok niego), 'cap' i 'code' TMA (opis BELOW … QNH FROM EPxx
 z QNH), "chart_labels" (szare oznaczenia TMA/CTR) i "aero_labels" (strona kodu ICAO przy symbolu lotniska).
---layout rozsuwa nachodzące na siebie napisy (model rozmiarów jak w qnh.css i test_qnh.py, wszystkie widoki
-services.qnh.VIEWS) i zapisuje nowe miejsca; przesuwa tylko napisy, które na coś nachodzą, więc na pliku bez kolizji
+--layout rozsuwa nachodzące na siebie napisy (model rozmiarów jak w qnh.css i test_qnh.py, każdy zoom widoku
+domyślnego services.qnh.FIT_ZOOMS z napisami jego poziomu, services.qnh.tier()) i zapisuje nowe miejsca; przesuwa tylko
+napisy, które na coś nachodzą (albo numer rejonu z ramką QNH wystający ze swojego rejonu), więc na pliku bez kolizji
 nic nie zmienia (test_script_reproduces_seed).
 
 Użycie (z katalogu głównego repozytorium):
@@ -218,8 +219,9 @@ UWAGA = ("Plik generuje scripts/trace_qnh_regions.py (opis źródeł w skrypcie)
          "środek opisu BELOW ... QNH FROM EPxx z QNH, 'stack' = QNH w trzecim wierszu (węższy opis), 'code' = osobny "
          "napis 'EPxx QNH' (wtedy opis bez kodu), 'join' = "
          "lotniska z własnym napisem 'code' pod wspólnym opisem; 'chart_labels' = szare oznaczenia TMA/CTR ('lines' = "
-         "wiersze); 'aero_labels' = strona kodu ICAO przy symbolu lotniska (domyślnie e). Brak nakładania napisów przy "
-         "oknach 1600x900, 1600x789, 1366x768 i 1366x657 sprawdza test_label_layout w backend/tests/test_qnh.py. "
+         "wiersze); 'aero_labels' = strona kodu ICAO przy symbolu lotniska (domyślnie e). Brak nakładania napisów w "
+         "widoku domyślnym przy każdym oknie od 1024x600 do 2560x1440 (poziomy napisów jak w qnhmap.js) sprawdza "
+         "test_label_layout w backend/tests/test_qnh.py. "
          "'note' = objaśnienie pod tabelami (po angielsku).")
 
 
@@ -705,22 +707,23 @@ AERO_SIDES = ("e", "w", "se", "ne", "sw", "nw", "s", "n")
 
 
 def relayout(cfg: dict, ads: dict) -> None:
-    """Rozsuwa napisy we wszystkich domyślnych widokach (services.qnh.VIEWS, model jak w test_qnh.py), tak żeby się
-    nie nakładały: przesuwa tylko napisy, które nachodzą na inne (napis, który tylko przecina linię, zostaje na swoim
+    """Rozsuwa napisy w każdym widoku domyślnym (services.qnh.FIT_ZOOMS, na każdym zoomie napisy jego poziomu
+    services.qnh.tier(), model jak w test_qnh.py), tak żeby się nie nakładały, a numer rejonu z ramką QNH nie wystawał
+    ze swojego rejonu: przesuwa tylko napisy, które nachodzą na inne (napis, który tylko przecina linię, zostaje na swoim
     miejscu z mapy PAŻP), a nowe miejsce wybiera tak, żeby nie nachodziło na inne napisy i, o ile się da, nie
     przecinało granic rejonów, linii 53°N/51°N, granicy FIR i obrysów TMA: numer rejonu z ramką QNH (najpierw inna
     strona ramki, potem przesunięcie numeru do 15 px), opisy BELOW, kody 'code' i szare oznaczenia przesunięte
     najmniej, jak się da, kod ICAO lotniska na wolnej stronie symbolu. Na pliku bez kolizji nic nie zmienia."""
-    from shapely.geometry import MultiLineString
+    from shapely.geometry import MultiLineString, MultiPolygon, Point, Polygon
     from shapely.geometry import box as rect
     from shapely.prepared import prep
 
-    from backend.app.services.qnh import VIEWS, clash, drawn_aerodromes, label_boxes, px
+    from backend.app.services.qnh import FIT_ZOOMS, clash, drawn_aerodromes, label_boxes, px, tier
 
     metar = {a for r in cfg["regions"] for a in r["airports"]} | {t["icao"] for t in cfg["tmas"]}
     rows = [{"icao": k, "lon": v[0], "lat": v[1]} for k, v in ads.items() if k.startswith("EP")]
     sides = cfg.setdefault("aero_labels", {})
-    zooms = list(VIEWS.values())
+    zooms = FIT_ZOOMS
     empty = {"regions": [], "tmas": [], "chart_labels": []}
     polys = lambda g: [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]  # noqa: E731
     # linie, których napisy nie powinny przecinać: granice rejonów 1–14 (z granicą FIR), linie 53°N i 51°N
@@ -730,9 +733,25 @@ def relayout(cfg: dict, ads: dict) -> None:
     lines += [[(14 + i / 10, par) for i in range(103)] for par in (51, 53)]   # równoleżnik = łuk, co 0,1°
     # linia z otoczką ma ok. 4,5 px, więc napis trzyma się 2,5 px od osi linii
     lines_px = [prep(MultiLineString([[px(*c, z) for c in ln] for ln in lines]).buffer(2.5)) for z in zooms]
+    # rejony w pikselach każdego zoomu: numer rejonu i ramka QNH w swoim rejonie (jak test_label_layout)
+    reg_px = {r["id"]: [prep(MultiPolygon([Polygon([px(*c, z) for c in p[0]], [[px(*c, z) for c in h] for h in p[1:]])
+                                           for p in polys(r["geometry"])])) for z in zooms] for r in cfg["regions"]}
+
+    def outside(key, own: list[list]) -> int:
+        """Napisy rejonu (numer, ramka QNH) poza swoim rejonem: środek albo więcej niż jeden narożnik za granicą
+        (ramka po drugiej stronie linii czytałaby się jako QNH sąsiedniego rejonu); liczą się jak kolizje."""
+        if key[0] != "r":
+            return 0
+        bad = 0
+        for zi, mine in enumerate(own):
+            for _, _, (x0, y0, x1, y1) in mine:
+                inside = [reg_px[key[1]][zi].contains(Point(x, y))
+                          for x, y in (((x0 + x1) / 2, (y0 + y1) / 2), (x0, y0), (x1, y0), (x0, y1), (x1, y1))]
+                bad += not inside[0] or sum(inside[1:]) < 3
+        return bad
 
     def boxes(item_cfg: dict, aero: list) -> list[list]:
-        return [label_boxes({**empty, **item_cfg}, aero, z) for z in zooms]
+        return [label_boxes({**empty, **item_cfg}, aero, z, tier(z, z)) for z in zooms]
 
     items = {("r", r["id"]): (lambda r=r: ({"regions": [r]}, [])) for r in cfg["regions"]}
     items |= {("t", t["icao"]): (lambda t=t: ({"tmas": [t]}, [])) for t in cfg["tmas"]}
@@ -748,6 +767,9 @@ def relayout(cfg: dict, ads: dict) -> None:
         """Napisy innych elementów w promieniu reach px od napisów elementu (do szybszego liczenia kolizji)."""
         out = []
         for zi, mine in enumerate(own):
+            if not mine:   # napisy elementu ukryte na poziomie napisów tego zoomu (tier())
+                out.append([])
+                continue
             x0, y0 = min(b[2][0] for b in mine) - reach, min(b[2][1] for b in mine) - reach
             x1, y1 = max(b[2][2] for b in mine) + reach, max(b[2][3] for b in mine) + reach
             out.append([b for k2, other in cur.items() if k2 != key for b in other[zi]
@@ -774,6 +796,7 @@ def relayout(cfg: dict, ads: dict) -> None:
             apply()
             own = boxes(*fn()) if fn else boxes({}, [next(a for a in ad_list() if a["icao"] == key[1])])
             hit, cross = cost(own, nbrs, skip)
+            hit += outside(key, own)
             base = cross if base is None else base
             c = (hit, max(0, cross - base))
             if best is None or c < best[0]:
@@ -794,10 +817,10 @@ def relayout(cfg: dict, ads: dict) -> None:
         return [(f"{field} {dx:+.1f}, {dy:+.1f} px", at(dx, dy)) for dx, dy in offsets]
 
     def clashes(key, skip: tuple = (), kind: str | None = None) -> bool:
-        """Czy napisy elementu (tylko rodzaju kind, np. 'code') nachodzą na inne (przecięcia linii nie liczą się:
-        napis z mapy PAŻP zostaje na miejscu)."""
+        """Czy napisy elementu (tylko rodzaju kind, np. 'code') nachodzą na inne albo wystają ze swojego rejonu
+        (przecięcia linii nie liczą się: napis z mapy PAŻP zostaje na miejscu)."""
         own = [[b for b in mine if kind is None or b[0] == kind] for mine in cur[key]]
-        return cost(own, near(key, cur[key]), skip)[0] > 0
+        return cost(own, near(key, cur[key]), skip)[0] + outside(key, own) > 0
 
     # kolejność: opisy BELOW i kody 'code' (najbliżej miejsc z mapy PAŻP), szare oznaczenia, numery rejonów z ramką
     # QNH, kody lotnisk; w pierwszej rundzie każdy pomija napisy ustawiane po nim

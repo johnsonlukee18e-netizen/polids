@@ -50,7 +50,7 @@
 .qr-grat span.lat { transform: translateY(-50%); }
 
 /* ikony divIcon: napis wyśrodkowany w punkcie z pliku, przy zoomie mniejszym od domyślnego maleje razem z mapą
-   (--k: 2^(zoom − 7,5), nie mniej niż 70%) */
+   (--k: 2^(zoom − 7,5), nie mniej niż 60%) */
 .leaflet-marker-icon.qr-icon { background: none; border: 0; }
 .qr-icon > div { position: absolute; left: 0; top: 0; white-space: nowrap; transform: translate(-50%, -50%) scale(var(--k)); }
 
@@ -98,7 +98,11 @@
 .qr-aero.s-s span { top: 6.5px; }
 .qr-aero.s-ne span, .qr-aero.s-nw span { bottom: 0; }
 .qr-aero.s-se span, .qr-aero.s-sw span { top: 0; }
-.qrwrap.qr-far .qr-aero span, .qrwrap.qr-far .qr-cap, .qrwrap.qr-far .qr-des { display: none; }
+/* poziomy napisów (labelTier() w qnhmap.js): qr-mid bez szarych oznaczeń i kodów lotnisk, qr-far ("z daleka") tylko
+   numery rejonów z ramką QNH i symbole lotnisk z METAR-em */
+.qrwrap.qr-mid .qr-aero span, .qrwrap.qr-mid .qr-des { display: none; }
+.qrwrap.qr-far .qr-aero span, .qrwrap.qr-far .qr-cap, .qrwrap.qr-far .qr-des,
+.qrwrap.qr-far .qr-aero:not(.ctl) { display: none; }
 .leaflet-tooltip.qr-tip { background: #fff; color: var(--qr-ink); border: 1px solid #555; border-radius: 0; box-shadow: none;
   font: 700 11px var(--mono); padding: 1px 5px; }
 .leaflet-tooltip.qr-tip::before { display: none; }
