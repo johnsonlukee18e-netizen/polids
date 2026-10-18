@@ -1,8 +1,11 @@
 /* AERODROME: listy lotnisk FIR-ów (runda 10) */
-/* Podzakładki 0, EPWW … UKLV; lista jak w PANDORZE: wyszukiwarka z WYŚWIETL / WYCZYŚĆ u góry, wiersze "ICAO NAZWA"
+/* Podzakładki 0, EPWW … UKLV; lista jak w PANDORZE: wyszukiwarka z SHOW / CLEAR u góry, wiersze "ICAO NAZWA"
    w jednej kolumnie, w pasach, przewijane w swoim okienku (strona się nie przewija). Lotnisko spoza bazy: karta. */
 .aero-pane.list-mode > .toolbar { display: none; }               /* lista ma własny pasek z wyszukiwarką */
-.aero-pane.card-mode > .toolbar .aero-view { display: none; }    /* PRZEGLĄD/AWOS/RUCH tylko dla lotnisk z bazy */
+.aero-pane.card-mode > .toolbar .aero-view { display: none; }    /* INFO/AWOS/TRAFFIC tylko dla lotnisk z bazy */
+/* ostre krawędzie (0.12.5) w całej zakładce AERODROME: wspólne panele, pola, przyciski i plakietki ze style.css */
+.aero-pane .card, .aero-pane .card > h3:first-child, .aero-pane .field, .aero-pane .toolbar select, .aero-pane .toolbar input,
+.aero-pane .btn, .aero-pane .ab { border-radius: 0; }
 
 .alist { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* pasek wyszukiwarki ma tę samą wysokość przy pisaniu i na każdej liście: licznik stałej szerokości, legenda w węższym
@@ -10,16 +13,16 @@
 .alist-bar { container: alistbar / inline-size; display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap;
   margin-bottom: 8px; }
 .alist-q { width: 380px; max-width: 36vw; padding: 5px 10px; background: #eef1ee; color: #000; border: 2px solid #9aa49a;
-  border-radius: 2px; outline: none; font: 700 18px/1.2 var(--mono); text-transform: uppercase; }
+  border-radius: 0; outline: none; font: 700 18px/1.2 var(--mono); text-transform: uppercase; }
 .alist-q::placeholder { color: #7a827a; font-weight: 400; text-transform: none; }
 .alist-q:focus { border-color: var(--green-hi); }
-.alist-btn { padding: 6px 16px; background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 2px;
+.alist-btn { padding: 6px 16px; background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 0;
   color: #f4fff0; font: 700 14px/1.35 var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; }
 .alist-btn:hover { background: linear-gradient(#52bd3c, #36992a); }
 .alist-btn:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
 .alist-title { margin-left: 10px; color: var(--muted); font: 700 14px var(--mono); text-transform: uppercase; letter-spacing: .5px; }
 .alist-title b { color: #fff; font-size: 18px; margin-right: 6px; }
-.alist-n { flex: none; min-width: 12ch; white-space: nowrap; }    /* "123 lotniska" i "3 z 123" tej samej szerokości */
+.alist-n { flex: none; min-width: 15ch; white-space: nowrap; }    /* "123 aerodromes" i "3 of 123" tej samej szerokości */
 .alist-legend { white-space: nowrap; }
 .alist-legend .ab { font-size: 10px; line-height: 14px; }
 @container alistbar (max-width: 1240px) { .alist-legend { flex-basis: 100%; } }

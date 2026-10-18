@@ -28,7 +28,7 @@ def test_tl_from_qnh_table():
     assert tl.from_qnh(995)["fl"] == 90 and tl.from_qnh(994)["fl"] == 90
     # także przy skrajnie niskim ciśnieniu zostaje FL090 (bez podnoszenia poziomu)
     assert tl.from_qnh(950)["fl"] == 90 and tl.from_qnh(930)["fl"] == 90
-    assert tl.from_qnh(None)["fl"] is None and "brak QNH" in tl.from_qnh(None)["rule"]
+    assert tl.from_qnh(None)["fl"] is None and "no QNH" in tl.from_qnh(None)["rule"]
     assert "FL090" in tl.from_qnh(995)["rule"] and "FL080" in tl.from_qnh(1013)["rule"]
     assert (tl.fl_text(80), tl.fl_text(90), tl.fl_text(None)) == ("FL080", "FL090", "–")
 
@@ -45,7 +45,7 @@ def test_tl_fir_level():
     # FL080 przy brakującym QNH nie jest pewne: opis mówi, ilu lotnisk brakuje
     part = tl.fir_level({"EPWA": 1009, "EPKK": None, "EPRZ": None})
     assert part["fl"] == 80 and part["uncertain"] and part["missing"] == ["EPKK", "EPRZ"]
-    assert "1 z 3" in part["rule"] and "EPKK, EPRZ" in part["rule"]
+    assert "1 of 3" in part["rule"] and "EPKK, EPRZ" in part["rule"]
     # FL090 jest pewne bez względu na brakujące QNH
     assert tl.fir_level({"EPWA": 990, "EPKK": None})["uncertain"] is False
     # równe minimum: wybór stały (alfabetycznie), żeby opis nie skakał między odświeżeniami
@@ -83,8 +83,8 @@ ECFMP_MEASURES = [
 def test_ecfmp_measure_po_polsku():
     firs = {f["id"]: f["identifier"] for f in ECFMP_FIRS}
     m = ecfmp.measure(ECFMP_MEASURES[0], firs, NOW)
-    assert m["type_label"] == "minimalny odstęp między startami" and m["value_text"] == "co 3 min"
-    assert m["adep"] == ["EPWA", "EPMO"] and m["ades"] == ["EGLL"] and m["levels"] == ["poniżej poziomu 245"]
+    assert m["type_label"] == "minimum departure interval" and m["value_text"] == "every 3 min"
+    assert m["adep"] == ["EPWA", "EPMO"] and m["ades"] == ["EGLL"] and m["levels"] == ["below level 245"]
     assert m["firs"] == ["EPWW"] and m["state"] == "active" and m["source"] == "ECFMP"
     assert ecfmp.measure(ECFMP_MEASURES[1], firs, NOW)["state"] == "notified"
     assert ecfmp.measure(ECFMP_MEASURES[2], firs, NOW)["state"] == "finished"
@@ -126,8 +126,8 @@ def test_ecfmp_zapas_z_viff(monkeypatch):
     monkeypatch.setattr(viff, "_get", viff_get)
     out = __import__("asyncio").run(ecfmp.measures(overview.AERODROMES, NOW))
     m = out["measures"][0]
-    assert out["source"] == "vIFF" and "ECFMP niedostępny" in out["error"]
-    assert m["value"] == 180 and m["value_text"] == "co 3 min" and m["state"] == "active"
+    assert out["source"] == "vIFF" and "ECFMP unavailable" in out["error"]
+    assert m["value"] == 180 and m["value_text"] == "every 3 min" and m["state"] == "active"
     assert m["start"] == "2026-10-08T14:30:00+00:00" and m["end"] == "2026-10-08T17:30:00+00:00"
 
 
@@ -337,10 +337,10 @@ def test_overview_awaria_zrodel(client, monkeypatch):
     monkeypatch.setattr(ecfmp, "fetch_text", boom_ecfmp)
     d = client.get("/api/overview?position=EPWA_APP").json()
     assert "METAR" in d["wx_error"] and "vIFF" in d["monitor_error"]
-    assert "ECFMP niedostępny" in d["flow"]["error"] and d["flow"]["measures"] == []
+    assert "ECFMP unavailable" in d["flow"]["error"] and d["flow"]["measures"] == []
     assert "vIFF" in d["flow"]["viff_error"]
     # bez METAR-ów nie ma poziomu przejściowego (ATIS go nie zastępuje)
-    assert d["tl"]["fl"] is None and "brak QNH" in d["tl"]["rule"] and d["tl"]["text"] == "–"
+    assert d["tl"]["fl"] is None and "no QNH" in d["tl"]["rule"] and d["tl"]["text"] == "–"
     # NOTAM-y i ATIS działają dalej
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
     assert wa["atis"]["letter"] == "K"
@@ -365,7 +365,7 @@ def test_overview_awaria_notam_vatsim_taf(client, monkeypatch):
     r = client.get("/api/overview?position=EPWA_APP")
     assert r.status_code == 200
     d = r.json()
-    assert d["notams"] == [] and d["notam_error"] == "Serwer NOTAM: EPLL, EPMO, EPRA, EPWA: timeout"
+    assert d["notams"] == [] and d["notam_error"] == "NOTAM server: EPLL, EPMO, EPRA, EPWA: timeout"
     assert "VATSIM" in d["network_error"] and "TAF" in d["wx_error"]
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
     assert wa["atis"] is None and wa["metar"] and wa["taf"] is None and d["tl"]["fl"] == 80

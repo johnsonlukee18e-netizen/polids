@@ -43,12 +43,12 @@ def test_eu_summer_time_and_windows():
 
 def test_runway_preference_epwr_day_and_night():
     # dzień: lądowania i starty 29; noc: lądowania 11, starty 29
-    assert _pick("EPWR", EPWR, "00000KT CAVOK", DAY) == {"arr": "29", "dep": "29", "reason": "ARR/DEP 29 wg AIP (0400-2000 UTC)"}
+    assert _pick("EPWR", EPWR, "00000KT CAVOK", DAY) == {"arr": "29", "dep": "29", "reason": "ARR/DEP 29 per AIP (0400-2000 UTC)"}
     night = _pick("EPWR", EPWR, "00000KT CAVOK", NIGHT)
     assert (night["arr"], night["dep"]) == ("11", "29") and "2000-0400 UTC" in night["reason"]
     # w nocy wiatr z zachodu 10 kt: 11 ma wiatr w plecy ponad 5 kt, lądowania na drugim pasie z listy AIP (29)
     west = _pick("EPWR", EPWR, "29010KT 9999 FEW030", NIGHT)
-    assert (west["arr"], west["dep"]) == ("29", "29") and "11: w plecy" in west["reason"]
+    assert (west["arr"], west["dep"]) == ("29", "29") and "11: tailwind" in west["reason"]
     assert preferential_now(runway_config("EPWR"), NIGHT)["arr"] == ["11", "29"]
     # zimą okno nocne zaczyna się o 2100 UTC
     assert _pick("EPWR", EPWR, "00000KT CAVOK", datetime(2026, 12, 1, 20, 30, tzinfo=UTC))["arr"] == "29"
@@ -58,28 +58,28 @@ def test_runway_preference_epmo_night_limits():
     # EPMO: tylko w nocy 26, potem 08; w dzień składowa czołowa
     assert _pick("EPMO", EPMO, "08004KT 9999", NIGHT)["arr"] == "26"
     tail = _pick("EPMO", EPMO, "08008KT 9999", NIGHT)
-    assert tail == {"arr": "08", "dep": "08", "reason": "ARR/DEP 08 wg AIP (2000-0400 UTC), bo 26: w plecy 8 kt > 5 kt"}
+    assert tail == {"arr": "08", "dep": "08", "reason": "ARR/DEP 08 per AIP (2000-0400 UTC), because 26: tailwind 8 kt > 5 kt"}
     # poryw liczy się do limitu: 26 z wiatrem 260/5 G12 dalej preferowany (wiatr czołowy), 080/3 G9 już nie
     assert _pick("EPMO", EPMO, "26005G12KT 9999", NIGHT)["arr"] == "26"
     assert _pick("EPMO", EPMO, "08003G09KT 9999", NIGHT)["arr"] == "08"
     cross = _pick("EPMO", EPMO, "35020KT 9999", NIGHT)
-    assert "boczny 20 kt > 15 kt" in cross["reason"] and "największa składowa czołowa" in cross["reason"]
-    assert _pick("EPMO", EPMO, "08004KT 9999", DAY) == {"arr": "08", "dep": "08", "reason": "Największa składowa czołowa"}
+    assert "crosswind 20 kt > 15 kt" in cross["reason"] and "largest headwind" in cross["reason"]
+    assert _pick("EPMO", EPMO, "08004KT 9999", DAY) == {"arr": "08", "dep": "08", "reason": "Largest headwind"}
 
 
 def test_runway_reason_whole_knots():
     # powód w całych węzłach jak tabela pasów w AERODROME ("TW 7 kt"), połówki w górę jak Math.round (round() z
     # Pythona dałby 6 z 6.5); limit porównany z wartością przed zaokrągleniem
     why = lambda metar: _pick("EPMO", EPMO, metar, NIGHT)["reason"]  # noqa: E731
-    assert why("09007KT 9999") == "ARR/DEP 08 wg AIP (2000-0400 UTC), bo 26: w plecy 7 kt > 5 kt"   # 6.9 kt
-    assert "26: w plecy 7 kt > 5 kt" in why("14113KT 9999")                                          # 6.5 kt
+    assert why("09007KT 9999") == "ARR/DEP 08 per AIP (2000-0400 UTC), because 26: tailwind 7 kt > 5 kt"   # 6.9 kt
+    assert "26: tailwind 7 kt > 5 kt" in why("14113KT 9999")                                          # 6.5 kt
     # 5.4 kt > 5 kt: w całych węzłach byłoby "5 kt > 5 kt", więc jedno miejsce po przecinku
-    assert "26: w plecy 5.4 kt > 5 kt" in why("10706KT 9999")
-    assert "boczny 20 kt > 15 kt" in why("35020KT 9999")
+    assert "26: tailwind 5.4 kt > 5 kt" in why("10706KT 9999")
+    assert "crosswind 20 kt > 15 kt" in why("35020KT 9999")
     # z porywem: składowa z porywu, więc "z porywami" (tabela pasów pokazuje TW ze średniego wiatru: tu 26 "TW 5")
-    assert why("09005G12KT 9999") == "ARR/DEP 08 wg AIP (2000-0400 UTC), bo 26: w plecy z porywami 12 kt > 5 kt"
-    assert "boczny z porywami 20 kt > 15 kt" in why("35012G20KT 9999")
-    assert "wiatr zmienny z porywami 12 kt > 5 kt" in why("VRB04G12KT 9999")
+    assert why("09005G12KT 9999") == "ARR/DEP 08 per AIP (2000-0400 UTC), because 26: tailwind with gusts 12 kt > 5 kt"
+    assert "crosswind with gusts 20 kt > 15 kt" in why("35012G20KT 9999")
+    assert "variable wind with gusts 12 kt > 5 kt" in why("VRB04G12KT 9999")
 
 
 def test_runway_preference_not_decisive_weather():
@@ -87,19 +87,19 @@ def test_runway_preference_not_decisive_weather():
     # podstawa 400 ft < 500 ft: lądowania bez pierwszeństwa AIP, starty dalej wg AIP (wiatr 110/8: 29 ma 8 kt w plecy)
     low = _pick("EPWR", EPWR, "11008KT 9999 BKN004", DAY, eq)
     assert (low["arr"], low["dep"]) == ("11", "11")
-    assert "ARR bez pierwszeństwa AIP: podstawa 400 ft < 500 ft" in low["reason"]
-    assert "DEP 11 wg AIP" in low["reason"] and "29: w plecy 8 kt > 5 kt" in low["reason"]
+    assert "ARR no AIP preference: ceiling 400 ft < 500 ft" in low["reason"]
+    assert "DEP 11 per AIP" in low["reason"] and "29: tailwind 8 kt > 5 kt" in low["reason"]
     ts = _pick("EPWR", EPWR, "29004KT 9999 TSRA BKN030CB", DAY, eq)
-    assert ts["reason"].startswith("ARR/DEP bez pierwszeństwa AIP: burza (TS)")
+    assert ts["reason"].startswith("ARR/DEP no AIP preference: thunderstorm (TS)")
     # podejście bez ILS (EPMO 26 tylko RNP): przy podstawie 700 ft < 800 ft lądowania bez pierwszeństwa, starty 26
     np = _pick("EPMO", EPMO, "08002KT 9999 BKN007", NIGHT, {"08": ["ILS"], "26": ["RNP"]})
-    assert "podejście bez ILS" in np["reason"] and np["dep"] == "26"
+    assert "non-ILS approach" in np["reason"] and np["dep"] == "26"
 
 
 def test_runway_preference_epgd_and_eppo_phase_limits():
     # EPGD: AIP podaje tylko starty (H24 29, potem 11)
     gd = _pick("EPGD", [{"designator": "11", "heading": 113}, {"designator": "29", "heading": 293}], "11004KT CAVOK", NIGHT)
-    assert (gd["arr"], gd["dep"]) == ("11", "29") and "ARR: największa składowa czołowa" in gd["reason"]
+    assert (gd["arr"], gd["dep"]) == ("11", "29") and "ARR: largest headwind" in gd["reason"]
     # EPPO: limit wiatru w plecy 5 kt dla lądowań i 10 kt dla startów
     po = _pick("EPPO", EPPO, "10008KT CAVOK", DAY)
     assert (po["arr"], po["dep"]) == ("10", "28")
@@ -112,15 +112,15 @@ def test_runway_preference_variable_wind():
     # i nie pierwszy pas z listy (EPGD 11 i EPPO 10 bez ILS: lądowania przeciwnie do startów)
     gd = _pick("EPGD", [{"designator": "11", "heading": 113}, {"designator": "29", "heading": 293}], "VRB02KT CAVOK", DAY,
                {"11": ["RNP", "VOR"], "29": ["ILS"]})
-    assert (gd["arr"], gd["dep"]) == ("29", "29") and "ARR: wiatr zmienny 2 kt: kierunek wyposażony w ILS" in gd["reason"]
+    assert (gd["arr"], gd["dep"]) == ("29", "29") and "ARR: variable wind 2 kt: ILS-equipped direction" in gd["reason"]
     po = _pick("EPPO", EPPO, "VRB02KT CAVOK", NIGHT, {"10": ["RNP", "VOR"], "28": ["ILS"]})
     assert (po["arr"], po["dep"]) == ("28", "28")
     mo = _pick("EPMO", EPMO, "VRB02KT CAVOK", DAY, {"08": ["ILS"], "26": ["RNP"]})
-    assert mo["arr"] == "08" and "Brak danych" not in mo["reason"] and "zmienny 2 kt" in mo["reason"]
+    assert mo["arr"] == "08" and "No wind data" not in mo["reason"] and "variable wind 2 kt" in mo["reason"].lower()
     # bez ILS: pierwszy pas z listy, ale z wiatrem w uzasadnieniu; bez wiatru w ogóle jak dotąd
-    assert _pick("EPMO", EPMO, "VRB02KT CAVOK", DAY)["reason"] == "Wiatr zmienny 2 kt: pierwszy pas z listy"
+    assert _pick("EPMO", EPMO, "VRB02KT CAVOK", DAY)["reason"] == "Variable wind 2 kt: first runway in list"
     assert select_runways(EPMO, None, None, config=runway_config("EPMO"), now=DAY)["reason"] == \
-        "Brak danych o wietrze: pierwszy pas z listy"
+        "No wind data: first runway in list"
 
 
 def test_config_now():
@@ -155,9 +155,9 @@ def test_lvp_thresholds_per_aerodrome():
     for icao in ("EPRA", "EPZG", "EPDE", "EPLY"):
         assert cfg[icao]["applies"] is False and cfg[icao]["reason"]
     assert lvp.rules(lvp.thresholds("EPKT")) == [
-        "Przygotowanie: RVR ≤ 800 m lub podstawa ≤ 300 ft", "LVP: RVR < 550 m lub podstawa < 200 ft",
-        "Odwołanie: RVR ≥ 600 m i podstawa ≥ 200 ft"]
-    assert lvp.rules(lvp.thresholds("EPLL"))[0] == "Przygotowanie: AIP nie podaje"
+        "Preparation: RVR ≤ 800 m or ceiling ≤ 300 ft", "LVP: RVR < 550 m or ceiling < 200 ft",
+        "Cancellation: RVR ≥ 600 m and ceiling ≥ 200 ft"]
+    assert lvp.rules(lvp.thresholds("EPLL"))[0] == "Preparation: not in AIP"
 
 
 def _ev(icao, metar, now=None):
@@ -172,22 +172,22 @@ def test_lvp_transitions_with_cancel():
     # brak -> przygotowanie -> LVP -> LVP dalej (powyżej progu wprowadzenia, poniżej odwołania) -> odwołane -> brak
     assert _ev("EPKT", "140600Z 26004KT 9999 FEW030 08/06 Q1012")["state"] is None
     prep = _ev("EPKT", "140630Z 26004KT 1500 BR OVC003 08/07 Q1012")
-    assert prep["state"] == "PREP" and prep["since"] == "06:30Z" and "podstawa 300 ft ≤ 300 ft" in prep["reasons"]
+    assert prep["state"] == "PREP" and prep["since"] == "06:30Z" and "ceiling 300 ft ≤ 300 ft" in prep["reasons"]
     on = _ev("EPKT", "140700Z 26004KT 0400 R26/0450N FG VV001 08/08 Q1012")
     assert on["state"] == "LVP" and on["since"] == "07:00Z" and "RVR 26 450 m < 550 m" in on["reasons"]
     held = _ev("EPKT", "140730Z 26004KT 0600 R26/0550N FG BKN003 08/08 Q1012")
     assert held["state"] == "LVP" and held["since"] == "07:00Z"
-    assert held["reasons"] == ["w mocy od 07:00Z", "do odwołania: RVR 26 ≥ 600 m (jest 550 m)"]
+    assert held["reasons"] == ["in force since 07:00Z", "to cancel: RVR 26 ≥ 600 m (now 550 m)"]
     # ten sam METAR liczony ponownie daje ten sam wynik
     assert _ev("EPKT", "140730Z 26004KT 0600 R26/0550N FG BKN003 08/08 Q1012")["state"] == "LVP"
     off = _ev("EPKT", "140800Z 26004KT 1200 BR BKN003 08/08 Q1012")
     assert off["state"] == "CANCELLED" and (off["since"], off["until"]) == ("08:00Z", "08:30Z")
-    assert off["reasons"][0].startswith("warunki odwołania")
+    assert off["reasons"][0].startswith("cancellation criteria")
     # przez 30 min stan odwołania, nawet gdy spełnione są warunki przygotowania
     assert _ev("EPKT", "140820Z 26004KT 1200 BR BKN003 08/08 Q1012")["state"] == "CANCELLED"
     assert _ev("EPKT", "140830Z 26004KT 9999 FEW030 10/08 Q1012")["state"] is None
     # trzy fazy z progami zawsze w odpowiedzi (dymek w interfejsie)
-    assert set(off["thresholds"]) == {"prep", "lvp", "cancel"} and off["source"] == "AIP AD 2.22 pkt 5.2.1-5.2.3"
+    assert set(off["thresholds"]) == {"prep", "lvp", "cancel"} and off["source"] == "AIP AD 2.22 para 5.2.1-5.2.3"
 
 
 def test_lvp_cancelled_back_to_lvp_and_fresh_start():
@@ -207,10 +207,10 @@ def test_lvp_military_visibility_departures_only():
     prep = _ev("EPKS", "140600Z 29004KT 1100 BR BKN003 08/07 Q1012")
     assert prep["state"] == "PREP" and prep["scope"] == "DEP"
     on = _ev("EPKS", "140630Z 29004KT 0800 FG BKN002 08/08 Q1012")
-    assert on["state"] == "LVP" and "widzialność 800 m ≤ 800 m" in on["reasons"]
+    assert on["state"] == "LVP" and "visibility 800 m ≤ 800 m" in on["reasons"]
     off = _ev("EPKS", "140700Z 29004KT 0900 BR BKN002 08/08 Q1012")
     assert off["state"] == "CANCELLED"
-    assert lvp.rules(lvp.thresholds("EPKS"))[1] == "LVP: widzialność ≤ 800 m (RVR 550 m)"
+    assert lvp.rules(lvp.thresholds("EPKS"))[1] == "LVP: visibility ≤ 800 m (RVR 550 m)"
 
 
 def test_lvp_not_applicable():
@@ -225,14 +225,14 @@ def test_thunderstorm_without_rain_blocks_aip_preference():
     for wx in ("TS", "VCTS"):
         assert parse_metar(f"EPWR 141200Z 29004KT 9999 {wx} SCT030CB 10/05 Q1012").weather == [wx]
         ts = _pick("EPWR", EPWR, f"29004KT 9999 {wx} SCT030CB", DAY, {"11": ["ILS"], "29": ["ILS"]})
-        assert ts["reason"].startswith("ARR/DEP bez pierwszeństwa AIP: burza (TS)"), wx
+        assert ts["reason"].startswith("ARR/DEP no AIP preference: thunderstorm (TS)"), wx
     assert parse_metar("EPWR 141200Z 29004KT 9999 VCSH 10/05 Q1012").weather == ["VCSH"]
 
 
 def test_runway_preference_variable_wind_over_limit():
     # VRB 7 kt: kierunku nie znamy, więc wiatr w plecy może przekroczyć 5 kt (EPMO w nocy bez pierwszeństwa AIP)
     vrb = _pick("EPMO", EPMO, "VRB07KT 9999", NIGHT)
-    assert "bez pierwszeństwa AIP: wiatr zmienny 7 kt > 5 kt" in vrb["reason"]
+    assert "no AIP preference: variable wind 7 kt > 5 kt" in vrb["reason"]
     assert _pick("EPMO", EPMO, "VRB03KT 9999", NIGHT)["arr"] == "26"
 
 
@@ -245,7 +245,7 @@ def test_lvp_ignores_aip_noise_preference():
     assert lvp.evaluate(m, "EPGD", now=t)["state"] == "LVP"
     on = select_runways(rw, m.wind_dir, m.wind_speed, equipment=eq, low_vis="LVP", config=runway_config("EPGD"),
                         metar=m, now=t)
-    assert (on["arr"], on["dep"]) == ("11", "11") and on["reason"].startswith("LVP w mocy")
+    assert (on["arr"], on["dep"]) == ("11", "11") and on["reason"].startswith("LVP in force")
     # przygotowanie LVP: pas preferowany z AIP do startów zostaje
     prep = select_runways(rw, m.wind_dir, m.wind_speed, equipment=eq, low_vis="PREP", config=runway_config("EPGD"),
                           metar=m, now=t)
@@ -255,25 +255,25 @@ def test_lvp_ignores_aip_noise_preference():
 def test_runway_preference_epwa():
     # AD 2.21: doloty 33, 11, 15, 29; odloty 29, 15, 33, 11 (H24); wiatr w plecy do 5 kt, boczny do 15 kt
     west = _pick("EPWA", EPWA, "28015KT CAVOK", NIGHT, EPWA_EQ)
-    assert west == {"arr": "33", "dep": "29", "reason": "ARR 33 wg AIP (H24); DEP 29 wg AIP (H24)"}
+    assert west == {"arr": "33", "dep": "29", "reason": "ARR 33 per AIP (H24); DEP 29 per AIP (H24)"}
     # wiatr z południowego wschodu: 33 i 29 z wiatrem w plecy, lądowania na 11, starty z 15
     se = _pick("EPWA", EPWA, "15020KT CAVOK", DAY, EPWA_EQ)
-    assert (se["arr"], se["dep"]) == ("11", "15") and "33: w plecy" in se["reason"] and "29: w plecy" in se["reason"]
+    assert (se["arr"], se["dep"]) == ("11", "15") and "33: tailwind" in se["reason"] and "29: tailwind" in se["reason"]
     # mgła: AIP nie daje pierwszeństwa przy widzialności < 1900 m
     fog = _pick("EPWA", EPWA, "28004KT 1200 BR OVC004", DAY, EPWA_EQ)
-    assert "bez pierwszeństwa AIP: widzialność 1200 m < 1900 m" in fog["reason"]
+    assert "no AIP preference: visibility 1200 m < 1900 m" in fog["reason"]
     # żaden pas w limitach: te same pasy i powody do lądowań i startów raz, z listy dwa pierwsze i "…"
     assert _pick("EPWA", EPWA, "01025KT CAVOK", DAY, EPWA_EQ) == {"arr": "33", "dep": "33", "reason": (
-        "ARR/DEP bez pierwszeństwa AIP: 33: boczny 16 kt > 15 kt; 11: w plecy 6 kt > 5 kt; …; największa składowa czołowa")}
+        "ARR/DEP no AIP preference: 33: crosswind 16 kt > 15 kt; 11: tailwind 6 kt > 5 kt; …; largest headwind")}
 
 
 def test_runway_preference_epwa_no_head_on():
     # starty nie pod prąd lądowań, gdy AIP daje inny pas w limicie: 190/10 lądowania 11, starty 15 (nie 29)
     s = _pick("EPWA", EPWA, "19010KT CAVOK", DAY, EPWA_EQ)
-    assert (s["arr"], s["dep"]) == ("11", "15") and "DEP 15 wg AIP (H24), bo 29: przeciwnie do lądowań na 11" in s["reason"]
+    assert (s["arr"], s["dep"]) == ("11", "15") and "DEP 15 per AIP (H24), because 29: opposite to landings on 11" in s["reason"]
     # 070/10: lądowania 33, starty 33 (29 z wiatrem w plecy, 15 pod prąd lądowań)
     e = _pick("EPWA", EPWA, "07010KT CAVOK", DAY, EPWA_EQ)
-    assert (e["arr"], e["dep"]) == ("33", "33") and "15: przeciwnie do lądowań na 33" in e["reason"]
+    assert (e["arr"], e["dep"]) == ("33", "33") and "15: opposite to landings on 33" in e["reason"]
     # lotnisko z jednym pasem: AIP dopuszcza starty z przeciwnego kierunku (EPPO lądowania 10, starty 28)
     assert (lambda r: (r["arr"], r["dep"]))(_pick("EPPO", EPPO, "10008KT CAVOK", DAY)) == ("10", "28")
 
@@ -284,15 +284,15 @@ def test_runway_preference_epwa_departures_without_ils():
     for metar in ("29006KT 1500 BR BKN008", "29006KT 0600 R33/0700N R29/0700N FG BKN003", "00000KT 1500 BR OVC005"):
         r = _pick("EPWA", EPWA, metar, DAY, EPWA_EQ, "IMC")
         assert (r["arr"], r["dep"]) == ("33", "29"), metar
-        assert r["reason"].endswith("1900 m; warunki IMC: kierunek z ILS (wiatr w plecy ≤ 5 kt); DEP 29 z listy AIP"), metar
+        assert r["reason"].endswith("1900 m; IMC conditions: ILS direction (tailwind ≤ 5 kt); DEP 29 from AIP list"), metar
     se = _pick("EPWA", EPWA, "15010KT 1800 BR", DAY, EPWA_EQ, "IMC")
-    assert (se["arr"], se["dep"]) == ("11", "15") and "DEP 15 z listy AIP, bo 29: w plecy 8 kt > 5 kt" in se["reason"]
+    assert (se["arr"], se["dep"]) == ("11", "15") and "DEP 15 from AIP list, because 29: tailwind 8 kt > 5 kt" in se["reason"]
     # wiatr zmienny ponad limit: kierunek z ILS pierwszy w kolejności AIP (33, nie 11 z bazy), starty z listy AIP
     for metar in ("VRB06KT CAVOK", "VRB08KT CAVOK", "VRB04KT CAVOK"):
         assert (lambda r: (r["arr"], r["dep"]))(_pick("EPWA", EPWA, metar, DAY, EPWA_EQ)) == ("33", "29"), metar
     assert _pick("EPWA", EPWA, "VRB06KT CAVOK", DAY, EPWA_EQ)["reason"] == (
-        "ARR/DEP bez pierwszeństwa AIP: wiatr zmienny 6 kt > 5 kt; wiatr zmienny 6 kt: kierunek wyposażony w ILS; "
-        "DEP 29 z listy AIP")
+        "ARR/DEP no AIP preference: variable wind 6 kt > 5 kt; variable wind 6 kt: ILS-equipped direction; "
+        "DEP 29 from AIP list")
     # lotnisko z jednym pasem: starty z listy AIP tylko w kierunku lądowań (EPWR w mgle, cisza: 29 i 29)
     wr = _pick("EPWR", EPWR, "00000KT 1500 BR OVC005", NIGHT, {"11": ["ILS"], "29": ["ILS"]}, "IMC")
     assert wr["arr"] == wr["dep"]
@@ -308,30 +308,30 @@ def test_lvp_runways_from_aip():
     # EPWA w LVP (AD 2.22 pkt 7.1): lądowania 33 (CAT IIIA) albo 11 (CAT II), starty 29 albo 15
     cfg, t = runway_config("EPWA"), DAY
     calm = select_runways(EPWA, None, None, equipment=EPWA_EQ, low_vis="LVP", config=cfg, now=t)
-    assert calm == {"arr": "33", "dep": "29", "reason": "LVP w mocy (AIP AD 2.22): ARR 33, DEP 29; brak danych o wietrze"}
-    assert _lvp("EPWA", EPWA, "VRB12KT 0400 R33/0350N FG VV002", EPWA_EQ)["reason"].endswith("; wiatr zmienny 12 kt")
+    assert calm == {"arr": "33", "dep": "29", "reason": "LVP in force (AIP AD 2.22): ARR 33, DEP 29; no wind data"}
+    assert _lvp("EPWA", EPWA, "VRB12KT 0400 R33/0350N FG VV002", EPWA_EQ)["reason"].endswith("; variable wind 12 kt")
     se = select_runways(EPWA, 150, 8, equipment=EPWA_EQ, low_vis="LVP", config=cfg, now=t)
     assert (se["arr"], se["dep"]) == ("11", "15")
-    assert se["reason"] == "LVP w mocy (AIP AD 2.22): ARR 11, bo 33: w plecy 8 kt > 5 kt; DEP 15"
+    assert se["reason"] == "LVP in force (AIP AD 2.22): ARR 11, because 33: tailwind 8 kt > 5 kt; DEP 15"
     # poryw liczy się do wiatru w plecy (150/4 G12: 33 z porywem 12 kt w plecy)
     gust = select_runways(EPWA, 150, 4, gust=12, equipment=EPWA_EQ, low_vis="LVP", config=cfg, now=t)
-    assert (gust["arr"], gust["dep"]) == ("11", "15") and "33: w plecy z porywami 12 kt > 5 kt" in gust["reason"]
+    assert (gust["arr"], gust["dep"]) == ("11", "15") and "33: tailwind with gusts 12 kt > 5 kt" in gust["reason"]
     # para pasów: przy lądowaniach na 33 starty tylko z 29 (15 to przeciwny kierunek 33), z wiatrem w plecy ponad
     # limit, więc lądowania 11 (CAT II, RVR 400 m) i starty 15, oba w limicie
-    for metar, kt in (("07010KT", "7 kt"), ("06010KT", "6 kt"), ("06010G20KT", "z porywami 12 kt")):
+    for metar, kt in (("07010KT", "7 kt"), ("06010KT", "6 kt"), ("06010G20KT", "with gusts 12 kt")):
         ne = _lvp("EPWA", EPWA, f"{metar} 0350 R33/0400N R11/0400N FG VV003", EPWA_EQ)
         assert ne == {"arr": "11", "dep": "15",
-                      "reason": f"LVP w mocy (AIP AD 2.22): ARR 11, bo 33: DEP 29 w plecy {kt} > 5 kt; DEP 15"}, metar
+                      "reason": f"LVP in force (AIP AD 2.22): ARR 11, because 33: DEP 29 tailwind {kt} > 5 kt; DEP 15"}, metar
     # bez pary w limitach (040/20: przy 33 starty 29 z 5.3 kt w plecy, przy 11 starty 15 z 7.4 kt): pierwszy pas
     # do lądowania w limicie
     ne = _lvp("EPWA", EPWA, "04020KT 0400 R33/0400N R11/0400N FG VV002", EPWA_EQ)
-    assert ne["reason"] == "LVP w mocy (AIP AD 2.22): ARR 33; DEP 29 mimo wiatru w plecy 5.3 kt > 5 kt"
+    assert ne["reason"] == "LVP in force (AIP AD 2.22): ARR 33; DEP 29 despite tailwind 5.3 kt > 5 kt"
     # EPPO (AD 2.22 pkt 6.1, 6.4.4): ILS CAT II tylko RWY 28, starty z 10 albo 28; 28 zostaje mimo wiatru w plecy,
     # starty też z 28 (limit startów 10 kt, nigdy pod prąd lądowań we mgle)
     po = select_runways(EPPO, 100, 8, equipment={"28": ["ILS"]}, low_vis="LVP", config=runway_config("EPPO"), now=t)
-    assert po == {"arr": "28", "dep": "28", "reason": "LVP w mocy (AIP AD 2.22): ARR 28 mimo wiatru w plecy 8 kt > 5 kt; DEP 28"}
+    assert po == {"arr": "28", "dep": "28", "reason": "LVP in force (AIP AD 2.22): ARR 28 despite tailwind 8 kt > 5 kt; DEP 28"}
     po = select_runways(EPPO, 100, 12, equipment={"28": ["ILS"]}, low_vis="LVP", config=runway_config("EPPO"), now=t)
-    assert (po["arr"], po["dep"]) == ("28", "28") and "DEP 28 mimo wiatru w plecy 12 kt > 10 kt" in po["reason"]
+    assert (po["arr"], po["dep"]) == ("28", "28") and "DEP 28 despite tailwind 12 kt > 10 kt" in po["reason"]
     # przygotowanie LVP: listy LVP z AIP jeszcze nie obowiązują, zostają pasy preferowane AD 2.21
     prep = select_runways(EPWA, 150, 3, equipment=EPWA_EQ, low_vis="PREP", config=cfg, now=t)
     assert (prep["arr"], prep["dep"]) == ("33", "29")
@@ -341,31 +341,31 @@ def test_lvp_ils_category_and_departure_rvr():
     # RWY 11 tylko CAT II: przy RVR 250 m lądowania na 33 (CAT IIIA) mimo wiatru w plecy, starty 29 (nie 15 pod prąd)
     low = _lvp("EPWA", EPWA, "15008KT 0300 R33/0250N R11/0250N R29/0300N FG VV001", EPWA_EQ)
     assert (low["arr"], low["dep"]) == ("33", "29")
-    assert low["reason"].startswith("LVP w mocy (AIP AD 2.22): ARR 33 mimo wiatru w plecy 8 kt > 5 kt, "
-                                    "bo 11: CAT II: RVR 250 m < 300 m; DEP 29 mimo wiatru w plecy 7 kt > 5 kt")
+    assert low["reason"].startswith("LVP in force (AIP AD 2.22): ARR 33 despite tailwind 8 kt > 5 kt, "
+                                    "because 11: CAT II: RVR 250 m < 300 m; DEP 29 despite tailwind 7 kt > 5 kt")
     # liczy się RVR pasa: R11 400 m wystarcza do CAT II
     assert _lvp("EPWA", EPWA, "15008KT 0300 R33/0250N R11/0400N FG VV001", EPWA_EQ)["arr"] == "11"
     # bez grupy RVR widzialność, tak też nazwana
     vis = _lvp("EPWA", EPWA, "15008KT 0200 FG VV001", EPWA_EQ)
-    assert vis["arr"] == "33" and "bo 11: CAT II: widzialność 200 m < 300 m" in vis["reason"]
+    assert vis["arr"] == "33" and "because 11: CAT II: visibility 200 m < 300 m" in vis["reason"]
     # jedyny pas CAT II poniżej minimów: zostaje, z uwagą (EPPO 28)
     po = _lvp("EPPO", EPPO, "28004KT 0200 R28/0200N FG VV001", {"28": ["ILS"]})
-    assert po["arr"] == "28" and "ARR 28 poniżej minimów CAT II: RVR 200 m < 300 m" in po["reason"]
+    assert po["arr"] == "28" and "ARR 28 below minima CAT II: RVR 200 m < 300 m" in po["reason"]
     # CAT IIIA (RWY 33) od RVR 175 m: przy RVR 100 m oba pasy poniżej minimów, zostaje 33 z najniższymi (także gdy 11
     # ma wiatr czołowy)
     for metar in ("00000KT", "15008KT"):
         r = _lvp("EPWA", EPWA, f"{metar} 0100 R33/0100N R11/0100N FG VV001", EPWA_EQ)
-        assert r["arr"] == "33" and "poniżej minimów CAT IIIA: RVR 100 m < 175 m;" in r["reason"], metar
+        assert r["arr"] == "33" and "below minima CAT IIIA: RVR 100 m < 175 m;" in r["reason"], metar
     # AIP: brak startów przy RVR < 125 m; liczy się RVR pasa startowego, bez jego grupy najniższy
     stop = _lvp("EPWA", EPWA, "15008KT 0100 R33/0250N R11/0250N R29/0100N R15/0100N FG VV001", EPWA_EQ)
-    assert stop["reason"].endswith("; starty niedozwolone: RVR 100 m < 125 m")
+    assert stop["reason"].endswith("; take-offs not permitted: RVR 100 m < 125 m")
     assert _lvp("EPWA", EPWA, "00000KT 0100 R33/0100N R11/0100N FG VV001", EPWA_EQ)["reason"].endswith(
-        "; starty niedozwolone: RVR 33 100 m < 125 m")
+        "; take-offs not permitted: RVR 33 100 m < 125 m")
     assert _lvp("EPPO", EPPO, "10008KT 0100 R28/0100N FG VV001", {"28": ["ILS"]})["reason"].endswith(
-        "; starty niedozwolone: RVR 100 m < 125 m")
+        "; take-offs not permitted: RVR 100 m < 125 m")
     assert _lvp("EPPO", EPPO, "28004KT 0100 FG VV001", {"28": ["ILS"]})["reason"] == (
-        "LVP w mocy (AIP AD 2.22): ARR 28 poniżej minimów CAT II: widzialność 100 m < 300 m; DEP 28; "
-        "starty niedozwolone: widzialność 100 m < 125 m")
+        "LVP in force (AIP AD 2.22): ARR 28 below minima CAT II: visibility 100 m < 300 m; DEP 28; "
+        "take-offs not permitted: visibility 100 m < 125 m")
     assert "niedozwolone" not in _lvp("EPWA", EPWA, "15008KT 0300 R33/0250N R29/0125N FG VV001", EPWA_EQ)["reason"]
     # RVR 100 m na pasie lądowań 33, 400 m na pasie startowym 29: starty dozwolone
     assert "niedozwolone" not in _lvp("EPWA", EPWA, "33005KT 0150 R33/0100N R29/0400N FG VV001", EPWA_EQ)["reason"]
@@ -376,14 +376,14 @@ def test_lvp_phase_without_list():
     cfg = {**runway_config("EPWA"), "lvp": {"arr": ["99"], "dep": ["29", "15"]}}
     r = select_runways(EPWA, 150, 8, equipment=EPWA_EQ, low_vis="LVP", config=cfg, now=DAY)
     assert (r["arr"], r["dep"]) == ("11", "15")
-    assert r["reason"] == "LVP w mocy (AIP AD 2.22): DEP 15; ARR: kierunek z ILS (wiatr w plecy ≤ 5 kt)"
+    assert r["reason"] == "LVP in force (AIP AD 2.22): DEP 15; ARR: ILS direction (tailwind ≤ 5 kt)"
     cfg = {**runway_config("EPWA"), "lvp": {"arr": [], "dep": ["29"]}}
-    assert "; ARR: kierunek z ILS" in select_runways(EPWA, 150, 8, equipment=EPWA_EQ, low_vis="LVP", config=cfg,
+    assert "; ARR: ILS direction" in select_runways(EPWA, 150, 8, equipment=EPWA_EQ, low_vis="LVP", config=cfg,
                                                      now=DAY)["reason"]
     # lista tylko lądowań: starty z kierunku z ILS, ale nie pod prąd lądowań (EPPO z ILS na obu kierunkach, 100/3)
     cfg = {**runway_config("EPPO"), "lvp": {"arr": ["28"]}}
     r = select_runways(EPPO, 100, 3, equipment={"10": ["ILS"], "28": ["ILS"]}, low_vis="LVP", config=cfg, now=DAY)
-    assert r == {"arr": "28", "dep": "28", "reason": "LVP w mocy (AIP AD 2.22): ARR 28, DEP 28"}
+    assert r == {"arr": "28", "dep": "28", "reason": "LVP in force (AIP AD 2.22): ARR 28, DEP 28"}
 
 
 def test_lvp_older_metar_keeps_newer_state():
@@ -394,7 +394,7 @@ def test_lvp_older_metar_keeps_newer_state():
     assert old["state"] == "LVP" and old["since"] == "07:30Z" and "RVR 26 450 m < 550 m" in old["reasons"]
     # starszy METAR nie zmienia pamięci: następny METAR liczony od LVP
     held = _ev("EPKT", "140800Z 26004KT 0600 R26/0575N BR BKN003 08/08 Q1012")
-    assert held["state"] == "LVP" and held["reasons"][0] == "w mocy od 07:30Z"
+    assert held["state"] == "LVP" and held["reasons"][0] == "in force since 07:30Z"
     # i odwrotnie: starszy METAR z LVP nie włącza LVP, gdy nowszy go nie wymaga
     lvp.reset_memory()
     _ev("EPKT", "140730Z 26004KT 9999 FEW030 10/08 Q1012", t)
@@ -431,12 +431,12 @@ def test_lvp_military_rvr_equivalent_without_visibility():
     on = _ev("EPKS", "140630Z 29004KT R29/0500N FG BKN002 08/08 Q1012")
     assert on["state"] == "LVP" and "RVR 29 500 m ≤ 550 m" in on["reasons"]
     off = _ev("EPKS", "140700Z 29004KT R29/0600N BKN002 08/08 Q1012")
-    assert off["state"] == "CANCELLED" and off["reasons"][0] == "warunki odwołania: RVR 29 600 m > 550 m"
+    assert off["state"] == "CANCELLED" and off["reasons"][0] == "cancellation criteria: RVR 29 600 m > 550 m"
     # odwołanie z widzialnością: powód z wartością z METAR
     lvp.reset_memory()
     _ev("EPKS", "140630Z 29004KT 0800 FG BKN002 08/08 Q1012")
     assert _ev("EPKS", "140700Z 29004KT 0900 BR BKN002 08/08 Q1012")["reasons"][0] == \
-        "warunki odwołania: widzialność 900 m > 800 m"
+        "cancellation criteria: visibility 900 m > 800 m"
 
 
 def test_runway_config_hours_all_parse():
@@ -467,7 +467,7 @@ def test_seed_runways_unique_and_elevations():
     assert (ap["EPDS"]["elevation_ft"], ap["EPDS"]["elevation_source"]) == ("1644", "lotniska.dlapilota.pl")
     # EPRA: TWR cywilna i wojskowa na tej samej częstotliwości rozróżnia uwaga
     radom = [f["note"] for f in _seed_rows("frequencies.csv") if f["airport_ident"] == "EPRA" and f["service"] == "TWR"]
-    assert radom == ["TWR cywilna", "TWR wojskowa (MIL)"]
+    assert radom == ["civil TWR", "military TWR (MIL)"]
 
 
 def test_seed_skips_rows_without_aerodrome(tmp_path, monkeypatch, caplog):

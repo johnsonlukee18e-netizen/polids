@@ -1,5 +1,5 @@
 /* AWOS (AERODROME › AWOS): wygląd jak NM UI: cienkie ramki 1px, paski tytułów małymi literami z odstępami,
-   wartości monospace, bez poświaty. Przełącznik PRZEGLĄD / AWOS na pasku narzędzi AERODROME. */
+   wartości monospace, bez poświaty. Przełącznik INFO / AWOS na pasku narzędzi AERODROME. */
 .aero-view { display: inline-flex; border: 1px solid var(--line); }
 .aero-view button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 5px 12px;
   font: 700 11px var(--ui); letter-spacing: 1.5px; cursor: pointer; }
@@ -58,7 +58,7 @@
 .aw-wbar { flex: none; display: flex; gap: 6px; align-items: center; min-width: 0; }
 .aw-mode { flex: none; display: inline-flex; gap: 2px; }
 .aw-mode button, .aw-auto { flex: none; min-width: 64px; padding: 1px 10px; background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16;
-  border-radius: 2px; color: #f4fff0; font: 700 12px/18px var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; }
+  border-radius: 0; color: #f4fff0; font: 700 12px/18px var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; }
 .aw-mode button:hover, .aw-auto:hover { background: linear-gradient(#52bd3c, #36992a); }
 .aw-mode button.active, .aw-auto.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
 .aw-mode button.use { box-shadow: inset 0 -2px 0 #f4fff0; }

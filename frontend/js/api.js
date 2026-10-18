@@ -277,7 +277,7 @@ export function lvpTip(lvp) {
     return ls;
   }, []).join("\n");
   const src = lvp.source ? `Source: ${lvp.source}` : "";
-  if (lvp.applies === false) return [lvp.reason || "No LVP in AIP", src].filter(Boolean).map(wrap).join("\n");
+  if (lvp.applies === false) return [lvp.reason || "AIP does not provide for LVP", src].filter(Boolean).map(wrap).join("\n");
   return [...(lvp.rules || []), lvp.scope === "DEP" ? "LVP for departures only" : "", src, lvp.note || ""]
     .filter(Boolean).map(wrap).join("\n");
 }

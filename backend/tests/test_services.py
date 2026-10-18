@@ -50,7 +50,7 @@ def test_wind_components_and_suggestion():
     best, _ = suggest_runway(rwys, 280, 15)
     assert best["designator"] == "29"
     best, reason = suggest_runway(rwys, 120, 2)
-    assert best["designator"] == "33" and "preferowan" in reason
+    assert best["designator"] == "33" and "preferred" in reason
 
 
 def test_runway_selection_equipment_and_lvp():
@@ -58,7 +58,7 @@ def test_runway_selection_equipment_and_lvp():
     eq = {"11": ["ILS", "RNP"], "33": ["ILS", "RNP"], "29": ["RNP"], "15": ["RNP"]}
     cfg = {"arr": "33", "dep": "29", "limit": 5}
     assert select_runways(rwys, 120, 2, equipment=eq, config=cfg) == {
-        "arr": "33", "dep": "29", "reason": "Wiatr < 5 kt: konfiguracja preferowana lotniska"}
+        "arr": "33", "dep": "29", "reason": "Wind < 5 kt: aerodrome preferred configuration"}
     # wiatr z zachodu: największa składowa czołowa na 29, ale przy LVP wybieramy kierunek z ILS (33, w plecy ≤ 5 kt)
     assert select_runways(rwys, 290, 12, equipment=eq, config=cfg)["arr"] == "29"
     lvp = select_runways(rwys, 290, 12, equipment=eq, config=cfg, low_vis="LVP")
@@ -240,7 +240,7 @@ def test_lvp():
     assert evaluate_lvp(parse_metar("EPWA 051630Z 31004KT 0400 R29/0350N FG VV002 08/08 Q1009"), "EPWA")["state"] == "LVP"
     # EPWA: AIP nie podaje fazy przygotowania, EPPO tak (RVR ≤ 800 m, bez grupy RVR widzialność)
     prep = evaluate_lvp(parse_metar("EPPO 051630Z 28004KT 0700 BR OVC006 08/08 Q1009"), "EPPO")
-    assert prep["state"] == "PREP" and "widzialność 700 m" in prep["reasons"][0]
+    assert prep["state"] == "PREP" and "visibility 700 m" in prep["reasons"][0]
     assert evaluate_lvp(parse_metar("EPWA 051630Z 31004KT CAVOK 08/02 Q1009"), "EPWA")["state"] is None
 
 

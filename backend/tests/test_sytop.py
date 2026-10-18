@@ -484,16 +484,16 @@ def test_js_hash_arg(js):
 def test_js_validity_text(js):
     """Opis ważności jak w liście NOTAM w AERODROME (od/do, PERM, EST)."""
     st = js["state"]
-    assert st[0] == {"cls": "active", "txt": "AKTYWNY DO 12.10 18:00Z (jeszcze 6 h 0 min)"}
-    assert st[1] == {"cls": "active", "txt": "AKTYWNY od 13.09 08:00Z · PERM"}
-    assert st[2] == {"cls": "active", "txt": "AKTYWNY DO 13.10 18:00Z EST (jeszcze 30 h 0 min)"}
-    assert st[3]["cls"] == "future" and st[3]["txt"].startswith("AKTYWNY OD 12.10 14:00Z (za 2 h 0 min) do 12.10 17:00Z")
-    assert st[4] == {"cls": "expired", "txt": "WYGASŁ 12.10 11:00Z"}
+    assert st[0] == {"cls": "active", "txt": "ACTIVE UNTIL 12.10 18:00Z (6 h 0 min left)"}
+    assert st[1] == {"cls": "active", "txt": "ACTIVE since 13.09 08:00Z · PERM"}
+    assert st[2] == {"cls": "active", "txt": "ACTIVE UNTIL 13.10 18:00Z EST (30 h 0 min left)"}
+    assert st[3]["cls"] == "future" and st[3]["txt"].startswith("ACTIVE FROM 12.10 14:00Z (in 2 h 0 min) until 12.10 17:00Z")
+    assert st[4] == {"cls": "expired", "txt": "EXPIRED 12.10 11:00Z"}
     # bez B) i C): nie "aktywny" (zielony), tylko wyraźnie nieznana ważność
-    assert st[5] == {"cls": "", "txt": "ważność nieznana (brak pól B/C)"}
-    assert st[6] == {"cls": "active", "txt": "AKTYWNY od 12.10 11:00Z"}            # B) bez C)
-    assert st[7]["txt"].endswith("(jeszcze <1 min)")                                # kończy się za 20 s, nie "0 min"
-    assert st[8] == {"cls": "active", "txt": "AKTYWNY od 12.10 07:00Z · PERM"}     # PERM z datą w C) nie wygasa
+    assert st[5] == {"cls": "", "txt": "validity unknown (no B/C fields)"}
+    assert st[6] == {"cls": "active", "txt": "ACTIVE since 12.10 11:00Z"}            # B) bez C)
+    assert st[7]["txt"].endswith("(<1 min left)")                                # kończy się za 20 s, nie "0 min"
+    assert st[8] == {"cls": "active", "txt": "ACTIVE since 12.10 07:00Z · PERM"}     # PERM z datą w C) nie wygasa
     # AERODROME › PRZEGLĄD opisuje NOTAM-y tą samą funkcją (wcześniej kopia, która się rozjechała)
     src = (ROOT_DIR / "frontend" / "js").joinpath
     ad = src("tabs", "aerodrome.js").read_text("utf-8")

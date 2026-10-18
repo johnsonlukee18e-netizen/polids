@@ -85,20 +85,20 @@ def test_split_from_atis(awos):
     a = awos["atisSplit"]
     assert (a["arr"], a["dep"], a["rwy"]) == (["33", "ATIS"], ["29", "ATIS"], ["33", "ATIS"])
     s = awos["sugSplit"]
-    assert (s["arr"], s["dep"]) == (["33", "sugestia"], ["29", "sugestia"])
+    assert (s["arr"], s["dep"]) == (["33", "suggested"], ["29", "suggested"])
 
 
 def test_second_runway_when_atis_has_one(awos):
     """ATIS z jednym pasem (2 PASY wybrane ręcznie): pas z ATIS zostaje, drugi z rozdziału, który go zawiera."""
     # sugestia systemu (pasy preferowane z AIP AD 2.21): ARR 33 / DEP 29
     c = awos["atisOneCalm"]
-    assert (c["arr"], c["dep"], c["rwy"]) == (["33", "sugestia"], ["29", "ATIS"], ["29", "ATIS"])
+    assert (c["arr"], c["dep"], c["rwy"]) == (["33", "suggested"], ["29", "ATIS"], ["29", "ATIS"])
     # sugestia bez rozdziału (jeden pas do lądowania i startu): konfiguracja preferowana EPWA z runway_config.json
     lvp = awos["atisOneLvp"]
     assert (lvp["arr"], lvp["dep"]) == (["33", "auto"], ["29", "ATIS"])
     # pas spoza konfiguracji: do lądowania pas z ATIS, do startu inny pas z największą składową czołową
     e = awos["atisEast"]
-    assert (e["arr"], e["dep"]) == (["11", "ATIS"], ["15", "auto"]) and "czołową" in e["why"]
+    assert (e["arr"], e["dep"]) == (["11", "ATIS"], ["15", "auto"]) and "largest headwind component" in e["why"]
     # drugi pas konfiguracji z wiatrem w plecy > 5 kt odpada
     t = awos["cfgTail"]
     assert (t["arr"], t["dep"]) == (["29", "ATIS"], ["15", "auto"])
@@ -111,9 +111,9 @@ def test_second_runway_when_atis_has_one(awos):
 def test_single_runway_and_no_data(awos):
     """Lotnisko z jednym pasem: w 2 PASY druga kolumna to przeciwny kierunek; bez pasów nic się nie wywraca."""
     k = awos["epkk"]
-    assert (k["arr"], k["dep"], k["rwy"]) == (["25", "sugestia"], ["07", "auto"], ["25", "sugestia"])
-    assert "jednym pasem" in k["why"]
-    assert awos["empty"]["rwy"] == [None, "sugestia"] and awos["empty"]["dep"] == [None, "sugestia"]
+    assert (k["arr"], k["dep"], k["rwy"]) == (["25", "suggested"], ["07", "auto"], ["25", "suggested"])
+    assert "single-runway aerodrome" in k["why"]
+    assert awos["empty"]["rwy"] == [None, "suggested"] and awos["empty"]["dep"] == [None, "suggested"]
     assert awos["nostatus"]["des"] is None
 
 
