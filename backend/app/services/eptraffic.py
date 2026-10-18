@@ -227,8 +227,8 @@ class EpTraffic:
         return [rel for rel, _ in self.classify(pilots, resolver)]
 
     def classify(self, pilots: list[dict], resolver) -> list[tuple[str | None, str | None]]:
-        """Jak relations, z punktem wyjścia z FIR-u tranzytu i odlotu z EP** za granicę: [(relacja, punkt wyjścia
-        albo None)]. Tranzyt w FIR-ze z planem lotu i odlot za granicę też mają rozpisaną trasę (tylko po punkt
+        """Jak relations, z punktem wyjścia z FIR-u tranzytu i odlotu z EP** za granicę (odlot: tylko przed
+        wylotem z FIR-u): [(relacja, punkt wyjścia albo None)]. Tranzyt w FIR-ze z planem lotu i odlot za granicę też mają rozpisaną trasę (tylko po punkt
         wyjścia; relacja zostaje "trn" albo "dep"). Lot krajowy i przylot: bez punktu wyjścia."""
         outline = self._outline()
         with self._lock:
@@ -263,7 +263,12 @@ class EpTraffic:
                 hit[1].seen = now
                 if rel is None:
                     rel = "trn" if hit[1].enters(pos, outline) else None
-                out[i] = (rel, hit[1].exit if rel in ("trn", "dep") else None)
+                    shown = rel == "trn"
+                else:
+                    # odlot za granicę jak tranzyt: punkt wyjścia tylko, dopóki samolot jest w FIR-ze albo reszta
+                    # trasy do niego wchodzi; po wylocie z FIR-u etykieta wraca do lotniska docelowego
+                    shown = rel == "trn" or (rel == "dep" and (outline.contains(*pos) or hit[1].enters(pos, outline)))
+                out[i] = (rel, hit[1].exit if shown else None)
             if now - self._pruned > 60:
                 self._pruned = now
                 self._plans = {cs: v for cs, v in self._plans.items() if now - v[1].seen < KEEP_S}

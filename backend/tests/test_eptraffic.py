@@ -265,6 +265,7 @@ def test_transit_exit_point(traffic):
 def test_departure_abroad_exit_point(traffic):
     """Runda 14 (przegląd): odlot z EP** za granicę opuszcza FIR EPWW jak tranzyt, więc trzecia linijka etykiety
     pokazuje punkt wyjścia z FIR-u (WZZ1AB EPWA → EGGW: punkt przy granicy zamiast EGGW). Relacja zostaje "dep".
+    Po wylocie z FIR-u (WZZ2AB nad Niemcami) jak tranzyt: znów lotnisko docelowe.
     Lot krajowy i przylot: bez trasy i bez punktu wyjścia (lotnisko docelowe), odlot samym DCT: bez punktu."""
     fr = FakeResolver()
     west = "P2 DCT ODRAA DCT P3"
@@ -275,7 +276,7 @@ def test_departure_abroad_exit_point(traffic):
         pilot("LOT3", 52.0, 19.6, "EPWA", "EPGD", west),            # krajowy
         pilot("BAW2", 52.3, 16.0, "EGLL", "EPWA", "P3 DCT ODRAA DCT P2"),  # przylot
         pilot("LOT9", 52.3, 19.0, "EPWA", None, west)], fr)         # bez lotniska docelowego
-    assert out == [("dep", "ODRAA"), ("dep", "ODRAA"), ("dep", None), ("dep", None), ("arr", None), ("dep", None)]
+    assert out == [("dep", "ODRAA"), ("dep", None), ("dep", None), ("dep", None), ("arr", None), ("dep", None)]
     assert sorted(fr.resolved) == ["EPWA DCT EDDF"] + [f"EPWA {west} EGLL"] * 2 and traffic.cached() == 3
     # w API (relations) relacja ta sama co do 0.12.4
     assert traffic.relations([pilot("WZZ1AB", *AD["EPWA"], "EPWA", "EGLL", west)], fr) == ["dep"]
