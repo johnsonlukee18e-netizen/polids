@@ -59,30 +59,37 @@ class Frequency(Base):
 
 
 class AircraftType(Base):
+    """Typ statku powietrznego (AIRCRAFT): jeden rekord na oznaczenie typu ICAO z data/import/ICAO_Aircraft.json
+    (ICAO Doc 8643), bez wersji produkcyjnych. Osiągi, których plik nie ma (silniki, MLW, pułap, Vmo, Mmo), z wersji
+    typu w data/seed/aircraft.csv: wartość = najmniejsza, *_max = największa, gdy wersje się różnią (inaczej None)."""
+
     __tablename__ = "aircraft_types"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    icao: Mapped[str] = mapped_column(String(4), index=True)
+    icao: Mapped[str] = mapped_column(String(4), unique=True, index=True)
     iata: Mapped[str | None] = mapped_column(String(3))
     manufacturer: Mapped[str | None] = mapped_column(String(120), index=True)
-    model: Mapped[str] = mapped_column(String(120), index=True)
-    aircraft_type: Mapped[str | None] = mapped_column(String(30))
-    engine_type: Mapped[str | None] = mapped_column(String(30))
-    engine_count: Mapped[int | None] = mapped_column(Integer)
+    model: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str | None] = mapped_column(String(4))  # opis ICAO DOC 8643, np. L2J
     wtc: Mapped[str | None] = mapped_column(String(1))
+    wtg: Mapped[str | None] = mapped_column(String(1))  # ICAO WTG A–G
     recat: Mapped[str | None] = mapped_column(String(1))
     wingspan: Mapped[float | None] = mapped_column(Float)
     length: Mapped[float | None] = mapped_column(Float)
     height: Mapped[float | None] = mapped_column(Float)
     mtow: Mapped[float | None] = mapped_column(Float)
-    mlw: Mapped[float | None] = mapped_column(Float)
-    ceiling_ft: Mapped[float | None] = mapped_column(Float)
-    vmo_kt: Mapped[float | None] = mapped_column(Float)
-    mmo: Mapped[float | None] = mapped_column(Float)
-    description: Mapped[str | None] = mapped_column(String(4))  # opis ICAO DOC 8643, np. L2J
     use: Mapped[str | None] = mapped_column(String(2))  # H/M/... z ICAO_Aircraft.json
-    remarks: Mapped[str | None] = mapped_column(Text)
-    source: Mapped[str | None] = mapped_column(String(40))
+    engine_count: Mapped[int | None] = mapped_column(Integer)  # z opisu ICAO (L2J: 2), bez cyfry w opisie z aircraft.csv
+    engine_type: Mapped[str | None] = mapped_column(String(40))  # z aircraft.csv, np. turbofan albo "turbojet/turbofan"
+    mlw: Mapped[float | None] = mapped_column(Float)
+    mlw_max: Mapped[float | None] = mapped_column(Float)
+    ceiling_ft: Mapped[float | None] = mapped_column(Float)
+    ceiling_ft_max: Mapped[float | None] = mapped_column(Float)
+    vmo_kt: Mapped[float | None] = mapped_column(Float)
+    vmo_kt_max: Mapped[float | None] = mapped_column(Float)
+    mmo: Mapped[float | None] = mapped_column(Float)
+    mmo_max: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str | None] = mapped_column(String(80))
 
 
 class Callsign(Base):

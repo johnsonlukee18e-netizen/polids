@@ -4,6 +4,10 @@
 katalog contrib/ac-data/aircraft-db). Kategorie WTC / RECAT-EU liczone tak jak w atciss
 (MIT), z nadpisaniami z pliku data/seed/wtc_overrides.csv.
 
+Od 0.12.5 plik nie jest listą typów: lista AIRCRAFT to jeden rekord na oznaczenie z data/import/ICAO_Aircraft.json,
+a z aircraft.csv aplikacja bierze tylko osiągi, których tamten plik nie ma (silniki, MLW, pułap, Vmo, Mmo); wiersze
+wersji jednego typu łączy w zakres od–do (backend/app/importers/aircraft_json.py), typy spoza pliku json pomija.
+
 Użycie:
     python scripts/build_aircraft_seed.py ŚCIEŻKA/DO/aircraft-db
 """

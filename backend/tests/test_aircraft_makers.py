@@ -69,7 +69,7 @@ def test_maker_filter_endpoint(client):
 
     atr = client.get("/api/aircraft?maker=ATR").json()
     assert {"AT45", "AT76"} <= {a["icao"] for a in atr}
-    assert not any(a["manufacturer"] in ("Air Tractor", "Matra") for a in atr)
+    assert not any(a["manufacturer"].lower() in ("air tractor", "matra") for a in atr)
 
     mcd = {a["icao"] for a in client.get("/api/aircraft?maker=mcdonnell&limit=500").json()}
     assert {"MD11", "MD82", "DC10", "DC93", "F4"} <= mcd
@@ -85,4 +85,4 @@ def test_maker_filter_endpoint(client):
     assert len(client.get("/api/aircraft?maker=boeing&limit=5").json()) == 5
 
     r = client.get("/api/aircraft?maker=fokker")
-    assert r.status_code == 400 and "Nieznany producent" in r.json()["detail"]
+    assert r.status_code == 400 and "Unknown manufacturer" in r.json()["detail"]
