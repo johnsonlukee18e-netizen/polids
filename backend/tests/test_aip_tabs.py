@@ -44,6 +44,10 @@ console.log(JSON.stringify({
   rowsAll: aip.chartRows(charts),
   rowsNone: aip.chartRows(charts, { kind: "SID" }),
   kindIds: aip.KINDS.map(([k]) => k),
+  // filtr po wyborze mapy spoza filtra: [filtr, id mapy]
+  picks: [["IAC", "12-3"], ["IAC", "2-1"], ["", "2-1"], ["STAR", ""], ["AD", ""], ["AD", "99-9"], ["STAR", "10-1"], ["SID", "12-1"]]
+    .map(([k, id]) => aip.kindAfterPick(charts, k, id)),
+  pickEmpty: aip.kindAfterPick([], "AD", "2-1"),
 }));
 """
 
@@ -134,3 +138,18 @@ def test_tabs_wiring():
     assert '.view[data-tab="adciv"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .chl-row, .chl-kd) { border-radius: 0; }' in css
     # inop.js i phraseology.js biorą pasek nad ramką stąd
     assert "export function embedBar(pane)" in AIP
+
+
+def test_kind_filter_survives_redraw(js):
+    """Runda 14 (przegląd): draw() wyłączał filtr, gdy wybrana mapa (domyślnie pierwsza, AD) była innego rodzaju, więc
+    kliknięcie SID / STAR / IAC nic nie robiło. Filtr wyłącza tylko wybór mapy spoza filtra (adres, historia ←, pierwsze
+    wczytanie z mapą w adresie) i tylko wtedy, gdy ta mapa jest ukryta filtrem."""
+    assert js["picks"] == ["IAC", "", "", "", "AD", "AD", "STAR", ""]
+    assert js["pickEmpty"] == "AD"   # bez listy map filtr bez zmian
+    draw = AIP[AIP.index("  const draw = () => {"):AIP.index('  el.addEventListener("click"')]
+    assert "kind =" not in draw and "kindAfterPick" not in draw
+    # przycisk filtra: sam filtr i rysowanie; pick() i pierwsze wczytanie: kindAfterPick dla wybranej mapy
+    assert "if (k) { kind = k.dataset.kind; draw(); return; }" in AIP
+    assert "const picked = (id) => { if (data?.charts?.length) kind = kindAfterPick(data.charts, kind, id); };" in AIP
+    assert "picked(sel); draw(); };" in AIP and "pick(id) { sel = id; picked(id); draw(); }" in AIP
+    assert AIP.count("kindAfterPick(") == 2   # definicja i picked()

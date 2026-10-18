@@ -238,7 +238,9 @@ class _Rows(HTMLParser):
     poza tabelami (adres, tekst). Odporny na eAIP: <br>/<p>/<div> rozdzielają słowa; tekst i odnośniki w <del> (zmiana
     z poprawki: skreślone) pomijamy; <td> bez </td> i <tr> bez </tr> zamyka poprzednią komórkę / wiersz; tabela
     zagnieżdżona w komórce należy do tej komórki; komórka z rowspan przechodzi do następnych wierszy (tytuł mapy
-    wspólny dla kilku PDF-ów)."""
+    wspólny dla kilku PDF-ów), ale nie do następnej tabeli. Nie rzuca wyjątku na żadnej zbitce znaczników: <a> bez </a>
+    kończy się razem ze swoim wierszem (alt obrazka z dalszych wierszy nie trafia do cudzego odnośnika), odnośnik poza
+    tabelą bez </a> zamyka następny <a> albo koniec strony."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -246,7 +248,8 @@ class _Rows(HTMLParser):
         self.loose: list[tuple[str, str]] = []
         self._stack: list[dict] = []          # otwarte wiersze (zagnieżdżone tabele): {cells, hrefs, alts, cell}
         self._span: list[tuple[str, int]] = []   # komórka z rowspan z poprzedniego wiersza: (tekst, ile wierszy jeszcze)
-        self._a: tuple[str, list[str]] | None = None
+        # otwarty <a href>: adres, tekst, wiersz (None = poza tabelą) i numer odnośnika w tym wierszu
+        self._a: dict | None = None
         self._del = 0
         self._tables = 0                      # otwarte <table> (wiersz należy do najbardziej wewnętrznej)
 
@@ -261,7 +264,7 @@ class _Rows(HTMLParser):
         if row is not None and row["cell"] is not None:
             row["cell"].append(data)
         if self._a is not None:
-            self._a[1].append(data)
+            self._a["text"].append(data)
 
     def _close_cell(self, row):
         if row["cell"] is not None:
@@ -274,6 +277,8 @@ class _Rows(HTMLParser):
     def _close_row(self):
         row = self._stack.pop()
         self._close_cell(row)
+        if self._a is not None and self._a["row"] is row:
+            self._a = None                    # <a> bez </a> kończy się z wierszem
         parent = self._row
         if parent is not None and parent["cell"] is not None:
             # wiersz tabeli zagnieżdżonej w komórce: tekst i odnośniki należą do komórki zewnętrznej
@@ -307,12 +312,16 @@ class _Rows(HTMLParser):
             except ValueError:
                 row["rowspan"] = 1
         elif tag == "a" and (href := a.get("href")) and not self._del:
-            self._a = (href, [])
-            if self._row is not None:
-                self._row["hrefs"].append(href)
-                self._row["alts"].append(a.get("title") or "")
-        elif tag == "img" and self._a is not None and self._row is not None and a.get("alt") and not self._row["alts"][-1]:
-            self._row["alts"][-1] = a["alt"]
+            self._end_loose()                         # <a> w <a> (bez </a>): poprzedni odnośnik poza tabelą kończy się
+            row = self._row
+            self._a = {"href": href, "text": [], "row": row, "i": len(row["hrefs"]) if row is not None else -1}
+            if row is not None:
+                row["hrefs"].append(href)
+                row["alts"].append(a.get("title") or "")
+        elif tag == "img" and self._a is not None and self._a["row"] is not None and a.get("alt"):
+            alts, i = self._a["row"]["alts"], self._a["i"]
+            if 0 <= i < len(alts) and not alts[i]:
+                alts[i] = a["alt"]
 
     def handle_endtag(self, tag):
         if tag in BREAKS:
@@ -327,18 +336,26 @@ class _Rows(HTMLParser):
             while self._row is not None and self._row["table"] >= self._tables:
                 self._close_row()                     # tabela zamknięta bez </tr>
             self._tables = max(0, self._tables - 1)
+            if not self._tables:
+                self._span = []                       # rowspan z ostatniego wiersza nie przechodzi do następnej tabeli
         elif tag == "a" and self._a is not None:
-            if self._row is None:
-                self.loose.append((self._a[0], " ".join("".join(self._a[1]).split())))
+            self._end_loose()
             self._a = None
 
     def handle_data(self, data):
         self._text(data)
 
+    def _end_loose(self):
+        """Odnośnik poza tabelą (otwarty bez wiersza) do listy loose z tekstem odnośnika."""
+        if self._a is not None and self._a["row"] is None:
+            self.loose.append((self._a["href"], " ".join("".join(self._a["text"]).split())))
+            self._a = None
+
     def close(self):
         super().close()
         while self._stack:
             self._close_row()
+        self._end_loose()
 
 
 def _chart_url(page_url: str, href: str) -> str | None:
@@ -368,10 +385,11 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
     found += p.loose
     out, seen = [], set()
     for href, text in found:
-        m = CHART_FILE.search(urlsplit(href.strip()).path)
-        if not m or m.group(1).upper() != icao:
+        try:
+            m = CHART_FILE.search(urlsplit(href.strip()).path)
+            url = _chart_url(page_url, href) if m and m.group(1).upper() == icao else None
+        except ValueError:   # adres, którego urllib nie rozbierze ("http://[x/..."): ten jeden odnośnik pomijamy
             continue
-        url = _chart_url(page_url, href)
         if not url or url in seen:
             continue
         seen.add(url)

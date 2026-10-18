@@ -518,3 +518,104 @@ def test_parse_charts_real_eaip_variants():
         "6-1": ("BIRD CONCENTRATION CHART", "OTHER"),
         "7-1": ("AERODROME OBSTACLE CHART - ICAO TYPE A", "OBST"),
     }
+
+
+# --- runda 14 (przegląd): parser nie rzuca wyjątku na żadnej zbitce znaczników (IndexError z _Rows dawał pustą listę
+# map całego lotniska na CHARTS_FAIL_TTL), rowspan nie przechodzi do następnej tabeli
+ZG = "../documents/Root_WePub/AIP IFR/AD/EPZG/{n:02d}/AD_2_EPZG_{n:02d}-1.pdf"
+
+
+def _ids(html, icao="EPZG"):
+    return [(c["id"], c["title"]) for c in eaip.parse_charts(html, ZG_PAGE, icao)]
+
+
+def test_parse_charts_unclosed_link_then_img_alt_in_later_row():
+    # <a> bez </a> kończy się z wierszem: alt obrazka z następnego wiersza nie trafia do niego (dawniej IndexError)
+    html = (f'<table><tr><td>A</td><td><a href="{ZG.format(n=2)}">AD 2 EPZG 2-1</td></tr>'
+            '<tr><td>B<img alt="x"></td></tr></table>')
+    assert _ids(html) == [("2-1", "A")]
+    # ten sam odnośnik bez tytułu w komórkach: alt obrazka w jego własnym wierszu dalej jest tytułem
+    html = f'<table><tr><td></td><td><a href="{ZG.format(n=2)}"><img alt="AERODROME CHART"></td></tr><tr><td><img alt="y"></td></tr></table>'
+    assert _ids(html) == [("2-1", "AERODROME CHART")]
+
+
+def test_parse_charts_link_wrapping_nested_table():
+    # <a href=pdf> obejmujący tabelę z obrazkiem (dawniej IndexError): odnośnik poza tabelą, tytuł = numer strony
+    html = f'<a href="{ZG.format(n=2)}"><table><tr><td><img alt="pdf"></td></tr></table></a>'
+    assert _ids(html) == [("2-1", "AD 2 EPZG 2-1")]
+    # to samo bez </a> i bez </table>: odnośnik nie ginie (koniec strony go zamyka)
+    assert _ids(f'<a href="{ZG.format(n=2)}"><table><tr><td><img alt="pdf">') == [("2-1", "AD 2 EPZG 2-1")]
+    # <a> w komórce obejmujący tabelę zagnieżdżoną: alt obrazka z tej tabeli to opis tego odnośnika
+    html = f'<table><tr><td></td><td><a href="{ZG.format(n=6)}"><table><tr><td><img alt="OBSTACLE CHART"></td></tr></table></a></td></tr></table>'
+    assert _ids(html) == [("6-1", "OBSTACLE CHART")]
+
+
+def test_parse_charts_rowspan_stops_at_table_end():
+    # rowspan=3 w ostatnim wierszu tabeli: tekst nie przechodzi do pierwszego wiersza następnej tabeli
+    html = (f'<table><tr><td rowspan="3">IAC</td><td><a href="{ZG.format(n=12)}">AD 2 EPZG 12-1</a></td></tr></table>'
+            f'<table><tr><td><a href="{ZG.format(n=2)}">AD 2 EPZG 2-1</a></td><td>AERODROME CHART</td></tr></table>')
+    assert _ids(html) == [("12-1", "IAC"), ("2-1", "AERODROME CHART")]
+    # w tej samej tabeli rowspan działa dalej (wspólny tytuł kilku PDF-ów)
+    html = (f'<table><tr><td rowspan="2">IAC RWY 24</td><td><a href="{ZG.format(n=12)}"></a></td></tr>'
+            f'<tr><td><a href="{ZG.format(n=13)}"></a></td></tr></table>')
+    assert _ids(html) == [("12-1", "IAC RWY 24"), ("13-1", "IAC RWY 24")]
+
+
+def test_parse_charts_bad_url_skips_only_that_link():
+    # adres, którego urllib nie rozbierze (ValueError), pomijamy; reszta listy zostaje
+    html = (f'<table><tr><td>X</td><td><a href="http://[x/AD_2_EPZG_3-1.pdf"></a></td></tr>'
+            f'<tr><td>AERODROME CHART</td><td><a href="{ZG.format(n=2)}"></a></td></tr></table>'
+            '<a href="//[nie-ip]/AD_2_EPZG_4-1.pdf">SID</a>')
+    assert _ids(html) == [("2-1", "AERODROME CHART")]
+
+
+FUZZ_TAGS = ("tr", "td", "th", "a", "img", "table", "br", "del", "ins", "p", "div")
+
+
+def _soup(rnd, n):
+    """Losowa zbitka znaczników z FUZZ_TAGS (otwarcia, zamknięcia, atrybuty rowspan / href / alt / title) i tekstu."""
+    out = []
+    for _ in range(n):
+        tag, r = rnd.choice(FUZZ_TAGS), rnd.random()
+        if r < 0.15:
+            out.append(rnd.choice(["AERODROME CHART", "SID RWY 29", "2-1", " ", "&amp;", "STAR", "<", "\""]))
+        elif r < 0.55:
+            attrs = ""
+            if tag == "a" and rnd.random() < 0.8:
+                attrs = f' href="{rnd.choice([ZG.format(n=rnd.randint(1, 30)), "AD_2_EPZG_7-2.pdf", "http://[x/AD_2_EPZG_5-1.pdf", "x.html", "", "AD_2_EPWA_2-1.pdf"])}"'
+                if rnd.random() < 0.3:
+                    attrs += ' title="BIRD CHART"'
+            elif tag == "img" and rnd.random() < 0.8:
+                attrs = f' alt="{rnd.choice(["pdf", "", "VISUAL APPROACH CHART"])}"'
+            elif tag in ("td", "th") and rnd.random() < 0.3:
+                attrs = f' rowspan="{rnd.choice(["2", "3", "0", "-1", "x", "", "99"])}"'
+            out.append(f"<{tag}{attrs}>")
+        elif r < 0.95:
+            out.append(f"</{tag}>")
+        else:
+            out.append(f"<{tag}/>")
+    return "".join(out)
+
+
+def test_parse_charts_fuzz_never_raises():
+    """Losowe zbitki znaczników (wiele ziaren): parse_charts nie rzuca wyjątku i daje poprawne wpisy; dobrze zbudowane
+    strony z dopisaną na końcu zbitką mają te same mapy co bez niej (zbitka używa innych numerów stron)."""
+    import random
+
+    page = "https://docs.pansa.pl/ais/eaipifr/X/eAIP/AD%202%20EPWA%201-en-GB.html"
+    good = {name: (html, icao, eaip.parse_charts(html, page, icao))
+            for name, html, icao in (("zg", ZG_HTML, "EPZG"), ("variant", VARIANT_HTML, "EPWA"))}
+    for seed in range(400):
+        rnd = random.Random(seed)
+        soup = _soup(rnd, rnd.randint(1, 80))
+        charts = eaip.parse_charts(soup, ZG_PAGE, "EPZG")
+        urls = [c["url"] for c in charts]
+        assert len(urls) == len(set(urls)), (seed, soup)
+        for c in charts:
+            assert set(c) == {"id", "page", "title", "kind", "url"} and re.fullmatch(r"\d+-\d+", c["id"]), (seed, soup)
+            assert c["title"] and c["url"].startswith("https://") and " " not in c["url"], (seed, soup)
+        # dobrze zbudowana strona + zbitka (z numerami stron 90+): mapy strony bez zmian, w tej samej kolejności
+        for name, (html, icao, want) in good.items():
+            tail = soup.replace("AD_2_EPZG_", f"AD_2_{icao}_9").replace("AD_2_EPWA_", f"AD_2_{icao}_9")
+            got = [c for c in eaip.parse_charts(html + tail, page, icao) if not c["id"].startswith("9")]
+            assert got == [c for c in want if not c["id"].startswith("9")], (name, seed, soup)

@@ -18,6 +18,29 @@ export function tvLabel(id) {
   return "sector combination";
 }
 
+// Warunki aktywacji scenariusza vIFF (vIFF sam decyduje, czy jest aktywny; pokazujemy tylko warunki). html: wartości
+// w <b> i escapowane (wiersz scenariusza w MAP), bez html sam tekst (dymek, escapowany przy wstawianiu).
+export function scnCond(s, { html = false } = {}) {
+  const e = html ? esc : (t) => String(t);
+  const v = (t) => (html ? `<b>${esc(t)}</b>` : String(t));
+  const b = (xs, sep) => xs.map(v).join(sep);
+  const out = [];
+  if (s.positions?.length) out.push(`when online: ${b(s.positions, " + ")}`);
+  if (s.anypositions?.length) out.push(`when online: ${b(s.anypositions, " or ")}`);
+  if (s.nopositions?.length) out.push(`and offline: ${b(s.nopositions, ", ")}`);
+  if (s.booked) out.push("bookings count too");
+  if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`time ${v(`${s.start}–${s.end}`)}`);
+  (s.times || []).forEach((t) => out.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}–${t.to}`)}`));
+  return out.join(" · ") || "no conditions";
+}
+
+// Dymek wiersza scenariusza vIFF po angielsku, z danych scenariusza: id, traffic volumes (z opisem jak tvLabel)
+// i warunki. Opisu scenariusza z vIFF (s.description, wolny tekst po polsku) nie pokazujemy.
+export function scnTip(s) {
+  const tvs = (s.tvs || []).map((t) => `${t.id} (${tvLabel(t.id)})`);
+  return `Scenario ${s.id}: ${tvs.length ? `traffic volumes ${tvs.join(", ")}` : "no traffic volumes"} · ${scnCond(s)}`;
+}
+
 // aktywny = status 1 w vIFF albo członek aktywnego scenariusza (backend liczy to w polu active)
 export const tvGroup = (tv) => (tv.active ?? tv.status === 1 ? "active" : "inactive");
 

@@ -37,6 +37,9 @@ const out = {
   short: as.aircraftMarker(dom, { label: true }).icon.html,
   full: as.aircraftMarker(tra, { label: true, detail: true, exit: "MIXAT" }).icon.html,
   noL3: as.aircraftMarker({ callsign: "SPABC", groundspeed: 90, altitude: 1500 }, { detail: true }).icon.html,
+  html: as.p21Html(dom), htmlShort: as.p21Html(dom, { detail: false }), htmlNoGs: as.p21Html({ ...dom, groundspeed: null }),
+  htmlLong: as.p21Html({ callsign: "LOT3913AB", groundspeed: 85, altitude: 9000 }),
+  htmlEsc: as.p21Html({ callsign: "<X&>", groundspeed: 5 }),
   size: as.aircraftMarker(dom).icon.iconSize,
   ad: as.SYMBOLS.aerodrome, half: ["aerodrome", "vor", "ndb", "vfr", "fix"].map(as.symbolHalf),
   svg: as.symbolSvg("aerodrome", "#fff"), svgFix: as.symbolSvg("fix", "#fff"),
@@ -86,14 +89,48 @@ def test_p21_rfl_two_digit_tens_and_below_tl(js):
                            "h  s  r A 45", "h  s  r A 45", "h  s  r A  5", "h  s  r A 70", "h  s  r"]
 
 
+def _text(html):
+    return re.sub(r"<[^>]+>", "", html)
+
+
 def test_aircraft_marker_label(js):
-    # bez szczegółów sam znak; ze szczegółami cztery linijki (pierwsza zielona w map.css), bez <br> i bez tła w HTML
-    assert '<span class="p21"><i class="l1">DOM004</i></span>' in js["short"]
+    # bez szczegółów sam znak; ze szczegółami cztery linijki, bez <br> i bez tła w HTML
+    assert '<span class="p21"><i class="l1"><b class="cs">DOM004</b></i></span>' in js["short"]
     full = js["full"]
-    assert ['<i class="l1">TRA005   431</i>', '<i class="l2">270</i>', '<i class="l3">B737M MIXAT</i>', '<i class="l4">h  s  r 27</i>'] == \
-        [x for x in (f'<i class="l{i}">' + full.split(f'<i class="l{i}">')[1].split("</i>")[0] + "</i>" for i in range(1, 5))]
+    lines = re.findall(r'<i class="l(\d)">(.*?)</i>', full)
+    assert [n for n, _ in lines] == ["1", "2", "3", "4"]
+    # tekst linijek jak p21Lines (spacje to kolumny)
+    assert [_text(x) for _, x in lines] == ["TRA005   431", "270", "B737M MIXAT", "h  s  r 27"]
+    assert lines[0][1] == '<b class="cs">TRA005</b>   <b class="gs">431</b>'
     assert 'class="l3"' not in js["noL3"] and 'class="l4"' in js["noL3"]
     assert js["size"] == [14, 14]  # ikona mniejsza niż do 0.12.4 (20 px)
+
+
+def test_p21_only_callsign_green():
+    """Runda 14 (przegląd): na etykiecie DOM004 z P21 zielony jest tylko znak wywoławczy, prędkość (248) jest biała jak
+    linijki 2-4; MAP kolorował całą linijkę 1. Prędkość w osobnym <b class="gs"> poza zielonym <b class="cs">, w map.css
+    kolor tylko dla b.cs (także wybrany lot i jasny podkład), legenda z tego samego p21Html."""
+    css = (JS.parent / "css" / "map.css").read_text("utf-8")
+    assert ".acicon span.p21 b.cs, .p21-sample b.cs { color: #00ff00; }" in css
+    assert ".acicon.sel span.p21 b.cs { color: #ff9f1a; }" in css
+    assert ".map.light .acicon span.p21 b.cs { color: #0a7a36; }" in css and ".map.light .acicon.sel span.p21 b.cs { color: #b02e08; }" in css
+    # linijka 1 ani prędkość nie mają własnego koloru: biorą kolor linijek (i) jak linijki 2-4
+    rules = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    assert "i.l1" not in rules and "b.gs" not in rules
+    assert ".acicon span.p21 b, .p21-sample b { font-weight: inherit; }" in css
+    # legenda MAP: ten sam HTML co etykieta na mapie
+    src = (JS / "tabs" / "map.js").read_text("utf-8")
+    assert "const P21_SAMPLE = p21Html({" in src and '<span class="p21-sample">${P21_SAMPLE}</span>' in src
+
+
+def test_p21_html(js):
+    assert js["html"] == ('<i class="l1"><b class="cs">DOM004</b>   <b class="gs">248</b></i><i class="l2">A 53↑</i>'
+                          '<i class="l3">DC10H EPWA</i><i class="l4">h  s  r 24</i>')
+    assert js["htmlShort"] == '<i class="l1"><b class="cs">DOM004</b></i>'
+    # bez prędkości: sam znak; długi znak (9 znaków): jedna spacja przed prędkością
+    assert js["htmlNoGs"].startswith('<i class="l1"><b class="cs">DOM004</b></i><i class="l2">')
+    assert js["htmlLong"].startswith('<i class="l1"><b class="cs">LOT3913AB</b> <b class="gs">085</b></i>')
+    assert js["htmlEsc"].startswith('<i class="l1"><b class="cs">&lt;X&amp;&gt;</b>     <b class="gs">005</b></i>')
 
 
 def test_aerodrome_symbol_is_closed_polygon(js):
