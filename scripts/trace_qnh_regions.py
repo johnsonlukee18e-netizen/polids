@@ -9,7 +9,8 @@ w odwzorowaniu stożkowym Lamberta dopasowanym do siatki zrzutu, LCC niżej; kon
 - TMA/MTMA cywilne i CTR/MCTR: sektory pliku data/import/EPWW-Sector.ese (dolne warstwy, poniżej FL095), wg
   przedrostków nazw "ese" przy TMA w pliku rejonów; obszar "BELOW … QNH FROM EPxx" = suma warstw, cienkie linie
   w środku = granice części TMA o różnych dolnych granicach (jak na mapie PAŻP); TMA Kraków dzieli na część Katowic
-  i Krakowa pogrubiona linia z mapy PAŻP (SPLIT);
+  i Krakowa pogrubiona linia z mapy PAŻP (SPLIT); części TMA, których brak w pliku .ese (TMA Łódź C), z obrysu
+  "… TMA OUT" pliku .sct (SCT_FILL);
 - MTMA i MCTR wojskowe, których nie ma w plikach sektorowych (MIL_TMA, MIL_CTR): wierzchołki odczytane ze zrzutu
   (proste odcinki jak na mapie); odcinki wspólne z TMA z pliku .ese biegną dokładnie po jej granicy;
 - linie rejonów (LINES): wierzchołki odczytane ze zrzutu, proste odcinki; tam, gdzie linia na mapie PAŻP biegnie
@@ -25,7 +26,9 @@ biegnie tą granicą (krótszą drogą).
 Układ napisów (wszystko [lon, lat], środek napisu) jest ręczny i skrypt przenosi go z dotychczasowego pliku:
 'num' i 'qnh_at' rejonów (duży numer i ramka z QNH obok niego), 'cap' i 'code' TMA (opis BELOW … QNH FROM EPxx
 z QNH), "chart_labels" (szare oznaczenia TMA/CTR) i "aero_labels" (strona kodu ICAO przy symbolu lotniska).
---layout rozsuwa nachodzące na siebie napisy (model rozmiarów jak w qnh.css i test_qnh.py) i zapisuje nowe miejsca.
+--layout rozsuwa nachodzące na siebie napisy (model rozmiarów jak w qnh.css i test_qnh.py, wszystkie widoki
+services.qnh.VIEWS) i zapisuje nowe miejsca; przesuwa tylko napisy, które na coś nachodzą, więc na pliku bez kolizji
+nic nie zmienia (test_script_reproduces_seed).
 
 Użycie (z katalogu głównego repozytorium):
     python scripts/trace_qnh_regions.py                          # zapis do data/seed/qnh_regions.json
@@ -73,14 +76,14 @@ NODES = {
     "F1-4": (1048.2, 1049.0),
 }
 # granice między rejonami: kolejne wierzchołki; 2/3 biegnie granicą TMA Gdańsk, 5/6 granicą TMA Wrocław,
-# 8/9 granicą CTR Warszawa, 9/10 granicą TMA Warszawa (jak na mapie PAŻP)
+# 8/9 granicą CTR Warszawa, 9/10 granicą TMA Warszawa (jak na mapie PAŻP); 3/4 i 4/9 przez lotniska EPIR i EPLY
 LINES = {
     "1/2": ["F1-2", "J1-2-3"],
     "2/3": ["J1-2-3", ("EPGD", 1775.7, 726.2), "J2-3-7-8"],
     "1/3": ["J1-2-3", (1461.6, 700.6), "J1-3-4"],
     "1/4": ["F1-4", "J1-3-4"],
     "2/7": ["F2-7", "J2-3-7-8"],
-    "3/4": ["J1-3-4", (1635.8, 947.8), "J3-4-8-9"],
+    "3/4": ["J1-3-4", (1635.8, 947.8), "@EPIR", "J3-4-8-9"],
     "3/8": ["J2-3-7-8", "J3-4-8-9"],
     "7/8": ["J2-3-7-8", (2236.5, 933.2), "@EPGY", (2682.3, 860.0), "F7-8"],
     "8/9": ["J3-4-8-9", (2011.4, 1088.2), (2191.3, 1175.2), "@EPBC", ("CTR EPWA", 2266.3, 1172.2),
@@ -103,13 +106,14 @@ LINES = {
 NUM = {1: (1478, 582.5), 2: (1506, 368.5), 3: (1606, 743.5), 4: (1228, 1045.5), 5: (1730, 1499.5), 6: (1421, 1701),
        7: (2455.5, 691.5), 8: (2392.5, 1051), 9: (2193.5, 1297.5), 10: (2706.5, 1302), 11: (1699.5, 1794.5),
        12: (2039, 2016), 13: (2276.5, 1722), 14: (2330, 1979.5), 15: (2662, 719.5), 16: (2656.5, 1040.5), 17: (2748, 1728)}
-# lotniska z METAR-em, z których bierzemy najniższe QNH rejonu: leżące w rejonie, a leżące na granicy (EPLY, EPLK, EPBC
-# w wierzchołkach linii) we wszystkich stykających się rejonach; rejony 6, 12 i 14 nie mają własnego lotniska
-# z METAR-em, więc biorą najbliższe (EPWR, EPKK, EPRZ); pasy 15–17 = wszystkie lotniska z METAR-em leżące w pasie
+# lotniska z METAR-em, z których bierzemy najniższe QNH rejonu: leżące w rejonie, a leżące na granicy (EPLY, EPLK, EPBC,
+# EPIR w wierzchołkach linii; na mapie PAŻP linia przechodzi przez symbol lotniska) we wszystkich stykających się
+# rejonach; rejony 6, 12 i 14 nie mają własnego lotniska z METAR-em, więc biorą najbliższe (EPWR, EPKK, EPRZ);
+# pasy 15–17 = wszystkie lotniska z METAR-em leżące w pasie
 AIRPORTS = {
     1: ["EPSC", "EPSN", "EPMI", "EPDA"],
     2: ["EPGD", "EPOK", "EPPR", "EPCE", "EPMB"],
-    3: ["EPBY"],
+    3: ["EPBY", "EPIR"],
     4: ["EPPO", "EPKS", "EPPW", "EPZG", "EPIR", "EPLY", "EPLK"],
     5: ["EPWR", "EPLK"],
     6: ["EPWR"],
@@ -130,6 +134,15 @@ BANDS = {15: (53.0, 90.0), 16: (51.0, 53.0), 17: (-90.0, 51.0)}
 # i "QNH FROM EPKK" pogrubiona linia z mapy PAŻP (od północnej granicy TMA do zachodniej); obszar lotniska = część,
 # w której leży lotnisko
 SPLIT = {("EPKT", "EPKK"): [(2017.6, 1600.0), (2015.0, 1681.7), (2012.3, 1768.3), (1913.3, 1839.3), (1780.0, 1839.3)]}
+
+# części TMA, których brak w pliku .ese: TMA -> grupa [ARTCC] pliku .sct z jej obrysem; do obszaru dochodzi część
+# obrysu, której nie pokrywa żadna warstwa TMA z pliku .ese (na dowolnej wysokości). TMA Łódź: w pliku .ese są
+# części A, B, D i E_W, a części C (północnej, przy TMA Warszawa) nie ma - leży tam tylko CTA03 (od 5500 ft)
+# i FIS, a na mapie PAŻP jest w obszarze "BELOW TMA QNH FROM EPLL". Pozostałe obrysy "… TMA OUT" sprawdzone:
+# ich części poza warstwami poniżej FL095 to górne części TMA (EPGD_UTMA, EPKK_TMA_W/E, EPLB_TMA_F, EPRZ_TMA_D,
+# EPPO_TMA_N_D, EPPO_TMA_S_G), a przy TMA Warszawa CTA01_N/S i EPWA_APP_S_G (od FL095) oraz CTA02_S - mapa PAŻP
+# ich nie zalicza do obszarów BELOW TMA (test_tma_covers_sct_outline w test_qnh.py)
+SCT_FILL = {"EPLL": "EPLL TMA OUT"}
 
 # MTMA wojskowe bez danych w plikach sektorowych: obrys z mapy PAŻP (piksele zrzutu, kolejne wierzchołki);
 # ("ICAO", x, y) = punkt na granicy TMA tego lotniska z pliku .ese (wspólny odcinek biegnie dokładnie po niej);
@@ -163,8 +176,8 @@ ESE_CTR = {
     "MCTR EPDE": ["EPDE_MCTR"], "CTR EPLB": ["EPLB_CTR"], "CTR EPWR": ["EPWR_CTR"],
     "CTR EPKT": ["EPKT_CTR08", "EPKT_CTR26"], "CTR EPKK": ["EPKK_CTR07", "EPKK_CTR25"], "CTR EPRZ": ["EPRZ_CTR"],
 }
-# MCTR wojskowe bez danych w plikach sektorowych: obrys przerywanej linii z mapy PAŻP (piksele zrzutu);
-# liczba = okrąg o tym promieniu (piksele) wokół lotniska
+# MCTR wojskowe bez danych w plikach sektorowych: obrys przerywanej linii (i szarego wypełnienia) z mapy PAŻP
+# (piksele zrzutu); liczba = okrąg o tym promieniu (piksele) wokół lotniska
 MIL_CTR = {
     "MCTR EPDA": [(1410.0, 441.7), (1451.7, 471.7), (1400.0, 530.0), (1370.0, 530.0), (1348.3, 515.0)],
     "MCTR EPOK": [(1728.3, 386.7), (1770.0, 378.3), (1866.7, 478.3), (1841.7, 500.0), (1793.3, 490.0),
@@ -176,7 +189,9 @@ MIL_CTR = {
     "MCTR EPSN": [(1245.0, 624.0), (1342.0, 646.0), (1398.3, 671.7), (1375.0, 723.3), (1336.7, 746.7),
                   (1306.7, 743.3), (1211.7, 698.3), (1235.0, 650.0)],
     "MCTR EPMI": [(1310.0, 753.3), (1401.7, 821.7), (1390.0, 846.0), (1320.0, 845.0), (1268.3, 806.7)],
-    "MCTR EPIR": 25.0,
+    # wydłużony ku EPIN (zachodnia część pod napisami EPIN i EPIR, wierzchołki z przedłużenia widocznych kresek)
+    "MCTR EPIR": [(1724.5, 993.0), (1739.5, 981.5), (1752.0, 974.5), (1782.0, 972.5), (1789.5, 983.5),
+                  (1757.0, 1020.5), (1745.0, 1020.5), (1727.0, 1006.5)],
     "MCTR EPPW": [(1611.7, 1070.7), (1721.7, 1116.0), (1701.7, 1186.0), (1618.3, 1156.7), (1570.7, 1122.7)],
     "MCTR EPLY": [(1874.0, 1228.0), (1925.0, 1236.0), (1930.0, 1262.0), (1905.0, 1272.0), (1872.0, 1262.0)],
     "MCTR EPLK": [(1860.0, 1345.0), (1930.0, 1369.3), (1980.0, 1390.0), (1961.7, 1459.3), (1836.7, 1421.3)],
@@ -204,8 +219,8 @@ UWAGA = ("Plik generuje scripts/trace_qnh_regions.py (opis źródeł w skrypcie)
          "napis 'EPxx QNH' (wtedy opis bez kodu), 'join' = "
          "lotniska z własnym napisem 'code' pod wspólnym opisem; 'chart_labels' = szare oznaczenia TMA/CTR ('lines' = "
          "wiersze); 'aero_labels' = strona kodu ICAO przy symbolu lotniska (domyślnie e). Brak nakładania napisów przy "
-         "1600x900 i 1366x768 sprawdza test_label_layout w backend/tests/test_qnh.py. 'note' = objaśnienie pod "
-         "tabelami (po angielsku).")
+         "oknach 1600x900, 1600x789, 1366x768 i 1366x657 sprawdza test_label_layout w backend/tests/test_qnh.py. "
+         "'note' = objaśnienie pod tabelami (po angielsku).")
 
 
 def _t(phi: float) -> float:
@@ -253,6 +268,22 @@ def fir_ring() -> list[tuple[float, float]]:
     segs = parse_line_groups(sections(read_text(SCT)).get("[ARTCC HIGH]", []))["FIR border 0 - EPWW"]
     polys = list(polygonize(unary_union([LineString([(a[1], a[0]), (b[1], b[0])]) for a, b in segs if a != b])))
     return list(max(polys, key=lambda p: p.area).exterior.coords)
+
+
+def sct_outline(name: str):
+    """Obszar ograniczony grupą linii [ARTCC] pliku .sct (np. "EPLL TMA OUT") jako wielokąt shapely bez dziur."""
+    from shapely.geometry import LineString, Polygon
+    from shapely.ops import polygonize, unary_union
+
+    sys.path.insert(0, str(ROOT))
+    from backend.app.importers.sct import parse_line_groups, read_text, sections
+
+    segs = parse_line_groups(sections(read_text(SCT)).get("[ARTCC]", [])).get(name)
+    if not segs:
+        sys.exit(f"Brak grupy {name!r} w sekcji [ARTCC] pliku {SCT.relative_to(ROOT)}")
+    faces = polygonize(unary_union([LineString([(a[1], a[0]), (b[1], b[0])]) for a, b in segs if a != b]))
+    g = unary_union(list(faces))
+    return unary_union([Polygon(p.exterior) for p in getattr(g, "geoms", [g])])
 
 
 def ese_sectors() -> list[dict]:
@@ -364,6 +395,18 @@ def tma_areas(cfg: dict, secs: list[dict], ads: dict):
         if not layers:
             sys.exit(f"{t['icao']}: brak sektorów {t['ese']} w pliku .ese")
         low[t["icao"]] = [(_poly(s["geometry"]), s["lower_ft"]) for s in layers]
+        if t["icao"] in SCT_FILL:
+            # część obrysu z pliku .sct, której nie ma w żadnej warstwie TMA z pliku .ese; dolna granica jak
+            # w warstwie, z którą ma najdłuższą wspólną granicę (cienka linia tylko tam, gdzie granica się zmienia)
+            every = unary_union([_poly(s["geometry"]) for s in secs
+                                 if s["fir"] == "EPWW" and s["name"].startswith(tuple(t["ese"]))])
+            gap = sct_outline(SCT_FILL[t["icao"]]).difference(every)
+            for q in getattr(gap, "geoms", [gap]):
+                if q.geom_type != "Polygon" or q.buffer(-0.002).is_empty:   # pomijamy drzazgi wzdłuż granic
+                    continue
+                edge = q.boundary.buffer(1e-4)
+                ft = max(low[t["icao"]], key=lambda pf: pf[0].boundary.intersection(edge).length)[1]
+                low[t["icao"]].append((Polygon(q.exterior), ft))
         areas[t["icao"]] = unary_union([p for p, _ in low[t["icao"]]])
         areas[t["icao"]] = unary_union([Polygon(p.exterior) for p in getattr(areas[t["icao"]], "geoms", [areas[t["icao"]]])])
     # TMA Kraków: część Katowic i część Krakowa
@@ -655,10 +698,12 @@ AERO_SIDES = ("e", "w", "se", "ne", "sw", "nw", "s", "n")
 
 
 def relayout(cfg: dict, ads: dict) -> None:
-    """Rozsuwa napisy przy oknie 1600x900 i 1366x768 (model services/qnh.py jak w test_qnh.py), tak żeby się nie
-    nakładały i, o ile się da, nie przecinały granic rejonów, linii 53°N/51°N i granicy FIR: numer rejonu z ramką QNH
-    (najpierw inna strona ramki, potem przesunięcie numeru do 15 px), opisy BELOW, kody 'code' i szare oznaczenia
-    przesunięte najmniej, jak się da, od miejsc z mapy PAŻP, kod ICAO lotniska na wolnej stronie symbolu."""
+    """Rozsuwa napisy we wszystkich domyślnych widokach (services.qnh.VIEWS, model jak w test_qnh.py), tak żeby się
+    nie nakładały: przesuwa tylko napisy, które nachodzą na inne (napis, który tylko przecina linię, zostaje na swoim
+    miejscu z mapy PAŻP), a nowe miejsce wybiera tak, żeby nie nachodziło na inne napisy i, o ile się da, nie
+    przecinało granic rejonów, linii 53°N/51°N, granicy FIR i obrysów TMA: numer rejonu z ramką QNH (najpierw inna
+    strona ramki, potem przesunięcie numeru do 15 px), opisy BELOW, kody 'code' i szare oznaczenia przesunięte
+    najmniej, jak się da, kod ICAO lotniska na wolnej stronie symbolu. Na pliku bez kolizji nic nie zmienia."""
     from shapely.geometry import MultiLineString
     from shapely.geometry import box as rect
     from shapely.prepared import prep
@@ -713,14 +758,17 @@ def relayout(cfg: dict, ads: dict) -> None:
         return hit, cross
 
     def place(key, variants, skip: tuple = ()) -> None:
-        """variants: (opis, funkcja ustawiająca wariant); wybór pierwszego bez kolizji i przecięć, inaczej najlepszego."""
+        """variants: (opis, funkcja ustawiająca wariant), pierwszy = obecne miejsce; wybór pierwszego (najbliższego)
+        bez kolizji i bez przecięć linii ponad te, które napis ma w obecnym miejscu, inaczej najlepszego."""
         fn = items.get(key)
         nbrs = near(key, cur[key])
-        best = None
+        best = base = None
         for i, (label, apply) in enumerate(variants):
             apply()
             own = boxes(*fn()) if fn else boxes({}, [next(a for a in ad_list() if a["icao"] == key[1])])
-            c = cost(own, nbrs, skip)
+            hit, cross = cost(own, nbrs, skip)
+            base = cross if base is None else base
+            c = (hit, max(0, cross - base))
             if best is None or c < best[0]:
                 best = (c, i, label, apply, own)
             if c == (0, 0):
@@ -738,23 +786,28 @@ def relayout(cfg: dict, ads: dict) -> None:
             return lambda: obj.__setitem__(field, _unpx(x0 + dx, y0 + dy, zooms[0]) if (dx or dy) else base)
         return [(f"{field} {dx:+.1f}, {dy:+.1f} px", at(dx, dy)) for dx, dy in offsets]
 
+    def clashes(key, skip: tuple = (), kind: str | None = None) -> bool:
+        """Czy napisy elementu (tylko rodzaju kind, np. 'code') nachodzą na inne (przecięcia linii nie liczą się:
+        napis z mapy PAŻP zostaje na miejscu)."""
+        own = [[b for b in mine if kind is None or b[0] == kind] for mine in cur[key]]
+        return cost(own, near(key, cur[key]), skip)[0] > 0
+
     # kolejność: opisy BELOW i kody 'code' (najbliżej miejsc z mapy PAŻP), szare oznaczenia, numery rejonów z ramką
     # QNH, kody lotnisk; w pierwszej rundzie każdy pomija napisy ustawiane po nim
     for rnd in range(4):
         later = lambda *kinds: kinds if rnd == 0 else ()  # noqa: E731
         for t in cfg["tmas"]:
             key = ("t", t["icao"])
-            if cost(cur[key], near(key, cur[key]), later("qnh", "aero")) != (0, 0):
-                for field in ("cap", "code"):
-                    if t.get(field):
-                        place(key, shifts(t, field, NUDGE), later("qnh", "aero"))
+            for field in ("cap", "code"):
+                if t.get(field) and clashes(key, later("qnh", "aero"), field):
+                    place(key, shifts(t, field, NUDGE), later("qnh", "aero"))
         for i, c in enumerate(cfg.get("chart_labels", [])):
             key = ("d", i)
-            if cost(cur[key], near(key, cur[key]), later("qnh", "aero")) != (0, 0):
+            if clashes(key, later("qnh", "aero")):
                 place(key, shifts(c, "lonlat", NUDGE), later("qnh", "aero"))
         for r in cfg["regions"]:
             key = ("r", r["id"])
-            if cost(cur[key], near(key, cur[key]), later("aero")) == (0, 0):
+            if not clashes(key, later("aero")):
                 continue
             keep = r.get("qnh_at", "e")
             order = (keep, *[s for s in NUM_SIDES if s != keep])
@@ -770,7 +823,7 @@ def relayout(cfg: dict, ads: dict) -> None:
             place(key, variants, later("aero"))
         for a in ad_list():
             key = ("a", a["icao"])
-            if cost(cur[key], near(key, cur[key])) == (0, 0):
+            if not clashes(key):
                 continue
             order = (a["label"], *[s for s in AERO_SIDES if s != a["label"]])
             place(key, [(f"kod {s}", lambda s=s, i=a["icao"]: sides.__setitem__(i, s)) for s in order])

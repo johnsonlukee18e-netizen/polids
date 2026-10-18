@@ -1,12 +1,14 @@
 """Mapa QNH regionalnego: plik data/seed/qnh_regions.json, services/qnh.py i endpoint /api/meteo/qnh-regions."""
 import csv
 import hashlib
+import importlib.util
 import json
 import math
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 os.environ.setdefault("POLIDS_DATABASE_URL",
@@ -27,6 +29,7 @@ ROOT = DATA_DIR.parent
 FRONT = ROOT / "frontend"
 CFG = json.loads((settings.seed_dir / "qnh_regions.json").read_text("utf-8"))
 SCT, ESE = DATA_DIR / "import" / "EPWW-Sector.sct", DATA_DIR / "import" / "EPWW-Sector.ese"
+SCRIPT = ROOT / "scripts" / "trace_qnh_regions.py"
 # obszary "BELOW TMA/MTMA QNH FROM EPxx" z mapy rejonów QNH z AIP Polska
 TMA_ICAOS = {"EPGD", "EPSN", "EPSC", "EPMI", "EPBY", "EPSY", "EPPO", "EPPW", "EPZG", "EPWA", "EPMM", "EPLL", "EPLK",
              "EPRA", "EPLB", "EPWR", "EPKT", "EPKK", "EPRZ", "EPMB", "EPDE"}
@@ -109,6 +112,14 @@ def _area(ring):
     return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(ring, ring[1:]))) / 2 * 0.6157
 
 
+def _script():
+    """Moduł scripts/trace_qnh_regions.py (stałe; shapely importuje dopiero w funkcjach)."""
+    spec = importlib.util.spec_from_file_location("trace_qnh_regions", SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _sha256(path) -> str:
     return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
@@ -164,6 +175,14 @@ def test_json_valid():
         assert c["name"].split()[0] in ("CTR", "MCTR", "CTR/MCTR") and c["src"] in ("ese", "chart")
         assert all(len(r) >= 4 and r[0] == r[-1] for r in _rings(c["geometry"]))
     assert {"CTR EPWA", "CTR EPKK", "MCTR EPMM"} <= {c["name"] for c in CFG["ctrs"]}
+    # MCTR z mapy PAŻP odrysowane wierzchołkami jak na mapie (nie okręgi wokół lotniska, np. wydłużony MCTR EPIR)
+    for c in CFG["ctrs"]:
+        if c["src"] == "chart":
+            assert all(4 <= len(r) - 1 <= 12 for r in _rings(c["geometry"])), c["name"]
+    # lotniska, przez których symbol przechodzi linia rejonów na mapie PAŻP, są w obu (wszystkich) rejonach
+    reg = {r["id"]: r["airports"] for r in CFG["regions"]}
+    for icao, ids in {"EPIR": (3, 4), "EPLY": (4, 9), "EPLK": (4, 5, 9), "EPBC": (8, 9)}.items():
+        assert all(icao in reg[i] for i in ids), icao
     # szare oznaczenia TMA/CTR z mapy AIP: 1-3 wiersze tekstu w punkcie [lon, lat]
     labels = CFG["chart_labels"]
     assert len(labels) > 30
@@ -202,9 +221,12 @@ def test_fir_from_sector_file():
 def test_tma_areas_from_sector_file():
     """Obszar TMA cywilnej = suma warstw pliku .ese poniżej FL095 o przedrostkach 'ese': środek każdej warstwy leży
     w obszarze (TMA Kraków podzielona na części Katowic i Krakowa: w jednej z nich), a obszar nie wychodzi poza
-    warstwy; cienkie linie części TMA leżą w swoim obszarze."""
+    warstwy (TMA z częścią spoza pliku .ese, SCT_FILL w skrypcie: poza warstwy i obrys TMA z pliku .sct); cienkie
+    linie części TMA leżą w swoim obszarze."""
     secs = [f for f in epww_features(ESE) if f["properties"]["fir"] == "EPWW"]
     tmas = {t["icao"]: t for t in CFG["tmas"]}
+    fill = _script().SCT_FILL
+    groups = parse_line_groups(sections(read_text(SCT)).get("[ARTCC]", [])) if fill and SCT.exists() else {}
     for t in CFG["tmas"]:
         if not t.get("ese"):
             continue
@@ -213,6 +235,7 @@ def test_tma_areas_from_sector_file():
         assert layers, t["icao"]
         areas = [tmas[i]["area"] for i in ({"EPKT", "EPKK"} if t["icao"] in ("EPKT", "EPKK") else {t["icao"]})]
         pts = [p for g in layers for ring in _rings(g) for p in ring]
+        pts += [(p[1], p[0]) for seg in groups.get(fill.get(t["icao"]), []) for p in seg]
         lo = (min(x for x, _ in pts) - 1e-4, min(y for _, y in pts) - 1e-4)
         hi = (max(x for x, _ in pts) + 1e-4, max(y for _, y in pts) + 1e-4)
         for g in layers:
@@ -227,6 +250,90 @@ def test_tma_areas_from_sector_file():
     for poly in CFG["overlaps"]["coordinates"]:
         p = _interior(poly[0])
         assert sum(_in_area(p, t["area"]) for t in CFG["tmas"]) >= 2, p
+
+
+# obrysy TMA z pliku .sct ([ARTCC] "… OUT") -> obszary BELOW TMA z pliku rejonów
+SCT_OUT = {"EPBY TMA OUT": ("EPBY",), "EPDE MTMA OUT": ("EPDE",), "EPGD TMA OUT": ("EPGD",),
+           "EPKK TMA OUT": ("EPKT", "EPKK"), "EPLB TMA OUT": ("EPLB",), "EPLL TMA OUT": ("EPLL",),
+           "EPPO TMA N OUT": ("EPPO",), "EPPO TMA S OUT": ("EPWR",), "EPRA TMA OUT": ("EPRA",),
+           "EPRZ TMA OUT": ("EPRZ",), "EPSC TMA OUT": ("EPSC",), "EPSY TMA OUT": ("EPSY",), "EPWA TMA OUT": ("EPWA",),
+           "EPZG TMA OUT": ("EPZG",)}
+
+
+@pytest.mark.skipif(not (SCT.exists() and ESE.exists()), reason="brak plików sektorowych")
+def test_tma_covers_sct_outline():
+    """Obszary BELOW TMA pokrywają obrysy TMA z pliku .sct ("… TMA OUT") co najmniej w 99% wszędzie tam, gdzie plik
+    .ese ma pod obrysem przestrzeń kontrolowaną poniżej FL095 (TMA, CTR, CTA; bez FIS, ATZ i TRA): obrys obejmuje też
+    górne części TMA (np. EPGD_UTMA od FL095), których mapa PAŻP nie zalicza do BELOW TMA. TMA, której cały obrys leży
+    poniżej FL095 (np. TMA Łódź z częścią C, której nie ma w pliku .ese), pokrywa go własnym obszarem."""
+    pytest.importorskip("shapely")
+    from shapely.geometry import LineString, Polygon, shape
+    from shapely.ops import polygonize, unary_union
+
+    def solid(g):
+        g = g.buffer(0)
+        return unary_union([Polygon(p.exterior) for p in getattr(g, "geoms", [g])])
+
+    groups = parse_line_groups(sections(read_text(SCT)).get("[ARTCC]", []))
+    assert {n for n in groups if n.endswith(" OUT")} == set(SCT_OUT)
+    low = unary_union([solid(shape(f["geometry"])) for f in epww_features(ESE)
+                       if f["properties"]["fir"] == "EPWW" and f["properties"]["lower_ft"] < LOW_FT
+                       and not re.match(r"(FIS|WAW_FIS|EPWW|EPTR)", f["properties"]["name"])
+                       and "_ATZ" not in f["properties"]["name"]])
+    tmas = {t["icao"]: shape(t["area"]) for t in CFG["tmas"]}
+    every = unary_union(list(tmas.values()))
+    for name, icaos in SCT_OUT.items():
+        lines = [LineString([(a[1], a[0]), (b[1], b[0])]) for a, b in groups[name] if a != b]
+        out = solid(unary_union(list(polygonize(unary_union(lines)))))
+        need = out.intersection(low)
+        assert need.intersection(every).area / need.area > 0.99, name
+        if need.area / out.area > 0.99:
+            own = unary_union([tmas[i] for i in icaos])
+            assert out.intersection(own).area / out.area > 0.99, name
+
+
+# pola z geometrią (porównywane polem różnicy symetrycznej, nie bajtami: inna wersja GEOS może zacząć pierścień
+# w innym wierzchołku)
+GEOM = {"geometry", "area", "parts", "overlaps", "fir"}
+
+
+def _run_script(tmp_path, *args) -> dict:
+    out = tmp_path / ("qnh" + "".join(args) + ".json")
+    r = subprocess.run([sys.executable, str(SCRIPT), "--out", str(out), *args], capture_output=True, text=True,
+                       timeout=600, cwd=ROOT)
+    assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
+    return json.loads(out.read_text("utf-8"))
+
+
+def _same(a, b, path="") -> None:
+    """Ten sam plik rejonów: pola bez geometrii równe, geometria ta sama (różnica symetryczna ~0)."""
+    from shapely.geometry import shape
+
+    if isinstance(a, dict) and isinstance(b, dict):
+        assert set(a) == set(b), path
+        for k in a:
+            if k in GEOM and a[k] is not None and b[k] is not None:
+                ga, gb = shape(a[k]), shape(b[k])
+                assert ga.symmetric_difference(gb).length < 1e-6 if ga.area == 0 else \
+                    ga.symmetric_difference(gb).area < 1e-9, f"{path}.{k}"
+            else:
+                _same(a[k], b[k], f"{path}.{k}")
+    elif isinstance(a, list) and isinstance(b, list):
+        assert len(a) == len(b), path
+        for i, (x, y) in enumerate(zip(a, b)):
+            _same(x, y, f"{path}[{i}]")
+    else:
+        assert a == b, path
+
+
+@pytest.mark.skipif(not (SCT.exists() and ESE.exists()), reason="brak plików sektorowych")
+def test_script_reproduces_seed(tmp_path):
+    """Skrypt odtwarza zapisany plik rejonów (zmiany geometrii tylko przez skrypt), a --layout na zapisanym pliku nic
+    nie zmienia: przesuwa tylko napisy, które na coś nachodzą, a w zapisanym pliku żadne nie nachodzą."""
+    pytest.importorskip("shapely")
+    plain = _run_script(tmp_path)
+    _same(plain, CFG)
+    assert _run_script(tmp_path, "--layout") == plain
 
 
 def test_region_lines_follow_tma():
@@ -305,19 +412,43 @@ def test_region_airports_inside():
 @pytest.mark.parametrize("view", qnh.VIEWS)
 def test_label_layout(view):
     """Napisy mapy (numery rejonów z ramką QNH, opisy BELOW … QNH FROM z QNH, kody 'code', szare oznaczenia,
-    symbole i kody lotnisk) nie nachodzą na siebie w obu domyślnych widokach. Miejsca poprawia się ręcznie
+    symbole i kody lotnisk) nie nachodzą na siebie w każdym domyślnym widoku (także przy oknie przeglądarki
+    1366x657 i 1600x789, czyli ekranie 1366x768 i 1600x900 z paskami przeglądarki). Miejsca poprawia się ręcznie
     w qnh_regions.json albo skryptem (python scripts/trace_qnh_regions.py --layout); ten test pilnuje układu."""
-    boxes = qnh.label_boxes(CFG, _drawn(), qnh.VIEWS[view])
+    zoom = qnh.VIEWS[view]
+    assert not qnh.far(zoom, zoom)   # domyślny widok ma wszystkie napisy
+    boxes = qnh.label_boxes(CFG, _drawn(), zoom)
     kinds = {k for k, _, _ in boxes}
     assert kinds == {"num", "qnh", "cap", "code", "des", "sym", "aero"}
     assert qnh.overlaps(boxes) == []
+    # numer rejonu i ramka z QNH rejonu w swoim rejonie (ramka po drugiej stronie linii czytałaby się jako QNH
+    # sąsiedniego rejonu): środek i co najmniej 3 narożniki prostokąta w rejonie
+    for r in CFG["regions"]:
+        rings = [[qnh.px(*c, zoom) for c in ring] for ring in _rings(r["geometry"])]
+        for k, n, (x0, y0, x1, y1) in boxes:
+            if n == str(r["id"]) and k in ("num", "qnh"):
+                pts = [((x0 + x1) / 2, (y0 + y1) / 2), (x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+                inside = [sum(_inside(x, y, ring) for ring in rings) % 2 == 1 for x, y in pts]
+                assert inside[0] and sum(inside[1:]) >= 3, (view, r["id"], k)
+    # wspólny opis (TMA Kraków: BELOW TMA / QNH FROM) nad kodami z QNH: każdy kod w całości pod opisem, żeby
+    # nie czytał się w jednym wierszu z "QNH FROM" (jak EPKT / EPKK pod opisem na mapie PAŻP)
+    caps = {n: r for k, n, r in boxes if k == "cap"}
+    for t in CFG["tmas"]:
+        for code in [t["icao"], *t.get("join", [])] if t.get("join") else []:
+            r = next(r for k, n, r in boxes if k == "code" and n == code)
+            assert r[1] >= caps[t["icao"]][3], (view, code)
 
 
 def test_label_model():
     """Model napisów: skala jak labelScale() w qnhmap.js, ramki po stronach numeru / symbolu, kolizje."""
     assert qnh.scale(7.5) == 1 and qnh.scale(8.5) == 1
-    assert qnh.scale(7.2) == pytest.approx(2 ** -0.3) and qnh.scale(7.16) == qnh.QR_MIN
-    assert qnh.scale(7.0) == pytest.approx(2 ** -0.5) and qnh.scale(5.5) == qnh.QR_MIN_FAR
+    assert qnh.scale(7.2) == pytest.approx(2 ** -0.3) and qnh.scale(7.0) == pytest.approx(2 ** -0.5)
+    assert qnh.scale(6.9) == qnh.QR_MIN == 0.7 and qnh.scale(5.5) == qnh.QR_MIN
+    # widok "z daleka" względem zoomu dopasowanego do okna (nie wyżej niż 7,5): przy 1366x657 (zoom 7,0) domyślny
+    # widok ma napisy, jedno "−" (0,5) już nie; na dużym ekranie (7,7) dopiero poniżej 7,2
+    assert not qnh.far(7.0, 7.0) and qnh.far(6.5, 7.0) and not qnh.far(6.75, 7.0)
+    assert not qnh.far(7.2, 7.5) and qnh.far(7.0, 7.5)
+    assert not qnh.far(7.4, 7.7) and not qnh.far(7.2, 7.7) and qnh.far(7.1, 7.7)
     x0, y0, x1, y1 = qnh._side(0, 0, 10, 5, 30, 12, "e", 2)
     assert (x0, y0, x1, y1) == (12, -6, 42, 6)
     assert qnh._side(0, 0, 10, 5, 30, 12, "n", 2) == (-15, -19, 15, -7)
@@ -351,15 +482,29 @@ def test_label_model_matches_css():
     assert re.search(r"\.qr-aero\.ctl i \{[^}]*width: 9px; height: 9px", css) and qnh.SYM == 9
     assert ".qr-aero.s-e span, .qr-aero.s-ne span, .qr-aero.s-se span { left: 6.5px; }" in css   # 4,5 + 2 px
     js = (FRONT / "js" / "qnhmap.js").read_text("utf-8")
-    m = re.search(r"const QR_ZOOM = ([\d.]+), QR_FAR = ([\d.]+), QR_MIN = ([\d.]+), QR_MIN_FAR = ([\d.]+);", js)
-    assert m and tuple(map(float, m.groups())) == (qnh.QR_ZOOM, qnh.QR_FAR, qnh.QR_MIN, qnh.QR_MIN_FAR)
+    m = re.search(r"const QR_ZOOM = ([\d.]+), QR_FAR = ([\d.]+), QR_MIN = ([\d.]+);", js)
+    assert m and tuple(map(float, m.groups())) == (qnh.QR_ZOOM, qnh.QR_FAR, qnh.QR_MIN)
+
+
+def test_fir_line_and_band_count_css():
+    """Granica FIR jedną linią w kolorze z mapy PAŻP (bez zielonego rdzenia i pomarańczowej podkładki), a w tabeli
+    pasów 15-17 "of N AD" w jednym wierszu (bez samego "AD" w drugim)."""
+    css = (FRONT / "css" / "qnh.css").read_text("utf-8")
+    js = (FRONT / "js" / "qnhmap.js").read_text("utf-8")
+    assert "qr-fcase" not in css + js and "qr-fcore" not in css + js
+    assert re.search(r"--qr-fir: #[0-9a-f]{6};", css)
+    assert re.search(r"\.qrmap path\.qr-fir \{ stroke: var\(--qr-fir\);[^}]*\}", css)
+    assert 'geo(data.fir, "qfir", "qr-fir", layers.base, { fill: false });' in js
+    assert '<span class="nil of">of ${r.stations.length} AD</span>' in js
+    assert re.search(r"\.qrside td\.sta \.of \{ white-space: nowrap; \}", css)
 
 
 QNHMAP_SCRIPT = r"""
 const m = await import(process.argv[2]);
 const t = { icao: "EPGD", below: "TMA", qnh: 1012 };
 console.log(JSON.stringify({
-  scale: [7.5, 8.5, 7.2, 7.16, 7.0, 5.5].map(m.labelScale),
+  scale: [7.5, 8.5, 7.2, 7.0, 6.9, 5.5].map(m.labelScale),
+  far: [[7.0, 7.0], [6.5, 7.0], [6.75, 7.0], [7.2, 7.5], [7.0, 7.5], [7.4, 7.7], [7.1, 7.7]].map(([z, f]) => m.isFar(z, f)),
   cap: [m.captionHtml(t), m.captionHtml({ ...t, qnh: null, stack: true }), m.captionHtml({ ...t, code: [19, 50] })],
   code: m.codeHtml({ icao: "EPKT", qnh: 1013 }),
 }));
@@ -379,7 +524,9 @@ def test_qnhmap_js(tmp_path):
                        text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
-    assert out["scale"] == pytest.approx([qnh.scale(z) for z in (7.5, 8.5, 7.2, 7.16, 7.0, 5.5)])
+    assert out["scale"] == pytest.approx([qnh.scale(z) for z in (7.5, 8.5, 7.2, 7.0, 6.9, 5.5)])
+    far = [(7.0, 7.0), (6.5, 7.0), (6.75, 7.0), (7.2, 7.5), (7.0, 7.5), (7.4, 7.7), (7.1, 7.7)]
+    assert out["far"] == [qnh.far(z, f) for z, f in far] == [False, True, False, False, True, False, True]
     assert out["cap"] == ['<span>BELOW TMA</span><span>QNH FROM EPGD <b class="q">1012</b></span>',
                           '<span>BELOW TMA</span><span>QNH FROM EPGD</span><span><b class="q nil">----</b></span>',
                           "<span>BELOW TMA</span><span>QNH FROM</span>"]
@@ -418,7 +565,8 @@ def test_endpoint_regions_and_tmas(client, monkeypatch):
         assert r["qnh"] == (min(vals) if vals else None) and r["max"] == (max(vals) if vals else None)
         assert [s["icao"] for s in r["stations"]] == r["airports"]
         assert r["num"] and r.get("qnh_at", "e") in qnh.SIDES
-    assert next(r for r in q["regions"] if r["id"] == 3)["qnh"] is None   # tylko EPBY, bez METAR-u
+    # rejon 3: EPBY bez METAR-u, więc QNH z EPIR (na linii 3/4)
+    assert next(r for r in q["regions"] if r["id"] == 3)["qnh"] == fake_qnh("EPIR")
     # pasy awaryjne: najniższe QNH wszystkich lotnisk pasa
     band = next(r for r in q["regions"] if r["id"] == 16)
     assert band["band"] and band["qnh"] == min(fake_qnh(a) for a in band["airports"] if a != "EPBY")

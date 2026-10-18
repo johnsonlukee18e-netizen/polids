@@ -121,10 +121,14 @@ async def regions(db: Session, get_metars) -> dict:
 # Odwzorowanie jak lccCrs() w qnhmap.js: stożkowe Lamberta na kuli R, stała stożka 0,798, południk 19°E,
 # r0 na 52°N, skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
 LCC_R, LCC_N = 6378137, 0.798
-# zoom domyślnego widoku (cały FIR) przy oknie 1600x900 i 1366x768; skala napisów jak labelScale() w qnhmap.js
-# (--k w CSS: 2^(zoom − 7,5), nie mniej niż 80%, poniżej QR_FAR 70%); odstęp między napisami w px
-VIEWS = {"1600x900": 7.5, "1366x768": 7.2}
-QR_ZOOM, QR_FAR, QR_MIN, QR_MIN_FAR = 7.5, 7.15, 0.8, 0.7
+# zoom domyślnego widoku (cały FIR dopasowany do mapy, fitBounds w qnhmap.js) przy oknie przeglądarki 1600x900
+# i 1366x768 (pełny ekran) oraz 1600x789 i 1366x657 (ekran 1600x900 i 1366x768 z paskami przeglądarki); skala napisów
+# jak labelScale() w qnhmap.js (--k w CSS: 2^(zoom − 7,5), nie mniej niż 70%, więc w każdym z tych widoków napisy
+# maleją razem z mapą); widok "z daleka" (bez kodów lotnisk, opisów BELOW i szarych oznaczeń) dopiero QR_FAR poniżej
+# zoomu dopasowanego do okna (far(), isFar() w qnhmap.js), więc domyślny widok ma zawsze wszystkie napisy;
+# odstęp między napisami w px
+VIEWS = {"1600x900": 7.5, "1600x789": 7.3, "1366x768": 7.2, "1366x657": 7.0}
+QR_ZOOM, QR_FAR, QR_MIN = 7.5, 0.3, 0.7
 GAP = 1.0
 # czcionka o stałej szerokości: Consolas 0,55 em, zastępcze Liberation Mono / DejaVu Sans Mono 0,6 em (model bierze
 # szerszą, więc w Consolas odstępy tylko rosną)
@@ -152,7 +156,13 @@ def px(lon: float, lat: float, zoom: float) -> tuple[float, float]:
 
 def scale(zoom: float) -> float:
     """Skala napisów jak labelScale() w qnhmap.js."""
-    return min(1.0, max(QR_MIN_FAR if zoom < QR_FAR else QR_MIN, 2 ** (zoom - QR_ZOOM)))
+    return min(1.0, max(QR_MIN, 2 ** (zoom - QR_ZOOM)))
+
+
+def far(zoom: float, fit: float) -> bool:
+    """Widok "z daleka" jak isFar() w qnhmap.js: zoom ponad QR_FAR poniżej dopasowanego do okna (nie wyżej niż
+    QR_ZOOM, więc na dużym ekranie dopiero poniżej widoku 1600x900)."""
+    return zoom < min(fit, QR_ZOOM) - QR_FAR
 
 
 def _side(cx: float, cy: float, hw: float, hh: float, w: float, h: float, side: str, gap: float) -> tuple:

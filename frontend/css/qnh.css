@@ -1,6 +1,6 @@
 /* METEO › QNH: mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP): biały podkład, siatka, zielone granice
-   rejonów na jasnoniebieskiej otoczce, pomarańczowe pasy 15–17, granica FIR (zielona na pomarańczowej, z daleka
-   oliwkowa jak na mapie), liliowe TMA/MTMA z ciemnym obrysem, CTR/MCTR ciemniejsze z przerywanym obrysem, czarne
+   rejonów na jasnoniebieskiej otoczce, pomarańczowe pasy 15–17, granica FIR (jedna oliwkowa linia jak na mapie),
+   liliowe TMA/MTMA z ciemnym obrysem, CTR/MCTR ciemniejsze z przerywanym obrysem, czarne
    opisy BELOW, szare oznaczenia TMA/CTR, duże numery rejonów z QNH w małej ramce i panel boczny z tabelami.
    Ostre rogi (zaokrąglone tylko kółka lotnisk), bez poświaty i cieni pod tekstem. Wymiary napisów (czcionka, wiersz,
    ramki, odstępy) zgadzają się z modelem w backend/app/services/qnh.py (test nakładania w test_qnh.py). */
@@ -8,9 +8,10 @@
   --qr-paper: #fff;            /* podkład mapy */
   --qr-grid: #c3c7cc;          /* siatka 1° i kreski co 10′ */
   --qr-coast: #c8ccd1;         /* linia brzegowa (szara jak na mapie) */
-  --qr-case: #c2d9ec;          /* jasnoniebieska otoczka granic rejonów i FIR */
+  --qr-case: #c2d9ec;          /* jasnoniebieska otoczka granic rejonów */
   --qr-reg: #30964e;           /* granice i numery rejonów 1–14 */
-  --qr-band: #e47e12;          /* linie 53°N i 51°N, numery pasów 15–17, granica FIR */
+  --qr-band: #e47e12;          /* linie 53°N i 51°N, numery pasów 15–17 */
+  --qr-fir: #a18f37;           /* granica FIR: średni kolor pikseli linii FIR na mapie PAŻP (oliwkowy) */
   --qr-tma: #e4d8ea;           /* wypełnienie TMA/MTMA (liliowe) */
   --qr-tma-over: #c9b9d6;      /* część wspólna dwóch obszarów (np. TMA EPGD i MTMA EPMB) */
   --qr-tma-edge: #262330;      /* obrys obszaru "BELOW … QNH FROM" */
@@ -39,9 +40,7 @@
 .qrmap path.qr-rcase { stroke: var(--qr-case); stroke-width: 4.5; stroke-linejoin: round; }
 .qrmap path.qr-rline { stroke: var(--qr-reg); stroke-width: 1.6; stroke-linejoin: round; }
 .qrmap path.qr-bline { stroke: var(--qr-band); stroke-width: 3.2; }
-.qrmap path.qr-fcase { stroke: var(--qr-case); stroke-width: 5.5; stroke-linejoin: round; }
-.qrmap path.qr-fir { stroke: var(--qr-band); stroke-width: 3.8; stroke-linejoin: round; }
-.qrmap path.qr-fcore { stroke: var(--qr-reg); stroke-width: 1.5; stroke-linejoin: round; }
+.qrmap path.qr-fir { stroke: var(--qr-fir); stroke-width: 3.4; stroke-linejoin: round; }
 .qrmap path.qr-hl { stroke: #0b6fd1; stroke-width: 3; fill: #0b6fd1; fill-opacity: .1; }
 
 /* opisy stopni siatki przy krawędziach (długość u góry, szerokość z lewej i prawej) */
@@ -51,7 +50,7 @@
 .qr-grat span.lat { transform: translateY(-50%); }
 
 /* ikony divIcon: napis wyśrodkowany w punkcie z pliku, przy zoomie mniejszym od domyślnego maleje razem z mapą
-   (--k: 2^(zoom − 7,5), nie mniej niż 80%, po oddaleniu 70%) */
+   (--k: 2^(zoom − 7,5), nie mniej niż 70%) */
 .leaflet-marker-icon.qr-icon { background: none; border: 0; }
 .qr-icon > div { position: absolute; left: 0; top: 0; white-space: nowrap; transform: translate(-50%, -50%) scale(var(--k)); }
 
@@ -130,6 +129,7 @@
 .qrside table.data td.sta { font: 11px/1.45 var(--mono); color: var(--muted); }
 .qrside td.sta .low { color: var(--text); }
 .qrside td.sta .nil { color: #555c55; }
+.qrside td.sta .of { white-space: nowrap; }   /* "of 17 AD" w jednym wierszu */
 .qrside tr.band td { color: var(--muted); }
 .qrside tr.band td.q { color: var(--qr-band); }
 .qrside tr[data-r], .qrside tr[data-t] { cursor: default; }

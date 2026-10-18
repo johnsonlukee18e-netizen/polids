@@ -1,6 +1,6 @@
 // METEO › QNH: mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP): biały podkład bez kafelków
 // w odwzorowaniu stożkowym (południki zbiegają się ku północy jak na mapie AIP), siatka co 1° z kreskami co 10′
-// i opisami stopni, granica FIR EPWW (zielona linia na pomarańczowej, jak na mapie), rejony 1–14 (zielone granice
+// i opisami stopni, granica FIR EPWW (jedna oliwkowa linia w kolorze z mapy), rejony 1–14 (zielone granice
 // i numery), pasy awaryjne 15–17 (pomarańczowe linie 53°N i 51°N), TMA/MTMA (liliowe, pogrubiony obrys i cienkie
 // linie części TMA), CTR/MCTR (ciemniejsze, przerywany obrys), czarne opisy "BELOW TMA QNH FROM EPxx" z QNH lotniska,
 // szare oznaczenia przestrzeni (TMA EPGD, MCTR EPOK…), lotniska (kółko z kropką = z METAR-em, romb = pozostałe)
@@ -11,12 +11,15 @@ import { api, esc, h, ONLINE_EVENT } from "./api.js";
 const QR_LAYERS = [["tma", "TMA/MTMA"], ["ctr", "CTR/MCTR"], ["ad", "Aerodromes"], ["cap", "Captions"],
   ["des", "Designators"]];
 // zoom, dla którego dobrano miejsca napisów z JSON-a (mapa 960x900 przy oknie 1600x900, cały FIR): przy mniejszym
-// napisy maleją razem z mapą (--k w CSS, nie mniej niż QR_MIN; przy 1366x768 zoom 7,2 i napisy 81%, jak mapa);
-// poniżej QR_FAR (już jedno "−" od widoku 1600x900 albo jeden ząbek kółka od widoku 1366x768) bez kodów lotnisk,
-// opisów BELOW i szarych oznaczeń, a numery z ramkami QNH do 70%. Ten sam model rozmiarów: services/qnh.py (test
-// nakładania).
-const QR_ZOOM = 7.5, QR_FAR = 7.15, QR_MIN = 0.8, QR_MIN_FAR = 0.7;
-export const labelScale = (z) => Math.min(1, Math.max(z < QR_FAR ? QR_MIN_FAR : QR_MIN, 2 ** (z - QR_ZOOM)));
+// napisy maleją razem z mapą (--k w CSS, nie mniej niż QR_MIN: przy oknie 1366x657, czyli ekranie 1366x768 z paskami
+// przeglądarki, zoom 7,0 i napisy 71%, jak mapa); widok "z daleka" (bez kodów lotnisk, opisów BELOW i szarych
+// oznaczeń) dopiero ponad QR_FAR poniżej zoomu dopasowanego do okna (jedno "−" albo ząbek kółka od widoku
+// domyślnego), więc domyślny widok przy każdym oknie ma wszystkie napisy. Ten sam model rozmiarów: services/qnh.py
+// (test nakładania).
+const QR_ZOOM = 7.5, QR_FAR = 0.3, QR_MIN = 0.7;
+export const labelScale = (z) => Math.min(1, Math.max(QR_MIN, 2 ** (z - QR_ZOOM)));
+// fit: zoom, przy którym cały FIR mieści się w oknie mapy (na dużym ekranie liczy się widok 1600x900)
+export const isFar = (z, fit) => z < Math.min(fit, QR_ZOOM) - QR_FAR;
 
 // odwzorowanie stożkowe wiernokątne Lamberta (kula) jak na mapie AIP: południk środkowy 19°E, stała stożka 0,798
 // (styczne na ok. 53°N, wartość dopasowana do siatki mapy PAŻP); skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
@@ -117,10 +120,13 @@ export function qnhMap(pane) {
     $(".qr-grat").innerHTML = out;
   };
   map.on("move zoom resize", grat);
+  // obszar widoku domyślnego (przed wczytaniem danych prostokąt wokół FIR, potem granica FIR) i odstęp od brzegów
+  let home = L.latLngBounds([49, 14.1], [55.85, 24.15]);
+  const PAD = [4, 4];
   const scaleLabels = () => {
-    const z = map.getZoom();
+    const z = map.getZoom(), fit = map.getBoundsZoom(home, false, L.point(PAD).multiplyBy(2));
     wrap.style.setProperty("--k", labelScale(z).toFixed(3));
-    wrap.classList.toggle("qr-far", z < QR_FAR);
+    wrap.classList.toggle("qr-far", isFar(z, fit));
   };
   map.on("zoomend", scaleLabels);
 
@@ -145,7 +151,7 @@ export function qnhMap(pane) {
     (data.ctrs || []).forEach((c) => geo(c.geometry, "qtma", "qr-ctr", layers.ctr, { fillOpacity: 1 }));
     if (data.coast) geo(data.coast, "qgrid", "qr-coast", layers.base);
     // granice rejonów (zielone na jasnoniebieskiej otoczce jak na mapie AIP), z obrysów pasów 15–17 tylko pomarańczowe
-    // linie 53°N i 51°N (reszta obrysu to granica FIR, a szersza linia pasa wystawałaby spod niej) i FIR
+    // linie 53°N i 51°N (reszta obrysu to granica FIR, a szersza linia pasa wystawałaby spod niej) i FIR (jedna linia)
     const reg = data.regions.filter((r) => !r.band);
     ["qr-rcase", "qr-rline"].forEach((c) => reg.forEach((r) => geo(r.geometry, "qreg", c, layers.base, { fill: false })));
     const par = [];
@@ -157,7 +163,7 @@ export function qnhMap(pane) {
         flush();
       });
     if (par.length) L.polyline(par, { pane: "qband", interactive: false, className: "qr-bline" }).addTo(layers.base);
-    ["qr-fcase", "qr-fir", "qr-fcore"].forEach((c) => geo(data.fir, "qfir", c, layers.base, { fill: false }));
+    geo(data.fir, "qfir", "qr-fir", layers.base, { fill: false });
 
     // numery rejonów (15–17 pomarańczowe jak na mapie AIP) z ramką QNH rejonu po stronie 'qnh_at'
     data.regions.forEach((r) => mark(r.num, div(`qr-num${r.band ? " band" : ""}`,
@@ -208,7 +214,7 @@ export function qnhMap(pane) {
     const st = (s, low) => `<span class="${s.qnh === null ? "nil" : s.qnh === low ? "low" : ""}">${esc(s.icao)}&nbsp;${s.qnh ?? "–"}</span>`;
     const sta = (r) => (!r.band ? r.stations.map((s) => st(s, r.qnh)).join(" ")
       : `${r.stations.filter((s) => s.qnh !== null && s.qnh === r.qnh).slice(0, 2).map((s) => st(s, r.qnh)).join(" ") || "–"}
-        <span class="nil">of ${r.stations.length} AD</span>`);
+        <span class="nil of">of ${r.stations.length} AD</span>`);
     hot = null;
     $(".qr-reg").innerHTML = `<thead><tr><th>Reg</th><th>QNH</th><th>mmHg</th><th>inHg</th><th>Aerodromes</th></tr></thead><tbody>${data.regions.map((r) =>
       `<tr data-r="${esc(r.id)}"${r.band ? ` class="band" title="Region ${esc(r.id)}: backup band ${BAND[r.id] || ""}, issued only when the IMGW model fails; here the lowest QNH of ${r.stations.length} band aerodromes"` : ""}>
@@ -220,7 +226,7 @@ export function qnhMap(pane) {
   };
 
   // widok od razu (także gdy API nie odpowiada), po pierwszym wczytaniu dopasowany do granicy FIR
-  map.fitBounds(L.latLngBounds([49, 14.1], [55.85, 24.15]), { padding: [4, 4] });
+  map.fitBounds(home, { padding: PAD });
   scaleLabels();
   let fitted = false, dead = false;
   const load = async () => {
@@ -229,7 +235,8 @@ export function qnhMap(pane) {
     if (dead) return;   // zakładka zamknięta w trakcie pobierania
     data = d;
     draw();
-    if (!fitted && data.fir) map.fitBounds(L.geoJSON(data.fir).getBounds(), { padding: [4, 4], animate: false });
+    if (data.fir) home = L.geoJSON(data.fir).getBounds();
+    if (!fitted && data.fir) map.fitBounds(home, { padding: PAD, animate: false });
     fitted = true;
     scaleLabels();
     grat();
@@ -242,7 +249,8 @@ export function qnhMap(pane) {
   const timer = setInterval(load, 300000);
   const online = () => $(".qr-err").textContent && load();   // serwer wrócił, a na mapie jest komunikat błędu
   window.addEventListener(ONLINE_EVENT, online);
-  const ro = new ResizeObserver(() => { map.invalidateSize(); grat(); });
+  // zmiana okna: inny zoom dopasowany do FIR, więc i granica widoku "z daleka"
+  const ro = new ResizeObserver(() => { map.invalidateSize(); grat(); scaleLabels(); });
   ro.observe($(".qrmap"));
   return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); ro.disconnect(); map.remove(); } };
 }
