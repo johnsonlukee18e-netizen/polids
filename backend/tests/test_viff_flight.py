@@ -81,7 +81,7 @@ def test_scenario_normalisation_and_label():
     assert s[2]["active"] and s[2]["times"] == [{"from": "1800", "to": "2000", "date": None}] and s[2]["start"] is None
     assert viff._times([["2026-10-07", "0600", "0900"]]) == [{"from": "0600", "to": "0900", "date": "2026-10-07"}]
     assert [viff.tv_label(t) for t in ("EP-BH", "EP-WATMA", "EP-KKTMAD", "EP-ALLFIR", "EP-SFIR2", "EP-XYZ")] == [
-        "sektor B górny", "TMA EPWA", "TMA EPKK (D)", "cały FIR", "FIR południe 2", "kombinacja sektorów"]
+        "sector B upper", "TMA EPWA", "TMA EPKK (D)", "whole FIR", "FIR south 2", "sector combination"]
 
 
 def test_history_level_and_profile():
@@ -184,7 +184,7 @@ def test_flight_endpoint(client):
     r = client.get("/api/viff/flight/lot3827")
     assert r.status_code == 200 and r.json()["callsign"] == "LOT3827" and r.json()["states"]["AA"].startswith("AA")
     r = client.get("/api/viff/flight/ABC123")
-    assert r.status_code == 404 and "vIFF nie zna lotu ABC123" in r.json()["detail"]
+    assert r.status_code == 404 and "vIFF does not know flight ABC123" in r.json()["detail"]
     for bad in ("X", "LOT-1", "ABCDEFGHIJK"):
         assert client.get(f"/api/viff/flight/{bad}").status_code == 400
     viff._get = fake({"/ifps/callsign": UpstreamError("timeout")})

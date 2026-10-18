@@ -25,11 +25,11 @@ from .http_cache import UpstreamError, fetch_text
 # Stan lotu jak w liście lotów NM (kody flight state z komunikatów EFD), wyliczany z pól vIFF.
 # vIFF ustawia ATC_ACTIV w chwili AOBT, więc to jest "AA"; lot w powietrzu bez ATC_ACTIV = "TA".
 FLIGHT_STATES = {
-    "FI": "FI: plan złożony (filed), bez slotu",
-    "SI": "SI: slot wydany (slot issued, CTOT)",
-    "SU": "SU: lot zawieszony (suspended, FLS)",
-    "AA": "AA: aktywowany przez ATC (ATC activated, AOBT)",
-    "TA": "TA: aktywowany po starcie (tact activated, ATOT)",
+    "FI": "FI: filed, no slot",
+    "SI": "SI: slot issued (CTOT)",
+    "SU": "SU: suspended (FLS)",
+    "AA": "AA: ATC activated (AOBT)",
+    "TA": "TA: TACT activated after take-off (ATOT)",
 }
 
 
@@ -327,20 +327,20 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
 
 # --- jeden lot: plan, CDM, ATFCM, historia i wejścia w sektory (jak szczegóły lotu w NM UI)
 
-BAND = {"H": "górny", "M": "środkowy", "L": "dolny"}
-FIR_PART = {"ALLFIR": "cały FIR", "NFIR": "FIR północ", "SFIR": "FIR południe"}
+BAND = {"H": "upper", "M": "middle", "L": "lower"}
+FIR_PART = {"ALLFIR": "whole FIR", "NFIR": "FIR north", "SFIR": "FIR south"}
 
 
 def tv_label(tv: str) -> str:
-    """Opis traffic volume po polsku, ta sama logika co tvLabel w viffchart.js."""
+    """Opis traffic volume (po angielsku), ta sama logika co tvLabel w viffchart.js."""
     code = re.sub(r"^EP-", "", tv)
     if m := re.fullmatch(r"([A-Z])([HML])", code):
-        return f"sektor {m[1]} {BAND[m[2]]}"
+        return f"sector {m[1]} {BAND[m[2]]}"
     if m := re.fullmatch(r"([A-Z]{2})TMA(D?)", code):
         return f"TMA EP{m[1]}{' (D)' if m[2] else ''}"
     if m := re.match(r"(ALLFIR|NFIR|SFIR)(.*)", code):
         return FIR_PART[m[1]] + (" " + m[2] if m[2] else "")
-    return "kombinacja sektorów"
+    return "sector combination"
 
 
 def _level(value) -> str | None:

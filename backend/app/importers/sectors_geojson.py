@@ -38,7 +38,7 @@ IMPORT_DIR = DATA_DIR / "import"
 FILENAME = "sectors.geojson"
 COMMAND = "python -m backend.app.importers.sectors_geojson"
 EPWW = "EPWW"  # source sektorów z pliku .ese EPWW (także kopii sektorów sąsiadów z tego pliku, np. UMMV)
-NO_SECTORS = f"Brak sektorów: wygeneruj data/seed/{FILENAME} ({COMMAND})."
+NO_SECTORS = f"No sectors: generate data/seed/{FILENAME} ({COMMAND})."
 # Podnieś przy zmianie sposobu generowania, której nie widać w generator_settings (wybór sektorów w select_sectors,
 # składanie i upraszczanie granic, zaokrąglenie): --check, test i build obrazu przypomną o ponownym wygenerowaniu pliku.
 GENERATOR_VERSION = 1

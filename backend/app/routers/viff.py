@@ -12,14 +12,14 @@ async def _call(coro):
     try:
         return await coro
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"vIFF niedostępny: {exc}") from exc
+        raise HTTPException(502, f"vIFF unavailable: {exc}") from exc
 
 
 @router.get("/departures/{icao}")
 async def departures(icao: str):
     """Odloty z vIFF: EOBT, CTOT, status lotu (jak w liście lotów NM), a na lotniskach z A-CDM także TOBT, TSAT, AOBT, TTOT."""
     if not re.fullmatch(r"[A-Za-z]{4}", icao):
-        raise HTTPException(400, "Kod ICAO lotniska = 4 litery")
+        raise HTTPException(400, "Aerodrome ICAO code = 4 letters")
     return await _call(viff.departures(icao))
 
 
@@ -34,8 +34,8 @@ async def flight(callsign: str):
     """Jeden lot z vIFF (jak szczegóły lotu w NM UI): EOBT/TOBT/TSAT/CTOT, regulacja, status CDM, trasa,
     historia i wejścia w sektory (traffic volumes) z całodobowych danych ETFMS."""
     if not re.fullmatch(r"[A-Za-z0-9]{2,10}", callsign):
-        raise HTTPException(400, "Znak wywoławczy = 2–10 liter i cyfr")
+        raise HTTPException(400, "Callsign = 2–10 letters and digits")
     f = await _call(viff.flight(callsign))
     if f is None:
-        raise HTTPException(404, f"vIFF nie zna lotu {callsign.upper()} (brak planu lotu w IFPS)")
+        raise HTTPException(404, f"vIFF does not know flight {callsign.upper()} (no flight plan in IFPS)")
     return f
