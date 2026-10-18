@@ -1,34 +1,46 @@
-"""Granice rejonów QNH regionalnego (1–14) i pasów awaryjnych (15–17) do data/seed/qnh_regions.json.
+"""Mapa QNH regionalnego (METEO › QNH): rejony 1–14, pasy awaryjne 15–17, TMA/MTMA i CTR/MCTR do data/seed/qnh_regions.json.
 
-Źródło: mapa rejonów QNH z AIP Polska (PAŻP), zrzut ekranu 3840x2160 dostarczony przez Marka 2026-10-08
-(siatka 14°–25°E, 49°–55°N w odwzorowaniu stożkowym). Linie rejonów odrysowane w pikselach zrzutu (wierzchołki
-w LINES poniżej: punkty załamania zielonych linii, wspólne węzły rejonów), przeliczone na współrzędne przez
-odwzorowanie stożkowe wiernokątne Lamberta dopasowane do siatki mapy (średni błąd ok. 1,5 px ≈ 0,5 km; kontrola:
-symbole lotnisk wypadają średnio 0,2 px od współrzędnych z airports.csv, pomarańczowe linie dokładnie na 53°N i 51°N).
-Granica zewnętrzna = granica FIR EPWW z pliku sektorowego (data/import/EPWW-Sector.sct, grupa "FIR border 0 - EPWW"),
-która na zrzucie pokrywa się z granicą FIR z mapy PAŻP (także nad Bałtykiem). Rejony powstają z podziału FIR liniami
-(shapely.polygonize), więc wspólne granice sąsiadów są identyczne, a rejony pokrywają FIR bez dziur i nakładania.
-Pasy 15–17 (wartości awaryjne podawane, gdy nie działa model IMGW) = FIR podzielony równoleżnikami 53°N i 51°N.
-Z --image także obszary "BELOW TMA/MTMA QNH FROM EPxx" (liliowe wypełnienie zrzutu dzielone pogrubionymi liniami,
-funkcja trace_tma) zapisywane jako 'aip' przy TMA; bez --image dotychczasowe 'aip' zostają w pliku.
-Układ napisów mapy jest ręczny i skrypt przenosi go bez zmian z dotychczasowego pliku: 'label' rejonów (ramka SEKTOR n),
-całe "tmas" (poza 'aip': 'box', 'short', 'cap', 'join' itd.) i "chart_labels" (szare oznaczenia TMA/CTR z mapy PAŻP).
+Wzór: mapa rejonów QNH z AIP Polska (PAŻP), zrzut 3840x2160 data/import/qnh_pansa.png (siatka 14°–25°E, 49°–55°N
+w odwzorowaniu stożkowym Lamberta dopasowanym do siatki zrzutu, LCC niżej; kontrola: symbole lotnisk wypadają średnio
+0,2 px od współrzędnych z airports.csv, pomarańczowe linie dokładnie na 53°N i 51°N).
+
+Źródła geometrii:
+- granica FIR EPWW: plik sektorowy data/import/EPWW-Sector.sct (grupa "FIR border 0 - EPWW");
+- TMA/MTMA cywilne i CTR/MCTR: sektory pliku data/import/EPWW-Sector.ese (dolne warstwy, poniżej FL095), wg
+  przedrostków nazw "ese" przy TMA w pliku rejonów; obszar "BELOW … QNH FROM EPxx" = suma warstw, cienkie linie
+  w środku = granice części TMA o różnych dolnych granicach (jak na mapie PAŻP); TMA Kraków dzieli na część Katowic
+  i Krakowa pogrubiona linia z mapy PAŻP (SPLIT);
+- MTMA i MCTR wojskowe, których nie ma w plikach sektorowych (MIL_TMA, MIL_CTR): wierzchołki odczytane ze zrzutu
+  (proste odcinki jak na mapie); odcinki wspólne z TMA z pliku .ese biegną dokładnie po jej granicy;
+- linie rejonów (LINES): wierzchołki odczytane ze zrzutu, proste odcinki; tam, gdzie linia na mapie PAŻP biegnie
+  granicą TMA/CTR, biegnie dokładnie granicą z pliku .ese; końce na granicy FIR leżą na granicy z pliku .sct.
+  Rejony powstają z podziału FIR liniami (shapely.polygonize), więc sąsiednie rejony mają identyczne wspólne
+  granice i pokrywają FIR bez dziur i nakładania. Pasy 15–17 = FIR podzielony równoleżnikami 53°N i 51°N.
+
+Wierzchołek w LINES, MIL_TMA i SPLIT: piksel zrzutu (x, y), węzeł z NODES, "@ICAO" (środek symbolu lotniska) albo
+("ICAO", x, y) / ("CTR ICAO", x, y) = punkt przyciągnięty do granicy obszaru TMA / CTR tego lotniska (do jej
+wierzchołka, gdy bliżej niż SNAP_PX); między dwoma kolejnymi punktami przyciągniętymi do tej samej granicy linia
+biegnie tą granicą (krótszą drogą).
+
+Układ napisów (wszystko [lon, lat], środek napisu) jest ręczny i skrypt przenosi go z dotychczasowego pliku:
+'num' i 'qnh_at' rejonów (duży numer i ramka z QNH obok niego), 'cap' i 'code' TMA (opis BELOW … QNH FROM EPxx
+z QNH), "chart_labels" (szare oznaczenia TMA/CTR) i "aero_labels" (strona kodu ICAO przy symbolu lotniska).
+--layout rozsuwa nachodzące na siebie napisy (model rozmiarów jak w qnh.css i test_qnh.py) i zapisuje nowe miejsca.
 
 Użycie (z katalogu głównego repozytorium):
-    python scripts/trace_qnh_regions.py                          # zapis rejonów i FIR do data/seed/qnh_regions.json
-    python scripts/trace_qnh_regions.py --out /tmp/qnh.json      # zapis do innego pliku (kontrola: diff z plikiem
-                                                                 # w data/seed - bez zmian w skrypcie identyczny)
-    python scripts/trace_qnh_regions.py --image data/import/qnh_pansa.png --overlay kontrola.png
-                                                                 # jak wyżej + obszary TMA "BELOW … QNH FROM" ze zrzutu
-                                                                 # ('aip' w "tmas") i nakładka granic na zrzucie
-    python scripts/trace_qnh_regions.py --image data/import/qnh_pansa.png --fit
-                                                                 # ponowne dopasowanie odwzorowania do siatki zrzutu
+    python scripts/trace_qnh_regions.py                          # zapis do data/seed/qnh_regions.json
+    python scripts/trace_qnh_regions.py --out /tmp/qnh.json      # zapis do innego pliku (kontrola: diff)
+    python scripts/trace_qnh_regions.py --overlay kontrola.png   # jak wyżej + nakładka geometrii na zrzucie
+    python scripts/trace_qnh_regions.py --layout                 # jak wyżej + rozsunięcie napisów
+    python scripts/trace_qnh_regions.py --fit                    # ponowne dopasowanie odwzorowania do siatki zrzutu
 
-Wymaga: numpy i shapely, dla --image także Pillow (pip install numpy shapely pillow).
+Po podmianie pliku .ese/.sct uruchom skrypt ponownie (test_qnh.py porównuje sumy kontrolne plików z "sources").
+Wymaga: numpy i shapely, dla --overlay i --fit także Pillow (pip install numpy shapely pillow).
 """
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import sys
@@ -36,52 +48,58 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED = ROOT / "data" / "seed"
+IMPORT = ROOT / "data" / "import"
 OUT = SEED / "qnh_regions.json"
+IMAGE = IMPORT / "qnh_pansa.png"
+SCT = IMPORT / "EPWW-Sector.sct"
+ESE = IMPORT / "EPWW-Sector.ese"
 
 # odwzorowanie Lamberta dopasowane do siatki zrzutu (--fit): piksel bieguna (xp, yp), stała stożka n,
 # ln skali C (promień równoleżnika = C * t(φ)^n, elipsoida GRS80) i południk środkowy lon0
 LCC = {"xp": 1880.394, "yp": -12592.290, "n": 0.7981264, "lnC": 10.3826669, "lon0": 19.002774}
 E = 0.0818191910428  # mimośród GRS80
+SNAP_PX = 4.0        # przyciąganie do wierzchołka granicy TMA/CTR (ok. 1,4 km)
+LOW_FT = 9500        # warstwy TMA z pliku .ese poniżej FL095 (mapa QNH: QNH obowiązuje pod TMA)
 
 # węzły wspólne kilku linii (piksele zrzutu); "F…" = koniec na granicy FIR (linia przedłużana do przecięcia z FIR),
 # "@ICAO" = wierzchołek w punkcie lotniska (linie na mapie PAŻP przechodzą przez środek symbolu lotniska)
 NODES = {
-    "J1-2-3": (1604.5, 582.8), "J1-3-4": (1444.8, 863.1), "J2-3-7-8": (1953.2, 865.2), "J3-4-8-9": (1904.2, 1049.9),
-    "J8-9-10": (2452.7, 1257.3), "J9-10-11-13": (2206.4, 1571.5), "J4-5-9": "@EPLK", "J5-9-11": (1932.8, 1579.9),
-    "J11-12-13-14": (2150.5, 1861.2),
+    "J1-2-3": ("EPGD", 1605.3, 584.3), "J1-3-4": (1444.8, 863.1), "J2-3-7-8": (1953.2, 865.2),
+    "J3-4-8-9": (1904.2, 1049.9), "J8-9-10": ("EPWA", 2452.7, 1257.3), "J9-10-11-13": (2206.4, 1571.5),
+    "J4-5-9": "@EPLK", "J5-9-11": (1932.8, 1579.9), "J11-12-13-14": (2150.5, 1861.2),
     "F1-2": (1279.5, 330.6), "F2-7": (2043.5, 494.9), "F7-8": (2786.1, 838.9), "F8-10": (2773.4, 1203.5),
     "F10-13": (2880.0, 1618.8), "F13-14": (2700.9, 1891.6), "F12-14": (2219.6, 2067.8), "F11-12": (1788.0, 1907.3),
     "F5-11": (1628.5, 1786.8), "F5-6s": (1475.9, 1741.2), "F5-6w": (1096.7, 1484.1), "F4-5": (1055.8, 1228.9),
     "F1-4": (1048.2, 1049.0),
 }
-# granice między rejonami: kolejne wierzchołki (nazwa węzła, "@ICAO" albo piksel zrzutu)
+# granice między rejonami: kolejne wierzchołki; 2/3 biegnie granicą TMA Gdańsk, 5/6 granicą TMA Wrocław,
+# 8/9 granicą CTR Warszawa, 9/10 granicą TMA Warszawa (jak na mapie PAŻP)
 LINES = {
     "1/2": ["F1-2", "J1-2-3"],
-    "2/3": ["J1-2-3", (1869.0, 799.0), "J2-3-7-8"],
+    "2/3": ["J1-2-3", ("EPGD", 1775.7, 726.2), "J2-3-7-8"],
     "1/3": ["J1-2-3", (1461.6, 700.6), "J1-3-4"],
     "1/4": ["F1-4", "J1-3-4"],
     "2/7": ["F2-7", "J2-3-7-8"],
     "3/4": ["J1-3-4", (1635.8, 947.8), "J3-4-8-9"],
     "3/8": ["J2-3-7-8", "J3-4-8-9"],
     "7/8": ["J2-3-7-8", (2236.5, 933.2), "@EPGY", (2682.3, 860.0), "F7-8"],
-    "8/9": ["J3-4-8-9", (2011.4, 1088.2), (2191.3, 1175.2), (2196.1, 1177.1), "@EPBC", (2264.3, 1170.8),
-            (2295.7, 1206.2), (2309.2, 1251.4), "J8-9-10"],
+    "8/9": ["J3-4-8-9", (2011.4, 1088.2), (2191.3, 1175.2), "@EPBC", ("CTR EPWA", 2266.3, 1172.2),
+            ("CTR EPWA", 2298.4, 1208.7), (2309.2, 1251.4), "J8-9-10"],
     "8/10": ["J8-9-10", (2535.0, 1260.6), "F8-10"],
-    "9/10": ["J8-9-10", (2398.6, 1322.2), (2375.2, 1371.7), (2344.7, 1391.5), (2274.8, 1537.7), "J9-10-11-13"],
+    "9/10": ["J8-9-10", ("EPWA", 2360.1, 1366.6), (2274.8, 1537.7), "J9-10-11-13"],
     "4/9": ["J3-4-8-9", "@EPLY", "J4-5-9"],
     "5/9": ["J4-5-9", "J5-9-11"],
     "4/5": ["F4-5", "J4-5-9"],
     "9/11": ["J5-9-11", (2044.0, 1576.5), "J9-10-11-13"],
     "10/13": ["J9-10-11-13", (2427.0, 1632.9), (2496.4, 1647.6), "F10-13"],
-    "5/6": ["F5-6w", (1356.9, 1574.0), (1541.5, 1657.0), "F5-6s"],
+    "5/6": ["F5-6w", ("EPWR", 1356.9, 1574.0), ("EPWR", 1542.0, 1657.4), "F5-6s"],
     "5/11": ["J5-9-11", (1760.3, 1608.5), "F5-11"],
     "11/13": ["J9-10-11-13", "J11-12-13-14"],
     "11/12": ["F11-12", "J11-12-13-14"],
     "12/14": ["J11-12-13-14", "F12-14"],
     "13/14": ["J11-12-13-14", (2200.5, 1890.6), (2282.1, 1858.8), "F13-14"],
 }
-# środki numerów rejonów (piksele zrzutu: zielone 1–14, pomarańczowe 15–17) jak na mapie PAŻP (środek cyfr); ramki
-# SEKTOR n i TMA stoją obok numerów, a nie na nich ('label' w pliku), więc numerów nie przesuwamy
+# środki numerów rejonów (piksele zrzutu: zielone 1–14, pomarańczowe 15–17) jak na mapie PAŻP (środek cyfr)
 NUM = {1: (1478, 582.5), 2: (1506, 368.5), 3: (1606, 743.5), 4: (1228, 1045.5), 5: (1730, 1499.5), 6: (1421, 1701),
        7: (2455.5, 691.5), 8: (2392.5, 1051), 9: (2193.5, 1297.5), 10: (2706.5, 1302), 11: (1699.5, 1794.5),
        12: (2039, 2016), 13: (2276.5, 1722), 14: (2330, 1979.5), 15: (2662, 719.5), 16: (2656.5, 1040.5), 17: (2748, 1728)}
@@ -108,52 +126,86 @@ METAR = ("EPBC EPBY EPCE EPDA EPDE EPGD EPIR EPKK EPKS EPKT EPLB EPLK EPLL EPLY 
          "EPPW EPRA EPRZ EPSC EPSN EPSY EPTM EPWA EPWR EPZG").split()
 BANDS = {15: (53.0, 90.0), 16: (51.0, 53.0), 17: (-90.0, 51.0)}
 
-# obszary "BELOW TMA/MTMA QNH FROM EPxx" z mapy AIP (tylko z --image): liliowe wypełnienie TMA/MTMA/CTR dzielą pogrubione
-# czarne linie; obszar lotniska = części wypełnienia osiągalne z punktów startowych (piksele zrzutu) bez przekraczania
-# pogrubionej linii. TMA_CUTS = pogrubione linie przerwane napisem albo zlewające się z zieloną granicą rejonu.
-# Pasek między TMA Poznań a MTMA Powidz (bez własnego opisu) dołączony do EPPW, bo opis "BELOW MTMA QNH FROM EPPW"
-# stoi tuż pod nim.
-TMA_SEEDS = {
-    "EPGD": [(1748, 531)], "EPMB": [(1947, 671), (1872, 634)], "EPSC": [(1100, 765)], "EPSN": [(1300, 670)],
-    "EPMI": [(1344, 815)], "EPBY": [(1700, 880)], "EPSY": [(2192, 773)], "EPPO": [(1469, 1140)],
-    "EPPW": [(1696, 1154), (1595, 1190)], "EPZG": [(1273, 1188)], "EPWA": [(2194, 1208)],
-    "EPMM": [(2507, 1146), (2402, 1168)], "EPLL": [(1982, 1313)], "EPLK": [(1905, 1432)],
-    "EPRA": [(2391, 1461), (2225, 1462)], "EPDE": [(2469, 1377)], "EPLB": [(2578, 1504)], "EPWR": [(1480, 1530)],
-    "EPKT": [(1877, 1732)], "EPKK": [(2058, 1836)], "EPRZ": [(2470, 1850)],
-}
-TMA_CUTS = [
-    [(2083, 1320), (2067, 1350), (2066, 1397)],                                          # EPLL | EPWA (napis EPTM)
-    [(2452.7, 1257.3), (2398.6, 1322.2), (2375.2, 1371.7), (2344.7, 1391.5)],             # EPWA | EPDE (granica 9/10)
-    [(2128, 1439), (2147, 1414)],                                                        # EPWA | EPRA (napis MCTR EPTM)
-    [(2243, 1412), (2277, 1397), (2300, 1391), (2346, 1391)],                            # EPWA | EPRA (EPRP)
-    [(2016, 1626), (2015, 1710), (2005, 1785), (1975, 1815), (1920, 1835), (1795, 1839)],  # EPKT | EPKK
-    [(1926.7, 581.7), (1880, 586.7), (1853.3, 615), (1826.7, 620), (1826.7, 678.3)],     # EPGD | EPMB
-]
+# TMA Kraków z pliku .ese (część zachodnia LTMA_W, wschodnia LTMA_E i sektory DEP) dzieli na obszary "QNH FROM EPKT"
+# i "QNH FROM EPKK" pogrubiona linia z mapy PAŻP (od północnej granicy TMA do zachodniej); obszar lotniska = część,
+# w której leży lotnisko
+SPLIT = {("EPKT", "EPKK"): [(2017.6, 1600.0), (2015.0, 1681.7), (2012.3, 1768.3), (1913.3, 1839.3), (1780.0, 1839.3)]}
 
-NOTE = ("QNH rejonu = najniższe aktualne QNH z lotnisk rejonu (METAR); oficjalne QNH regionalne liczy IMGW z modelu "
-        "(najniższe ciśnienie w rejonie minus 3 hPa), więc może być niższe. Rejony 15–17 (pasy 53°N i 51°N) to "
-        "wartości awaryjne, podawane tylko przy awarii modelu IMGW. Pod TMA/MTMA obowiązuje QNH lotniska z opisu "
-        "„BELOW … QNH FROM”. Granice rejonów i obszary TMA/MTMA odrysowane z mapy AIP Polska (PAŻP) – orientacyjnie, "
-        "do celów symulacji.")
-UWAGA = ("Rejony 1-14 odrysowane z mapy rejonów QNH z AIP Polska (zrzut mapy PAŻP dostarczony przez Marka 2026-10-08) "
-         "skryptem scripts/trace_qnh_regions.py (wierzchołki w pikselach zrzutu, odwzorowanie Lamberta dopasowane do "
-         "siatki mapy), granica zewnętrzna 'fir' = FIR EPWW z pliku sektorowego (pokrywa się z mapą PAŻP). Plik "
-         "generuje skrypt: zmiany granic, numerów i list lotnisk rejonów wprowadzać w skrypcie. Rejony 15-17 "
-         "(band) = pasy awaryjne: FIR podzielony równoleżnikami 53°N i 51°N (pomarańczowe linie na mapie PAŻP), QNH = "
-         "najniższe z lotnisk z METAR-em w pasie. QNH rejonu = najniższe aktualne QNH z lotnisk w 'airports'. TMA: QNH z "
-         "METAR-u lotniska 'icao' (pod TMA obowiązuje QNH tego lotniska); obszar 'aip' = obszar BELOW ... QNH FROM odrysowany "
-         "z tego samego zrzutu (skrypt z --image), cienkie linie w środku = dolne warstwy .ese ('ese'), bez nich linie .sct "
-         "('sct'). 'num' rejonu = [lon, lat] numeru jak na mapie PAŻP (ze skryptu). Układ pozostałych napisów (wszystko "
-         "[lon, lat], środek napisu) poprawiać ręcznie w tym pliku - skrypt go przenosi: "
-         "'label' rejonu = ramka SEKTOR n z QNH rejonu, 'box' TMA = ramka z nazwą "
-         "('short' = krótka nazwa w ramce, jak w vAWOS) i QNH lotniska, 'cap' = opis BELOW ... QNH FROM jak na mapie PAŻP, "
-         "'join' = lotniska dopisane do wspólnego opisu (EPKT w opisie EPKK; Katowice mają własną ramkę), 'chart_labels' = "
-         "szare oznaczenia TMA/CTR z mapy PAŻP ('lines' = wiersze). Ramki: miejsca z vAWOS przesunięte o tyle, żeby przy "
-         "1600x900 nie zasłaniały lotnisk z mapy PAŻP, lotnisk z METAR-em, opisów BELOW, numerów rejonów ani siebie "
-         "nawzajem (co najmniej 4 px odstępu); mogą zasłaniać lądowiska spoza mapy PAŻP i, gdzie brak miejsca, szare "
-         "oznaczenia. SEKTOR 6 stoi jak w vAWOS za granicą FIR (rejon 6 jest za wąski). Nakładanie ramek na siebie i na "
-         "numery przy 1600x900 i 1366x768 sprawdza test_box_layout w backend/tests/test_qnh.py. 'note' = objaśnienie pod "
-         "tabelami.")
+# MTMA wojskowe bez danych w plikach sektorowych: obrys z mapy PAŻP (piksele zrzutu, kolejne wierzchołki);
+# ("ICAO", x, y) = punkt na granicy TMA tego lotniska z pliku .ese (wspólny odcinek biegnie dokładnie po niej);
+# części wspólne z TMA cywilną (np. kwadrat przy Malborku, pasek między TMA Poznań i MTMA Powidz) są na mapie
+# ciemniejsze ("overlaps")
+MIL_TMA = {
+    "EPSN": [("EPSC", 1198.1, 624.2), ("EPSC", 1259.6, 781.5), (1285.0, 751.0), (1306.0, 745.0), (1361.7, 752.7),
+             (1389.0, 746.0), (1392.0, 706.0), (1402.0, 704.0), (1409.0, 699.3), (1432.3, 684.3), (1399.0, 671.7),
+             (1341.7, 646.7), (1220.0, 621.7)],
+    "EPMI": [("EPSC", 1259.6, 781.5), (1285.0, 751.0), (1306.0, 745.0), (1361.7, 752.7), (1374.0, 782.7),
+             (1425.0, 813.3), (1432.5, 863.0), (1403.8, 873.0), (1295.0, 845.8), (1268.8, 826.3)],
+    "EPMB": [(1826.7, 619.3), (1853.3, 616.7), (1880.0, 586.7), (1928.3, 581.7), ("EPGD", 1924.3, 598.0),
+             ("EPGD", 1949.4, 597.2), (1970.0, 599.3), (1993.3, 573.3), (2006.7, 635.0), (2021.7, 707.3),
+             (1893.3, 742.7), ("EPGD", 1853.3, 676.4), (1826.7, 678.3)],
+    "EPPW": [("EPPO", 1628.8, 1049.3), ("EPPO", 1570.9, 1124.1), ("EPPO", 1594.7, 1140.7), (1575.0, 1233.3),
+             (1600.0, 1239.3), (1623.3, 1243.3), (1755.0, 1229.3), (1803.3, 1211.0), (1817.3, 1140.0),
+             (1791.7, 1102.7)],
+    "EPLK": [("EPLL", 1861.8, 1344.0), ("EPLL", 1995.2, 1363.3), (2010.0, 1407.3), (1991.7, 1468.3),
+             (1948.3, 1516.7), (1930.0, 1532.7), (1851.7, 1517.3), (1800.7, 1389.0), (1833.3, 1356.0)],
+    "EPMM": [(2340.7, 1132.7), ("EPWA", 2373.3, 1110.7), ("EPWA", 2426.0, 1110.3), (2470.0, 1107.3),
+             (2488.3, 1085.0), (2560.0, 1091.7), (2581.7, 1094.0), (2575.0, 1136.7), (2586.7, 1183.3),
+             (2526.7, 1198.3), (2511.7, 1220.0), (2383.3, 1226.7), (2381.7, 1208.3), (2370.0, 1209.3),
+             (2350.7, 1190.0)],
+}
+# CTR z pliku .ese: nazwa na mapie -> sektory (suma, np. CTR Kraków dla obu kierunków pasa); "nazwa:ft" = tylko
+# warstwa o tej dolnej granicy (CTR EDAH na mapie PAŻP = najniższa część TMA Szczecin nad podejściem do Heringsdorfu)
+ESE_CTR = {
+    "CTR EPGD": ["EPGD_CTR"], "CTR EPSC": ["EPSC_CTR"], "CTR EDAH": ["EPSC_TMA_EDAH:1000"], "CTR EPBY": ["EPBY_CTR"],
+    "CTR EPSY": ["EPSY_CTR"], "CTR EPPO": ["EPPO_CTR"], "MCTR EPKS": ["EPKS_MCTR"], "CTR EPZG": ["EPZG_CTR"],
+    "CTR EPWA": ["EPWA_CTR"], "CTR EPMO": ["EPMO_CTR"], "CTR EPLL": ["EPLL_CTR"], "CTR/MCTR EPRA": ["EPRA_CTR"],
+    "MCTR EPDE": ["EPDE_MCTR"], "CTR EPLB": ["EPLB_CTR"], "CTR EPWR": ["EPWR_CTR"],
+    "CTR EPKT": ["EPKT_CTR08", "EPKT_CTR26"], "CTR EPKK": ["EPKK_CTR07", "EPKK_CTR25"], "CTR EPRZ": ["EPRZ_CTR"],
+}
+# MCTR wojskowe bez danych w plikach sektorowych: obrys przerywanej linii z mapy PAŻP (piksele zrzutu);
+# liczba = okrąg o tym promieniu (piksele) wokół lotniska
+MIL_CTR = {
+    "MCTR EPDA": [(1410.0, 441.7), (1451.7, 471.7), (1400.0, 530.0), (1370.0, 530.0), (1348.3, 515.0)],
+    "MCTR EPOK": [(1728.3, 386.7), (1770.0, 378.3), (1866.7, 478.3), (1841.7, 500.0), (1793.3, 490.0),
+                  (1766.7, 475.0), (1746.0, 428.3)],
+    "MCTR EPCE": [(1609.0, 459.0), (1698.0, 454.0), (1705.0, 509.0), (1666.0, 534.0), (1595.0, 546.0), (1590.0, 500.0)],
+    "MCTR EPPR": [(1785.0, 541.7), (1848.3, 533.3), (1875.0, 546.7), (1868.3, 576.7), (1833.3, 591.7), (1790.0, 581.7)],
+    "MCTR EPMB": [(1852.0, 617.0), (1880.0, 587.0), (1928.0, 582.0), (1925.0, 601.0), (1973.0, 600.0),
+                  (1973.0, 665.0), (1902.0, 672.0), (1852.0, 678.0)],
+    "MCTR EPSN": [(1245.0, 624.0), (1342.0, 646.0), (1398.3, 671.7), (1375.0, 723.3), (1336.7, 746.7),
+                  (1306.7, 743.3), (1211.7, 698.3), (1235.0, 650.0)],
+    "MCTR EPMI": [(1310.0, 753.3), (1401.7, 821.7), (1390.0, 846.0), (1320.0, 845.0), (1268.3, 806.7)],
+    "MCTR EPIR": 25.0,
+    "MCTR EPPW": [(1611.7, 1070.7), (1721.7, 1116.0), (1701.7, 1186.0), (1618.3, 1156.7), (1570.7, 1122.7)],
+    "MCTR EPLY": [(1874.0, 1228.0), (1925.0, 1236.0), (1930.0, 1262.0), (1905.0, 1272.0), (1872.0, 1262.0)],
+    "MCTR EPLK": [(1860.0, 1345.0), (1930.0, 1369.3), (1980.0, 1390.0), (1961.7, 1459.3), (1836.7, 1421.3)],
+    "MCTR EPMM": [(2348.3, 1158.3), (2443.3, 1150.0), (2462.0, 1200.0), (2392.0, 1207.0), (2370.0, 1209.3),
+                  (2352.0, 1190.0)],
+    "MCTR EPTM": [(2071.3, 1331.3), (2172.5, 1407.5), (2138.8, 1446.3), (2027.5, 1366.3)],
+}
+
+NOTE = ("Region QNH = lowest current QNH of the region's aerodromes (METAR); the official regional QNH is computed "
+        "by IMGW from its model (lowest pressure in the region minus 3 hPa), so it may be lower. Regions 15–17 "
+        "(bands split at 53°N and 51°N) are backup values, issued only when the IMGW model fails. Below a TMA/MTMA "
+        "use the QNH of the aerodrome named in its BELOW … QNH FROM caption. TMA, CTR and FIR boundaries from the "
+        "EPWW sector files; region lines, MTMA and MCTR not in the sector files traced from the PANSA QNH regions "
+        "chart. For simulation use only.")
+UWAGA = ("Plik generuje scripts/trace_qnh_regions.py (opis źródeł w skrypcie): granice rejonów, obszary TMA/MTMA, "
+         "CTR/MCTR i FIR poprawiać w skrypcie i uruchomić go ponownie (także po podmianie plików sektorowych: "
+         "'sources' = sha256 plików, test_qnh.py przypomni). Rejony: 'airports' = lotniska z METAR-em, QNH rejonu = "
+         "najniższe z nich; 15-17 (band) = pasy awaryjne 53°N/51°N. TMA: 'ese' = przedrostki nazw sektorów pliku "
+         ".ese (warstwy poniżej FL095), 'mil' = obrys MTMA z mapy PAŻP (brak w plikach sektorowych), 'area' = obszar "
+         "BELOW ... QNH FROM, 'parts' = cienkie linie części TMA; QNH TMA = QNH z METAR-u lotniska 'icao'. 'ctrs' = "
+         "CTR/MCTR ('src' ese albo chart), 'overlaps' = części wspólne obszarów TMA/MTMA (ciemniejsze). Układ "
+         "napisów poprawiać ręcznie w tym pliku (skrypt go przenosi, --layout rozsuwa nachodzące): rejon 'num' = "
+         "[lon, lat] środka numeru, 'qnh_at' = strona ramki QNH przy numerze (e, w, n, s, ne, nw, se, sw); TMA 'cap' = "
+         "środek opisu BELOW ... QNH FROM EPxx z QNH, 'stack' = QNH w trzecim wierszu (węższy opis), 'code' = osobny "
+         "napis 'EPxx QNH' (wtedy opis bez kodu), 'join' = "
+         "lotniska z własnym napisem 'code' pod wspólnym opisem; 'chart_labels' = szare oznaczenia TMA/CTR ('lines' = "
+         "wiersze); 'aero_labels' = strona kodu ICAO przy symbolu lotniska (domyślnie e). Brak nakładania napisów przy "
+         "1600x900 i 1366x768 sprawdza test_label_layout w backend/tests/test_qnh.py. 'note' = objaśnienie pod "
+         "tabelami (po angielsku).")
 
 
 def _t(phi: float) -> float:
@@ -178,6 +230,11 @@ def to_lonlat(x: float, y: float, p: dict = LCC) -> tuple[float, float]:
     return lon, math.degrees(phi)
 
 
+def file_sha256(path: Path) -> str:
+    """sha256 treści z końcami wierszy LF (jak sources w sectors.geojson)."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def airports() -> dict[str, tuple[float, float]]:
     with open(SEED / "airports.csv", encoding="utf-8") as f:
         return {r["ident"]: (float(r["longitude_deg"]), float(r["latitude_deg"])) for r in csv.DictReader(f)}
@@ -191,53 +248,219 @@ def fir_ring() -> list[tuple[float, float]]:
     sys.path.insert(0, str(ROOT))
     from backend.app.importers.sct import parse_line_groups, read_text, sections
 
-    sct = sorted((ROOT / "data" / "import").glob("EPWW*.sct"))
-    if not sct:
-        sys.exit("Brak pliku data/import/EPWW-Sector.sct (granica FIR)")
-    segs = parse_line_groups(sections(read_text(sct[0])).get("[ARTCC HIGH]", []))["FIR border 0 - EPWW"]
+    if not SCT.exists():
+        sys.exit(f"Brak pliku {SCT.relative_to(ROOT)} (granica FIR)")
+    segs = parse_line_groups(sections(read_text(SCT)).get("[ARTCC HIGH]", []))["FIR border 0 - EPWW"]
     polys = list(polygonize(unary_union([LineString([(a[1], a[0]), (b[1], b[0])]) for a, b in segs if a != b])))
     return list(max(polys, key=lambda p: p.area).exterior.coords)
 
 
-def vertex(v, ads) -> tuple[float, float]:
-    """Wierzchołek jako (lon, lat): węzeł, lotnisko albo piksel zrzutu."""
-    if isinstance(v, str) and v in NODES:
-        v = NODES[v]
-    if isinstance(v, str) and v.startswith("@"):
-        return ads[v[1:]]
-    return to_lonlat(*v)
+def ese_sectors() -> list[dict]:
+    """Sektory pliku .ese EPWW (nazwa, FIR, granice pionowe, wielokąt lon/lat) jak w sectors.geojson."""
+    sys.path.insert(0, str(ROOT))
+    from backend.app.importers.sectors_geojson import epww_features
+
+    if not ESE.exists():
+        sys.exit(f"Brak pliku {ESE.relative_to(ROOT)} (TMA i CTR)")
+    return [{**f["properties"], "geometry": f["geometry"]} for f in epww_features(ESE)]
 
 
-def build(fir: list, labels: dict | None = None) -> tuple[list[dict], dict]:
-    """Rejony z podziału FIR liniami LINES; labels = 'label' rejonów (ramki SEKTOR n) z dotychczasowego pliku."""
+def _poly(geom):
+    """Wielokąt shapely z GeoJSON-a, poprawiony (buffer(0)) i bez dziur."""
+    from shapely.geometry import Polygon, shape
+
+    g = shape(geom).buffer(0)
+    parts = getattr(g, "geoms", [g])
+    from shapely.ops import unary_union
+    return unary_union([Polygon(p.exterior) for p in parts])
+
+
+class Snapper:
+    """Przyciąganie wierzchołków do granic obszarów (TMA, CTR) i wstawianie odcinków tych granic."""
+
+    def __init__(self):
+        self.rings = {}
+
+    def add(self, name: str, poly) -> None:
+        from shapely.geometry import LineString
+
+        parts = sorted(getattr(poly, "geoms", [poly]), key=lambda q: -q.area)
+        self.rings[name] = LineString(parts[0].exterior.coords)
+
+    def point(self, name: str, x: float, y: float) -> tuple[float, float]:
+        """Punkt zrzutu (x, y) na granicy obszaru: wierzchołek granicy, gdy bliżej niż SNAP_PX, inaczej rzut."""
+        from shapely.geometry import Point
+
+        ring = self.rings[name]
+        lon, lat = to_lonlat(x, y)
+        best = min(ring.coords, key=lambda c: math.dist(to_px(*c), (x, y)))
+        if math.dist(to_px(*best), (x, y)) < SNAP_PX:
+            return tuple(best)
+        p = ring.interpolate(ring.project(Point(lon, lat)))
+        if math.dist(to_px(p.x, p.y), (x, y)) > 3 * SNAP_PX:
+            sys.exit(f"Punkt ({x}, {y}) jest {math.dist(to_px(p.x, p.y), (x, y)):.0f} px od granicy {name}")
+        return p.x, p.y
+
+    def path(self, name: str, a: tuple, b: tuple) -> list[tuple[float, float]]:
+        """Wierzchołki granicy obszaru między punktami a i b (bez nich), krótszą drogą."""
+        from shapely.geometry import Point
+
+        ring = self.rings[name]
+        n = ring.length
+        da, db = ring.project(Point(a)), ring.project(Point(b))
+        coords = list(ring.coords)[:-1]
+        cum = [0.0]
+        for p, q in zip(coords, coords[1:] + coords[:1]):
+            cum.append(cum[-1] + math.dist(p, q))
+
+        def walk(d0, d1):   # wierzchołki o odległości w (d0, d1) wzdłuż pierścienia, z przejściem przez początek
+            if d1 < d0:
+                d1 += n
+            out = []
+            for k in (0, 1):
+                for c, d in zip(coords, cum):
+                    dd = d + k * n
+                    if d0 + 1e-9 < dd < d1 - 1e-9:
+                        out.append((dd, c))
+            return [c for _, c in sorted(out)]
+        fwd = walk(da, db)
+        back = walk(db, da)[::-1]
+        length = lambda pts: sum(math.dist(p, q) for p, q in zip([a] + pts, pts + [b]))  # noqa: E731
+        return fwd if length(fwd) <= length(back) else back
+
+
+def resolve(seq: list, snap: Snapper, ads: dict) -> list[tuple[float, float]]:
+    """Wierzchołki (piksele, węzły, "@ICAO", przyciągnięte do granic) jako (lon, lat), z odcinkami granic TMA/CTR
+    między kolejnymi punktami przyciągniętymi do tej samej granicy."""
+    out, prev = [], None
+    for v in seq:
+        if isinstance(v, str) and v in NODES:
+            v = NODES[v]
+        if isinstance(v, str) and v.startswith("@"):
+            pt, name = ads[v[1:]], None
+        elif isinstance(v, tuple) and isinstance(v[0], str):
+            name, pt = v[0], snap.point(v[0], v[1], v[2])
+        else:
+            pt, name = to_lonlat(*v), None
+        if name and prev and prev[1] == name:
+            out += snap.path(name, prev[0], pt)
+        out.append(pt)
+        prev = (pt, name)
+    return out
+
+
+def tma_areas(cfg: dict, secs: list[dict], ads: dict):
+    """Obszary "BELOW … QNH FROM" (MultiPolygon) i cienkie linie części TMA dla każdej TMA z pliku rejonów,
+    CTR/MCTR i części wspólne obszarów. Zwraca (areas, parts, ctrs, overlaps, snapper)."""
+    from shapely.geometry import LineString, MultiLineString, Point, Polygon
+    from shapely.ops import linemerge, polygonize, unary_union
+
+    snap = Snapper()
+    areas, parts, low = {}, {}, {}
+    for t in cfg["tmas"]:
+        if not t.get("ese"):
+            continue
+        layers = [s for s in secs if s["fir"] == "EPWW" and s["name"].startswith(tuple(t["ese"])) and s["lower_ft"] < LOW_FT]
+        if not layers:
+            sys.exit(f"{t['icao']}: brak sektorów {t['ese']} w pliku .ese")
+        low[t["icao"]] = [(_poly(s["geometry"]), s["lower_ft"]) for s in layers]
+        areas[t["icao"]] = unary_union([p for p, _ in low[t["icao"]]])
+        areas[t["icao"]] = unary_union([Polygon(p.exterior) for p in getattr(areas[t["icao"]], "geoms", [areas[t["icao"]]])])
+    # TMA Kraków: część Katowic i część Krakowa
+    for (west, east), seq in SPLIT.items():
+        whole = areas[east]
+        cut = LineString([to_lonlat(*p) for p in seq])
+        pieces = list(polygonize(unary_union([whole.exterior, cut])))
+        pieces = [q for q in pieces if whole.contains(q.representative_point())]
+        a = unary_union([q for q in pieces if q.distance(Point(ads[west])) < q.distance(Point(ads[east]))])
+        areas[west], areas[east] = a, whole.difference(a)
+        low[west] = low[east]
+    # drobne zakładki między sąsiednimi TMA z pliku .ese (inne współrzędne wspólnej granicy): część wspólna należy
+    # do TMA wcześniejszej w pliku rejonów
+    done = []
+    for t in cfg["tmas"]:
+        i = t["icao"]
+        if i in areas:
+            for j in done:
+                if (i, j) not in SPLIT and (j, i) not in SPLIT and areas[i].intersection(areas[j]).area > 0:
+                    areas[i] = areas[i].difference(areas[j]).buffer(0)
+            done.append(i)
+    for i, g in areas.items():
+        snap.add(i, g)
+    # cienkie linie: granice części o różnych dolnych granicach (najniższa granica w każdym punkcie), bez obrysu
+    for i, g in areas.items():
+        cells, below = [], None
+        for ft in sorted({f for _, f in low[i]}):
+            c = unary_union([p for p, f in low[i] if f == ft])
+            cells.append(c if below is None else c.difference(below))
+            below = c if below is None else unary_union([below, c])
+        lines = unary_union([c.boundary for c in cells if not c.is_empty])
+        inner = lines.intersection(g.buffer(-1e-5)) if not lines.is_empty else lines
+        inner = linemerge(inner) if inner.geom_type in ("MultiLineString", "GeometryCollection") and not inner.is_empty \
+            and all(q.geom_type == "LineString" for q in getattr(inner, "geoms", [])) else inner
+        segs = [q for q in getattr(inner, "geoms", [inner]) if q.geom_type == "LineString" and q.length > 0.003]
+        parts[i] = MultiLineString(segs) if segs else None
+    # CTR z pliku .ese (przed MTMA: linie rejonów i obrysy mogą biec ich granicą)
+    ctrs = []
+    for name, names in ESE_CTR.items():
+        g = unary_union([_poly(s["geometry"]) for s in secs if s["name"] in names or f"{s['name']}:{s['lower_ft']}" in names])
+        if g.is_empty:
+            sys.exit(f"{name}: brak sektorów {names} w pliku .ese")
+        ctrs.append({"name": name, "src": "ese", "geometry": g})
+        snap.add(name, g)
+    # MTMA z mapy PAŻP
+    for t in cfg["tmas"]:
+        if t.get("mil"):
+            ring = resolve(MIL_TMA[t["icao"]], snap, ads)
+            areas[t["icao"]] = Polygon(ring).buffer(0)
+            parts[t["icao"]] = None
+    for name, spec in MIL_CTR.items():
+        if isinstance(spec, float):
+            x, y = to_px(*ads[name.split()[-1]])
+            ring = [to_lonlat(x + spec * math.cos(k * math.pi / 18), y + spec * math.sin(k * math.pi / 18)) for k in range(36)]
+        else:
+            ring = [to_lonlat(*p) for p in spec]
+        ctrs.append({"name": name, "src": "chart", "geometry": Polygon(ring)})
+    keys = [t["icao"] for t in cfg["tmas"]]
+    over = [areas[a].intersection(areas[b]) for n, a in enumerate(keys) for b in keys[n + 1:]]
+    over = unary_union([q for o in over for q in getattr(o, "geoms", [o]) if q.geom_type == "Polygon" and q.area > 1e-6])
+    return areas, parts, ctrs, over, snap
+
+
+def build(fir: list, snap: Snapper, ads: dict, old: dict) -> tuple[list[dict], dict]:
+    """Rejony z podziału FIR liniami LINES; old = dotychczasowe rejony (układ napisów: 'qnh_at')."""
     from shapely.geometry import LineString, Point, Polygon, box
     from shapely.ops import polygonize, unary_union
 
-    ads = airports()
     firp = Polygon(fir)
     edge = firp.exterior
     lines = []
     for name, seq in LINES.items():
-        pts = [vertex(v, ads) for v in seq]
-        # koniec na granicy FIR: odcinek przedłużony do pierwszego przecięcia z granicą (punkt FIR, gdy bliżej niż ~50 m);
-        # pierwsze, a nie najbliższe końcowi, żeby linia nie wychodziła poza FIR przy narożniku granicy
+        pts = resolve(seq, snap, ads)
+        # koniec na granicy FIR: odcinek przedłużony do pierwszego przecięcia z granicą (wierzchołek FIR, gdy bliżej
+        # niż ~50 m); pierwsze, a nie najbliższe końcowi, żeby linia nie wychodziła poza FIR przy narożniku granicy
         for end, prev in ((0, 1), (-1, -2)):
-            if isinstance(seq[end], str) and seq[end].startswith("F"):
+            v = seq[end]
+            if isinstance(v, str) and v.startswith("F"):
                 (x0, y0), (x1, y1) = pts[prev], pts[end]
                 far = LineString([(x0, y0), (x1 + (x1 - x0) * 0.5, y1 + (y1 - y0) * 0.5)])
                 hit = far.intersection(edge)
                 cand = [hit] if hit.geom_type == "Point" else list(getattr(hit, "geoms", []))
                 if not cand:
-                    sys.exit(f"Linia {name}: koniec {seq[end]} nie przecina granicy FIR")
+                    sys.exit(f"Linia {name}: koniec {v} nie przecina granicy FIR")
                 p = min(cand, key=lambda q: q.distance(Point(x0, y0)))
                 near = min(fir, key=lambda c: math.dist(c, (p.x, p.y)))
                 pts[end] = near if math.dist(near, (p.x, p.y)) < 0.0005 else (p.x, p.y)
-                # minimalnie za granicę, żeby polygonize na pewno połączyło linię z granicą FIR
+                # minimalnie za granicę, żeby polygonize na pewno połączyło linię z granicą FIR (końcówka za
+                # granicą odpada, a wierzchołkiem rejonu jest punkt przecięcia leżący na granicy FIR)
                 (x0, y0), (x1, y1) = pts[prev], pts[end]
                 k = 0.0002 / math.dist((x0, y0), (x1, y1))
                 pts[end] = (x1 + (x1 - x0) * k, y1 + (y1 - y0) * k)
         lines.append(LineString(pts))
     faces = [f for f in polygonize(unary_union([edge] + lines)) if firp.contains(f.representative_point())]
+    if len(faces) != 14:
+        sys.exit(f"Podział FIR dał {len(faces)} obszarów zamiast 14")
+    prev = {r["id"]: r for r in old}
     regions = []
     for rid, (x, y) in sorted(NUM.items()):
         lon, lat = to_lonlat(x, y)
@@ -253,19 +476,14 @@ def build(fir: list, labels: dict | None = None) -> tuple[list[dict], dict]:
                 sys.exit(f"Rejon {rid}: numer w {len(hit)} obszarach")
             geom = hit[0]
             reg["airports"] = AIRPORTS[rid]
-            if (labels or {}).get(rid):
-                reg["label"] = labels[rid]
-            else:
-                print(f"Rejon {rid}: brak 'label' (ramki SEKTOR n) w pliku - do uzupełnienia ręcznie")
-        reg["num"] = _r((lon, lat), 3)
+        reg["num"] = prev.get(rid, {}).get("num") or _r((lon, lat), 3)
+        reg["qnh_at"] = prev.get(rid, {}).get("qnh_at", "e")
         if geom.geom_type == "MultiPolygon":   # pas 17: także "worek turoszowski" na zachód od Bogatyni
             parts = sorted(geom.geoms, key=lambda q: -q.area)
             reg["geometry"] = {"type": "MultiPolygon", "coordinates": [[_ring(q, True)] for q in parts]}
         else:
             reg["geometry"] = {"type": "Polygon", "coordinates": [_ring(geom, rid in BANDS)]}
         regions.append(reg)
-    if len(faces) != 14:
-        sys.exit(f"Podział FIR dał {len(faces)} obszarów zamiast 14")
     return regions, {"type": "Polygon", "coordinates": [[_r(c) for c in fir]]}
 
 
@@ -274,14 +492,15 @@ def _r(c, nd: int = 5) -> list[float]:
 
 
 def _ring(geom, band: bool) -> list[list[float]]:
-    """Zewnętrzny pierścień (lon, lat) w kierunku przeciwnym do wskazówek zegara; w pasach odcinki wzdłuż równoleżnika
-    zagęszczone co 0,1°, żeby w odwzorowaniu stożkowym biegły łukiem jak na mapie."""
+    """Zewnętrzny pierścień (lon, lat) w kierunku przeciwnym do wskazówek zegara, bez powtórzonych punktów; w pasach
+    odcinki wzdłuż równoleżnika zagęszczone co 0,1°, żeby w odwzorowaniu stożkowym biegły łukiem jak na mapie."""
     from shapely.geometry.polygon import orient
 
     pts = list(orient(geom, 1.0).exterior.coords)
     out = []
     for a, b in zip(pts, pts[1:]):
-        out.append(_r(a))
+        if not out or _r(a) != out[-1]:
+            out.append(_r(a))
         if band and abs(a[1] - b[1]) < 1e-9 and abs(a[1] - round(a[1])) < 1e-9:
             k = int(abs(b[0] - a[0]) / 0.1)
             out += [_r((a[0] + (b[0] - a[0]) * i / (k + 1), a[1])) for i in range(1, k + 1)]
@@ -289,7 +508,26 @@ def _ring(geom, band: bool) -> list[list[float]]:
     return out
 
 
-def check(regions: list[dict], fir: dict) -> None:
+def _gj(g, nd: int = 5) -> dict | None:
+    """Geometria shapely jako GeoJSON (MultiPolygon / MultiLineString) z zaokrąglonymi współrzędnymi."""
+    if g is None or g.is_empty:
+        return None
+    if g.geom_type in ("Polygon", "MultiPolygon"):
+        polys = [q for q in getattr(g, "geoms", [g]) if q.area > 1e-7]
+        return {"type": "MultiPolygon", "coordinates": [[_dedup([_r(c, nd) for c in q.exterior.coords])] for q in polys]}
+    lines = [q for q in getattr(g, "geoms", [g]) if q.geom_type == "LineString"]
+    return {"type": "MultiLineString", "coordinates": [_dedup([_r(c, nd) for c in q.coords]) for q in lines]}
+
+
+def _dedup(pts: list) -> list:
+    out = []
+    for p in pts:
+        if not out or p != out[-1]:
+            out.append(p)
+    return out
+
+
+def check(regions: list[dict], fir: dict, areas: dict) -> None:
     """Rejony 1–14 i pasy 15–17 pokrywają FIR bez dziur i nakładania; lotniska rejonów leżą w swoich rejonach."""
     from shapely.geometry import Point, shape
     from shapely.ops import unary_union
@@ -308,133 +546,45 @@ def check(regions: list[dict], fir: dict) -> None:
         out = [a for a in r["airports"] if a not in inside]
         print(f"{r['id']:>2}: lotniska z METAR-em w rejonie {' '.join(inside) or '–'}"
               f"{'; spoza rejonu: ' + ' '.join(out) if out else ''}")
+    for i, g in areas.items():
+        if not g.contains(Point(ads[i])) and g.distance(Point(ads[i])) > 0.02:
+            print(f"{i}: lotnisko poza swoim obszarem TMA ({g.distance(Point(ads[i])):.3f}°)")
 
 
-# ramki na mapie aplikacji przy zoomie domyślnym (qnh.css: SEKTOR n 72x27 px, TMA 88x27 px albo szersza przy długiej
-# nazwie, ok. 6 px na znak + 10 px) w pikselach zrzutu (1 px aplikacji przy zoomie 7,5 = ok. 2,43 px zrzutu); opis BELOW
-# ok. 165x37 px zrzutu jak na mapie PAŻP
-APP_PX = 2.43
-BOX_PX = {"sektor": (72 * APP_PX, 27 * APP_PX), "cap": (165, 37)}
-
-
-def tma_box_px(t: dict) -> tuple[float, float]:
-    """Rozmiar ramki TMA w pikselach zrzutu: szerokość jak w qnh.css (min. 88 px, dłuższa nazwa poszerza ramkę)."""
-    return max(88, 6 * len(t.get("short", t["name"])) + 10) * APP_PX, 27 * APP_PX
-
-
-def overlay(image: str, out: str, regions: list[dict], tma: dict | None = None, cfg: dict | None = None) -> None:
-    """Granice z pliku narysowane z powrotem na zrzucie (rejony magenta, pasy pomarańczowe, obszary TMA niebieskie,
-    numery w kółkach, ramki SEKTOR n niebieskie, ramki TMA czerwone, opisy BELOW zielone, szare oznaczenia TMA/CTR
-    krzyżykami) – do kontroli wzrokowej."""
+def overlay(out: str, cfg: dict) -> None:
+    """Geometria z pliku narysowana na zrzucie (rejony magenta, pasy pomarańczowe, obszary TMA niebieskie, cienkie
+    linie TMA granatowe, CTR czerwone, numery w kółkach, opisy BELOW zielone, szare oznaczenia krzyżykami) – do
+    kontroli wzrokowej."""
     from PIL import Image, ImageDraw
 
-    def rect(c, size, colour):
-        x, y = to_px(*c)
-        w, h = size[0] / 2, size[1] / 2
-        d.rectangle((x - w, y - h, x + w, y + h), outline=colour, width=2)
-
-    im = Image.open(image).convert("RGB")
+    im = Image.open(IMAGE).convert("RGB")
     d = ImageDraw.Draw(im)
-    for g in (tma or {}).values():
-        for poly in g["coordinates"]:
-            d.line([to_px(*c) for c in poly[0]], fill=(0, 90, 255), width=2)
-    for r in regions:
-        g = r["geometry"]
-        for poly in [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]:
+    polys = lambda g: [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]  # noqa: E731
+    for t in cfg["tmas"]:
+        for poly in polys(t["area"]):
+            d.line([to_px(*c) for c in poly[0]], fill=(0, 90, 255), width=3)
+        for line in (t.get("parts") or {}).get("coordinates", []):
+            d.line([to_px(*c) for c in line], fill=(0, 0, 120), width=1)
+    for c in cfg["ctrs"]:
+        for poly in polys(c["geometry"]):
+            d.line([to_px(*p) for p in poly[0]], fill=(220, 0, 0), width=2)
+    for r in cfg["regions"]:
+        for poly in polys(r["geometry"]):
             d.line([to_px(*c) for c in poly[0]], fill=(255, 140, 0) if r.get("band") else (230, 0, 230),
                    width=2 if r.get("band") else 3)
-    for r in regions:
         x, y = to_px(*r["num"])
         d.ellipse((x - 6, y - 6, x + 6, y + 6), outline=(0, 0, 255), width=2)
-        if "label" in r:
-            rect(r["label"], BOX_PX["sektor"], (0, 0, 255))
-    for t in (cfg or {}).get("tmas", []):
-        if t.get("box"):
-            rect(t["box"], tma_box_px(t), (220, 0, 0))
-        if t.get("cap"):
-            rect(t["cap"], BOX_PX["cap"], (0, 150, 0))
-    for c in (cfg or {}).get("chart_labels", []):
+    for t in cfg["tmas"]:
+        for k in ("cap", "code"):
+            if t.get(k):
+                x, y = to_px(*t[k])
+                d.rectangle((x - 80, y - 18, x + 80, y + 18), outline=(0, 150, 0), width=2)
+    for c in cfg.get("chart_labels", []):
         x, y = to_px(*c["lonlat"])
         d.line((x - 8, y, x + 8, y), fill=(120, 120, 120), width=2)
         d.line((x, y - 8, x, y + 8), fill=(120, 120, 120), width=2)
     im.save(out)
     print(f"nakładka: {out}")
-
-
-def _grow(mask, k: int):
-    """Dylatacja (k > 0) albo erozja (k < 0) maski kwadratem (2|k|+1) px."""
-    import numpy as np
-    from PIL import Image, ImageFilter
-
-    im = Image.fromarray(mask.astype(np.uint8) * 255)
-    f = ImageFilter.MaxFilter(2 * k + 1) if k > 0 else ImageFilter.MinFilter(-2 * k + 1)
-    return np.asarray(im.filter(f)) > 127
-
-
-def _polygon(mask, x0: int, y0: int):
-    """Maska (wycinek od x0, y0) jako wielokąt shapely w pikselach zrzutu: suma prostokątów z odcinków wierszy."""
-    import numpy as np
-    from shapely.geometry import box
-    from shapely.ops import unary_union
-
-    boxes = []
-    for y, row in enumerate(mask):
-        d = np.diff(np.r_[0, row.astype(np.int8), 0])
-        boxes += [box(x0 + a, y0 + y, x0 + b, y0 + y + 1) for a, b in zip(np.nonzero(d == 1)[0], np.nonzero(d == -1)[0])]
-    return unary_union(boxes)
-
-
-def trace_tma(image: str) -> dict[str, dict]:
-    """Obszary "BELOW … QNH FROM" lotnisk z liliowego wypełnienia zrzutu (MultiPolygon lon/lat dla każdego lotniska)."""
-    import numpy as np
-    from PIL import Image, ImageDraw
-
-    a = np.asarray(Image.open(image).convert("RGB")).astype(int)
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    gray = (r + g + b) / 3
-    purple = (b > g + 8) & (r > g + 2) & (gray > 150) & (gray < 245)
-    purple[:, :905] = purple[:, 2936:] = False
-    # zielone/pomarańczowe linie i niebieska otoczka przecinające TMA należą do wypełnienia
-    col = ((g > r + 50) & (g > b + 40) & (g > 100)) | ((r > 170) & (g > 80) & (g < 175) & (b < 90) & (r > g + 50)) \
-        | ((abs(r - 194) < 25) & (abs(g - 217) < 20) & (abs(b - 236) < 20) & (b > r + 25))
-    fill = _grow(_grow(purple | (col & _grow(purple, 8)), 3), -3)
-    # pogrubione linie: ciemne piksele, których czterej sąsiedzi też są ciemni (linia >= 3 px), z powrotem poszerzone
-    dark = gray < 110
-    core = dark.copy()
-    core[1:] &= dark[:-1]
-    core[:-1] &= dark[1:]
-    core[:, 1:] &= dark[:, :-1]
-    core[:, :-1] &= dark[:, 1:]
-    bold = _grow(core, 2) & dark
-    cut = Image.new("L", (a.shape[1], a.shape[0]), 0)
-    for c in TMA_CUTS:
-        ImageDraw.Draw(cut).line(c, fill=255, width=5)
-    cells = fill & ~_grow(bold, 1) & ~(np.asarray(cut) > 0)
-    canvas = Image.fromarray(cells.astype(np.uint8) * 255)
-    out = {}
-    for icao, seeds in TMA_SEEDS.items():
-        work = canvas.copy()
-        for sx, sy in seeds:
-            # punkt startowy na najbliższym pikselu wypełnienia (napisy i symbole wycinają dziury)
-            ys, xs = np.nonzero(cells[sy - 15:sy + 16, sx - 15:sx + 16])
-            k = int(np.argmin((xs - 15) ** 2 + (ys - 15) ** 2))
-            ImageDraw.floodfill(work, (int(sx - 15 + xs[k]), int(sy - 15 + ys[k])), 128, thresh=0)
-        m = np.asarray(work) == 128
-        ys, xs = np.nonzero(m)
-        y0, y1, x0, x1 = ys.min() - 12, ys.max() + 13, xs.min() - 12, xs.max() + 13
-        sub = m[y0:y1, x0:x1]
-        # domknięcie (cienkie linie i napisy w środku), wypełnienie dziur, poszerzenie do osi pogrubionej linii
-        sub = _grow(_grow(sub, 4), -4)
-        bg = Image.fromarray((~sub).astype(np.uint8) * 255).copy()   # kopia: obraz z tablicy jest tylko do odczytu
-        ImageDraw.floodfill(bg, (0, 0), 128, thresh=0)
-        sub = _grow(np.asarray(bg) != 128, 2)
-        poly = _polygon(sub, x0, y0).simplify(1.5)
-        parts = sorted(getattr(poly, "geoms", [poly]), key=lambda q: -q.area)
-        parts = [q for q in parts if q.area > 300]
-        out[icao] = {"type": "MultiPolygon", "coordinates": [
-            [[_r(to_lonlat(x, y), 4) for x, y in q.exterior.coords]] for q in parts]}
-        print(f"{icao}: {len(parts)} część/i, {sum(len(q.exterior.coords) for q in parts)} wierzchołków")
-    return out
 
 
 def fit(image: str) -> None:
@@ -482,46 +632,212 @@ def fit(image: str) -> None:
     print("LCC =", {k: round(float(v), 7) for k, v in zip(("xp", "yp", "n", "lnC", "lon0"), p)})
 
 
+def _unpx(x: float, y: float, zoom: float) -> list[float]:
+    """Odwrotność services.qnh.px(): [lon, lat] piksela mapy przy zoomie (kula, stożek jak lccCrs() w qnhmap.js)."""
+    from backend.app.services.qnh import LCC_N, LCC_R
+
+    d = math.pi / 180
+    tn = lambda phi: math.tan(math.pi / 4 + phi / 2) ** LCC_N   # noqa: E731
+    f = math.cos(math.asin(LCC_N)) * tn(math.asin(LCC_N)) / LCC_N
+    s = 0.5 / (math.pi * LCC_R) * 256 * 2 ** zoom
+    mx, my = x / s, LCC_R * f / tn(52 * d) + y / s
+    r = math.hypot(mx, my)
+    lat = 2 * math.atan((LCC_R * f / r) ** (1 / LCC_N)) - math.pi / 2
+    return [round(19 + math.atan2(mx, my) / LCC_N / d, 3), round(lat / d, 3)]
+
+
+# przesunięcia napisu przy rozsuwaniu (px przy zoomie 7,5), od najmniejszego (w pionie drożej: napisy są szerokie)
+NUDGE = sorted(((dx * 1.5, dy * 1.5) for dx in range(-24, 25) for dy in range(-16, 17)),
+               key=lambda p: (math.hypot(p[0], p[1] * 1.3), abs(p[1])))
+NUM_NUDGE = [p for p in NUDGE if math.hypot(*p) <= 15]
+NUM_SIDES = ("e", "w", "n", "s", "ne", "se", "nw", "sw")
+AERO_SIDES = ("e", "w", "se", "ne", "sw", "nw", "s", "n")
+
+
+def relayout(cfg: dict, ads: dict) -> None:
+    """Rozsuwa napisy przy oknie 1600x900 i 1366x768 (model services/qnh.py jak w test_qnh.py), tak żeby się nie
+    nakładały i, o ile się da, nie przecinały granic rejonów, linii 53°N/51°N i granicy FIR: numer rejonu z ramką QNH
+    (najpierw inna strona ramki, potem przesunięcie numeru do 15 px), opisy BELOW, kody 'code' i szare oznaczenia
+    przesunięte najmniej, jak się da, od miejsc z mapy PAŻP, kod ICAO lotniska na wolnej stronie symbolu."""
+    from shapely.geometry import MultiLineString
+    from shapely.geometry import box as rect
+    from shapely.prepared import prep
+
+    from backend.app.services.qnh import VIEWS, clash, drawn_aerodromes, label_boxes, px
+
+    metar = {a for r in cfg["regions"] for a in r["airports"]} | {t["icao"] for t in cfg["tmas"]}
+    rows = [{"icao": k, "lon": v[0], "lat": v[1]} for k, v in ads.items() if k.startswith("EP")]
+    sides = cfg.setdefault("aero_labels", {})
+    zooms = list(VIEWS.values())
+    empty = {"regions": [], "tmas": [], "chart_labels": []}
+    polys = lambda g: [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]  # noqa: E731
+    # linie, których napisy nie powinny przecinać: granice rejonów 1–14 (z granicą FIR), linie 53°N i 51°N
+    # i pogrubione obrysy obszarów TMA/MTMA
+    lines = [p[0] for r in cfg["regions"] if not r.get("band") for p in polys(r["geometry"])]
+    lines += [ring for t in cfg["tmas"] if t.get("area") for p in polys(t["area"]) for ring in p]
+    lines += [[(14 + i / 10, par) for i in range(103)] for par in (51, 53)]   # równoleżnik = łuk, co 0,1°
+    # linia z otoczką ma ok. 4,5 px, więc napis trzyma się 2,5 px od osi linii
+    lines_px = [prep(MultiLineString([[px(*c, z) for c in ln] for ln in lines]).buffer(2.5)) for z in zooms]
+
+    def boxes(item_cfg: dict, aero: list) -> list[list]:
+        return [label_boxes({**empty, **item_cfg}, aero, z) for z in zooms]
+
+    items = {("r", r["id"]): (lambda r=r: ({"regions": [r]}, [])) for r in cfg["regions"]}
+    items |= {("t", t["icao"]): (lambda t=t: ({"tmas": [t]}, [])) for t in cfg["tmas"]}
+    items |= {("d", i): (lambda c=c: ({"chart_labels": [c]}, [])) for i, c in enumerate(cfg.get("chart_labels", []))}
+    ad_list = lambda: drawn_aerodromes(rows, metar, sides)  # noqa: E731
+    cur: dict = {}
+    for key, fn in items.items():
+        cur[key] = boxes(*fn())
+    for a in ad_list():
+        cur[("a", a["icao"])] = boxes({}, [a])
+
+    def near(key, own: list[list], reach: float = 90) -> list[list]:
+        """Napisy innych elementów w promieniu reach px od napisów elementu (do szybszego liczenia kolizji)."""
+        out = []
+        for zi, mine in enumerate(own):
+            x0, y0 = min(b[2][0] for b in mine) - reach, min(b[2][1] for b in mine) - reach
+            x1, y1 = max(b[2][2] for b in mine) + reach, max(b[2][3] for b in mine) + reach
+            out.append([b for k2, other in cur.items() if k2 != key for b in other[zi]
+                        if b[2][0] < x1 and b[2][2] > x0 and b[2][1] < y1 and b[2][3] > y0])
+        return out
+
+    def cost(own: list[list], nbrs: list[list], skip: tuple = ()) -> tuple[int, int]:
+        """(kolizje z innymi napisami, przecięcia linii); skip: rodzaje napisów pomijane (ustawiane później)."""
+        hit = cross = 0
+        for zi, mine in enumerate(own):
+            for a in mine:
+                hit += sum(clash(a, b) for b in nbrs[zi] if b[0] not in skip)
+                if a[0] != "sym":
+                    cross += lines_px[zi].intersects(rect(*a[2]))
+        return hit, cross
+
+    def place(key, variants, skip: tuple = ()) -> None:
+        """variants: (opis, funkcja ustawiająca wariant); wybór pierwszego bez kolizji i przecięć, inaczej najlepszego."""
+        fn = items.get(key)
+        nbrs = near(key, cur[key])
+        best = None
+        for i, (label, apply) in enumerate(variants):
+            apply()
+            own = boxes(*fn()) if fn else boxes({}, [next(a for a in ad_list() if a["icao"] == key[1])])
+            c = cost(own, nbrs, skip)
+            if best is None or c < best[0]:
+                best = (c, i, label, apply, own)
+            if c == (0, 0):
+                break
+        best[3]()
+        cur[key] = best[4]
+        if best[1]:
+            print(f"  {key[1]}: {best[2]}" + (f" (kolizje {best[0][0]}, przecięcia {best[0][1]})" if any(best[0]) else ""))
+
+    def shifts(obj: dict, field: str, offsets) -> list:
+        base = obj[field]
+        x0, y0 = px(*base, zooms[0])
+
+        def at(dx, dy):
+            return lambda: obj.__setitem__(field, _unpx(x0 + dx, y0 + dy, zooms[0]) if (dx or dy) else base)
+        return [(f"{field} {dx:+.1f}, {dy:+.1f} px", at(dx, dy)) for dx, dy in offsets]
+
+    # kolejność: opisy BELOW i kody 'code' (najbliżej miejsc z mapy PAŻP), szare oznaczenia, numery rejonów z ramką
+    # QNH, kody lotnisk; w pierwszej rundzie każdy pomija napisy ustawiane po nim
+    for rnd in range(4):
+        later = lambda *kinds: kinds if rnd == 0 else ()  # noqa: E731
+        for t in cfg["tmas"]:
+            key = ("t", t["icao"])
+            if cost(cur[key], near(key, cur[key]), later("qnh", "aero")) != (0, 0):
+                for field in ("cap", "code"):
+                    if t.get(field):
+                        place(key, shifts(t, field, NUDGE), later("qnh", "aero"))
+        for i, c in enumerate(cfg.get("chart_labels", [])):
+            key = ("d", i)
+            if cost(cur[key], near(key, cur[key]), later("qnh", "aero")) != (0, 0):
+                place(key, shifts(c, "lonlat", NUDGE), later("qnh", "aero"))
+        for r in cfg["regions"]:
+            key = ("r", r["id"])
+            if cost(cur[key], near(key, cur[key]), later("aero")) == (0, 0):
+                continue
+            keep = r.get("qnh_at", "e")
+            order = (keep, *[s for s in NUM_SIDES if s != keep])
+            near_ = shifts(r, "num", [p for p in NUM_NUDGE if math.hypot(*p) <= 8])
+            far = shifts(r, "num", NUM_NUDGE)
+
+            def both(shift, side):
+                return lambda: (shift(), r.__setitem__("qnh_at", side))
+            # ramka po tej samej stronie co zwykle (e, potem w, n, s) z przesunięciem numeru do 8 px, dopiero potem
+            # inne strony i dalsze przesunięcia
+            variants = [(f"{lab}, QNH {side}", both(sh, side)) for side in order[:4] for lab, sh in near_]
+            variants += [(f"{lab}, QNH {side}", both(sh, side)) for lab, sh in far for side in order]
+            place(key, variants, later("aero"))
+        for a in ad_list():
+            key = ("a", a["icao"])
+            if cost(cur[key], near(key, cur[key])) == (0, 0):
+                continue
+            order = (a["label"], *[s for s in AERO_SIDES if s != a["label"]])
+            place(key, [(f"kod {s}", lambda s=s, i=a["icao"]: sides.__setitem__(i, s)) for s in order])
+        total = [0, 0]
+        for key, own in cur.items():
+            c = cost(own, near(key, own))
+            total[0] += c[0]
+            total[1] += c[1]
+        print(f"runda {rnd + 1}: kolizje {total[0] // 2}, przecięcia linii {total[1]}")
+        if total[0] == 0 and rnd:
+            break
+    cfg["aero_labels"] = {k: v for k, v in sorted(sides.items()) if v != "e"}
+
+
+def dump(cfg: dict) -> str:
+    """Tekst pliku: jeden rejon / jedna TMA / jeden CTR / jeden napis w wierszu."""
+    def val(k, v):
+        sep = (", ", ": ") if k in ("chart_labels",) else (",", ":")
+        if isinstance(v, list):
+            return "[\n" + ",\n".join(json.dumps(x, ensure_ascii=False, separators=sep) for x in v) + "\n]"
+        if k in ("aero_labels", "sources"):
+            return "{" + ",".join(f"\n {json.dumps(a)}: {json.dumps(b)}" for a, b in v.items()) + "\n}"
+        return json.dumps(v, ensure_ascii=False, separators=(", ", ": ") if isinstance(v, str) else sep)
+
+    return "{" + ",\n".join(f'"{k}": {val(k, v)}' for k, v in cfg.items()) + "}\n"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--image", help="zrzut mapy PAŻP (3840x2160) do --overlay i --fit")
-    ap.add_argument("--overlay", help="zapisz nakładkę granic na zrzucie do tego pliku PNG")
+    ap.add_argument("--overlay", help="zapisz nakładkę geometrii na zrzucie mapy PAŻP do tego pliku PNG")
+    ap.add_argument("--layout", action="store_true", help="rozsuń nachodzące na siebie napisy")
     ap.add_argument("--fit", action="store_true", help="dopasuj odwzorowanie do siatki zrzutu i wypisz parametry")
     ap.add_argument("--dry-run", action="store_true", help="bez zapisu pliku JSON")
     ap.add_argument("--out", default=str(OUT), help="plik wynikowy (domyślnie data/seed/qnh_regions.json); "
-                    "TMA, napisy i ramki zawsze z data/seed/qnh_regions.json")
+                    "TMA i układ napisów zawsze z data/seed/qnh_regions.json")
     args = ap.parse_args()
     if args.fit:
-        if not args.image:
-            sys.exit("--fit wymaga --image")
-        fit(args.image)
+        fit(str(IMAGE))
         return
-    if args.overlay and not args.image:
-        sys.exit("--overlay wymaga --image")
-    # dotychczasowy plik: TMA i ręczny układ napisów (ramki SEKTOR n, ramki TMA, opisy BELOW, szare oznaczenia)
+    from shapely.geometry import Polygon
+
     cfg = json.loads(OUT.read_text("utf-8"))
-    regions, fir = build(fir_ring(), {r["id"]: r["label"] for r in cfg.get("regions", []) if r.get("label")})
-    check(regions, fir)
-    tma = trace_tma(args.image) if args.image else None
+    ads = airports()
+    fir = fir_ring()
+    areas, parts, ctrs, over, snap = tma_areas(cfg, ese_sectors(), ads)
+    regions, fir_gj = build(fir, snap, ads, cfg.get("regions", []))
+    check(regions, fir_gj, areas)
+    firp = Polygon(fir)
+    tmas = []
+    for t in cfg["tmas"]:
+        keep = {k: v for k, v in t.items() if k not in ("area", "parts", "aip", "sct", "box", "short")}
+        tmas.append({**keep, "area": _gj(areas[t["icao"]]), "parts": _gj(parts[t["icao"]])})
+    out = {"_uwaga": UWAGA, "note": NOTE,
+           "sources": {p.relative_to(ROOT).as_posix(): file_sha256(p) for p in (SCT, ESE)},
+           "regions": regions, "tmas": tmas,
+           "ctrs": [{"name": c["name"], "src": c["src"], "geometry": _gj(c["geometry"])} for c in ctrs],
+           "overlaps": _gj(over), "chart_labels": cfg.get("chart_labels", []),
+           "aero_labels": dict(sorted(cfg.get("aero_labels", {}).items())), "fir": fir_gj}
+    if not firp.is_valid:
+        sys.exit("Granica FIR nie jest poprawnym wielokątem")
+    if args.layout:
+        relayout(out, ads)
     if args.overlay:
-        overlay(args.image, args.overlay, regions, tma, cfg)
+        overlay(args.overlay, out)
     if args.dry_run:
         return
-    cfg.update({"_uwaga": UWAGA, "note": NOTE, "fir": fir, "regions": regions})
-    for t in cfg.get("tmas", []) if tma else []:
-        if t["icao"] in tma:
-            t["aip"] = tma[t["icao"]]
-    order = ["_uwaga", "note", "regions", "tmas", "chart_labels", "fir"]
-    cfg = {k: cfg[k] for k in order + [k for k in cfg if k not in order] if k in cfg}
-    # jeden rejon / jedna TMA / jeden napis w wierszu, jak w ręcznie pisanym pliku
-    def dump(k, v):
-        sep = (", ", ": ") if k in ("tmas", "chart_labels") else (",", ":")
-        if isinstance(v, list):
-            return "[\n" + ",\n".join(json.dumps(x, ensure_ascii=False, separators=sep) for x in v) + "\n]"
-        return json.dumps(v, ensure_ascii=False, separators=(", ", ": ") if isinstance(v, str) else sep)
-
-    body = ",\n".join(f'"{k}": {dump(k, v)}' for k, v in cfg.items())
-    Path(args.out).write_text("{" + body + "}\n", "utf-8")
+    Path(args.out).write_text(dump(out), "utf-8")
     print(f"zapisano {args.out}")
 
 
