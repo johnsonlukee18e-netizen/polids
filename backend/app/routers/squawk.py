@@ -13,9 +13,9 @@ def _data() -> dict:
     try:
         return normalize(seed_json(settings.seed_dir / "squawk.json"))
     except FileNotFoundError as exc:
-        raise HTTPException(404, "SQUAWK: brak pliku data/seed/squawk.json") from exc
+        raise HTTPException(404, "SQUAWK: file data/seed/squawk.json missing") from exc
     except (OSError, ValueError) as exc:
-        raise HTTPException(500, f"SQUAWK: nie da się odczytać pliku data/seed/squawk.json ({exc})") from exc
+        raise HTTPException(500, f"SQUAWK: cannot read file data/seed/squawk.json ({exc})") from exc
 
 
 @router.get("")
@@ -30,10 +30,10 @@ def squawk():
 
 
 @router.get("/lookup")
-def squawk_lookup(code: str = Query(..., description="kod SSR: 4 cyfry ósemkowe, np. 7700")):
+def squawk_lookup(code: str = Query(..., description="SSR code: 4 octal digits, e.g. 7700")):
     """Znaczenie kodu: kody specjalne o tym numerze i wszystkie pule (każdej kategorii), w których leży."""
     code = code.strip()
     if not valid_code(code):
-        hint = " (8 i 9 nie występują)" if any(c in "89" for c in code) else ""
-        raise HTTPException(422, f"Kod SSR to 4 cyfry ósemkowe 0–7, np. 7700{hint}")
+        hint = " (8 and 9 do not occur)" if any(c in "89" for c in code) else ""
+        raise HTTPException(422, f"An SSR code is 4 octal digits 0–7, e.g. 7700{hint}")
     return lookup(_data(), code)

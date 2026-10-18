@@ -12,12 +12,12 @@ const RELOAD_MS = 60 * 1000;   // po powrocie na zakładkę dane z serwera najwy
 
 // widoki tabeli pul: id = kategoria puli z importera; EUR-E pokazuje wszystkie wiersze obszaru (także pule EPWW)
 export const CATEGORIES = [
-  { id: "epww", label: "EPWW", tag: "EPWW", line: "EPWW – pule, z których FIR EPWW sam przydziela kody (CAL, PA EUR-E, UNIT EP)." },
-  { id: "ccams", label: "CCAMS", tag: "CCAMS", line: "CCAMS – kody przydzielane centralnie przez CCAMS (na VATSIM: wtyczka CCAMS); UNIT z EP." },
-  { id: "nato", label: "NATO", tag: "NATO", line: "NATO – pule wojskowe NATO (UNIT z EP)." },
-  { id: "eur-e", label: "EUR-E (wszystkie)", tag: "EUR-E",
-    line: "EUR-E – wszystkie wpisy obszaru EUR-E (Polska, Litwa, Bułgaria, Węgry, Czechy, Rumunia, Mołdawia, Słowacja, "
-      + "Ukraina, Kaliningrad, Białoruś): przydziały sąsiadów i retencja." },
+  { id: "epww", label: "EPWW", tag: "EPWW", line: "EPWW – pools from which FIR EPWW assigns codes itself (CAL, PA EUR-E, UNIT EP)." },
+  { id: "ccams", label: "CCAMS", tag: "CCAMS", line: "CCAMS – codes assigned centrally by CCAMS (on VATSIM: the CCAMS plugin); UNIT with EP." },
+  { id: "nato", label: "NATO", tag: "NATO", line: "NATO – NATO military pools (UNIT with EP)." },
+  { id: "eur-e", label: "EUR-E (all)", tag: "EUR-E",
+    line: "EUR-E – all entries of the EUR-E area (Poland, Lithuania, Bulgaria, Hungary, Czechia, Romania, Moldova, Slovakia, "
+      + "Ukraine, Kaliningrad, Belarus): neighbour allocations and retention." },
 ];
 export const DEFAULT_VIEW = "epww";
 const CAT = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
@@ -34,9 +34,9 @@ export const inRange = (code, pool) => codeValue(pool.from) <= codeValue(code) &
 export function checkCode(text) {
   const code = String(text ?? "").trim();
   if (!code) return { code, ok: false, error: null };
-  if (/[89]/.test(code)) return { code, ok: false, error: "8 i 9 nie występują w kodach SSR: cyfry 0–7 (system ósemkowy)." };
-  if (!/^\d+$/.test(code)) return { code, ok: false, error: "Kod SSR to same cyfry 0–7." };
-  if (code.length > 4) return { code, ok: false, error: "Kod SSR ma 4 cyfry." };
+  if (/[89]/.test(code)) return { code, ok: false, error: "8 and 9 do not occur in SSR codes: digits 0–7 (octal)." };
+  if (!/^\d+$/.test(code)) return { code, ok: false, error: "An SSR code has digits 0–7 only." };
+  if (code.length > 4) return { code, ok: false, error: "An SSR code has 4 digits." };
   return { code, ok: code.length === 4, error: null };
 }
 
@@ -49,10 +49,10 @@ export const viewCounts = (pools) => Object.fromEntries(CATEGORIES.map((c) => [c
 
 // A/R z CAL: A = przydział (kody przydziela JEDNOSTKA), R = retencja (kod nadany przez PRZYDZIELA zostaje)
 export function arInfo(ar) {
-  if (ar === "A") return { text: "przydział", tip: "A – przydział: kody z tej puli przydziela JEDNOSTKA (kolumna Unit) w obszarze PA." };
+  if (ar === "A") return { text: "allocation", tip: "A – allocation: codes from this pool are assigned by the UNIT (Unit column) in the PA area." };
   if (ar === "R") {
-    return { text: "retencja", tip: "R – retencja: kod nadany przez jednostkę z kolumny PRZYDZIELA (Unit which assigned) "
-      + "zostaje bez zmiany, gdy lot wlatuje do obszaru JEDNOSTKA (kolumna Unit)." };
+    return { text: "retention", tip: "R – retention: a code assigned by the unit in the ASSIGNED BY column (Unit which assigned) "
+      + "is kept unchanged when the flight enters the area of the UNIT (Unit column)." };
   }
   return { text: ar || "–", tip: "" };
 }
@@ -72,7 +72,7 @@ export function lookup(data, code) {
 // czego kod nie ma (wynik lookup): "" = leży w puli
 export function missText(r) {
   if (r.pools.length) return "";
-  return `${r.special.length ? "Nie leży" : "– nie jest kodem specjalnym i nie leży"} w żadnej puli z CAL (EPWW, CCAMS, NATO, EUR-E).`;
+  return `${r.special.length ? "Not" : "– not a special code and not"} in any CAL pool (EPWW, CCAMS, NATO, EUR-E).`;
 }
 
 // filtr pul: każde słowo musi pasować; pełny kod (4 cyfry 0–7) = pule, w których leży
@@ -85,13 +85,10 @@ export function filterPools(pools, q = "") {
   return pools.filter((p) => { const t = hay(p); return words.every((w) => (isCode(w) && inRange(w, p)) || t.includes(w)); });
 }
 
-// 1 kod, 2 kody, 5 kodów, 22 kody, 12 kodów
-export function plural(n, one, few, many) {
-  const d = n % 10, dd = n % 100;
-  return n === 1 ? one : d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
-}
-const nCodes = (n) => `${n} ${plural(n, "kod", "kody", "kodów")}`;
-const nPools = (n) => `${n} ${plural(n, "pula", "pule", "pul")}`;
+// 1 code, 2 codes, 0 codes (0.12.5: interfejs po angielsku, bez polskiej odmiany)
+export const plural = (n, one, many) => (n === 1 ? one : many);
+const nCodes = (n) => `${n} ${plural(n, "code", "codes")}`;
+const nPools = (n) => `${n} ${plural(n, "pool", "pools")}`;
 export const rangeText = (p) => (p.to && p.to !== p.from ? `${p.from}–${p.to}` : p.from);
 const countOf = (p) => p.count ?? rangeSize(p.from, p.to || p.from);
 
@@ -101,8 +98,8 @@ const units = (text) => (text ? String(text).split(/\s+/).filter(Boolean)
   .map((t) => (t === "EP" ? `<b class="sq-ep">EP</b>` : esc(t))).join(" ") : "–");
 const FIELDS = [["pa", "PA"], ["unit", "Unit"], ["civ_mil", "CIV/MIL"], ["app", "APP"], ["assigned_by", "Unit which assigned"],
   ["ar", "A/R"], ["destination", "Destination"], ["via", "Via"], ["protection", "Protection"], ["remarks", "Remarks"], ["ver", "Ver"],
-  ["type", "przeznaczenie"]];
-const poolTip = (p) => [`${catTag(p.category)} · arkusz ${p.sheet ?? "?"}, wiersz ${p.row ?? "?"}`,
+  ["type", "purpose"]];
+const poolTip = (p) => [`${catTag(p.category)} · sheet ${p.sheet ?? "?"}, row ${p.row ?? "?"}`,
   ...FIELDS.filter(([k]) => p[k]).map(([k, n]) => `${n}: ${p[k]}`),
   ...Object.entries(p.raw || {}).map(([k, v]) => `${k}: ${v}`)].join("\n");
 const COLS = 10;
@@ -115,9 +112,9 @@ function poolRow(p, code, view, areas) {
   <td class="sq-range">${esc(rangeText(p))}</td><td class="num">${countOf(p)}</td>
   <td class="sq-cm">${esc(civMil(p.civ_mil) || "–")}${p.app === "APP" ? ` <span class="tag sq-app">APP</span>` : ""}</td>
   <td><span class="sq-ar sq-ar-${p.ar === "R" ? "r" : "a"}" title="${esc(ar.tip)}">${esc(ar.text)}</span></td>
-  <td class="sq-units">${wholeArea(p.unit, p.pa, areas) ? `<span class="sq-all" title="${esc(p.unit)}">cały ${esc(p.pa)}</span>` : units(p.unit)}${own}</td>
+  <td class="sq-units">${wholeArea(p.unit, p.pa, areas) ? `<span class="sq-all" title="${esc(p.unit)}">whole ${esc(p.pa)}</span>` : units(p.unit)}${own}</td>
   <td class="sq-units">${units(p.assigned_by)}</td>
-  <td class="sq-units">${units(p.destination)}${p.via ? `<div class="sq-minor">przez ${esc(p.via)}</div>` : ""}</td>
+  <td class="sq-units">${units(p.destination)}${p.via ? `<div class="sq-minor">via ${esc(p.via)}</div>` : ""}</td>
   <td class="sq-units">${units(p.protection)}</td>
   <td class="sq-minor">${esc(notes)}</td><td class="sq-ver">${esc(p.ver || "")}</td></tr>`;
 }
@@ -126,19 +123,19 @@ const specialRow = (s, code) => `<tr class="${s.code === code ? "selected" : ""}
   <td class="sq-scode${EMERGENCY.has(s.code) ? " emerg" : ""}">${esc(s.code)}</td>
   <td><b class="sq-label">${esc(s.label || "")}</b> <span class="sq-meaning">${esc(s.meaning || "")}</span>
     ${s.note ? `<div class="sq-note">${esc(s.note)}</div>` : ""}
-    ${s.excluded?.length ? `<div class="sq-excl"><span class="hint">bez kodu ${esc(s.code)}:</span> ${s.excluded.map((x) => `<span class="tag">${esc(x)}</span>`).join(" ")}</div>` : ""}
-    <div class="hint sq-src">źródło: ${esc(s.source || "–")}</div></td></tr>`;
+    ${s.excluded?.length ? `<div class="sq-excl"><span class="hint">without ${esc(s.code)}:</span> ${s.excluded.map((x) => `<span class="tag">${esc(x)}</span>`).join(" ")}</div>` : ""}
+    <div class="hint sq-src">source: ${esc(s.source || "–")}</div></td></tr>`;
 
 // jedna pula w odpowiedzi: kategoria (przycisk: pokaż w tabeli), zakres, liczba, CIV/MIL, przydział albo retencja, cel
 export function hitText(p, areas) {
   const parts = [`${rangeText(p)} (${nCodes(countOf(p))})`];
-  const unit = wholeArea(p.unit, p.pa, areas) ? `cały ${p.pa}` : p.unit;
+  const unit = wholeArea(p.unit, p.pa, areas) ? `whole ${p.pa}` : p.unit;
   if (p.civ_mil) parts.push(civMil(p.civ_mil) + (p.app === "APP" ? " APP" : ""));
-  if (p.ar === "R") parts.push(`retencja (${unit || "–"}), przydziela ${p.assigned_by || "–"}`);
-  else if (p.ar === "A") parts.push(`przydział: ${unit || "–"}`);
+  if (p.ar === "R") parts.push(`retention (${unit || "–"}), assigned by ${p.assigned_by || "–"}`);
+  else if (p.ar === "A") parts.push(`allocation: ${unit || "–"}`);
   else if (unit) parts.push(unit);
-  if (p.destination) parts.push(`cel ${p.destination}`);
-  if (p.protection) parts.push(`ochrona ${p.protection}`);
+  if (p.destination) parts.push(`dest ${p.destination}`);
+  if (p.protection) parts.push(`protection ${p.protection}`);
   if (p.type) parts.push(p.type);
   if (p.remarks) parts.push(p.remarks);
   return parts.join(" · ");
@@ -147,14 +144,14 @@ export function hitText(p, areas) {
 function answerHtml(data, text, view) {
   const { code, ok, error } = checkCode(text);
   if (error) return `<p class="sq-bad">${esc(error)}</p>`;
-  if (!ok) return `<p class="hint">${code ? `jeszcze ${4 - code.length} ${plural(4 - code.length, "cyfra", "cyfry", "cyfr")}` : "Wpisz 4 cyfry kodu SSR (0–7), np. 7700."}</p>`;
-  if (!data) return `<p class="hint">Ładowanie…</p>`;
+  if (!ok) return `<p class="hint">${code ? `${4 - code.length} more ${plural(4 - code.length, "digit", "digits")}` : "Enter the 4 digits of an SSR code (0–7), e.g. 7700."}</p>`;
+  if (!data) return `<p class="hint">Loading…</p>`;
   const r = lookup(data, code);
   const lines = r.special.map((s) => `<p><b class="sq-big${EMERGENCY.has(s.code) ? " emerg" : ""}">${esc(s.code)}</b>
     <b class="sq-label">${esc(s.label || "")}</b> – ${esc(s.meaning || "")}</p>`);
   if (r.pools.length) {
     const shown = r.pools.some((p) => inView(p, view));
-    lines.push(`<p><b class="sq-big">${esc(code)}</b> ${nPools(r.pools.length)} w CAL${shown ? "" : " <span class=\"hint\">(kliknij kategorię, żeby pokazać w tabeli)</span>"}:</p>`);
+    lines.push(`<p><b class="sq-big">${esc(code)}</b> ${nPools(r.pools.length)} in CAL${shown ? "" : " <span class=\"hint\">(click a category to show it in the table)</span>"}:</p>`);
     lines.push(`<ul class="sq-hits">${r.pools.map((p) => `<li><button type="button" class="sq-cat${inView(p, view) ? " on" : ""}"
       data-view="${esc(p.category)}" title="${esc(CAT[p.category]?.line || "")}">${esc(catTag(p.category))}</button>
       <span class="sq-hit">${esc(hitText(p, data.meta?.participating_areas))}</span></li>`).join("")}</ul>`);
@@ -167,38 +164,38 @@ function answerHtml(data, text, view) {
 function metaText(meta) {
   if (!meta) return "";
   return [meta.edition ? `EUROCONTROL CAL v${meta.edition}` : "EUROCONTROL CAL", meta.source, meta.generated ? `import ${meta.generated}` : "",
-    meta.layout && meta.layout !== "CAL" ? `układ arkusza: ${meta.layout}` : ""].filter(Boolean).join(" · ");
+    meta.layout && meta.layout !== "CAL" ? `sheet layout: ${meta.layout}` : ""].filter(Boolean).join(" · ");
 }
 
 export default {
   mount(root) {
     const pane = h(`<div class="pane sq-pane">
-      <h2 class="title">SQUAWK – kody SSR FIR EPWW</h2>
+      <h2 class="title">SQUAWK – SSR codes FIR EPWW</h2>
       <div class="sq-grid">
         <div class="sq-col">
-          <div class="card sq-look"><h3>Sprawdź kod</h3>
+          <div class="card sq-look"><h3>Check code</h3>
             <div class="sq-lookrow">
-              <input class="field sq-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" placeholder="7700" aria-label="Kod SSR">
+              <input class="field sq-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" placeholder="7700" aria-label="SSR code">
               <div class="sq-answer"></div>
             </div>
           </div>
-          <div class="card sq-pools"><h3>Pule kodów SSR · EUROCONTROL CAL</h3>
+          <div class="card sq-pools"><h3>SSR code pools · EUROCONTROL CAL</h3>
             <div class="toolbar sq-bar">
               <span class="sq-views">${CATEGORIES.map((c) => `<button type="button" class="btn" data-view="${c.id}" title="${esc(c.line)}">${esc(c.label)} <span class="sq-n"></span></button>`).join("")}</span>
-              <input type="search" class="sq-filter" placeholder="Filtr: kod, jednostka, cel…" size="32">
+              <input type="search" class="sq-filter" placeholder="Filter: code, unit, destination…" size="32">
               <span class="hint sq-count"></span>
             </div>
             <p class="sq-line"></p>
             <p class="hint sq-meta"></p>
-            <table class="data sq-table"><thead><tr><th>Od–do</th><th class="num">Liczba</th><th>CIV/MIL</th>
-              <th title="${esc(`${arInfo("A").tip}\n${arInfo("R").tip}`)}">Przydział</th><th>Jednostka</th><th>Przydziela</th>
-              <th>Cel</th><th>Ochrona</th><th>Uwagi</th><th title="wersja CAL, w której wiersz ostatnio zmieniono">Wer.</th></tr></thead>
-              <tbody><tr><td colspan="${COLS}" class="hint">Ładowanie…</td></tr></tbody></table>
+            <table class="data sq-table"><thead><tr><th>From–to</th><th class="num">Count</th><th>CIV/MIL</th>
+              <th title="${esc(`${arInfo("A").tip}\n${arInfo("R").tip}`)}">A/R</th><th>Unit</th><th>Assigned by</th>
+              <th>Dest</th><th>Protection</th><th>Remarks</th><th title="CAL version in which the row was last changed">Ver</th></tr></thead>
+              <tbody><tr><td colspan="${COLS}" class="hint">Loading…</td></tr></tbody></table>
           </div>
         </div>
-        <div class="card sq-special"><h3>Kody specjalne</h3>
-          <table class="data sq-table"><thead><tr><th>Kod</th><th>Znaczenie</th></tr></thead><tbody></tbody></table>
-          <p class="hint sq-foot">Znaczenia ogólne ICAO i SERA, nie z arkusza CAL – do potwierdzenia w AIP Polska ENR 1.6.</p>
+        <div class="card sq-special"><h3>Special codes</h3>
+          <table class="data sq-table"><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody></tbody></table>
+          <p class="hint sq-foot">General ICAO and SERA meanings, not from the CAL sheet – to be confirmed in AIP Poland ENR 1.6.</p>
         </div>
       </div>
     </div>`);
@@ -225,12 +222,12 @@ export default {
       const list = filterPools(all, filter.value);
       const total = list.reduce((n, p) => n + countOf(p), 0);
       pane.querySelector(".sq-count").textContent = all.length
-        ? `${list.length === all.length ? nPools(list.length) : `${list.length} z ${nPools(all.length)}`} · ${nCodes(total)}` : "";
+        ? `${list.length === all.length ? nPools(list.length) : `${list.length} of ${nPools(all.length)}`} · ${nCodes(total)}` : "";
       pane.querySelector(".sq-meta").textContent = metaText(data.meta);
-      poolBody.innerHTML = !data.pools.length ? `<tr><td colspan="${COLS}" class="hint sq-empty">Brak pul kodów w pliku data/seed/squawk.json.</td></tr>`
-        : !all.length ? `<tr><td colspan="${COLS}" class="hint">Brak pul w tej kategorii.</td></tr>`
+      poolBody.innerHTML = !data.pools.length ? `<tr><td colspan="${COLS}" class="hint sq-empty">No code pools in data/seed/squawk.json.</td></tr>`
+        : !all.length ? `<tr><td colspan="${COLS}" class="hint">No pools in this category.</td></tr>`
           : list.length ? list.map((p) => poolRow(p, code, view, data.meta?.participating_areas)).join("")
-            : `<tr><td colspan="${COLS}" class="hint">Żadna pula nie pasuje do filtra.</td></tr>`;
+            : `<tr><td colspan="${COLS}" class="hint">No pool matches the filter.</td></tr>`;
       specialBody.innerHTML = data.special.map((s) => specialRow(s, code)).join("");
       poolBody.querySelector("tr.selected")?.scrollIntoView({ block: "nearest" });
     };

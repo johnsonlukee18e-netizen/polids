@@ -122,10 +122,10 @@ def test_api_squawk(client):
     hit = client.get("/api/squawk/lookup", params={"code": "1500"}).json()
     assert [(p["category"], p["civ_mil"]) for p in hit["pools"]] == [("nato", "MIL")]
     assert client.get("/api/squawk/lookup", params={"code": " 1000 "}).json()["special"][0]["code"] == "1000"
-    for bad, word in (("7800", "8 i 9"), ("77", "ósemkowe"), ("abcd", "ósemkowe"), ("77000", "ósemkowe")):
+    for bad, word in (("7800", "8 and 9"), ("77", "octal"), ("abcd", "octal"), ("77000", "octal")):
         r = client.get("/api/squawk/lookup", params={"code": bad})
         assert r.status_code == 422 and word in r.json()["detail"], bad
-    assert "8 i 9" not in client.get("/api/squawk/lookup", params={"code": "77"}).json()["detail"]
+    assert "8 and 9" not in client.get("/api/squawk/lookup", params={"code": "77"}).json()["detail"]
     assert client.get("/api/squawk/lookup").status_code == 422
 
 
@@ -159,7 +159,7 @@ def real_cal():
 def test_real_cal_layout_and_categories(real_cal):
     res, log = real_cal
     meta, pools = res["meta"], res["pools"]
-    assert (meta["layout"], meta["edition"], meta["edition_from"], meta["latest_ver"]) == ("CAL", "4.13", "nazwa pliku i kolumna Ver", "4.13")
+    assert (meta["layout"], meta["edition"], meta["edition_from"], meta["latest_ver"]) == ("CAL", "4.13", "file name and Ver column", "4.13")
     assert (meta["rows"], meta["skipped"], res["skipped"]) == (1273, 0, [])
     assert meta["participating_areas"]["EUR-E"] == EUR_E and "EP" in meta["participating_areas"]["CCAMS"]
     assert list(meta["participating_areas"]) == ["EUR-A", "EUR-B", "EUR-C", "EUR-D", "EUR-E", "EUR-F", "CCAMS"]
@@ -200,7 +200,7 @@ def test_real_cal_command(tmp_path, capsys):
     out.write_text(squawk_cal.dumps({**base, "_status": "stara notatka", "meta": None, "pools": []}), "utf-8")
     assert squawk_cal.main([str(REAL_CAL), "--out", str(out), "--dry-run"]) == 0
     printed = capsys.readouterr().out
-    assert "# układ: CAL" in printed and "# wydanie CAL: 4.13 (nazwa pliku i kolumna Ver)" in printed
+    assert "# układ: CAL" in printed and "# wydanie CAL: 4.13 (file name and Ver column)" in printed
     assert "# pule: 207 (epww 5, ccams 37, nato 5, eur-e 160)" in printed and "7401–7477" in printed
     assert json.loads(out.read_text("utf-8"))["pools"] == []   # --dry-run nic nie zapisuje
     assert squawk_cal.main([str(REAL_CAL), "--out", str(out)]) == 0
@@ -264,19 +264,19 @@ def test_cal_layout_synthetic(tmp_path):
         (15, "Series/From/To: dwie cyfry ósemkowe 0–7")]
     assert res["skipped"][0]["raw"]["Series"] == "18" and res["skipped"][0]["pa"] == "EUR-E"
     meta = res["meta"]
-    assert (meta["edition"], meta["edition_from"], meta["rows"], meta["skipped"]) == ("4.13", "nazwa pliku i kolumna Ver", 13, 4)
+    assert (meta["edition"], meta["edition_from"], meta["rows"], meta["skipped"]) == ("4.13", "file name and Ver column", 13, 4)
     assert meta["participating_areas"] == {"EUR-E": EUR_E, "CCAMS": ["EE", "EP", "ES"]}
     assert meta["counts"] == {"epww": 2, "ccams": 1, "nato": 1, "eur-e": 2}
     assert "CAL:14 EUR-C A/R=''" in "\n".join(log)
     # wydanie bez numeru w nazwie pliku: najnowsza wersja z kolumny Ver
     other = squawk_cal.extract(sheets, "cal.xlsx", report=lambda *_: None)["meta"]
-    assert (other["edition"], other["edition_from"]) == ("4.13", "kolumna Ver")
+    assert (other["edition"], other["edition_from"]) == ("4.13", "Ver column")
     # opcje układu ogólnego nie zmieniają wyboru w układzie CAL (tylko uwaga w raporcie)
     log.clear()
     forced = squawk_cal.extract(sheets, path.name, units=["LK"], report=log.append)
     assert forced["pools"] == res["pools"] and "dotyczą tylko układu ogólnego" in log[0]
     # --generic: ten sam arkusz przez zgadywanie kolumn
-    assert squawk_cal.extract(sheets, path.name, generic=True, report=lambda *_: None)["meta"]["layout"] == "ogólny"
+    assert squawk_cal.extract(sheets, path.name, generic=True, report=lambda *_: None)["meta"]["layout"] == "generic"
 
 
 def test_cal_helpers():
@@ -374,9 +374,9 @@ def test_import_xlsx(tmp_path):
     assert [p["category"] for p in res["pools"]] == ["epww", "epww", "epww", "epww", "eur-e"]   # bez UNIT EP: eur-e
     assert [(s["row"], s["match"]) for s in res["skipped"]] == [(11, ["unit"])]
     meta = res["meta"]
-    assert (meta["edition"], meta["edition_from"], meta["source"]) == ("4.13", "arkusz", "synthetic.xlsx")
+    assert (meta["edition"], meta["edition_from"], meta["source"]) == ("4.13", "sheet", "synthetic.xlsx")
     assert meta["filter"] == {"unit": ["EP"], "mention": ["EUR-E"]} and meta["sheets"]["CAL"]["header_row"] == 4
-    assert meta["layout"] == "ogólny" and meta["counts"] == {"epww": 4, "ccams": 0, "nato": 0, "eur-e": 1}
+    assert meta["layout"] == "generic" and meta["counts"] == {"epww": 4, "ccams": 0, "nato": 0, "eur-e": 1}
     assert meta["sheets"]["CAL"]["columns"]["from"] == "CODE FROM" and meta["sheets"]["CAL"]["columns"]["to"] == "CODE TO"
     # raport: wartości każdej kolumny z liczbą wystąpień (do ustalenia znaczenia EUR-E)
     text = "\n".join(log)
@@ -396,7 +396,7 @@ def test_import_xls_two_level_header_and_ranges(tmp_path):
                                                       "remarks": "REMARKS"}
     assert res["meta"]["sheets"]["RANGES"]["columns"]["code"] == "SSR CODES"
     assert [s["raw"]["SSR CODES"] for s in res["skipped"]] == ["TBD"]
-    assert (res["meta"]["edition"], res["meta"]["edition_from"]) == ("4.13", "nazwa pliku")
+    assert (res["meta"]["edition"], res["meta"]["edition_from"]) == ("4.13", "file name")
     # inne filtry z wiersza poleceń
     only = squawk_cal.extract(squawk_cal.read_book(path), path.name, units=["EPGD"], mentions=[], only=["RANGES"],
                               report=lambda *_: None)
@@ -412,7 +412,7 @@ def test_import_command_keeps_special_codes(tmp_path, capsys):
     assert json.loads(out.read_text("utf-8"))["_status"] == "czeka"   # --dry-run nic nie zapisuje
     assert squawk_cal.main([str(path), "--out", str(out)]) == 0
     printed = capsys.readouterr().out
-    assert "0100–0177" in printed and "wydanie CAL: 4.13" in printed and "układ: ogólny" in printed
+    assert "0100–0177" in printed and "wydanie CAL: 4.13" in printed and "układ: generic" in printed
     data = json.loads(out.read_text("utf-8"))
     assert list(data) == ["_uwaga", "meta", "special", "pools"]
     assert data["special"] == [{"code": "7700", "label": "EMERGENCY"}] and data["meta"]["source"] == "cal.xlsx"
@@ -502,8 +502,8 @@ console.log(JSON.stringify({
     sq.lookup(empty, "7700"), sq.lookup(null, "7700")].map(short),
   miss: [sq.lookup(data, "7450"), sq.lookup(data, "7700"), sq.lookup(data, "1234"), sq.lookup(empty, "1234")].map(sq.missText),
   hits: [sq.hitText(pools[0], areas), sq.hitText(pools[4], areas), sq.hitText(pools[4], {}), sq.hitText(pools[5], areas), sq.hitText(pools[6], areas)],
-  filter: ["", "ep", "ccams", "retencja", "7450", "4000", "eb all", "abc", "7700", "v4.12", "civ/mil app"].map((q) => sq.filterPools(pools, q).map((p) => `${p.category}:${p.from}`)),
-  plural: [0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024].map((n) => sq.plural(n, "kod", "kody", "kodów")),
+  filter: ["", "ep", "ccams", "retention", "7450", "4000", "eb all", "abc", "7700", "v4.12", "civ/mil app"].map((q) => sq.filterPools(pools, q).map((p) => `${p.category}:${p.from}`)),
+  plural: [0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024].map((n) => sq.plural(n, "code", "codes")),
   range: [sq.rangeText(pools[0]), sq.rangeText(pools[6]), sq.rangeText({ from: "1000" })],
   tag: ["epww", "eur-e", "inne", undefined].map(sq.catTag),
 }));
@@ -536,23 +536,23 @@ def test_js_codes(js):
 def test_js_check_code(js):
     res = [(c["code"], c["ok"], c["error"]) for c in js["check"]]
     assert res[0] == ("", False, None) and res[1] == ("7700", True, None) and res[2] == ("77", False, None)
-    assert "8 i 9" in res[3][2] and "8 i 9" in res[4][2] and "0–7" in res[5][2] and "4 cyfry" in res[6][2]
+    assert "8 and 9" in res[3][2] and "8 and 9" in res[4][2] and "0–7" in res[5][2] and "4 digits" in res[6][2]
     assert res[7] == ("0000", True, None)
 
 
 def test_js_categories_and_views(js):
     # te same kategorie co w importerze, domyślnie pule EPWW
     assert [c[0] for c in js["categories"]] == list(CATEGORIES) and js["def"] == "epww"
-    assert [c[1] for c in js["categories"]] == ["EPWW", "CCAMS", "NATO", "EUR-E (wszystkie)"]
-    assert js["lines"][0].startswith("EPWW – pule, z których FIR EPWW sam przydziela kody")
-    assert "CCAMS" in js["lines"][1] and "VATSIM" in js["lines"][1] and "wojskowe" in js["lines"][2]
-    assert all(c in js["lines"][3] for c in ("Polska", "Litwa", "Kaliningrad", "Białoruś", "retencja"))
+    assert [c[1] for c in js["categories"]] == ["EPWW", "CCAMS", "NATO", "EUR-E (all)"]
+    assert js["lines"][0].startswith("EPWW – pools from which FIR EPWW assigns codes itself")
+    assert "CCAMS" in js["lines"][1] and "VATSIM" in js["lines"][1] and "military" in js["lines"][2]
+    assert all(c in js["lines"][3] for c in ("Poland", "Lithuania", "Kaliningrad", "Belarus", "retention"))
     # widoki po kodzie; EUR-E (wszystkie) = wiersze EUR-E sąsiadów i pule EPWW
     assert js["views"] == [["epww:0001", "epww:4000", "epww:7401"], ["ccams:2001"], ["nato:1500"],
                            ["epww:0001", "eur-e:0101", "epww:4000", "epww:7401", "eur-e:7401"]]
     assert js["counts"] == {"epww": 3, "ccams": 1, "nato": 1, "eur-e": 5}
     assert js["countsEmpty"] == {"epww": 0, "ccams": 0, "nato": 0, "eur-e": 0}
-    assert js["ar"] == [["przydział", "A"], ["retencja", "R"], ["–", ""], ["X", ""]]
+    assert js["ar"] == [["allocation", "A"], ["retention", "R"], ["–", ""], ["X", ""]]
     assert js["civMil"] == ["CIV", "MIL", "CIV/MIL", "", ""]
     assert js["whole"] == [True, True, False, False, False, False]
     assert js["tag"] == ["EPWW", "EUR-E", "INNE", "?"]
@@ -563,20 +563,20 @@ def test_js_lookup_and_filter(js):
     assert js["lookup"] == [[[], ["epww:7401", "eur-e:7401"]], [[], ["eur-e:0101"]], [["7700"], []], [[], []],
                             [["7700"], []], [[], []]]
     miss = js["miss"]
-    assert miss[0] == "" and miss[1] == "Nie leży w żadnej puli z CAL (EPWW, CCAMS, NATO, EUR-E)."
-    assert miss[2] == miss[3] == "– nie jest kodem specjalnym i nie leży w żadnej puli z CAL (EPWW, CCAMS, NATO, EUR-E)."
-    assert js["hits"] == ["7401–7477 (63 kody) · CIV · przydział: EP · cel EP · ochrona ES",
-                          "0101–0117 (15 kodów) · CIV · retencja (cały EUR-E), przydziela EB · cel ALL",
-                          "0101–0117 (15 kodów) · CIV · retencja (EP EY LB), przydziela EB · cel ALL",
-                          "7401–7477 (63 kody) · CIV/MIL APP · przydział: LR · cel LR",
-                          "4000 (1 kod) · EPKK · SINGLE"]
+    assert miss[0] == "" and miss[1] == "Not in any CAL pool (EPWW, CCAMS, NATO, EUR-E)."
+    assert miss[2] == miss[3] == "– not a special code and not in any CAL pool (EPWW, CCAMS, NATO, EUR-E)."
+    assert js["hits"] == ["7401–7477 (63 codes) · CIV · allocation: EP · dest EP · protection ES",
+                          "0101–0117 (15 codes) · CIV · retention (whole EUR-E), assigned by EB · dest ALL",
+                          "0101–0117 (15 codes) · CIV · retention (EP EY LB), assigned by EB · dest ALL",
+                          "7401–7477 (63 codes) · CIV/MIL APP · allocation: LR · dest LR",
+                          "4000 (1 code) · EPKK · SINGLE"]
     assert js["filter"] == [
         ["epww:7401", "epww:0001", "ccams:2001", "nato:1500", "eur-e:0101", "eur-e:7401", "epww:4000"],
         ["epww:7401", "epww:0001", "ccams:2001", "nato:1500", "eur-e:0101", "epww:4000"],   # EP też w EPKK
         ["ccams:2001"], ["eur-e:0101"], ["epww:7401", "eur-e:7401"], ["epww:4000"], ["eur-e:0101"], ["epww:4000"], [],
         ["eur-e:0101"], ["eur-e:7401"]]
-    # 0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024
-    assert js["plural"] == ["kodów", "kod", "kody", "kody", "kodów", "kodów", "kodów", "kody", "kodów", "kody", "kodów", "kody"]
+    # 0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024 (0.12.5: po angielsku – liczba pojedyncza tylko dla 1)
+    assert js["plural"] == ["codes", "code"] + ["codes"] * 10
     assert js["range"] == ["7401–7477", "4000", "1000"]
 
 
