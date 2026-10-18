@@ -173,17 +173,18 @@
 .map.light .acicon.arr svg { fill: #a87c00; stroke: #fff; }
 .map.light .acicon.trn svg { fill: #2a3036; stroke: #fff; }
 .map.light .acicon.sel svg { fill: #d4380d; }
-/* etykieta jak w PEGASUS_21 (airspace.js p21Lines): bez ramki, tła i poświaty, linijki czcionką o stałej szerokości
-   (spacje w linijce to kolumny); znak wywoławczy na zielono, reszta na biało jak na etykiecie DOM004 z P21;
-   wybrany lot: znak na pomarańczowo */
+/* etykieta jak w PEGASUS_21 (airspace.js p21Lines, p21Html): bez ramki, tła i poświaty, linijki czcionką o stałej
+   szerokości (spacje w linijce to kolumny); sam znak wywoławczy (b.cs) na zielono, prędkość (b.gs) i linijki 2-4
+   na biało jak na etykiecie DOM004 z P21; wybrany lot: znak na pomarańczowo */
 .mapwrap .acicon span.p21 { left: 12px; top: -7px; padding: 0; background: none; border-radius: 0; font: 11px/12px var(--mono); }
 .acicon span.p21 i, .p21-sample i { display: block; font-style: normal; white-space: pre; color: #f4f6f8; }
-.acicon span.p21 i.l1, .p21-sample i.l1 { color: #00ff00; }
-.acicon.sel span.p21 i.l1 { color: #ff9f1a; }
+.acicon span.p21 b, .p21-sample b { font-weight: inherit; }
+.acicon span.p21 b.cs, .p21-sample b.cs { color: #00ff00; }
+.acicon.sel span.p21 b.cs { color: #ff9f1a; }
 .map.light .acicon span.p21 { background: none; }
 .map.light .acicon span.p21 i { color: #1d2329; }
-.map.light .acicon span.p21 i.l1 { color: #0a7a36; }
-.map.light .acicon.sel span.p21 i.l1 { color: #b02e08; }
+.map.light .acicon span.p21 b.cs { color: #0a7a36; }
+.map.light .acicon.sel span.p21 b.cs { color: #b02e08; }
 .p21-sample { display: block; padding: 2px 3px; background: #000; font: 10px/11px var(--mono); }
 .lgx .lgx-i.p21 { align-items: flex-start; }
 .ac-key { display: flex; gap: 10px; margin: -2px 0 2px 38px; font: 11px var(--mono); color: var(--muted); }

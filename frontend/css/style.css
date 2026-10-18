@@ -53,9 +53,21 @@ a { color: var(--green-text); }
 .menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }
 /* display:block wyżej przykrywa [hidden] przeglądarki: ADMIN (hidden dla nie-administratorów) zajmował miejsce w menu */
 .menu nav button[hidden] { display: none; }
+/* Niskie okno (poniżej 900 px; laptop 1366x768 z paskami przeglądarki to 600-657 px): przyciski menu w kolumnie flex
+   zmniejszają się po równo, gdy wszystkie się nie mieszczą, więc całe menu (z EMERGENCY i ADMIN) i zegar z AIRAC są
+   widoczne bez przewijania do 600 px wysokości, także z zalogowanym użytkownikiem. Gdy się mieszczą, mają wysokość jak
+   dotąd (28,8 px = 5 + 16,8 + 5 + ramka; od 820 px w dół 24,8 px): wysokość zamiast pionowego paddingu i linia 14 px,
+   więc tekst zostaje na środku przycisku także przy 16 px (przy paddingu przepełniony przycisk spychał tekst w dół).
+   W flex marginesy się nie łączą: odstęp nad EMERGENCY i ADMIN = margines przycisku wyżej + margin-top, razem 10 px
+   (6 px od 820 px w dół) jak w układzie blokowym. */
+@media (max-height: 899px) {
+  .menu nav { display: flex; flex-direction: column; }
+  #tabs button { flex: 0 1 auto; height: 28.8px; min-height: 16px; padding-top: 0; padding-bottom: 0; line-height: 14px; }
+  #tabs button.red, #tabs button.admin { margin-top: 8px; }
+}
 @media (max-height: 820px) {
-  #tabs button { padding: 3px 6px; margin-bottom: 1px; }
-  #tabs button.red, #tabs button.admin { margin-top: 6px; }
+  #tabs button { height: 24.8px; margin-bottom: 1px; }
+  #tabs button.red, #tabs button.admin { margin-top: 5px; }
 }
 .menu nav button.back { font-size: 22px; line-height: 16.8px; }
 .menu nav button.back:disabled { opacity: .35; cursor: default; background: linear-gradient(#45a832, #2f8a22); }

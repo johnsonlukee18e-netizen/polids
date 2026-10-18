@@ -244,3 +244,46 @@ def test_square_native_controls_and_no_drop_shadows():
                if not (v.strip() == "none" or v.strip().startswith("inset") or re.match(r"0 0 0 \d+px", v.strip()))]
         assert not bad, (name, bad)
     assert ".leaflet-tooltip, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-bar, .leaflet-control-layers { box-shadow: none; }" in css
+
+
+def _media(css, query):
+    """Treść bloku @media (query) { ... } (jeden poziom zagnieżdżenia)."""
+    i = css.index(f"@media ({query}) {{")
+    depth, j = 0, css.index("{", i)
+    for k in range(j, len(css)):
+        depth += {"{": 1, "}": -1}.get(css[k], 0)
+        if not depth:
+            return css[j + 1:k]
+    raise AssertionError(query)
+
+
+def test_menu_fits_low_windows():
+    """Runda 14 (audyt): przy 1366x657 (laptop 1366x768) lewe menu się przewijało, a EMERGENCY chował się do połowy pod
+    zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
+    przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
+    zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
+    bez zmian (reguły bez @media nietknięte)."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
+    low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")
+    assert ".menu nav { display: flex; flex-direction: column; }" in low
+    btn = re.search(r"#tabs button \{([^}]*)\}", low).group(1)
+    assert "flex: 0 1 auto" in btn and "padding-top: 0; padding-bottom: 0" in btn
+    height = float(re.search(r"(?<![-\w])height: ([\d.]+)px", btn).group(1))
+    min_h = float(re.search(r"min-height: ([\d.]+)px", btn).group(1))
+    line = float(re.search(r"line-height: ([\d.]+)px", btn).group(1))
+    # wysokość bez ściskania jak przy paddingu 5 px (od 900 px), linia mieści się w najniższym przycisku (tekst na środku)
+    assert height == 5 + 14 * 1.2 + 5 + 2 and line <= min_h - 2
+    assert re.search(r"#tabs button \{ height: 24\.8px; margin-bottom: 1px; \}", lower)   # 3 + 16,8 + 3 + ramka
+    # w flex marginesy się nie łączą: odstęp nad EMERGENCY / ADMIN jak w układzie blokowym (10 px, od 820 px 6 px)
+    assert "#tabs button.red, #tabs button.admin { margin-top: 8px; }" in low
+    assert "#tabs button.red, #tabs button.admin { margin-top: 5px; }" in lower
+    assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
+    assert ".menu nav { flex: 1; overflow-y: auto; }" in css
+    # budżet 600 px (pomiary Playwright przy 1366x600): logo z paddingiem menu 45,5 px, zegar z AIRAC 49,8 px,
+    # użytkownik z wylogowaniem 66 px; 23 przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie
+    n, margins = 23, 23 * 1 + 5 + 5
+    for user in (0, 66):
+        nav = 600 - 45.5 - 49.8 - user - 6
+        assert n * min_h + margins <= nav, (user, nav)
+    # kolejność: niskie okno przed 820 px (te same selektory, niższe okno nadpisuje)
+    assert css.index("@media (max-height: 899px)") < css.index("@media (max-height: 820px)")

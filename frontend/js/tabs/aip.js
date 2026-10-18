@@ -64,6 +64,13 @@ export function kindButtons(charts, kind) {
     + KINDS.filter(([k]) => n(k)).map(([k, tip]) => `<button type="button" class="gbtn chl-kind${kind === k ? " on" : ""}" data-kind="${k}"`
       + ` title="${esc(tip)}">${k} <small>${n(k)}</small></button>`).join("");
 }
+// filtr rodzaju po wyborze mapy spoza filtra (adres, historia ←, pierwsze wczytanie z mapą w adresie): mapa ukryta
+// filtrem go wyłącza (""), mapa tego rodzaju albo filtr ALL go zostawia; id "" albo nieznane = pierwsza mapa listy.
+// Kliknięcie przycisku filtra go nie wywołuje (filtr działa także, gdy wybrana mapa jest innego rodzaju).
+export function kindAfterPick(charts, kind, id) {
+  const c = charts.find((x) => x.id === id) || charts[0];
+  return kind && c && c.kind !== kind ? "" : kind;
+}
 export function chartRows(charts, { kind = "", selected = "" } = {}) {
   const list = charts.filter((c) => !kind || c.kind === kind);
   if (!list.length) return `<p class="hint">No charts of this type.</p>`;
@@ -111,7 +118,6 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     const c = charts.find((x) => x.id === sel) || charts[0];
     const label = c.page || `AD 2 ${icao} ${c.id}`;
     sel = c.id;
-    if (kind && c.kind !== kind) kind = "";   // mapa z adresu albo historii ukryta filtrem: filtr wyłączamy
     $(".chl-kinds").innerHTML = kindButtons(charts, kind);
     $(".chl-list").innerHTML = chartRows(charts, { kind, selected: sel });
     $(".chl-list .chl-row.on")?.scrollIntoView({ block: "nearest" });
@@ -133,12 +139,14 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     const row = e.target.closest?.(".chl-row");
     if (row && e.target === row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); row.click(); }
   });
-  const got = (d) => { data = d; if (!d.error) cache.set(icao, { t: Date.now(), d }); draw(); };
+  // filtr (kind) zmieniają tylko przyciski filtra i wybór mapy spoza filtra (pick, pierwsze wczytanie), nie draw()
+  const picked = (id) => { if (data?.charts?.length) kind = kindAfterPick(data.charts, kind, id); };
+  const got = (d) => { data = d; if (!d.error) cache.set(icao, { t: Date.now(), d }); picked(sel); draw(); };
   const hit = cache.get(icao);
   if (hit && Date.now() - hit.t < CACHE_MS) got(hit.d);
   else api(`/api/docs/charts/${icao}`).then(got).catch((e) => got({ page: text, charts: [], error: e.message }));
   // mapa z adresu (←, Wstecz): "" = pierwsza
-  return { pick(id) { sel = id; draw(); }, current: () => sel };
+  return { pick(id) { sel = id; picked(id); draw(); }, current: () => sel };
 }
 
 const EAIP = "eaip";   // id przycisku całej przeglądarki eAIP

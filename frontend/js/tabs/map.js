@@ -1,7 +1,7 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
-import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel } from "../viffchart.js";
+import { chartHtml, delayClass, listRow, loadRatio, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
 import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates, colorFor, controllerRows,
-  drawFirs, fl, loadFirs, loadVacs, p21Lines, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
+  drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
 import { dissolve, mainParts, pointIn } from "../dissolve.js";
@@ -57,8 +57,8 @@ const CHAIN_KINDS = ["tma", "cta", "ctr"];
 const LEVELS = [15, 50, 100, 200, 300, 370];
 
 // Legenda w zakładkach (zwinięta domyślnie razem z całą sekcją).
-// Etykieta samolotu (zakładka Ruch): wzór jak w PEGASUS_21, te same linijki co na mapie (p21Lines z airspace.js)
-const P21_SAMPLE = p21Lines({ callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 300, aircraft: "DC10", wake: "H",
+// Etykieta samolotu (zakładka Ruch): wzór jak w PEGASUS_21, ten sam HTML co na mapie (p21Html z airspace.js)
+const P21_SAMPLE = p21Html({ callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 300, aircraft: "DC10", wake: "H",
   arrival: "EPWA", rfl: "24000" });
 const LEGEND = [
   ["air", "Airspace", () => [
@@ -74,7 +74,7 @@ const LEGEND = [
     lg(plane("dep"), "departure from an EP** aerodrome"), lg(plane("arr"), "arrival to an EP** aerodrome"),
     lg(plane("trn"), "transit through FIR EPWW / no flight plan in FIR EPWW"), lg(plane("sel"), "selected flight"),
     lg(`<span class="lg-line lg-flight"></span>`, "route of the selected aircraft"), lg(`<span class="lg-line lg-route"></span>`, "manually entered route"),
-    lg(`<span class="p21-sample">${P21_SAMPLE.map((l, i) => `<i class="l${i + 1}">${esc(l)}</i>`).join("")}</span>`,
+    lg(`<span class="p21-sample">${P21_SAMPLE}</span>`,
       `label as in PEGASUS_21: 1. callsign, ground speed (kt); 2. Mode C: A + altitude in hundreds of ft below the
       transition level (FL080), above it the FL; ↑ / ↓ climbing / descending since the previous update; 3. type + wake
       category, destination (transit or departure to a foreign aerodrome: FIR exit point from the flight plan route);
@@ -1189,21 +1189,10 @@ function mainMap(ctx) {
     L.geoJSON({ type: "FeatureCollection", features: feats }, { interactive: false,
       style: { color: "#ffd400", weight: 2.6, opacity: 0.95, fillColor: "#ffd400", fillOpacity: 0.025 } }).addTo(layers.viff);
   };
-  // warunki aktywacji scenariusza (vIFF sam decyduje, czy jest aktywny; pokazujemy tylko warunki)
-  const scnCond = (s) => {
-    const b = (xs, sep) => xs.map((x) => `<b>${esc(x)}</b>`).join(sep);
-    const out = [];
-    if (s.positions.length) out.push(`when online: ${b(s.positions, " + ")}`);
-    if (s.anypositions.length) out.push(`when online: ${b(s.anypositions, " or ")}`);
-    if (s.nopositions.length) out.push(`and offline: ${b(s.nopositions, ", ")}`);
-    if (s.booked) out.push("bookings count too");
-    if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`time <b>${esc(s.start)}–${esc(s.end)}</b>`);
-    s.times.forEach((t) => out.push(`${t.date ? esc(t.date) + " " : ""}time <b>${esc(t.from)}–${esc(t.to)}</b>`));
-    return out.join(" · ") || "no conditions";
-  };
-  const scnHtml = (s, byId) => `<div class="vs-scn ${s.active ? "on" : ""}"${s.description ? ` title="${esc(s.description)}"` : ""}>
+  // wiersz scenariusza vIFF: warunki aktywacji (scnCond) i dymek po angielsku z danych scenariusza (scnTip), nie opis z vIFF
+  const scnHtml = (s, byId) => `<div class="vs-scn ${s.active ? "on" : ""}" title="${esc(scnTip(s))}">
       <div class="vs-top"><b>${esc(s.id)}</b>${s.active ? `<span class="vs-chip on">ACTIVE</span>` : ""}<span class="vs-n">${s.tvs.length} TV</span></div>
-      <div class="vs-cond">${scnCond(s)}</div>
+      <div class="vs-cond">${scnCond(s, { html: true })}</div>
       ${s.tvs.map((t) => listRow(byId[t.id], viffSel, t.id)).join("")}</div>`;
   const renderChart = () => {
     const tv = (viffData?.sectors || []).find((t) => t.id === viffSel);

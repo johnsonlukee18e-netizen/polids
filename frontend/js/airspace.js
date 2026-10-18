@@ -236,15 +236,28 @@ export function p21Lines(p, { exit = null } = {}) {
   return [l1, lvl + arrow, l3, `h  s  r${rfl ? " " + rfl : ""}`];
 }
 
-// Samolot: sylwetka obrócona wg kursu (14 px, mniejsza niż do 0.12.4) i etykieta: sam znak wywoławczy albo (detail)
-// pełna etykieta PEGASUS_21 (p21Lines; pusta trzecia linijka, np. bez planu lotu, odpada). Bez tła: znak na zielono,
-// reszta na biało (map.css). cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW;
-// out = wybrany lot spoza ruchu EP); exit: punkt wyjścia z FIR-u tranzytu albo odlotu za granicę (trzecia linijka
-// zamiast lotniska docelowego).
+// Linijki etykiety jako HTML (aircraftMarker, wzór w legendzie MAP): sam znak wywoławczy albo (detail) pełna etykieta
+// PEGASUS_21 (p21Lines; pusta trzecia linijka, np. bez planu lotu, odpada). W linijce 1 tylko znak w <b class="cs">
+// (zielony, wybrany lot pomarańczowy, map.css), prędkość w osobnym <b class="gs"> w kolorze linijek 2-4, jak na
+// etykiecie DOM004 z P21; tekst linijki (textContent) bez zmian. Nie <span>: ".acicon span" w style.css to dawna
+// etykieta z tłem i pozycją absolute.
+export function p21Html(p, { detail = true, exit = null } = {}) {
+  const cs = String(p.callsign || "");
+  const lines = detail ? p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2) : [[cs, 0]];
+  return lines.map(([t, i]) => {
+    if (i) return `<i class="l${i + 1}">${esc(t)}</i>`;
+    const [, gap = "", gs = ""] = /^(\s*)(.*)$/.exec(t.slice(cs.length)) || [];
+    return `<i class="l1"><b class="cs">${esc(cs)}</b>${gs ? `${gap}<b class="gs">${esc(gs)}</b>` : ""}</i>`;
+  }).join("");
+}
+
+// Samolot: sylwetka obrócona wg kursu (14 px, mniejsza niż do 0.12.4) i etykieta p21Html (sam znak albo, detail,
+// pełna etykieta PEGASUS_21). Bez tła: znak na zielono, reszta na biało (map.css). cls: dodatkowa klasa ikony
+// (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP); exit: punkt
+// wyjścia z FIR-u tranzytu albo odlotu za granicę (trzecia linijka zamiast lotniska docelowego).
 export function aircraftMarker(p, { label = true, detail = false, cls = "", exit = null } = {}) {
-  const lines = detail ? p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2) : [[String(p.callsign || ""), 0]];
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
-    + (label ? `<span class="p21">${lines.map(([t, i]) => `<i class="l${i + 1}">${esc(t)}</i>`).join("")}</span>` : "") + "</div>";
+    + (label ? `<span class="p21">${p21Html(p, { detail, exit })}</span>` : "") + "</div>";
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [14, 14], iconAnchor: [7, 7] }) });
 }
 
