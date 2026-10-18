@@ -113,7 +113,7 @@
 .dm-spans .sp.r { margin-left: 18px; }
 .dm-spans button.on { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; border-color: #1f5a16; }
 .dm-rwys { flex: none; display: flex; flex-wrap: wrap; gap: 4px; }
-.dm-rwy { flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 3px 4px; color: #fff; border-radius: 2px; }
+.dm-rwy { flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 3px 4px; color: #fff; border-radius: 0; }
 .dm-rwy i { font-style: normal; font-size: 15px; }
 .dm-rwy b { font-size: 20px; font-weight: 400; }
 .dm-rwy small { font-size: 10px; color: #bcd; }
