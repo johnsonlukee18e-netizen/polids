@@ -93,7 +93,7 @@ def manifest():
     icons += [{"src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
                "purpose": "maskable"},
               {"src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml"}]
-    data = {"name": settings.name, "short_name": settings.name[:12], "description": settings.tagline, "lang": "pl",
+    data = {"name": settings.name, "short_name": settings.name[:12], "description": settings.tagline, "lang": "en",
             "id": "/", "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#000000",
             "theme_color": "#000000", "icons": icons}
     return JSONResponse(data, media_type="application/manifest+json")

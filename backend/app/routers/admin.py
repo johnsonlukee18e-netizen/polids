@@ -31,21 +31,21 @@ def add_user(body: UserIn, request: Request):
     try:
         return access.add_user(body.cid, body.note.strip() or None, by=me["cid"] if me else None)
     except ValueError:
-        raise HTTPException(409, f"CID {body.cid} jest już na liście") from None
+        raise HTTPException(409, f"CID {body.cid} is already on the list") from None
 
 
 @router.patch("/users/{cid}")
 def edit_user(body: NoteIn, cid: str = Path(pattern=CID)):
     u = access.update_note(cid, body.note.strip() or None)
     if not u:
-        raise HTTPException(404, f"Nie ma CID {cid} na liście")
+        raise HTTPException(404, f"CID {cid} is not on the list")
     return u
 
 
 @router.delete("/users/{cid}", status_code=204)
 def remove_user(cid: str = Path(pattern=CID)):
     if not access.remove_user(cid):
-        raise HTTPException(404, f"Nie ma CID {cid} na liście")
+        raise HTTPException(404, f"CID {cid} is not on the list")
     return Response(status_code=204)
 
 

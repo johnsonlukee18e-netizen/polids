@@ -1,9 +1,9 @@
 // Wspólne funkcje: zapytania do API i drobne narzędzia DOM.
 
-// Serwer nie odpowiada (brak internetu, restart serwera): zamiast angielskiego "Failed to fetch" komunikat po polsku i jeden pasek
+// Serwer nie odpowiada (brak internetu, restart serwera): zamiast "Failed to fetch" przeglądarki czytelny komunikat i jeden pasek
 // u dołu ekranu; znika po pierwszym udanym zapytaniu (sprawdzamy co 5 s, także gdy żadna zakładka nic nie odświeża).
 // Po powrocie serwera zdarzenie ONLINE_EVENT na window: zakładki z komunikatem błędu od razu pobierają dane ponownie.
-export const OFFLINE_MSG = "brak połączenia z serwerem PolIDS";
+export const OFFLINE_MSG = "no connection to the PolIDS server";
 export const ONLINE_EVENT = "polids:online";
 let offlineBar = null, offlineTimer = null;
 function setOffline(on) {
@@ -18,8 +18,8 @@ function setOffline(on) {
     return;
   }
   if (offlineBar) return;
-  offlineBar = h(`<div class="srv-off" role="alert"><b>Brak połączenia z serwerem PolIDS</b>
-    <span>sprawdź internet; strona połączy się sama, gdy serwer odpowie.</span></div>`);
+  offlineBar = h(`<div class="srv-off" role="alert"><b>No connection to the PolIDS server</b>
+    <span>check your internet connection; the page will reconnect automatically when the server responds.</span></div>`);
   document.body.append(offlineBar);
   offlineTimer = setInterval(() => fetch("/api/config", { cache: "no-store" }).then(() => setOffline(false), () => {}), 5000);
 }
@@ -37,13 +37,13 @@ export async function api(path, options = {}) {
   // sesja wygasła
   if (res.status === 401) {
     location.href = "/auth/login";
-    throw new Error("Wymagane logowanie");
+    throw new Error("Login required");
   }
   let body = null;
   try { body = await res.json(); } catch { /* pusta odpowiedź albo nie JSON (np. strona błędu) */ }
   if (!res.ok) {
     const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
-      : `Błąd serwera PolIDS (HTTP ${res.status})`;
+      : `PolIDS server error (HTTP ${res.status})`;
     throw new Error(msg);
   }
   return body;
@@ -163,7 +163,7 @@ export function subtabs(root, tabs, opts = {}) {
 // Kliknięcie litery to krok do cofnięcia: remember(zakładka, "A".."Z" albo "" dla wszystkich); activate(arg)
 // zakładki ustawia literę z adresu przez set() ("" albo brak = ALL). opts.remember = false wyłącza.
 export const LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-export const letterButtons = () => `<button class="all" data-l="" title="Wszystkie rekordy">ALL</button>`
+export const letterButtons = () => `<button class="all" data-l="" title="All records">ALL</button>`
   + LETTERS.map((l) => `<button data-l="${l}">${l}</button>`).join("");
 export function letterMenu(root, onPick, opts = {}) {
   const nav = h(`<nav class="submenu letters">${letterButtons()}</nav>`);
@@ -196,7 +196,7 @@ export function iframeWithFallback(pane, url, note = "") {
   pane.append(h(`<div class="toolbar" style="padding:6px 10px;margin:0;background:var(--panel)">
       <span class="hint mono">${esc(url)}</span><span style="flex:1"></span>
       ${note ? `<span class="hint">${esc(note)}</span>` : ""}
-      <a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Otwórz w nowej karcie ↗</a></div>`));
+      <a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Open in new tab ↗</a></div>`));
   pane.append(h(`<iframe class="embed" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>`));
 }
 
@@ -252,8 +252,8 @@ export const hhmm = (iso) => (iso ? new Date(iso).toISOString().slice(11, 16) + 
 // Opis do dymka po najechaniu na stanowisko: kto jest zalogowany / kto zarezerwował.
 export function positionTip(on, books = []) {
   const lines = [];
-  if (on) lines.push(`ONLINE: ${on.name || "?"} (CID ${on.cid ?? "?"})`, `${on.callsign} ${on.frequency}, od ${hhmm(on.logon_time)}`);
-  books.forEach((b) => lines.push(`${b.active ? "BOOKING TERAZ" : "BOOKING"}: CID ${b.cid}${b.name ? " " + b.name : ""}`,
+  if (on) lines.push(`ONLINE: ${on.name || "?"} (CID ${on.cid ?? "?"})`, `${on.callsign} ${on.frequency}, since ${hhmm(on.logon_time)}`);
+  books.forEach((b) => lines.push(`${b.active ? "BOOKING NOW" : "BOOKING"}: CID ${b.cid}${b.name ? " " + b.name : ""}`,
     `${b.callsign} ${hhmm(b.start)}–${hhmm(b.end)}${b.type && b.type !== "booking" ? " (" + b.type + ")" : ""}`));
   return lines.join("\n");
 }
@@ -261,11 +261,11 @@ export function positionTip(on, books = []) {
 // LVP (services/lvp.py, progi z AIP w data/seed/lvp.json): stan do AERODROME, OVERVIEW i AWOS. cls: lvp / prep /
 // cancel (odwołane, przez 30 min) / off (nie obowiązują) / na (AIP nie przewiduje LVP).
 export function lvpState(lvp) {
-  if (!lvp || lvp.applies === false) return { cls: "na", label: "LVP nie dotyczy" };
-  if (lvp.state === "LVP") return { cls: "lvp", label: "LVP W MOCY" };
-  if (lvp.state === "PREP") return { cls: "prep", label: "PRZYGOTOWANIE LVP" };
-  if (lvp.state === "CANCELLED") return { cls: "cancel", label: `LVP ODWOŁANE ${lvp.since || ""}`.trim() };
-  return { cls: "off", label: "LVP nie obowiązują" };
+  if (!lvp || lvp.applies === false) return { cls: "na", label: "LVP not applicable" };
+  if (lvp.state === "LVP") return { cls: "lvp", label: "LVP IN FORCE" };
+  if (lvp.state === "PREP") return { cls: "prep", label: "LVP PREPARATION" };
+  if (lvp.state === "CANCELLED") return { cls: "cancel", label: `LVP CANCELLED ${lvp.since || ""}`.trim() };
+  return { cls: "off", label: "LVP not in force" };
 }
 
 // dymek LVP: progi trzech faz (przygotowanie, wprowadzenie, odwołanie), zakres i źródło w AIP; długie uwagi łamane
@@ -276,9 +276,9 @@ export function lvpTip(lvp) {
     if (ls.length && (ls[ls.length - 1] + " " + w).length <= 60) ls[ls.length - 1] += " " + w; else ls.push(w);
     return ls;
   }, []).join("\n");
-  const src = lvp.source ? `Źródło: ${lvp.source}` : "";
-  if (lvp.applies === false) return [lvp.reason || "AIP nie przewiduje LVP", src].filter(Boolean).map(wrap).join("\n");
-  return [...(lvp.rules || []), lvp.scope === "DEP" ? "LVP tylko dla odlotów" : "", src, lvp.note || ""]
+  const src = lvp.source ? `Source: ${lvp.source}` : "";
+  if (lvp.applies === false) return [lvp.reason || "No LVP in AIP", src].filter(Boolean).map(wrap).join("\n");
+  return [...(lvp.rules || []), lvp.scope === "DEP" ? "LVP for departures only" : "", src, lvp.note || ""]
     .filter(Boolean).map(wrap).join("\n");
 }
 

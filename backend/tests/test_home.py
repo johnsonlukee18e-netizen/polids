@@ -148,7 +148,8 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
         return []          # JSON innego kształtu (lista zamiast obiektu): komunikat, nie 500
     monkeypatch.setattr(vatsim_api, "get_feed", as_list)
     d = client.get("/api/vatsim/me").json()
-    assert d["online"] == [] and d["online_error"].startswith("VATSIM data feed niedostępny")
+    # komunikat o data feed (tekst z routers/vatsim.py), nie 500
+    assert d["online"] == [] and d["online_error"].startswith("VATSIM data feed ")
 
 
 # --- frontend: czyste funkcje HOME w Node -----------------------------------------------------------------------
@@ -173,9 +174,9 @@ const bk = (callsign, start, end, extra = {}) => ({ callsign, start, end, type: 
 
 // HOME jak decide() i zmiana pola: kroki {net} (odpowiedź /api/vatsim/me, zostaje do następnej), {pick} (wybór ręczny
 // w polu, zapisany), {shared} (wybór zmieniony w OVERVIEW tego okna, potem pokazanie HOME); wynik: wartość pola po kroku
-const FEED_DOWN = { online: [], bookings: [], error: "VATSIM data feed niedostępny: timeout", online_error: "VATSIM data feed niedostępny: timeout" };
-const NO_SERVER = { online: [], bookings: [], error: "brak połączenia z serwerem PolIDS", online_error: "brak połączenia z serwerem PolIDS",
-                    bookings_error: "brak połączenia z serwerem PolIDS" };   // loadNet: wyjątek z api()
+const FEED_DOWN = { online: [], bookings: [], error: "VATSIM data feed unavailable: timeout", online_error: "VATSIM data feed unavailable: timeout" };
+// loadNet: wyjątek z api() (serwer PolIDS nie odpowiada)
+const NO_SERVER = { online: [], bookings: [], error: api.OFFLINE_MSG, online_error: api.OFFLINE_MSG, bookings_error: api.OFFLINE_MSG };
 const ONLINE = { online: [on("EPWW_CTR", { position: "EPWW_DBT_CTR" })], bookings: [] };
 const OFFLINE = { online: [], bookings: [] };
 const BOOKED = { online: [], bookings: [bk("EPWA_TWR", "2026-10-15T18:00:00+00:00", "2026-10-15T20:00:00+00:00")] };
@@ -304,18 +305,18 @@ def test_rating_text(js):
 def test_airac_text(js):
     # ostatni dzień cyklu = dzień przed następnym (także przez koniec roku i luty)
     assert js["airac"] == ["AIRAC 2610 · 01.10.2026 – 28.10.2026", "AIRAC 2613 · 24.12.2026 – 20.01.2027",
-                           "AIRAC 2602 · 19.02.2026 – 18.03.2026", "AIRAC 2610 · od 01.10.2026", "", ""]
+                           "AIRAC 2602 · 19.02.2026 – 18.03.2026", "AIRAC 2610 · from 01.10.2026", "", ""]
 
 
 def test_times_and_lines(js):
     assert js["hm"] == ["10:12Z", "23:59Z", "", "", ""]
-    assert js["booking"] == ["Rezerwacja: EPWA_TWR 18:00–20:00Z", "Rezerwacja: EPWA_TWR 16.10 08:00–10:00Z",
-                             "Rezerwacja: EDDB_TWR 11:00–13:00Z (event) · trwa"]
-    assert js["online"] == ["Jesteś zalogowany na VATSIM jako EPWW_DBT_CTR (127.025) od 10:12Z",
-                            "ATIS EPWA_ATIS (120.455) od 10:12Z · litera K",
-                            "Jesteś zalogowany na VATSIM jako obserwator (EPKK_OBS) od 10:12Z",
-                            "Jesteś zalogowany na VATSIM jako EPWA_APP"]
-    assert js["hello"] == "Witaj, Jan Kowalski (1234567)"
+    assert js["booking"] == ["Booking: EPWA_TWR 18:00–20:00Z", "Booking: EPWA_TWR 16.10 08:00–10:00Z",
+                             "Booking: EDDB_TWR 11:00–13:00Z (event) · in progress"]
+    assert js["online"] == ["You are connected to VATSIM as EPWW_DBT_CTR (127.025) since 10:12Z",
+                            "ATIS EPWA_ATIS (120.455) since 10:12Z · information K",
+                            "You are connected to VATSIM as an observer (EPKK_OBS) since 10:12Z",
+                            "You are connected to VATSIM as EPWA_APP"]
+    assert js["hello"] == "Welcome, Jan Kowalski (1234567)"
 
 
 def test_listed_position(js):
@@ -341,9 +342,9 @@ def test_initial_position(js):
 
 
 def test_session_target(js):
-    assert js["target"] == [{"arg": "0", "label": "PRZYGOTUJ SESJĘ → AERODROME OVERVIEW"},
-                            {"arg": "0", "label": "PRZYGOTUJ SESJĘ → AERODROME OVERVIEW"},
-                            {"arg": "EPWA", "label": "PRZYGOTUJ SESJĘ → AERODROME EPWA"}]
+    assert js["target"] == [{"arg": "0", "label": "PREPARE SESSION → AERODROME OVERVIEW"},
+                            {"arg": "0", "label": "PREPARE SESSION → AERODROME OVERVIEW"},
+                            {"arg": "EPWA", "label": "PREPARE SESSION → AERODROME EPWA"}]
 
 
 def test_home_choice_sequences(js):
