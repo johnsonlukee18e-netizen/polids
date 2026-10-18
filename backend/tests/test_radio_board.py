@@ -212,7 +212,7 @@ def test_board_stacks(board):
 def test_board_geo(client):
     d = client.get("/api/radio/board?geo=1").json()
     g = d["geo"]
-    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis"}
+    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis", "nb"}
     assert g["border"]["type"] == "MultiPolygon" and g["border"]["coordinates"]
     assert {f["id"] for f in g["firs"]} >= {"EDWW", "EDMM", "LKAA", "LZBB", "UKLV", "UMMV", "EYVL", "UMKK", "ESAA"}
     assert all("-" not in f["id"] and f["id"] != "EPWW" for f in g["firs"])
@@ -225,6 +225,32 @@ def test_board_geo(client):
     r = client.get("/api/radio/board?geo=1")
     assert r.headers["content-type"] == "application/json" and r.json()["geo"] == g
     assert set(d) - {"geo"} == set(client.get("/api/radio/board").json())
+
+
+def test_board_neighbour_areas(client):
+    """0.12.5 (Marek): na podglądach sektory ACC sąsiadów (wg poziomu podglądu, jak EPWW) i TMA/CTR lotnisk sąsiadów
+    przy granicy FIR EPWW (LZTT, LKMT, EDDB); obsadzone wg pierwszego stanowiska online z listy OWNER (d.nb)."""
+    d = client.get("/api/radio/board?geo=1").json()
+    nb = d["geo"]["nb"]
+    assert nb and len({a["id"] for a in nb}) == len(nb)
+    assert {a["kind"] for a in nb} == {"acc", "app", "twr"}
+    for a in nb:
+        assert set(a) == {"id", "fir", "name", "kind", "lo", "hi", "geometry"} and a["lo"] < a["hi"] <= rb.TOP_FT
+        assert a["geometry"]["type"] == "MultiPolygon" and a["geometry"]["coordinates"], a["name"]
+    acc_firs = {a["fir"] for a in nb if a["kind"] == "acc" and a["lo"] <= 30000 < a["hi"]}
+    assert {"EDWW", "EDMM", "ESAA", "LKAA", "LZBB", "EYVL", "UMKK", "UKLV", "UMMV"} <= acc_firs  # UMMV z pliku EPWW
+    names = {a["name"] for a in nb if a["kind"] != "acc"}
+    # Poprad (TWR z TMA), Ostrawa (APP), Berlin (APP przy granicy), Lwów (APP), Kaliningrad (APP)
+    assert {"LZTT_CTR", "LZTT_TMA3", "LKMT_TMA1", "LKMT_CTR", "EDWWDBAN1", "EDWWDBAS1", "UKLL_TMA",
+            "KALININGRAD TMA L"} <= names
+    # w głąb kraju nie: CTR Berlina i Pragi, TMA Pragi z dala od granicy
+    assert not names & {"EDDBTWRN", "EDDBTWRS", "LKPR24_TMA1_ARR_P1"}
+    assert not any(a["name"].startswith(("TECH ", "T-")) for a in nb)
+    # obsadzone: EDWW_FLG_CTR online (FEED) obsługuje wycinki, w których jest pierwszym stanowiskiem online
+    assert d["nb"] and all(o == "EDWW_FLG_CTR" for o in d["nb"].values())
+    flg = {a["id"] for a in nb if a["name"].startswith("EDWWFLG")}
+    assert flg and flg <= set(d["nb"])
+    assert "nb" in client.get("/api/radio/board").json()  # stan obsady przy każdym odświeżeniu, geometria raz
 
 
 def test_board_version_and_reimport(client):
