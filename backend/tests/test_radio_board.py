@@ -912,15 +912,15 @@ def test_js_loa_panel(tmp_path):
     out = json.loads(r.stdout)
     e, f = out["edww"], firs["EDWW"]
     n_out = sum(t["dir"] == "out" for t in f["transfers"])
-    assert f"przekazania: {n_out} z EPWW · {len(f['transfers']) - n_out} do EPWW" in e
-    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Stanowiska i sektory wg LOA" in e
+    assert f"transfers: {n_out} from EPWW · {len(f['transfers']) - n_out} to EPWW" in e
+    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Positions and sectors per LOA" in e
     rows = len(f["transfers"]) + len(f["positions"]) + sum(len(f[k]) for k in ("silent", "vfr", "other"))
     assert e.count("data-f=") == rows
     assert 'data-coord="EDWW"' in e and "COORDINATION ›" in e
     assert 'href="/files/docs/LOA/LOA%20EPWW%20EDWW%20Bremen,%20EDUU%20Karlsruhe%20(AIRAC%202602).pdf"' in e
     assert "<td>Bremen Radar</td>" in e  # znak radiowy z tablicy RADIO, gdy LOA go nie podaje
-    assert "Brak LOA EPWW z UMKK" in out["none"] and "data-coord" not in out["none"] and "KALININGRAD" in out["none"]
-    assert "Wczytywanie LOA…" in out["loading"]
+    assert "No EPWW LOA with UMKK" in out["none"] and "data-coord" not in out["none"] and "KALININGRAD" in out["none"]
+    assert "Loading LOA…" in out["loading"]
     assert 'class="error">LOA: &lt;zły plik&gt;' in out["error"]
     ev = out["evil"]
     assert "<img" not in ev and "<b>X" not in ev and "<i>s" not in ev and "<s>" not in ev and 'C"OP' not in ev
@@ -983,20 +983,20 @@ def test_js_neighbour_stack(tmp_path):
     top = out["top"]
     # EYVL_CTR top-down: wszystkie kafelki z jego częstotliwością, skrót przy cudzych
     assert top.count('<span class="rb-fq">133.305</span>') == 4 and top.count('<i class="rb-by">EYVL</i>') == 3
-    assert "Teraz: EYVL_CTR 133.305 – Jonas" in top and top.count("Online: EYVL_CTR 133.305 – Jonas") == 1  # dymek nagłówka
-    assert "Nikt online – ADVISORY 122.800" in off and "Online:" not in off
-    # dymki kafelków: ADVISORY tylko, gdy nikt w całym stosie; w częściowo obsadzonym samo "Teraz nikt"
-    assert off.count("Teraz nikt – ADVISORY 122.800") == 4
-    assert part.count("Teraz nikt") == 3 and "ADVISORY" not in part
+    assert "Now: EYVL_CTR 133.305 – Jonas" in top and top.count("Online: EYVL_CTR 133.305 – Jonas") == 1  # dymek nagłówka
+    assert "Nobody online – ADVISORY 122.800" in off and "Online:" not in off
+    # dymki kafelków: ADVISORY tylko, gdy nikt w całym stosie; w częściowo obsadzonym samo "Now: unstaffed"
+    assert off.count("Now: unstaffed – ADVISORY 122.800") == 4
+    assert part.count("Now: unstaffed") == 3 and "ADVISORY" not in part
     # oś wysokości w dymku nagłówka tylko w stosie z osią
-    assert "granice pionowe (FL)" in off and "granice pionowe" not in out["flat"] and "nowy ciąg" not in off
+    assert "vertical limits (FL)" in off and "vertical limits" not in out["flat"] and "new band group" not in off
     # EDUU: 365, 285, kreska i "+315" nad SPE (nowy ciąg), bez 315 pod SPE
     eduu = out["eduu"]
     assert re.findall(r'class="rb-bd(?: rb-re)?"[^>]*><i>([^<]+)</i>', eduu) == ["365", "285", "+315"]
     assert eduu.index("<i>285</i>") < eduu.index('class="rb-sep"') < eduu.index("<i>+315</i>") < eduu.index(">EDUU SPE<")
-    assert "nowy ciąg pasm" in eduu
+    assert "new band group" in eduu
     assert 'class="rb-nb flat"' in out["flat"] and "rb-bd" not in out["flat"] and 'class="rb-nbh"' in out["flat"]
-    assert "brak sektorów VACS" in out["empty"] and "ADVISORY" not in out["empty"]
+    assert "no VACS sectors" in out["empty"] and "ADVISORY" not in out["empty"]
     # błąd VATSIM: nie wiadomo, czy ktoś jest online – bez linii ADVISORY i bez częstotliwości
     assert "rb-unicom" not in out["nonet"] and 'class="rb-fq"' not in out["nonet"]
     ev = out["evil"]

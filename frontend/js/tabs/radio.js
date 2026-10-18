@@ -95,7 +95,7 @@ function loaTransfers(rows, from, to) {
   if (!rows.length) return "";
   // kolumny sektorów tylko, gdy LOA je podaje (LKAA, LZBB: bez sektorów)
   const sec = rows.some((t) => t.from || t.to);
-  const head = `<tr><th>Ruch</th><th>COP</th><th>Poziom</th>${sec ? "<th>Z sektora</th><th>Do sektora</th>" : ""}<th>Warunki</th></tr>`;
+  const head = `<tr><th>Traffic</th><th>COP</th><th>Level</th>${sec ? "<th>From sector</th><th>To sector</th>" : ""}<th>Conditions</th></tr>`;
   // filtr po treści wiersza bez pola dir ("out"/"in" pasowałoby do każdego przekazania w tę stronę)
   const body = rows.map((t) => `<tr data-f="${esc(Object.entries(t).filter(([k]) => k !== "dir").map(([, v]) => v).join(" ").toLowerCase())}">`
     + `<td class="trf">${esc(t.traffic)}</td><td class="cop">${esc(t.cop)}</td><td class="lvl">${esc(t.level)}</td>`
@@ -115,25 +115,25 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
   const head = `<div class="rb-loa-h"><b class="rb-loa-tag">LOA</b>${f ? "" : `<span class="rb-loa-fir"><b>${esc(fir)}</b> ${esc(title)}</span>`}`
     + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span><span class="rb-loa-v" title="${esc(f.version)}">${esc(f.version)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
-    + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Otwórz LOA w COORDINATION › DOKUMENTY (← wraca do RADIO)">COORDINATION ›</button>`
+    + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Open the LOA in COORDINATION › DOCUMENTS (← returns to RADIO)">COORDINATION ›</button>`
       + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="${esc(pdf)}">PDF ↗</a>` : "")
-    + `<button type="button" class="rb-loa-x" title="Zamknij (Esc)">✕</button></div>`;
+    + `<button type="button" class="rb-loa-x" title="Close (Esc)">✕</button></div>`;
   if (!f) {
-    return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Wczytywanie LOA…"
-      : `Brak LOA EPWW z ${esc(fir)} w PolIDS. Wszystkie LOA: COORDINATION › DOKUMENTY.`}</p></div>`;
+    return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Loading LOA…"
+      : `No EPWW LOA with ${esc(fir)} in PolIDS. All LOAs: COORDINATION › DOCUMENTS.`}</p></div>`;
   }
   const pos = arr(f.positions).map((p) => `<tr data-f="${esc(Object.values(p).join(" ").toLowerCase())}">`
     + `<td class="${p.side === "EP" ? "ep" : "nb"}">${p.side === "EP" ? "EPWW" : esc(fir)}</td><td class="pcs">${esc(p.callsign)}</td>`
     + `<td>${esc(p.radio || radio(p.callsign))}</td><td class="cop">${esc(p.sector)}</td><td class="lvl">${esc(p.frequency)}</td>`
     + `<td class="cond">${esc(p.note)}</td></tr>`).join("");
   return head + `<div class="rb-loa-b">
-    <div class="rb-loa-tools"><input type="search" class="rb-loa-q" placeholder="filtr: COP, lotnisko, FL, sektor…" aria-label="Filtr LOA">
-      <span class="rb-loa-cnt"></span><span class="rb-loa-n">przekazania: ${out.length} z EPWW · ${inn.length} do EPWW</span>
-      <span class="hint" title="Wyciąg z PDF (data/seed/loa.json); w razie wątpliwości obowiązuje PDF">wyciąg z PDF, obowiązuje PDF</span></div>
+    <div class="rb-loa-tools"><input type="search" class="rb-loa-q" placeholder="filter: COP, aerodrome, FL, sector…" aria-label="LOA filter">
+      <span class="rb-loa-cnt"></span><span class="rb-loa-n">transfers: ${out.length} from EPWW · ${inn.length} to EPWW</span>
+      <span class="hint" title="Extract from the PDF (data/seed/loa.json); if in doubt, the PDF prevails">PDF extract, the PDF prevails</span></div>
     ${loaTransfers(out, "EPWW", fir)}${loaTransfers(inn, fir, "EPWW")}
-    <div class="rb-loa-rules">${loaList("Przekazanie kontroli i łączności", f.silent)}${loaList("VFR", f.vfr)}${loaList("Inne zasady", f.other)}</div>
-    ${pos ? `<div class="rb-loa-sec"><h4>Stanowiska i sektory wg LOA <small>${arr(f.positions).length}</small></h4>
-      <table class="rb-loa-tab pos"><thead><tr><th>Strona</th><th>Stanowisko</th><th>Znak radiowy</th><th>Sektor</th><th>Częst.</th><th>Uwagi</th></tr></thead>
+    <div class="rb-loa-rules">${loaList("Transfer of control and communication", f.silent)}${loaList("VFR", f.vfr)}${loaList("Other rules", f.other)}</div>
+    ${pos ? `<div class="rb-loa-sec"><h4>Positions and sectors per LOA <small>${arr(f.positions).length}</small></h4>
+      <table class="rb-loa-tab pos"><thead><tr><th>Side</th><th>Position</th><th>Radio callsign</th><th>Sector</th><th>Freq.</th><th>Remarks</th></tr></thead>
       <tbody>${pos}</tbody></table></div>` : ""}
   </div>`;
 }
@@ -143,17 +143,17 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
 // stanowisko kafelka; nikt w całym stosie → jedna linia ADVISORY 122.800 pod nagłówkiem. Granice pionowe raz, na osi
 // między pasmami (stackBands). st: stos z /api/radio/board; x: {nm(cs), freq(cs), who(cs), pos(cs), sel, net} – nazwa,
 // częstotliwość i zalogowany z tablicy, opis stanowiska, FIR otwartego LOA, false = brak danych VATSIM (bez ADVISORY).
-const altText = (t) => (t.lo ? (t.hi < TOP_FT ? `${flText(t.lo)}–${flText(t.hi)}` : `od ${flText(t.lo)}`) : `do ${flText(t.hi)}`);
+const altText = (t) => (t.lo ? (t.hi < TOP_FT ? `${flText(t.lo)}–${flText(t.hi)}` : `from ${flText(t.lo)}`) : `up to ${flText(t.hi)}`);
 const bdHtml = (ft) => `<div class="rb-bd" data-rt="${esc(flText(ft))}"><i>${esc(flNum(ft))}</i></div>`;
 // nowy ciąg pasm (gap): krótka kreska, a pod nią zakres pasma jak w VACS (+315) – należy do pasma poniżej
-const reHtml = (b) => `<div class="rb-sep"></div><div class="rb-bd rb-re" data-rt="${esc(`Nowy ciąg: ${altText(b)} (nie styka się z pasmami wyżej)`)}">`
+const reHtml = (b) => `<div class="rb-sep"></div><div class="rb-bd rb-re" data-rt="${esc(`New band group: ${altText(b)} (not adjacent to the bands above)`)}">`
   + `<i>${esc(b.re)}</i></div>`;
 // nobody: nikt w całym stosie – tylko wtedy kafelek bez nikogo mówi o ADVISORY
 function tileHtml(t, x, nobody) {
   const o = t.owner, chain = arr(t.chain);
-  const rt = [`${t.label}${t.alt ? ` · ${altText(t)} (VACS ${t.alt})` : ""}`, `Stanowisko: ${x.pos(t.callsign)}`,
-    o ? `Teraz: ${x.who(o) || o}` : x.net === false ? "VATSIM: brak danych" : nobody ? `Teraz nikt – ADVISORY ${ADVISORY_FQ}` : "Teraz nikt",
-    ...(chain.length > 1 ? [`Kolejność: ${chain.map(x.nm).join(" › ")}`] : [])].join("\n");
+  const rt = [`${t.label}${t.alt ? ` · ${altText(t)} (VACS ${t.alt})` : ""}`, `Position: ${x.pos(t.callsign)}`,
+    o ? `Now: ${x.who(o) || o}` : x.net === false ? "VATSIM: no data" : nobody ? `Now: unstaffed – ADVISORY ${ADVISORY_FQ}` : "Now: unstaffed",
+    ...(chain.length > 1 ? [`Coverage order: ${chain.map(x.nm).join(" › ")}`] : [])].join("\n");
   const by = o && o !== t.callsign ? `<i class="rb-by">${esc(byShort(x.nm(o)))}</i>` : "";
   return `<div class="rb-box ${o ? "on" : "off"}" data-rt="${esc(rt)}"><b class="rb-id">${esc(t.label)}</b>`
     + `${o ? `<span class="rb-ln">${by}<span class="rb-fq">${esc(x.freq(o))}</span></span>` : ""}</div>`;
@@ -163,15 +163,15 @@ export function nbStackHtml(st, x) {
   const owners = [...new Set(tiles.map((t) => t.owner).filter(Boolean))];
   const nobody = x.net !== false && tiles.length > 0 && !owners.length;
   const flat = !bands.some((b) => b.top || b.fl || b.re);  // bez wysokości (UMMV, UKLV): bez osi z lewej
-  const tipH = [`${st.fir} ${st.title}: sektory graniczące z FIR EPWW jak w VACS (bez FMP)`,
-    ...(flat ? [] : ["liczby między polami: granice pionowe (FL)"]),
-    ...(bands.some((b) => b.re) ? ["kreska i zakres (np. +315): nowy ciąg pasm, który nie styka się z wyższymi"] : []),
-    ...(nobody ? [`Nikt online – ADVISORY ${ADVISORY_FQ}`] : owners.map((o) => `Online: ${x.who(o) || o}`)), `Kliknij: LOA EPWW – ${st.fir}`].join("\n");
+  const tipH = [`${st.fir} ${st.title}: sectors bordering FIR EPWW as in VACS (without FMP)`,
+    ...(flat ? [] : ["numbers between the tiles: vertical limits (FL)"]),
+    ...(bands.some((b) => b.re) ? ["dash and range (e.g. +315): new band group, not adjacent to the bands above"] : []),
+    ...(nobody ? [`Nobody online – ADVISORY ${ADVISORY_FQ}`] : owners.map((o) => `Online: ${x.who(o) || o}`)), `Click: LOA EPWW – ${st.fir}`].join("\n");
   return `<div class="rb-nb${flat ? " flat" : ""}" data-fir="${esc(st.fir)}"><div class="rb-nbh${x.sel === st.fir ? " sel" : ""}" role="button" tabindex="0" data-title="${esc(st.title)}" data-rt="${esc(tipH)}"><b>${esc(st.fir)}</b> ${esc(st.title)}</div>`
     + (nobody ? `<div class="rb-unicom">ADVISORY ${ADVISORY_FQ}</div>` : "")
     + (bands.length ? bands.map((b) => `${b.re ? reHtml(b) : ""}${b.top ? bdHtml(b.top) : ""}`
       + `<div class="rb-bxs">${b.tiles.map((t) => tileHtml(t, x, nobody)).join("")}</div>${b.fl ? bdHtml(b.fl) : ""}`).join("")
-      : `<div class="rb-none">brak sektorów VACS</div>`) + "</div>";
+      : `<div class="rb-none">no VACS sectors</div>`) + "</div>";
 }
 
 // --- etykieta podglądu (sektor ACC, APP, TWR, FIS) w odmianach: 0 pełna (ID nad częstotliwością), 1 skrócona (ID
@@ -249,7 +249,7 @@ export default {
         ${MAPS.map((m) => m.key === "MID" ? `<div class="rb-mid">
             <div class="rb-btns">${LAYERS.map((l) => `<button type="button" data-ly="${l.id}" title="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>
             <div class="rb-status"></div>
-            <div class="rb-legend"><span title="Sektory ACC: jeden obszar i jedna etykieta (stanowisko, częstotliwość) na stanowisko; granica tylko tam, gdzie zmienia się obsługujący. Sektorów bez nikogo nie rysujemy (zostaje granica FIR EPWW)."><i class="rb-sw on"></i>obsadzony</span><span title="TMA, CTR i FIS EPWW bez nikogo online: samo ID, bez częstotliwości (stanowisko i jego częstotliwość w dymku); sektory ACC bez nikogo: nie rysujemy; sąsiedzi: pole bez częstotliwości, nikt w całym stosie – ADVISORY ${ADVISORY_FQ}"><i class="rb-sw off"></i>nikt (TMA, CTR, FIS: samo ID)</span><span><i class="rb-sw cov"></i>↑ przejmuje inne (TWR)</span></div>
+            <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour tile without frequency, nobody in the whole stack – ADVISORY ${ADVISORY_FQ}"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>↑ covered by (TWR)</span><span title="TMA boundary (APP layer; sector file colour)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers; sector file colour)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
             ${panelHtml(m)}
           </div>` : panelHtml(m)).join("")}
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
@@ -276,14 +276,14 @@ export default {
     const freqOf = (cs) => on(cs)?.frequency || d?.pos?.[cs]?.frequency || "";
     const who = (cs) => {
       const o = on(cs);
-      return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, od ${utcHhmm(o.logon_time)}` : ""}` : "";
+      return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
     };
     const posLine = (cs) => `${cs}${d?.pos?.[cs]?.name ? ` · ${d.pos[cs].name}` : ""} ${d?.pos?.[cs]?.frequency || ""}`.trim();
     const chainText = (ch) => ch.map(nm).join(" › ");
     // linijki etykiet (lblLines, tmaLines, twrLines): częstotliwości i nazwy z tablicy
     const lx = () => ({ freq: freqOf, nm, on, pos: d?.pos });
-    const nowText = (owners) => (owners.length ? owners.map((o) => `Teraz: ${who(o) || o}`).join("\n")
-      : d?.net?.ok === false ? "VATSIM: brak danych" : "Teraz nikt");
+    const nowText = (owners) => (owners.length ? owners.map((o) => `Now: ${who(o) || o}`).join("\n")
+      : d?.net?.ok === false ? "VATSIM: no data" : "Now: unstaffed");
 
     // --- pasek ATIS
     function renderAtis() {
@@ -292,12 +292,12 @@ export default {
       if (box.hidden || !d) return;
       box.innerHTML = d.atis.map((a) => {
         const o = on(a.callsign), fq = freqOf(a.callsign) || "—";
-        const rt = [posLine(a.callsign), o ? `Online: ${who(a.callsign)}${o.atis_code ? `\nInformacja ${o.atis_code}` : ""}` : "ATIS offline",
-          ...(o?.text_atis || []).slice(0, 6), "Kliknij: AERODROME"].join("\n");
+        const rt = [posLine(a.callsign), o ? `Online: ${who(a.callsign)}${o.atis_code ? `\nInformation ${o.atis_code}` : ""}` : "ATIS offline",
+          ...(o?.text_atis || []).slice(0, 6), "Click: AERODROME"].join("\n");
         return `<button type="button" class="rb-at ${o ? "on" : "off"}" data-icao="${esc(a.icao)}" data-rt="${esc(rt)}">`
           + `<span class="rb-ati">${esc(a.callsign.replace(/_ATIS$/, "").replace(/_/g, " "))}</span><span class="rb-fq">${esc(fq)}</span>`
           + `${o?.atis_code ? `<b class="rb-code">${esc(o.atis_code)}</b>` : ""}</button>`;
-      }).join("") || `<span class="rb-none">Brak stanowisk ATIS w pliku .ese.</span>`;
+      }).join("") || `<span class="rb-none">No ATIS positions in the .ese file.</span>`;
     }
 
     // --- stosy sąsiadów (nbStackHtml): nazwy, częstotliwości i zalogowani z tablicy
@@ -320,12 +320,12 @@ export default {
     const accTip = (g, layer) => {
       const ly = d.layers?.[layer];
       return [`${displayName(g.owner)} · ${layer}${ly?.label ? ` ${ly.label}` : ""}`, nowText([g.owner]),
-        `Sektory: ${g.sectors.map((s) => s.id).join(", ")}`,
-        ...g.sectors.map((s) => `${s.id}: ${s.nominal !== g.owner ? `stanowisko sektora ${nm(s.nominal)}, ` : ""}kolejność ${chainText(s.chain)}`)].join("\n");
+        `Sectors: ${g.sectors.map((s) => s.id).join(", ")}`,
+        ...g.sectors.map((s) => `${s.id}: ${s.nominal !== g.owner ? `sector position ${nm(s.nominal)}, ` : ""}coverage order ${chainText(s.chain)}`)].join("\n");
     };
-    const groupTip = (g, title, extra = [], now = null) => [title, `Stanowisko: ${posLine(g.nominal)}`,
-      now || (g.owners.length || !g.topdown ? nowText(g.owners) : `Teraz top-down: ${who(g.topdown) || g.topdown}`), ...extra,
-      `Kolejność: ${chainText(g.chains[0] || [])}`].join("\n");
+    const groupTip = (g, title, extra = [], now = null) => [title, `Position: ${posLine(g.nominal)}`,
+      now || (g.owners.length || !g.topdown ? nowText(g.owners) : `Now top-down: ${who(g.topdown) || g.topdown}`), ...extra,
+      `Coverage order: ${chainText(g.chains[0] || [])}`].join("\n");
 
     // etykiety podglądu: {lb (model etykiety), at: [lat, lon], kind, box?, dot?}; APP, TWR i FIS tylko na LOW;
     // kolejność układania: lblPrio. Sektory ACC: jedna etykieta na stanowisko (accGroups)
@@ -342,9 +342,9 @@ export default {
         tma.forEach((g) => {
           const { ls, more } = parts.get(g.id);
           const id = nm(g.nominal), proc = /_TWR$/.test(g.nominal);
-          const title = `${g.tma}${g.id !== g.tma ? ` – część ${id}` : ""} (${g.lo ? flText(g.lo) : "GND"}–${flText(g.hi)})`;
-          const extra = [...(proc ? [`TMA proceduralna (bez APP): częstotliwość wieży ${id}`] : []),
-            ...(g.apps.length > 1 ? [`APP w tej części: ${g.apps.map((c) => `${nm(c)} ${d.pos[c]?.frequency || ""}`).join(", ")}`] : [])];
+          const title = `${g.tma}${g.id !== g.tma ? ` – part ${id}` : ""} (${g.lo ? flText(g.lo) : "GND"}–${flText(g.hi)})`;
+          const extra = [...(proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : []),
+            ...(g.apps.length > 1 ? [`APP in this part: ${g.apps.map((c) => `${nm(c)} ${d.pos[c]?.frequency || ""}`).join(", ")}`] : [])];
           out.push({ at: g.at, box: g.box, kind: "app", dot: "app", lb: { cls: "app",
             state: g.owners.length ? "on" : "off", id, ls, more, rt: groupTip(g, title, extra) } });
         });
@@ -355,12 +355,12 @@ export default {
           if (!g.at) return;
           const { tw, cover, ls, atl } = twrLines(g, x, twra);
           const a = g.atis ? on(g.atis) : null;
-          const extra = g.atis ? [`ATIS: ${posLine(g.atis)}${a ? ` – online${a.atis_code ? `, informacja ${a.atis_code}` : ""}` : " – offline"}`] : [];
+          const extra = g.atis ? [`ATIS: ${posLine(g.atis)}${a ? ` – online${a.atis_code ? `, information ${a.atis_code}` : ""}` : " – offline"}`] : [];
           const id = nm(g.nominal);
           out.push({ at: g.at, box: g.box, kind: "twr", dot: "twr", lb: { cls: "twr", state: tw ? "on" : cover ? "cov" : "off", id,
             ls, extra: atl,
-            icao: g.icao, k: g.icao, rt: groupTip(g, `${g.id} · ${g.icao}`, [...extra, "Kliknij: AERODROME"],
-              cover ? `Wieża offline – przejmuje ${g.owners.map((o) => who(o) || o).join(", ")}` : null) } });
+            icao: g.icao, k: g.icao, rt: groupTip(g, `${g.id} · ${g.icao}`, [...extra, "Click: AERODROME"],
+              cover ? `Tower offline – covered by ${g.owners.map((o) => who(o) || o).join(", ")}` : null) } });
         });
       }
       if (layers.has("fis")) {
@@ -369,7 +369,7 @@ export default {
           const ls = lblLines(g.nominal, g.owners, x), id = nm(g.nominal);
           out.push({ at: g.at, kind: "fis", dot: "fis", lb: { cls: "fis", state: g.owners.length ? "on" : "off", id,
             ls, more: Math.max(0, g.owners.length - 2),
-            rt: groupTip(g, `${g.id} (do ${flText(g.hi)})`) } });
+            rt: groupTip(g, `${g.id} (up to ${flText(g.hi)})`) } });
         });
       }
       return out;
@@ -385,17 +385,28 @@ export default {
       const groups = accGroups(sliceAt(geo.acc, ft), d.sectors, m.key, geoVer);
       const low = m.key === "LOW";
       const g = (cls, list) => `<g class="${cls}">${list.map((x) => `<path d="${pathOf(x.geometry, P)}"/>`).join("")}</g>`;
+      const twrOn = layers.has("twr") || layers.has("twra");
+      // sąsiedzi (0.12.5, Marek): sektory ACC na wysokości podglądu (jak EPWW: jasnoszare nieobsadzone, ciemne obsadzone –
+      // obsadzone rysowane na końcu, nad nieobsadzonymi), na LOW także TMA i CTR lotnisk sąsiadów przy granicy FIR EPWW
+      const nbOn = d.nb || {}, nbAll = geo.nb || [];
+      const nbAcc = sliceAt(nbAll.filter((a) => a.kind === "acc"), ft).sort((a, b) => !!nbOn[a.id] - !!nbOn[b.id]);
+      const nbTma = low && layers.has("app") ? nbAll.filter((a) => a.kind === "app") : [];
+      const nbCtr = low && twrOn ? nbAll.filter((a) => a.kind === "twr") : [];
       m.svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
       m.svg.setAttribute("width", W);
       m.svg.setAttribute("height", H);
+      // kolejność (kolory z pliku sektora, radio.css): tło FIR-ów, sąsiedzi, FIR EPWW nieobsadzony, obszary stanowisk
+      // ACC (obsadzone: ciemne, pełne – pod nimi nic nie ginie), granice TMA/CTR/FIS EPWW i sąsiadów, granica FIR EPWW
       m.svg.innerHTML = g("rb-firs", geo.firs)
+        + `<g class="rb-nbacc">${nbAcc.map((a) => `<path class="${nbOn[a.id] ? "on" : "off"}" d="${pathOf(a.geometry, P)}"/>`).join("")}</g>`
         + `<path class="rb-land" d="${pathOf(geo.border, P)}"/>`
-        + (low && layers.has("fis") ? g("rb-fisg", geo.fis) : "")
-        + (low && layers.has("app") ? g("rb-tmag", geo.tma) : "")
-        + (low && (layers.has("twr") || layers.has("twra")) ? g("rb-ctrg", geo.ctr) : "")
         // obszar stanowiska (bez granic między jego sektorami); po błędzie sumy same wypełnienia wycinków
         + `<g class="rb-accg">${groups.map((x) => (x.geom ? `<path data-k="${esc(x.owner)}" class="st" d="${pathAll(x.geom, P)}"/>`
           : x.slices.map((sl) => `<path data-k="${esc(x.owner)}" class="st fb" d="${pathOf(sl.geometry, P)}"/>`).join(""))).join("")}</g>`
+        + (low && layers.has("fis") ? g("rb-fisg", geo.fis) : "")
+        + g("rb-tmag nb", nbTma) + g("rb-ctrg nb", nbCtr)
+        + (low && layers.has("app") ? g("rb-tmag", geo.tma) : "")
+        + (low && twrOn ? g("rb-ctrg", geo.ctr) : "")
         + `<path class="rb-border" d="${pathOf(geo.border, P)}"/>`;
       renderTitle(m, { top: fr.top - pr.top, left: fr.left - pr.left, right: pr.right - fr.right });
       // etykiety: wstawiamy wszystkie odmiany, mierzymy, układamy (ważniejsze pierwsze), zostawiamy wybraną odmianę
@@ -412,8 +423,7 @@ export default {
       const obstacles = [...p.querySelectorAll(".rb-nb, .rb-title")].filter((e) => e.offsetWidth && e.offsetHeight).map(rel);
       // kształty, których etykiety nie zasłaniają (runda 11, Marek): TMA na warstwie APP, CTR na TWR i TWR/ATIS, kropki
       // lotnisk i punktów TMA; etykieta APP/TWR staje obok nich z linią do punktu, sektora ACC przesuwa się mniej
-      const twrOn = layers.has("twr") || layers.has("twra");
-      const shapes = low ? [...(layers.has("app") ? geo.tma : []), ...(twrOn ? geo.ctr : [])] : [];
+      const shapes = low ? [...(layers.has("app") ? geo.tma : []), ...(twrOn ? geo.ctr : []), ...nbTma, ...nbCtr] : [];
       const shapeKind = !shapes.length ? "" : twrOn ? "twr" : "app";
       const cover = shapes.length ? coverGrid(shapes.flatMap((x) => ringsOf(x.geometry).map((r) => r.map(P))), W, H,
         { points: pts.filter((_, i) => items[i].dot && items[i].dot !== "fis") }) : null;
@@ -431,7 +441,9 @@ export default {
         const e = vars[i][v], w = e.offsetWidth, hh = e.offsetHeight, [x, y] = pts[i];
         e.style.left = `${Math.round(x + dx - w / 2)}px`;
         e.style.top = `${Math.round(y + dy - hh / 2)}px`;
-        if (it.dot) marks += `<circle class="rb-dot ${it.dot}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.2"/>`;
+        // lotnisko (TWR): trójkąt jak w pliku sektora; punkt TMA (APP) i FIS: kropka
+        if (it.dot === "twr") marks += `<path class="rb-dot twr" d="M${x.toFixed(1)},${(y - 3.2).toFixed(1)}l2.8,4.8h-5.6z"/>`;
+        else if (it.dot) marks += `<circle class="rb-dot ${it.dot}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2"/>`;
         if (Math.abs(dx) > w / 2 + 2 || Math.abs(dy) > hh / 2 + 2) {
           const ex = Math.max(x + dx - w / 2, Math.min(x, x + dx + w / 2)), ey = Math.max(y + dy - hh / 2, Math.min(y, y + dy + hh / 2));
           marks += `<path class="rb-lead" d="M${x.toFixed(1)},${y.toFixed(1)}L${ex.toFixed(1)},${ey.toFixed(1)}"/>`;
@@ -448,7 +460,7 @@ export default {
       // szkielet raz: suwak LOW powstały od nowa przy każdym rysowaniu zgubiłby przeciąganie i fokus
       if (!t.firstChild) {
         t.innerHTML = `<b>${m.key}</b> <span class="rb-tl"></span>` + (m.key !== "LOW" ? ""
-          : `<span class="rb-lvl"><input type="range" class="rb-cut" aria-label="Wysokość przekroju LOW"><span class="rb-ticks" aria-hidden="true"></span></span>`
+          : `<span class="rb-lvl"><input type="range" class="rb-cut" aria-label="LOW cross-section level"><span class="rb-ticks" aria-hidden="true"></span></span>`
             + `<output class="rb-cutv"></output>`);
       }
       t.querySelector(".rb-tl").textContent = ly?.label || "";
@@ -460,8 +472,8 @@ export default {
       Object.assign(inp, { min: r.min, max: r.max, step: r.step });
       if (Number(inp.value) !== v) inp.value = v;
       inp.setAttribute("aria-valuetext", flText(v * 100));
-      inp.title = `Przekrój LOW na ${flText(v * 100)}: kształty sektorów z przedziału ${flText(c.lo)}–${flText(c.hi)}`
-        + `\nKreski: granice wycinków ACC (tam zmieniają się kształty); strzałki: co 500 ft`;
+      inp.title = `LOW cross-section at ${flText(v * 100)}: sector shapes of the band ${flText(c.lo)}–${flText(c.hi)}`
+        + `\nTicks: ACC slice limits (shapes change there); arrow keys: 500 ft steps`;
       t.querySelector(".rb-cutv").textContent = flText(v * 100);
       t.querySelector(".rb-ticks").innerHTML = b.filter((x) => x / 100 > r.min && x / 100 <= r.max)
         .map((x) => `<i style="left:${(((x / 100 - r.min) / Math.max(1, r.max - r.min)) * 100).toFixed(1)}%"></i>`).join("");
@@ -477,11 +489,11 @@ export default {
       const s = $(".rb-status");
       const n = d ? controllersOn(d.online) : 0;
       const net = d?.net;
-      s.innerHTML = !d ? (err ? `<span class="error">${esc(err)}</span>` : "Wczytywanie…")
-        : `${net?.ok ? `VATSIM ${esc(utcHhmm(net.updated))} · ${n} na tablicy` : `<span class="error">${esc(net?.error || "VATSIM: brak danych")}</span>`}`
-          + (noBorder ? ` <span class="error">Brak granicy FIR EPWW (VATSpy): podglądy bez obrysu FIR.</span>` : "")
+      s.innerHTML = !d ? (err ? `<span class="error">${esc(err)}</span>` : "Loading…")
+        : `${net?.ok ? `VATSIM ${esc(utcHhmm(net.updated))} · ${n} on the board` : `<span class="error">${esc(net?.error || "VATSIM: no data")}</span>`}`
+          + (noBorder ? ` <span class="error">No FIR EPWW boundary (VATSpy): previews without the FIR outline.</span>` : "")
           + (err ? ` <span class="error">${esc(err)}</span>` : "");
-      s.title = d?.source ? `Kolejność przejmowania: ${d.source}` : "";
+      s.title = d?.source ? `Coverage order: ${d.source}` : "";
     }
     let raf = 0;
     // jeden błąd (np. dziwne dane) nie zatrzymuje reszty strony
@@ -638,7 +650,7 @@ export default {
       const items = [...loaBox.querySelectorAll("[data-f]")];
       items.forEach((x) => { x.hidden = !!t && !x.dataset.f.includes(t); });
       loaBox.querySelectorAll(".rb-loa-sec").forEach((sec) => { sec.hidden = !!t && !sec.querySelector("[data-f]:not([hidden])"); });
-      loaBox.querySelector(".rb-loa-cnt").textContent = t ? `${items.filter((x) => !x.hidden).length} z ${items.length}` : "";
+      loaBox.querySelector(".rb-loa-cnt").textContent = t ? `${items.filter((x) => !x.hidden).length} of ${items.length}` : "";
     });
 
     // --- dymki (jeden pływający, przycięty do okna) i podświetlenie sektora pod etykietą
