@@ -1,6 +1,6 @@
-/* AERODROME › RUCH: paski postępu lotu jak w EFES. Odlot niebieski, przylot żółty, lokalny różowy, planowany przygaszony.
+/* STRIP: paski postępu lotu jak w EFES. Odlot niebieski, przylot żółty, lokalny różowy, planowany przygaszony.
    Paski to jedyne miejsce z dominującym kolorem innym niż zielony; obudowa (pasek informacji, zatoki) jak NM UI.
-   Bez poświaty: żadnych text-shadow ani cieni wokół pasków. */
+   Bez poświaty: żadnych text-shadow ani cieni wokół pasków. Ostre krawędzie (0.12.5): border-radius 0 jak w PANDORZE. */
 .aero-pane .strips, .strip-pane .strips { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 /* zakładka STRIP: podzakładka lotniska z paskiem tytułu, paski pod spodem na całą wysokość */
 .pane.strip-pane { padding: 8px 12px; }
@@ -13,7 +13,7 @@
 
 /* pasek informacji: pasy w użyciu, ATIS, A-CDM, legenda */
 .sx-bar { flex: none; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 4px 10px; min-height: 32px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
 .sx-bar .kv { display: inline-flex; align-items: baseline; gap: 6px; font: 13px var(--mono); color: #fff; white-space: nowrap; }
 .sx-bar .kv i { font: 700 10px/1 var(--sans); font-style: normal; letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
 .sx-bar .kv b { font-size: 18px; }
@@ -22,7 +22,7 @@
 .sx-bar .kv.sugg { color: var(--warn); font: 12px var(--sans); }
 .sx-legend { display: inline-flex; gap: 10px; font-size: 12px; color: var(--text); white-space: nowrap; }
 .sx-legend span { display: inline-flex; align-items: center; gap: 4px; }
-.lg { display: inline-block; width: 18px; height: 11px; border-radius: 2px; border: 1px solid; }
+.lg { display: inline-block; width: 18px; height: 11px; border-radius: 0; border: 1px solid; }
 .lg.dep { background: linear-gradient(#e8f3ff, #6db3f2); border-color: #2f74c0; }
 .lg.arr { background: linear-gradient(#fffbe0, #f5c400); border-color: #c79a00; }
 .lg.loc { background: linear-gradient(#fff3f7, #f5aec4); border-color: #c97e95; }
@@ -33,11 +33,11 @@
 /* tablica: dwie kolumny zatok, każda zatoka przewija się w sobie */
 .sx-board { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .sx-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
-.sx-bay { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.sx-bay { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
 .sx-bay.main { flex: 1 1 0; }
 .sx-bay.side { flex: 0 1 auto; max-height: 36%; }
 .sx-bay > h3 { flex: none; display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 5px 10px; background: var(--head);
-  border-bottom: 1px solid var(--head-line); border-left: 3px solid var(--bay, var(--green)); border-radius: 3px 3px 0 0;
+  border-bottom: 1px solid var(--head-line); border-left: 3px solid var(--bay, var(--green)); border-radius: 0;
   font: 700 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
 .sx-bay > h3 .n { color: #fff; font: 700 12px var(--mono); }
 .sx-bay > h3 .sub { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; white-space: nowrap;
@@ -55,7 +55,7 @@
 .sx-div::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 
 /* pasek EFES */
-.strip { flex: none; position: relative; color: #000; border: 1px solid; border-radius: 5px; font-family: var(--strip-font);
+.strip { flex: none; position: relative; color: #000; border: 1px solid; border-radius: 0; font-family: var(--strip-font);
   font-stretch: semi-condensed; line-height: 1.1; cursor: pointer; user-select: none; }
 .strip.dep { background: linear-gradient(#eef6ff 0%, #c2e0ff 42%, #6fb4f3 100%); border-color: #2f74c0; }
 .strip.arr { background: linear-gradient(#fffbe3 0%, #ffe788 42%, #f5c200 100%); border-color: #c08f00; }
@@ -88,7 +88,7 @@
 .strip .cs.long { font-size: 23px; }
 .strip .st { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 12px; margin-top: -2px; }
 .strip .mv { letter-spacing: .3px; }
-.strip .fs { font: 700 10px/13px var(--sans); padding: 0 3px; border-radius: 2px; border: 1px solid; cursor: inherit; }
+.strip .fs { font: 700 10px/13px var(--sans); padding: 0 3px; border-radius: 0; border: 1px solid; cursor: inherit; }
 .strip .fs-fi { color: #2b3138; background: rgba(255, 255, 255, .55); border-color: #59636d; }
 .strip .fs-si { color: #1d1400; background: #ffb020; border-color: #9c6500; }
 .strip .fs-su { color: #fff; background: #c81e1e; border-color: #7d0d0d; }
@@ -107,7 +107,7 @@
 .strip .cur { display: inline-flex; gap: 3px; align-items: baseline; }
 /* prawe pole zamiast przycisku SU: najważniejszy czas */
 .strip .c-box { margin: 4px 5px 4px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border: 1px solid rgba(0, 0, 0, .45); border-radius: 3px; background: rgba(255, 255, 255, .5); }
+  border: 1px solid rgba(0, 0, 0, .45); border-radius: 0; background: rgba(255, 255, 255, .5); }
 .strip .c-box b { font-size: 16px; font-weight: 400; line-height: 1.05; }
 .strip .c-box.empty { border-style: dashed; background: transparent; }
 .strip .c-box.ctot.d15 { background: #2f6fd6; color: #fff; } .strip .c-box.ctot.d30 { background: #e8c400; }
@@ -149,10 +149,46 @@
   .strip .c-proc .s { gap: 6px; }
 }
 
-/* dymek: opis pola + pełne dane paska (position: fixed, żeby nie obcinało go przewijanie zatoki) */
-.sx-tip { position: fixed; z-index: 2000; max-width: 560px; pointer-events: none; background: #0b0d0b; color: #e8e8e8;
-  border: 1px solid var(--green-hi); border-radius: 2px; padding: 6px 9px; font: 12px/1.45 var(--mono); white-space: pre-wrap; }
-.sx-tip .h { color: var(--green-hi); font-family: var(--sans); font-size: 12px; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+/* okno lotu po kliknięciu paska: "EXTENDED LABEL WINDOW" jak w SDD 2014 (Figure 2-6): turkusowa belka z tytułem, szare
+   pole z białym tekstem o stałej szerokości znaków, zielony callsign, żółte RFL / reguły / ORCAM; ostre krawędzie.
+   position: fixed, żeby nie obcinało go przewijanie zatoki; strips.js trzyma je w oknie przeglądarki. */
+.sx-win { --xl-bg: #3c3c3c; --xl-g: #3cf03c; --xl-y: #ffff3c; --xl-r: #ff4040;
+  position: fixed; z-index: 2000; max-width: calc(100vw - 12px); max-height: calc(100vh - 12px); overflow: auto;
+  background: var(--xl-bg); color: #fff; border: 2px solid #b8b8b8; border-radius: 0; font: 14px/1.3 var(--mono); }
+.sx-win[hidden] { display: none; }
+.sx-win .xw-head { display: flex; align-items: stretch; gap: 2px; background: #b8b8b8; border-bottom: 2px solid #b8b8b8; }
+.sx-win .xw-t { flex: 1; padding: 2px 8px; background: #5f9f8a; color: #000; text-align: center; letter-spacing: .5px; white-space: nowrap; }
+.sx-win .xw-key, .sx-win .xw-x { flex: none; padding: 0 6px; border: 0; border-radius: 0; background: #d6d6d6; color: #000;
+  font: 12px/1 var(--mono); cursor: pointer; }
+.sx-win .xw-x { width: 30px; font-size: 18px; }
+.sx-win .xw-key.on { background: #5f9f8a; }
+.sx-win .xw-key:hover, .sx-win .xw-x:hover { background: #fff; }
+.sx-win .xw-body { box-sizing: content-box; max-width: 100%; padding: 4px 8px 6px; }
+.sx-win .xw-ln { display: flex; gap: 1ch; min-height: 1.3em; white-space: pre; }
+.sx-win .xw-ln.gap { margin-top: .8em; }
+.sx-win .xw-f { flex: none; display: inline-flex; flex-direction: column; min-width: 0; }
+.sx-win .xw-f.rt { margin-left: auto; text-align: right; }
+.sx-win .xw-f b { font-weight: 400; }
+.sx-win .xw-f .g { color: var(--xl-g); }
+.sx-win .xw-f .y { color: var(--xl-y); }
+.sx-win .xw-f .r { color: var(--xl-r); }
+/* wartość skrócona do szerokości pola z Table 2-13: blady znak "…", klik albo Enter pokazuje pełną pod oknem */
+.sx-win .xw-f .more { color: #a8c8bc; }
+.sx-win .xw-f.cut { cursor: pointer; }
+.sx-win .xw-f.cut:hover b { background: #555; }
+.sx-win .xw-f.cut:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
+/* KEY: nazwy pól nad wartościami, puste pola z kreską */
+.sx-win .xw-body.key .xw-ln { margin-top: 2px; }
+.sx-win .xw-body.key .xw-f i { font: 9px/1.2 var(--mono); font-style: normal; letter-spacing: .3px; color: #a8c8bc; white-space: nowrap; }
+.sx-win .xw-body.key .xw-f.nil b::before { content: "–"; color: #8a8a8a; }
+/* opis pola i stopka nie poszerzają okna: szerokość wyznacza część SDD (XL_WIDTH znaków) */
+.sx-win .xw-note, .sx-win .xw-foot { box-sizing: border-box; width: 0; min-width: 100%; }
+.sx-win .xw-note { display: flex; gap: 8px; padding: 4px 8px; border-top: 1px solid #5a5a5a; font-size: 12px; white-space: normal; }
+.sx-win .xw-note i { flex: none; font: 700 10px/16px var(--mono); font-style: normal; letter-spacing: .6px; color: #a8c8bc; }
+.sx-win .xw-note span { min-width: 0; overflow-wrap: anywhere; }
+.sx-win .xw-foot { padding: 3px 8px; border-top: 1px solid #5a5a5a; color: #c8c8c8; font-size: 11px; }
+.sx-win .xw-foot b { font-weight: 700; color: #fff; }
+.strip:focus-visible { outline: 2px solid var(--green-hi); outline-offset: -2px; }
 
 /* PRZEGLĄD: jednowierszowe podsumowanie ruchu, klik przełącza na RUCH */
 .aero-col > .card.aero-ruch { flex: none; cursor: pointer; }

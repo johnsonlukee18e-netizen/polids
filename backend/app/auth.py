@@ -59,10 +59,10 @@ def access_denied_reason(user: dict) -> str | None:
     """None = wpuszczamy, inaczej komunikat dla użytkownika. Wchodzą admini i CID-y z listy (zakładka ADMIN)."""
     cid = str(user.get("cid"))
     if user.get("rating", -1) < 1:
-        return "Konto VATSIM jest nieaktywne albo zawieszone."
+        return "Your VATSIM account is inactive or suspended."
     if is_admin_cid(cid) or access.is_allowed(cid):
         return None
-    return f"Brak dostępu dla CID {cid}. Poproś administratora o dodanie Cię do listy."
+    return f"No access for CID {cid}. Ask an administrator to add you to the list."
 
 
 def is_admin(user: dict | None) -> bool:
@@ -86,7 +86,7 @@ def current_user(request: Request) -> dict | None:
 
 def require_admin(request: Request) -> None:
     if not is_admin(current_user(request)):
-        raise HTTPException(403, "Tylko dla administratorów (POLIDS_AUTH_ADMIN_CIDS)")
+        raise HTTPException(403, "Administrators only (POLIDS_AUTH_ADMIN_CIDS)")
 
 
 def _is_public(path: str) -> bool:
@@ -109,11 +109,11 @@ async def gate(request: Request, call_next):
     path = request.url.path
     if _cross_origin(request):
         log.warning("Odrzucono %s %s z Origin %s", request.method, path, request.headers.get("origin"))
-        return JSONResponse({"detail": "Zapytanie z innej strony odrzucone"}, status_code=403)
+        return JSONResponse({"detail": "Cross-site request rejected"}, status_code=403)
     if settings.auth_mode == "none" or _is_public(path) or current_user(request):
         return await call_next(request)
     if path.startswith("/api/") or path == "/openapi.json":
-        return JSONResponse({"detail": "Wymagane logowanie"}, status_code=401)
+        return JSONResponse({"detail": "Login required"}, status_code=401)
     return RedirectResponse("/auth/login?" + urlencode({"next": path}), status_code=303)
 
 
@@ -147,19 +147,19 @@ def _login_page(error: str = "", nxt: str = "/") -> HTMLResponse:
     page = (settings.frontend_dir / "login.html").read_text("utf-8")
     nxt_q = html.escape(urlencode({"next": _safe_next(nxt)}))
     if settings.auth_mode == "vatsim":
-        body = f'<a class="btn" href="/auth/vatsim?{nxt_q}">Zaloguj przez VATSIM</a>'
+        body = f'<a class="btn" href="/auth/vatsim?{nxt_q}">LOG IN WITH VATSIM</a>'
     else:
         options = "".join(f'<option value="{k}"{" selected" if k == 2 else ""}>{v}</option>'
                           for k, v in RATINGS.items() if k >= 0)
-        body = f"""<p class="warn">Tryb dev - logowanie bez VATSIM, tylko lokalnie.</p>
+        body = f"""<p class="warn">Dev mode – login without VATSIM, local only.</p>
         <form method="post" action="/auth/dev">
           <input type="hidden" name="next" value="{html.escape(_safe_next(nxt))}">
           <label>CID <input name="cid" value="10000002" required pattern="[0-9]{{6,8}}"></label>
-          <label>Imię i nazwisko <input name="name" value="Test Kontroler" required maxlength="60"></label>
+          <label>Full name <input name="name" value="Test Controller" required maxlength="60"></label>
           <label>Rating <select name="rating">{options}</select></label>
-          <label>Dywizja <input name="division" value="EUD" maxlength="5"></label>
+          <label>Division <input name="division" value="EUD" maxlength="5"></label>
           <label>vACC <input name="subdivision" value="POL" maxlength="5"></label>
-          <button class="btn" type="submit">Zaloguj</button>
+          <button class="btn" type="submit">LOG IN</button>
         </form>"""
     page = (page.replace("{{NAME}}", html.escape(settings.name))
             .replace("{{TAGLINE}}", html.escape(settings.tagline))
@@ -234,15 +234,15 @@ async def vatsim_callback(request: Request, code: str = "", state: str = "", err
         raise HTTPException(404)
     saved = request.session.pop("oauth", None) or {}
     if error:
-        return _fail(request, "Logowanie w VATSIM zostało przerwane.")
+        return _fail(request, "VATSIM login was cancelled.")
     if not code or not state or not secrets.compare_digest(state, saved.get("state", "")) \
             or time.time() - saved.get("t", 0) > 600:
-        return _fail(request, "Sesja logowania wygasła, spróbuj jeszcze raz.")
+        return _fail(request, "Login session expired, please try again.")
     try:
         user = await fetch_vatsim_user(code)
     except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:
         log.warning("VATSIM Connect: %s", exc)
-        return _fail(request, "VATSIM Connect nie odpowiada, spróbuj za chwilę.")
+        return _fail(request, "VATSIM Connect is not responding, please try again shortly.")
     return _start_session(request, user, saved.get("next", "/"))
 
 
@@ -258,6 +258,6 @@ def me(request: Request):
         return {"mode": "none", "user": None, "admin": True}
     user = current_user(request)
     if not user:
-        raise HTTPException(401, "Wymagane logowanie")
+        raise HTTPException(401, "Login required")
     return {"mode": settings.auth_mode, "admin": is_admin(user),
             "user": {k: user.get(k) for k in ("cid", "name", "rating", "rating_short", "division", "subdivision")}}

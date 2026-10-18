@@ -10,13 +10,13 @@ const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 const byType = (a, b) => TYPE_ORDER.indexOf(a.callsign.split("_").pop()) - TYPE_ORDER.indexOf(b.callsign.split("_").pop()) || a.callsign.localeCompare(b.callsign);
 
 // Stan LVP z progami z AIP (dymek: przygotowanie, wprowadzenie, odwołanie, źródło); LVP w mocy pokazuje, czego
-// brakuje do odwołania, odwołane LVP godzinę odwołania (przez 30 min), "nie dotyczy" = AIP nie przewiduje LVP
+// brakuje do odwołania, odwołane LVP godzinę odwołania (przez 30 min), "not applicable" = AIP nie przewiduje LVP
 function lvpBox(lvp) {
   if (!lvp) return "";
   const s = lvpState(lvp), tip = esc(lvpTip(lvp));
-  if (s.cls === "na") return `<div class="lvp lvp-off lvp-na" data-tip="${tip}">LVP <span>nie dotyczy</span></div>`;
-  if (s.cls === "off") return `<div class="lvp lvp-off" data-tip="${tip}">LVP <span>nie obowiązują</span></div>`;
-  const scope = lvp.scope === "DEP" ? " · ODLOTY" : "";
+  if (s.cls === "na") return `<div class="lvp lvp-off lvp-na" data-tip="${tip}">LVP <span>not applicable</span></div>`;
+  if (s.cls === "off") return `<div class="lvp lvp-off" data-tip="${tip}">LVP <span>not in force</span></div>`;
+  const scope = lvp.scope === "DEP" ? " · DEPARTURES" : "";
   return `<div class="lvp lvp-${s.cls}" data-tip="${tip}">${esc(s.label)}${scope}<span>${(lvp.reasons || []).map(esc).join("<br>")}</span></div>`;
 }
 
@@ -27,11 +27,11 @@ function aipFreqs(list) {
   if (!list?.length) return "";
   const srcs = new Set(list.map((x) => (/^AIP/.test(x.source || "") ? "AIP" : "lotniska.dlapilota.pl")));
   // objaśnienie godzin tylko przy godzinach z czasem (samo H24, NOTAM, PPR albo brak godzin: bez niego)
-  const hrs = list.some((x) => /\d{4}/.test(x.hours || "")) ? " · godziny UTC zimą, w nawiasie latem" : "";
-  return list.map((x) => `<div class="radio-row aip-freq" data-tip="${esc([x.description, x.note, x.hours && `godziny: ${x.hours}`, x.source && `źródło: ${x.source}`].filter(Boolean).join("\n"))}">
+  const hrs = list.some((x) => /\d{4}/.test(x.hours || "")) ? " · hours UTC winter (summer in brackets)" : "";
+  return list.map((x) => `<div class="radio-row aip-freq" data-tip="${esc([x.description, x.note, x.hours && `hours: ${x.hours}`, x.source && `source: ${x.source}`].filter(Boolean).join("\n"))}">
       <span class="freq">${esc(x.mhz)}</span><span class="pos-txt"><span class="cs">${esc(x.kind)}</span><span class="nm">${esc(x.description || "")}</span>
       ${x.note ? `<span class="fq-note">${esc(x.note)}</span>` : ""}${x.hours ? `<span class="hrs">${esc(x.hours)}</span>` : ""}</span></div>`).join("")
-    + `<p class="hint">wg ${[...srcs].sort().join(" i ")}${hrs}</p>`;
+    + `<p class="hint">source: ${[...srcs].sort().join(" and ")}${hrs}</p>`;
 }
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
@@ -136,7 +136,7 @@ function windrose(status) {
     arrow += `<path d="M${x1},${y1} A${r - 18},${r - 18} 0 ${span > 180 ? 1 : 0} 1 ${x2},${y2}" stroke="#ffb020" stroke-width="3" fill="none"/>`;
   }
   return `<svg class="windrose" viewBox="0 0 ${size} ${size}">${defs}<circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}${marks}</svg>
-    <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>sugestia</span></div>`;
+    <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>suggested</span></div>`;
 }
 
 // Pas w użyciu z ATIS albo preferowany wg systemu (wiatr, wyposażenie, LVP)
@@ -144,15 +144,15 @@ function runwayBox(st) {
   const u = st.runway_in_use || {};
   const fromAtis = u.source === "ATIS";
   const atc = st.atc_online || [];
-  const title = fromAtis ? `PAS W UŻYCIU · ATIS ${esc(st.atis?.letter || "")}` : "PAS PREFEROWANY";
+  const title = fromAtis ? `RWY IN USE · ATIS ${esc(st.atis?.letter || "")}` : "PREFERRED RWY";
   // kolory jak na paskach: ARR żółty, DEP niebieski (także gdy oba na tym samym pasie)
   const body = !u.arr ? "–"
     : `<span>ARR</span><b class="arr" style="color:${USE_COLOR.arr}">${esc(u.arr)}</b><span>DEP</span><b class="dep" style="color:${USE_COLOR.dep}">${esc(u.dep || u.arr)}</b>`;
-  // liczba i „kt” w jednej linii (np. „w plecy 7 kt > 5 kt”)
+  // liczba i „kt” w jednej linii (np. „tailwind 7 kt > 5 kt”)
   let note = fromAtis ? `${esc(st.atis.callsign)}` : esc(u.reason || "").replace(/(\d) kt\b/g, "$1&nbsp;kt");
-  if (!fromAtis && st.atis) note += `<br>ATIS ${esc(st.atis.letter || "")} online, nie udało się odczytać pasa`;
-  else if (!fromAtis && atc.length) note += `<br>Kontrola online (${atc.map((c) => esc(c.callsign)).join(", ")}), brak ATIS`;
-  if (fromAtis && st.preferred?.arr && st.preferred.arr !== u.arr) note += `<br><span class="hint">wg wiatru: ${esc(st.preferred.arr)}</span>`;
+  if (!fromAtis && st.atis) note += `<br>ATIS ${esc(st.atis.letter || "")} online, runway not readable`;
+  else if (!fromAtis && atc.length) note += `<br>ATC online (${atc.map((c) => esc(c.callsign)).join(", ")}), no ATIS`;
+  if (fromAtis && st.preferred?.arr && st.preferred.arr !== u.arr) note += `<br><span class="hint">by wind: ${esc(st.preferred.arr)}</span>`;
   return `<div class="rwy-use ${fromAtis ? "atis" : "pref"}"><div class="label">${title}</div><div class="pair">${body}</div><div class="hint">${note}</div></div>`;
 }
 
@@ -162,15 +162,15 @@ const roleOrder = (active, sugg) => (d) => (active.arr === d || sugg.arr === d ?
 function runwayTable(st) {
   const { active, sugg } = roleSets(st);
   const tags = (d) => ["arr", "dep"].map((k) => (active[k] === d ? `<span class="tag ${k}">${ROLE_LABEL[k]}</span>`
-    : sugg[k] === d ? `<span class="tag ${k} sugg" title="sugestia systemu">${ROLE_LABEL[k]}?</span>` : "")).join("");
+    : sugg[k] === d ? `<span class="tag ${k} sugg" title="system suggestion">${ROLE_LABEL[k]}?</span>` : "")).join("");
   // pasy w użyciu na górze, potem z podejściem, na końcu pozostałe (np. trawiaste): w niskim oknie tabela przewija się
   const order = roleOrder(active, sugg);
   const rank = (r) => order(r.designator) * 2 + ((r.equipment || []).length ? 0 : 1);
-  return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dł. m</th><th>Podejście</th><th>Czoł.</th><th>Bocz.</th></tr></thead><tbody>
+  return `<table class="data rwy-table"><thead><tr><th>RWY</th><th></th><th>HDG</th><th>LEN m</th><th>APCH</th><th>HW</th><th>XW</th></tr></thead><tbody>
     ${[...st.runways].sort((a, b) => rank(a) - rank(b)).map((r) => {
       const tg = tags(r.designator);
       const eq = r.equipment || [];
-      const tip = `${r.designator}: ${fmt(r.length_m, 0)} × ${fmt(r.width_m, 0)} m, ${r.surface || "?"}; podejścia: ${eq.join(", ") || "brak danych"}`;
+      const tip = `${r.designator}: ${fmt(r.length_m, 0)} × ${fmt(r.width_m, 0)} m, ${r.surface || "?"}; approaches: ${eq.join(", ") || "no data"}`;
       const rl = ["arr", "dep"].filter((k) => active[k] === r.designator || sugg[k] === r.designator);
       // zaokrąglenie jak w karcie wiatru (meteo.js kt): po wartości bezwzględnej, TW dopiero od 1 kt
       const tw = r.headwind !== null && r.headwind < 0 && kt(r.headwind) > 0;
@@ -180,15 +180,15 @@ function runwayTable(st) {
       <td class="num" style="color:${tw ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (tw ? "TW " : "") + kt(r.headwind) + " kt"}</td>
       <td class="num">${r.crosswind === null ? "–" : kt(r.crosswind) + " kt" + (!kt(r.crosswind) ? "" : r.crosswind > 0 ? " R" : " L")}</td></tr>`;
     }).join("")}
-  </tbody></table><div class="hint">TW = wiatr w plecy · ARR? / DEP? = sugestia systemu · najedź na pas: szerokość, nawierzchnia, podejścia</div>`;
+  </tbody></table><div class="hint">TW = tailwind · ARR? / DEP? = system suggestion · hover a runway: width, surface, approaches</div>`;
 }
 
 // Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak METEO › WIND, bez mapy): METAR i model 10 m
 // (Open-Meteo) w punkcie lotniska, 3000 ft AMSL w punkcie FAF/IF z procedury albo na przedłużeniu osi (3°)
 function approachWind(aw, st, err) {
   // lotnisko bez pasów w bazie (część lądowisk z listy EPWW, np. EPGM): nie ma czego liczyć, to nie błąd
-  if (!aw && st && Array.isArray(st.runways) && !st.runways.length) return `<span class="hint">Brak danych o pasach tego lotniska.</span>`;
-  if (!aw) return `<span class="${err ? "error" : "hint"}">${esc(err || "Ładowanie prognozy…")}</span>`;
+  if (!aw && st && Array.isArray(st.runways) && !st.runways.length) return `<span class="hint">No runway data for this aerodrome.</span>`;
+  if (!aw) return `<span class="${err ? "error" : "hint"}">${esc(err || "Loading forecast…")}</span>`;
   const { active, sugg } = roleSets(st || {});
   const rolesOf = (d) => ["arr", "dep"].filter((k) => active[k] === d || sugg[k] === d);
   const isSugg = (k, d) => active[k] !== d;
@@ -201,16 +201,16 @@ function approachWind(aw, st, err) {
       `<span class="apw-tag ${k}">${ROLE_LABEL[k]}${isSugg(k, r.designator) ? "?" : ""}</span>`).join("")}</span></td>
       <td class="num">${pair(r.c_metar)}</td><td class="num">${pair(r.c_model)}</td>
       <td class="num w">${windVec(r.w3000)}</td><td class="num">${pair(r.c3000)}</td>
-      <td class="pt ${r.method}">${esc(r.fix || "oś 3°")}</td></tr>`;
+      <td class="pt ${r.method}">${esc(r.fix || "CL 3°")}</td></tr>`;
   }).join("");
   const errs = [aw.model_error, aw.metar_error].filter(Boolean);
   return `<div class="apw-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
-    <table class="data apw-tab"><thead><tr><th rowspan="2">Pas</th><th colspan="2">0 ft · H/T XW</th><th colspan="2">3000 ft</th><th rowspan="2">Punkt</th></tr>
-      <tr><th>METAR</th><th>10 m</th><th>wiatr</th><th>H/T XW</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="data apw-tab"><thead><tr><th rowspan="2">RWY</th><th colspan="2">0 ft · H/T XW</th><th colspan="2">3000 ft</th><th rowspan="2">Point</th></tr>
+      <tr><th>METAR</th><th>10 m</th><th>wind</th><th>H/T XW</th></tr></thead><tbody>${rows}</tbody></table>
     ${errs.length ? `<div class="error apw-err" title="${esc(errs.join("\n"))}">${errs.map(esc).join(" · ")}</div>` : ""}
-    <div class="hint apw-note" title="Punkt podejścia: nazwa = FAF/IF z procedury STAR (.ese), oś 3° = punkt na przedłużeniu osi pasa, w którym ścieżka 3° osiąga 3000 ft AMSL.
-H = wiatr czołowy, T = w plecy, L/R = boczny z lewej/prawej, kt. Wiatr 0 ft z modelu: 10 m nad lotniskiem.
-${esc(aw.source)} (model ${esc(aw.model)}), prognoza na ${validTxt(aw.valid)}, pobrano ${esc(aw.fetched)}.">punkt: nazwa = FAF z procedury, oś 3° = na przedłużeniu osi, 3° · H/T L/R kt</div>`;
+    <div class="hint apw-note" title="Approach point: name = FAF/IF from the STAR procedure (.ese), CL 3° = point on the extended runway centreline where a 3° path reaches 3000 ft AMSL.
+H = headwind, T = tailwind, L/R = crosswind from left/right, kt. Model 0 ft wind: 10 m above the aerodrome.
+${esc(aw.source)} (model ${esc(aw.model)}), forecast for ${validTxt(aw.valid)}, fetched ${esc(aw.fetched)}.">point: name = FAF from procedure, CL 3° = on extended centreline · H/T L/R kt</div>`;
 }
 
 const NOTAM_SORT = {
@@ -219,14 +219,15 @@ const NOTAM_SORT = {
   end: (a, b) => (a.perm - b.perm) || (a.end || "9").localeCompare(b.end || "9"),
 };
 
-// Ruch: w PRZEGLĄDZIE tylko jednowierszowe podsumowanie; widok RUCH to DMAN/AMAN (dman.js), paski EFES są w zakładce STRIP
+// Ruch: w INFO tylko jednowierszowe podsumowanie; widok TRAFFIC to DMAN/AMAN (dman.js), paski EFES są w zakładce STRIP.
+// Liczby z sieci VATSIM (połączeni piloci i prefile), bez lotów OFFLINE znanych tylko z vIFF.
 function ruchLine(t, icao) {
   const local = t.departures.filter((p) => p.arrival === icao).length;
-  const n = (v, one, few, many) => `<b>${v}</b> ${v === 1 ? one : v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? few : many}`;
-  return `<div class="ruch-line"><span><s class="lg dep"></s>${n(t.departures.length - local, "odlot", "odloty", "odlotów")}</span>
-    <span><s class="lg arr"></s>${n(t.arrivals.length, "przylot", "przyloty", "przylotów")}</span>
-    ${local ? `<span><s class="lg loc"></s>${n(local, "lokalny", "lokalne", "lokalnych")}</span>` : ""}
-    ${t.prefiles.length ? `<span><s class="lg plan"></s>${n(t.prefiles.length, "prefile", "prefile", "prefile")}</span>` : ""}
+  const n = (v, one, many) => `<b>${v}</b> ${v === 1 ? one : many}`;
+  return `<div class="ruch-line"><span><s class="lg dep"></s>${n(t.departures.length - local, "departure", "departures")}</span>
+    <span><s class="lg arr"></s>${n(t.arrivals.length, "arrival", "arrivals")}</span>
+    ${local ? `<span><s class="lg loc"></s>${n(local, "local", "local")}</span>` : ""}
+    ${t.prefiles.length ? `<span><s class="lg plan"></s>${n(t.prefiles.length, "prefile", "prefiles")}</span>` : ""}
 </div>`;
 }
 
@@ -240,9 +241,9 @@ function windText(p) {
 function sunBox(sun) {
   if (!sun) return "";
   const t = (v) => esc(v || "–");
-  return `<div class="sunbox ${sun.day ? "day" : "night"}" title="Słońce w UTC: BMCT = początek zmierzchu cywilnego rano, EECT = koniec wieczorem">
-    <div class="label">Słońce UTC · ${sun.day ? "dzień" : "noc"}</div>
-    <div><span>Wschód</span><b>${t(sun.sunrise)}</b><span>Zachód</span><b>${t(sun.sunset)}</b></div>
+  return `<div class="sunbox ${sun.day ? "day" : "night"}" title="Sun in UTC: BMCT = beginning of morning civil twilight, EECT = end of evening civil twilight">
+    <div class="label">Sun UTC · ${sun.day ? "day" : "night"}</div>
+    <div><span>Sunrise</span><b>${t(sun.sunrise)}</b><span>Sunset</span><b>${t(sun.sunset)}</b></div>
     <div class="hint">BMCT ${t(sun.civil_dawn)} · EECT ${t(sun.civil_dusk)}</div></div>`;
 }
 
@@ -253,16 +254,17 @@ function value(label, v, extra = "") {
 export default {
   mount(root, ctx) {
     // Podmenu jak w PANDORZE: 0 = OVERVIEW całego FIR EPWW (overview.js), dalej listy lotnisk FIR-ów (aerolist.js):
-    // lotnisko polskie z bazy otwiera PRZEGLĄD / AWOS / RUCH, pozostałe kartę z METAR, TAF i stanowiskami.
-    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="OVERVIEW: cały FIR EPWW">0</button>
+    // lotnisko polskie z bazy otwiera INFO / AWOS / TRAFFIC (dawniej PRZEGLĄD / AWOS / RUCH), pozostałe kartę z METAR,
+    // TAF i stanowiskami.
+    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="OVERVIEW: whole FIR EPWW">0</button>
       ${FIR_KEYS.map((k) => `<button data-fir="${k}" title="${esc(FIR_LABELS[k])}">${k}</button>`).join("")}</nav>`);
     root.append(sub);
     const pane = h(`<div class="pane aero-pane">
       <div class="toolbar">
         <input class="field aero-icao" list="aero-list" size="10" placeholder="ICAO">
         <datalist id="aero-list"></datalist>
-        <button class="btn primary go">Pokaż</button>
-        <span class="aero-view"><button data-view="overview">PRZEGLĄD</button><button data-view="awos">AWOS</button><button data-view="ruch">RUCH</button></span>
+        <button class="btn primary go">Show</button>
+        <span class="aero-view"><button data-view="overview">INFO</button><button data-view="awos">AWOS</button><button data-view="ruch">TRAFFIC</button></span>
         <span class="title" style="font-weight:600"></span><span style="flex:1"></span>
         <span class="hint upd"></span>
       </div>
@@ -307,19 +309,19 @@ export default {
 
     let notamSort = lsGet("notam.sort") || "id";
     const renderNotams = async (el) => {
-      if (!el.innerHTML) el.innerHTML = `<span class="hint">Ładowanie NOTAM…</span>`;
+      if (!el.innerHTML) el.innerHTML = `<span class="hint">Loading NOTAM…</span>`;
       let data;
       try { data = await api(`/api/notam/${icao}`); } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; return; }
       const draw = () => {
         const list = [...data.notams].sort(NOTAM_SORT[notamSort] || NOTAM_SORT.id);
-        el.innerHTML = `<div class="notam-bar">Sortuj: ${[["id", "numer"], ["start", "początek"], ["end", "koniec"]].map(([k, l]) =>
+        el.innerHTML = `<div class="notam-bar">Sort: ${[["id", "number"], ["start", "start"], ["end", "end"]].map(([k, l]) =>
           `<button class="btn ${k === notamSort ? "primary" : ""}" data-sort="${k}">${l}</button>`).join("")}
           <span class="hint">${list.length} NOTAM</span></div>`
           + (list.length ? list.map((n) => {
             const s = notamState(n);
             return `<div class="notam ${s.cls}"><div class="nhead"><b class="mono">${esc(n.id || "")}</b><span class="valid">${esc(s.txt)}</span>
-              ${n.schedule ? `<span class="hint">harmonogram: ${esc(n.schedule)}</span>` : ""}</div><pre>${esc(n.raw)}</pre></div>`;
-          }).join("") : `<span class="hint">Brak NOTAM-ów dla ${esc(icao)}.</span>`);
+              ${n.schedule ? `<span class="hint">schedule: ${esc(n.schedule)}</span>` : ""}</div><pre>${esc(n.raw)}</pre></div>`;
+          }).join("") : `<span class="hint">No NOTAMs for ${esc(icao)}.</span>`);
       };
       el.onclick = (e) => {
         const b = e.target.closest("button[data-sort]");
@@ -347,14 +349,14 @@ export default {
         el.innerHTML = ((ps.map((p) => {
           const on = online[p.callsign], books = bookings[p.callsign] || [];
           const cls = on ? "on" : books.length ? "booked" : "";
-          const tip = [positionTip(on, books), ...aipOf(p).map((x) => ["AIP " + x.kind, x.note, x.hours && `godziny: ${x.hours}`].filter(Boolean).join(" · "))]
+          const tip = [positionTip(on, books), ...aipOf(p).map((x) => ["AIP " + x.kind, x.note, x.hours && `hours: ${x.hours}`].filter(Boolean).join(" · "))]
             .filter(Boolean).join("\n");
           // pos-txt: znak, nazwa stacji i kto (imię i nazwisko albo rezerwacja); przy braku miejsca kto schodzi pod znak (style.css)
           return `<div class="radio-row ${cls}" ${tip ? `data-tip="${esc(tip)}"` : ""}><span class="freq ${cls}">${esc(p.frequency)}</span>
             <span class="pos-txt"><span class="cs">${esc(p.callsign)}</span><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
             ${on ? `<b class="who">${esc(on.name || "")}</b>` : books.length ? `<span class="booked-txt">${hhmm(books[0].start)}–${hhmm(books[0].end)}</span>` : ""}</span></div>`;
         }).join("") + aipFreqs(aipRest))
-          || `<span class="hint">Brak danych</span>`)
+          || `<span class="hint">No data</span>`)
           + extra.map((cs) => `<div class="radio-row booked" data-tip="${esc(positionTip(null, bookings[cs]))}"><span class="freq booked">-</span>
             <span class="pos-txt"><span class="cs">${esc(cs)}</span><span class="nm"></span>
             <span class="booked-txt">${hhmm(bookings[cs][0].start)}–${hhmm(bookings[cs][0].end)}</span></span></div>`).join("")
@@ -364,11 +366,11 @@ export default {
       const [on, bk] = await Promise.allSettled([vatsimOnline(), vatsimBookings()]);
       const errs = [on, bk].filter((r) => r.status === "rejected").map((r) => esc(r.reason.message));
       draw(on.status === "fulfilled" ? on.value.positions : {}, bk.status === "fulfilled" ? bk.value : {},
-        `Zielone = online, przerywana ramka = rezerwacja (najedź, żeby zobaczyć kto). ${errs.length ? `<span class="error">${errs.join(" · ")}</span>` : ""}`);
+        `Green = online, dashed frame = booking (hover to see who). ${errs.length ? `<span class="error">${errs.join(" · ")}</span>` : ""}`);
     };
 
     // Układ na jeden ekran: trzy kolumny, długie listy przewijają się wewnątrz swoich okienek
-    // (checklista jest tylko w zakładce CHECKLIST, loty w widoku RUCH). Szkielet budujemy raz na lotnisko, dane odświeżamy co minutę.
+    // (checklista jest tylko w zakładce CHECKLIST, loty w widoku TRAFFIC). Szkielet budujemy raz na lotnisko, dane odświeżamy co minutę.
     const build = () => {
       $(".content").innerHTML = `
         <div class="aero-errors"></div>
@@ -380,14 +382,14 @@ export default {
           </div>
           <div class="aero-col">
             <div class="values compact"></div>
-            <div class="card aero-rwy-card"><h3>Pasy</h3><div class="aero-rwys"></div></div>
+            <div class="card aero-rwy-card"><h3>Runways</h3><div class="aero-rwys"></div></div>
             <div class="card grow aero-taf-card"><h3>TAF</h3><div class="scroll aero-taf wx"></div></div>
-            <div class="card aero-ruch" title="Pokaż ruch na drabinach DMAN/AMAN (widok RUCH)"><h3>Ruch VATSIM<span class="ruch-go">DMAN/AMAN ›</span></h3><div class="aero-ruch-line"><span class="hint">Ładowanie…</span></div></div>
+            <div class="card aero-ruch" title="Show traffic on the DMAN/AMAN ladders (TRAFFIC view)"><h3>VATSIM traffic<span class="ruch-go">DMAN/AMAN ›</span></h3><div class="aero-ruch-line"><span class="hint">Loading…</span></div></div>
           </div>
           <div class="aero-col">
-            <div class="card part"><h3>Częstotliwości · online · rezerwacje</h3><div class="scroll freqs"></div></div>
-            <div class="card aero-apw" title="Wiatr przy ziemi i na 3000 ft AMSL w punkcie podejścia każdego pasa (Open-Meteo); METEO › WIND pokazuje to samo na mapie Windy">
-              <h3>Wiatr 0 / 3000 ft · podejście<span class="apw-src"></span></h3><div class="apw"></div></div>
+            <div class="card part"><h3>Frequencies · online · bookings</h3><div class="scroll freqs"></div></div>
+            <div class="card aero-apw" title="Surface wind and 3000 ft AMSL wind at the approach point of each runway (Open-Meteo); METEO › WIND shows the same on the Windy map">
+              <h3>Wind 0 / 3000 ft · approach<span class="apw-src"></span></h3><div class="apw"></div></div>
             <div class="card grow aero-notam"><h3>NOTAM</h3><div class="scroll notams"></div></div>
           </div>
         </div>`;
@@ -437,7 +439,7 @@ export default {
           $(".title").textContent = icao;
           $(".upd").textContent = "";
         }
-        // RUCH nie zależy od statusu lotniska: własne zapytanie, przy braku serwera błąd zamiast "Ładowanie…"
+        // TRAFFIC nie zależy od statusu lotniska: własne zapytanie, przy braku serwera błąd zamiast "Loading…"
         renderRuch($(".aero-ruch-line"));
         if (apwDue()) loadApw();   // błąd statusu nie blokuje karty wiatru
         return;
@@ -446,7 +448,7 @@ export default {
       if (view !== "overview" || mode !== "page" || code !== icao) return;
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
-      $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z";
+      $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
       const clouds = (p.clouds || []).map((c) => `${c.cover}${c.base_ft !== null ? String(c.base_ft / 100).padStart(3, "0") : "///"}${c.type || ""}`).join(" ") || (p.cavok ? "CAVOK" : "NSC");
       const rvr = (p.rvr || []).map((x) => `R${x.runway} ${x.value}`).join("<br>") || "–";
       const obs = obsInfo(p.time);
@@ -459,18 +461,18 @@ export default {
           ${lvpBox(st.lvp)}`;
       $(".aero-wind").innerHTML = `${windrose(st)}
             <div class="big">${windText(p).replace(/G\d+/, "")}${gust}</div>
-            <div class="hint">${p.wind_speed !== null && p.wind_speed !== undefined ? `${Math.round(p.wind_speed * 0.514)} m/s` : ""}${p.wind_var_from !== null && p.wind_var_from !== undefined ? ` · zmienny ${p.wind_var_from}°–${p.wind_var_to}°` : ""}</div>
+            <div class="hint">${p.wind_speed !== null && p.wind_speed !== undefined ? `${Math.round(p.wind_speed * 0.514)} m/s` : ""}${p.wind_var_from !== null && p.wind_var_from !== undefined ? ` · variable ${p.wind_var_from}°–${p.wind_var_to}°` : ""}</div>
             ${runwayBox(st)}`;
       $(".values").innerHTML = `
               ${value("QNH", p.qnh ?? "–", '<span class="hint">hPa</span>')}
-              ${value("QFE", st.qfe ?? "–", '<span class="hint">hPa (przybl.)</span>')}
-              ${value("Widzialność", p.visibility_m !== null && p.visibility_m !== undefined ? (p.visibility_m >= 9999 ? "≥10 km" : p.visibility_m + " m") : "–")}
+              ${value("QFE", st.qfe ?? "–", '<span class="hint">hPa (approx.)</span>')}
+              ${value("Visibility", p.visibility_m !== null && p.visibility_m !== undefined ? (p.visibility_m >= 9999 ? "≥10 km" : p.visibility_m + " m") : "–")}
               ${value("RVR", `<span class="sm">${rvr}</span>`)}
-              ${value("Podstawa", p.ceiling_ft ? p.ceiling_ft + " ft" : "–")}
-              ${value("Chmury", `<span class="sm">${esc(clouds)}</span>`)}
-              ${value("Temp / Dew", `${p.temperature ?? "–"} / ${p.dewpoint ?? "–"}`, p.temperature !== null && p.dewpoint !== null && p.temperature !== undefined && p.temperature - p.dewpoint <= 2 ? '<span class="hint" style="color:var(--warn)">mały spread</span>' : "")}
-              ${value("Zjawiska", `<span class="sm">${esc((p.weather || []).join(" ") || "–")}</span>`)}
-              ${value("Kategoria", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<span class="hint mono">${esc(p.trend)}</span>` : "")}`;
+              ${value("Ceiling", p.ceiling_ft ? p.ceiling_ft + " ft" : "–")}
+              ${value("Clouds", `<span class="sm">${esc(clouds)}</span>`)}
+              ${value("Temp / Dew", `${p.temperature ?? "–"} / ${p.dewpoint ?? "–"}`, p.temperature !== null && p.dewpoint !== null && p.temperature !== undefined && p.temperature - p.dewpoint <= 2 ? '<span class="hint" style="color:var(--warn)">small spread</span>' : "")}
+              ${value("Weather", `<span class="sm">${esc((p.weather || []).join(" ") || "–")}</span>`)}
+              ${value("Category", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<span class="hint mono">${esc(p.trend)}</span>` : "")}`;
       $(".aero-rwys").innerHTML = runwayTable(st);
       lastSt = st;
       drawApw();
@@ -478,7 +480,7 @@ export default {
       $(".aero-taf").innerHTML = st.taf ? wxLines("taf", st.taf) : colorize(null);
       $(".atis-h").textContent = `ATIS ${st.atis ? st.atis.letter || "" : ""}`;
       $(".aero-atis").innerHTML = st.atis ? `<div class="mono atis-text">${atisHtml(st.atis.lines)}</div>`
-        : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`;
+        : `<span class="hint">${st.network_error ? esc(st.network_error) : "No ATIS on the VATSIM network now."}</span>`;
       renderFreqs($(".freqs"), info);
       renderRuch($(".aero-ruch-line"));
       if (++ticks % 10 === 0) renderNotams($(".notams"));
@@ -553,7 +555,7 @@ export default {
       card = mountAeroCard($(".content"), code, {
         onInfo: (d) => {
           if (d.fir) markSub(d.fir);
-          $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z · co minutę";
+          $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z · every 1 min";
           saveLast(true);
         },
         onMissing: () => {
@@ -596,7 +598,7 @@ export default {
           saveLast();
         }, onUpdate: (d) => {
           $(".title").textContent = `${d.icao} · ${d.name}  (elev ${fmt(d.elevation_ft, 0)} ft)`;
-          $(".upd").textContent = `Aktualizacja ${d.now.slice(0, 2)}:${d.now.slice(2)}Z · co 30 s`;
+          $(".upd").textContent = `Updated ${d.now.slice(0, 2)}:${d.now.slice(2)}Z · every 30 s`;
         } });
         return `${code}/${rv}`;
       }
@@ -634,7 +636,7 @@ export default {
     const goto = (arg, opts) => {
       let a = aeroArg(arg);
       if (!a) {
-        $(".title").textContent = `Niepoprawny kod ICAO: ${String(arg ?? "").trim().slice(0, 10)}`;
+        $(".title").textContent = `Invalid ICAO code: ${String(arg ?? "").trim().slice(0, 10)}`;
         return;
       }
       if (mode === "list" && list) stash("aerodrome", { key: listKey, ...list.save() });   // stan listy w jej wpisie, przed krokiem dalej

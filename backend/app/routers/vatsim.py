@@ -26,7 +26,7 @@ async def _feed() -> dict:
     try:
         return await get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed niedostępny: {exc}") from exc
+        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
 
 
 @router.get("/online")
@@ -66,7 +66,7 @@ async def bookings(prefix: str = "EP", hours: int | None = Query(None, ge=1, le=
     try:
         data = await get_bookings()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM ATC bookings niedostępne: {exc}") from exc
+        raise HTTPException(502, f"VATSIM ATC bookings unavailable: {exc}") from exc
     until = datetime.now(timezone.utc) + timedelta(hours=hours) if hours else None
     result = bookings_by_callsign(data, prefix, until=until)
     # API rezerwacji podaje tylko CID; imię i nazwisko znamy, jeśli ta osoba jest teraz zalogowana w sieci
@@ -108,13 +108,13 @@ async def me(request: Request, db: Session = Depends(get_db)):
         out["online"] = [c | {"position": pos.get(c["callsign"])} for c in online]
         out["updated"] = (feed.get("general") or {}).get("update_timestamp")
     except Exception as exc:  # noqa: BLE001 - błąd sieci (UpstreamError), zły JSON albo nieoczekiwany kształt danych
-        out["online_error"] = f"VATSIM data feed niedostępny: {exc}"
+        out["online_error"] = f"VATSIM data feed unavailable: {exc}"
     try:
         if isinstance(books, BaseException):
             raise books
         out["bookings"] = user_bookings(books, cid)
     except Exception as exc:  # noqa: BLE001 - jak wyżej
-        out["bookings_error"] = f"VATSIM ATC bookings niedostępne: {exc}"
+        out["bookings_error"] = f"VATSIM ATC bookings unavailable: {exc}"
     out["error"] = " · ".join(e for e in (out["online_error"], out["bookings_error"]) if e) or None
     return out
 
@@ -141,11 +141,13 @@ async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db:
     albo reszta trasy z planu lotu w niego wchodzi; bez planu: tylko w FIR-ze), null = bez związku z Polską
     (services/eptraffic.py). ep=1 (MAP): tylko samoloty z relacją. keep: znaki po przecinku, które są w odpowiedzi
     zawsze, także bez relacji i poza bbox (MAP: wybrany lot i loty z wykresu vIFF); te, które są w niej tylko dzięki
-    keep (poza bbox albo, przy ep=1, bez relacji), mają "kept": true i nie liczą się do ruchu w obszarze."""
+    keep (poza bbox albo, przy ep=1, bez relacji), mają "kept": true i nie liczą się do ruchu w obszarze.
+    exit: punkt wyjścia z FIR EPWW tranzytu i odlotu z EP** za granicę (nazwany punkt trasy z planu lotu, etykieta
+    samolotu na MAP) albo null."""
     try:
         s, w, n, e = (float(x) for x in bbox.split(","))
     except ValueError as exc:
-        raise HTTPException(400, "bbox = poludnie,zachod,polnoc,wschod") from exc
+        raise HTTPException(400, "bbox = south,west,north,east") from exc
     data = await _feed()
     keep_cs = {x.strip().upper() for x in keep.split(",")[:200] if x.strip()}
 
@@ -155,13 +157,13 @@ async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db:
     found = [(pilot_info(p), inside(p)) for p in data.get("pilots", []) if p.get("latitude") is not None and (
         inside(p) or (p.get("callsign") or "").upper() in keep_cs)]
     # rozpisywanie nowych tras (zapytania do bazy) poza pętlą zdarzeń
-    rels = await run_in_threadpool(ep_traffic.relations, [p for p, _ in found], RouteResolver(db))
+    rels = await run_in_threadpool(ep_traffic.classify, [p for p, _ in found], RouteResolver(db))
     out = []
-    for (p, inb), r in zip(found, rels):
+    for (p, inb), (r, x) in zip(found, rels):
         if inb and (r or not ep):
-            out.append(p | {"ep": r})
+            out.append(p | {"ep": r, "exit": x})
         elif (p["callsign"] or "").upper() in keep_cs:
-            out.append(p | {"ep": r, "kept": True})
+            out.append(p | {"ep": r, "exit": x, "kept": True})
     return out
 
 
@@ -171,9 +173,9 @@ async def pilot_route(callsign: str, db: Session = Depends(get_db)):
     data = await _feed()
     p = next((x for x in data.get("pilots", []) if x.get("callsign") == callsign.upper()), None)
     if not p:
-        raise HTTPException(404, f"{callsign} nie jest online")
+        raise HTTPException(404, f"{callsign} is not online")
     info = pilot_info(p)
     if not info["route"] and not info["departure"]:
-        return {**info, "points": [], "distance_nm": 0, "warnings": ["Brak planu lotu"]}
+        return {**info, "points": [], "distance_nm": 0, "warnings": ["No flight plan"]}
     text = " ".join(x for x in (info["departure"], info["route"], info["arrival"]) if x)
     return {**info, **RouteResolver(db).resolve(text)}

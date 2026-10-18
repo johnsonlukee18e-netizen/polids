@@ -13,14 +13,14 @@ import sys
 import time
 from pathlib import Path
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, inspect, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import DATA_DIR, settings
 from ..database import SCHEMA_VERSION, Base, SessionLocal, engine
 from ..models import (AircraftType, Aerodrome, Callsign, Document, Frequency, ImportLog, NavPoint, NbPosition, NbSector,
                       Runway, Sector)
-from .aircraft_json import import_aircraft_json
+from .aircraft_json import build_aircraft
 from .callsigns import import_gr_operator_info, import_icao_airlines
 from .ese import import_ese
 from .neighbours import import_nb_ese, source_key
@@ -42,8 +42,8 @@ IMPORTERS = [
     (".ese", import_ese),
     ("icao_airlines.txt", import_icao_airlines),
     ("grpluginoperatorinfo.txt", import_gr_operator_info),
-    ("icao_aircraft.json", import_aircraft_json),
 ]
+AIRCRAFT_JSON = "icao_aircraft.json"  # typy AIRCRAFT (import_aircraft, razem z data/seed/aircraft.csv)
 
 
 def _csv(name: str):
@@ -104,24 +104,62 @@ def seed_aerodromes(db: Session):
                         lat=float(n["latitude_deg"]), lon=float(n["longitude_deg"]), source="ourairports"))
 
 
-def seed_aircraft(db: Session):
-    ints = {"engine_count"}
-    floats = {"wingspan", "length", "height", "mtow", "mlw", "ceiling_ft", "vmo_kt", "mmo"}
-    for r in _csv("aircraft.csv"):
-        vals = {}
-        for k, v in r.items():
-            if k in ints:
-                vals[k] = int(v) if v else None
-            elif k in floats:
-                vals[k] = _f(v)
-            else:
-                vals[k] = v or None
-        db.add(AircraftType(source="aircraft-database.com", **vals))
+def import_aircraft(db: Session, force: bool = False) -> list[dict]:
+    """AIRCRAFT od nowa: jeden rekord na oznaczenie typu z data/import/ICAO_Aircraft.json, osiągi z wersji typu
+    w data/seed/aircraft.csv (aircraft_json.build_aircraft). Przebudowa, gdy zmienił się któryś z tych plików (ImportLog
+    "aircraft/<plik>"), tabela jest pusta albo force. Baza sprzed 0.12.5 (typy z aircraft.csv jako osobne wersje i plik
+    json w ImportLog pod własną nazwą) nie ma kluczy "aircraft/", więc przebudowuje się przy pierwszym starcie."""
+    files = sorted(p for p in IMPORT_DIR.iterdir() if p.is_file() and p.name.lower().endswith(AIRCRAFT_JSON)) \
+        if IMPORT_DIR.is_dir() else []
+    if not files:
+        log.warning("Brak pliku ICAO_Aircraft.json w %s: lista AIRCRAFT bez zmian", IMPORT_DIR)
+        return []
+    perf = settings.seed_dir / "aircraft.csv"
+    stamps = {f"aircraft/{p.name}": p.stat().st_mtime for p in files}
+    stamps["aircraft/aircraft.csv"] = perf.stat().st_mtime if perf.exists() else 0.0
+    logged = {i.filename: i.mtime for i in db.scalars(select(ImportLog).where(ImportLog.filename.like("aircraft/%")))}
+    if logged == stamps and not force and db.scalar(select(func.count()).select_from(AircraftType)):
+        return []
+    t0 = time.time()
+    try:
+        res = build_aircraft(db, files, _csv("aircraft.csv"))
+    except Exception as exc:  # zły plik nie może zablokować startu aplikacji: zostaje poprzednia lista
+        db.rollback()
+        log.exception("Import typów AIRCRAFT nieudany")
+        res = {"error": str(exc)}
+    log.info("Import AIRCRAFT %s: %s (%.1fs)", ", ".join(stamps), res, time.time() - t0)
+    # wpisy dawnego importu pliku json (pod nazwą pliku) i plików, których już nie ma
+    db.execute(delete(ImportLog).where(or_(ImportLog.filename.like("aircraft/%"),
+                                           func.lower(ImportLog.filename).like(f"%{AIRCRAFT_JSON}"))))
+    # nieudany import zapisujemy z mtime=0, żeby przy kolejnym starcie spróbować ponownie
+    for name, mtime in stamps.items():
+        db.add(ImportLog(filename=name, mtime=0 if "error" in res else mtime, result=str(res)))
+    db.commit()
+    return [{"file": ", ".join(p.name for p in files), **res}]
+
+
+def _upgrade_aircraft_table():
+    """Tabela typów z innymi kolumnami (sprzed 0.12.5: wiele wersji na typ, bez WTG i zakresów osiągów) jest tworzona
+    od nowa, a import_aircraft wypełnia ją z ICAO_Aircraft.json. Reszta bazy zostaje."""
+    insp = inspect(engine)
+    if not insp.has_table(AircraftType.__tablename__):
+        return
+    have = {c["name"] for c in insp.get_columns(AircraftType.__tablename__)}
+    if have != set(AircraftType.__table__.columns.keys()):
+        log.info("Nowa struktura tabeli %s: lista AIRCRAFT od nowa", AircraftType.__tablename__)
+        AircraftType.__table__.drop(engine)
 
 
 def seed_callsigns(db: Session):
     for r in _csv("callsigns.csv"):
         db.merge(Callsign(source="seed", **r))
+
+
+# tytuły dokumentów, których nazwa pliku nic nie mówi po angielsku (polskie wydania ICAO)
+DOC_TITLES = {
+    "Doc_4444_pl.pdf": "ICAO Doc 4444 PANS-ATM (Polish edition)",
+    "Doc_9432_pl.pdf": "ICAO Doc 9432 Manual of Radiotelephony (Polish edition)",
+}
 
 
 def register_docs(db: Session):
@@ -132,10 +170,16 @@ def register_docs(db: Session):
         if rel in known:
             continue
         stem = p.stem.upper()
-        cat = "ICAO" if stem.startswith(("DOC", "ICAO")) else ("EUROCONTROL" if "EUROCONTROL" in stem else "INNE")
+        cat = "ICAO" if stem.startswith(("DOC", "ICAO")) else ("EUROCONTROL" if "EUROCONTROL" in stem else "OTHER")
         if "/" in rel:
             cat = rel.split("/")[0].upper()
-        db.add(Document(title=p.stem.replace("_", " ").replace("-", " "), category=cat, filename=rel))
+        db.add(Document(title=DOC_TITLES.get(rel) or p.stem.replace("_", " ").replace("-", " "), category=cat, filename=rel))
+    # bazy sprzed 0.12.5: grupa "INNE" i tytuły z nazw plików
+    for d in db.scalars(select(Document)).all():
+        if d.category == "INNE":
+            d.category = "OTHER"
+        if d.filename in DOC_TITLES:
+            d.title = DOC_TITLES[d.filename]
     # usuń wpisy, których pliki zniknęły
     for d in db.scalars(select(Document)).all():
         if not (settings.docs_dir / d.filename).exists():
@@ -208,7 +252,7 @@ def import_user_files(db: Session, force: bool = False) -> list[dict]:
                 continue
             if res := _import_file(db, p, fn, p.name, force):
                 results.append(res)
-    return results + import_sectors(db, force) + import_neighbours(db, force)
+    return results + import_aircraft(db, force) + import_sectors(db, force) + import_neighbours(db, force)
 
 
 def _check_schema():
@@ -226,6 +270,7 @@ def _check_schema():
 
 def init_db(force: bool = False) -> list[dict]:
     _check_schema()
+    _upgrade_aircraft_table()
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
         if force:
@@ -235,8 +280,6 @@ def init_db(force: bool = False) -> list[dict]:
             db.commit()
         if not db.scalar(select(func.count()).select_from(Aerodrome)):
             seed_aerodromes(db)
-        if not db.scalar(select(func.count()).select_from(AircraftType)):
-            seed_aircraft(db)
         if not db.scalar(select(func.count()).select_from(Callsign)):
             seed_callsigns(db)
         db.commit()

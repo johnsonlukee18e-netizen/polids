@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..config import settings
 from ..database import get_db
-from ..models import Aerodrome, AircraftType, AtcPosition
+from ..models import Aerodrome, AircraftType, AtcPosition, Callsign
 from ..services import dman as dman_service
 from ..services import viff as viff_service
 from ..services.aerolist import FIR_KEYS, FIR_LABELS, airport_entry, airport_positions, fir_key, fir_lists
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/aerodromes", tags=["aerodrome"])
 def _ad(db: Session, icao: str) -> Aerodrome:
     ad = db.get(Aerodrome, icao.upper())
     if not ad:
-        raise HTTPException(404, f"Nie znam lotniska {icao}")
+        raise HTTPException(404, f"Unknown aerodrome {icao}")
     return ad
 
 
@@ -52,7 +52,7 @@ def fir_list(key: str, db: Session = Depends(get_db)):
     główne lotnisko miasta, 1 = ze stanowiskami ATC, 2 = pozostałe; alias = inne nazwy do wyszukiwania)."""
     k = key.upper()
     if k not in FIR_KEYS:
-        raise HTTPException(404, f"Nie znam listy lotnisk {key[:8]}")
+        raise HTTPException(404, f"Unknown aerodrome list {key[:8]}")
     return [{"icao": a["icao"], "name": a["name"], "kind": a["kind"], "rank": a["rank"], "alias": a["alias"]}
             for a in fir_lists(db)[k]]
 
@@ -75,11 +75,11 @@ async def card(icao: str, db: Session = Depends(get_db)):
     ATIS ze stanem w sieci VATSIM (kto, od kiedy, litera i tekst ATIS)."""
     code = icao.upper()
     if not re.fullmatch(r"[A-Z0-9]{4}", code):
-        raise HTTPException(404, f"Nie znam lotniska {icao[:8]}")
+        raise HTTPException(404, f"Unknown aerodrome {icao[:8]}")
     local = await run_in_threadpool(_card_local, db, code)
     entry, known = local["entry"], local["known"]
     if not entry and not known:
-        raise HTTPException(404, f"Nie znam lotniska {code}")
+        raise HTTPException(404, f"Unknown aerodrome {code}")
 
     async def safe(label, coro, errs=(UpstreamError,)):
         try:
@@ -182,7 +182,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
         net_error = f"VATSIM: {exc}"
     if atis and (atis["arr"] or atis["dep"]):
         in_use = {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
-                  "reason": f"Z ATIS {atis['letter'] or ''}".strip()}
+                  "reason": f"From ATIS {atis['letter'] or ''}".strip()}
     else:
         in_use = {**pref, "source": "SUGGESTED"}
 
@@ -201,13 +201,30 @@ async def status(icao: str, db: Session = Depends(get_db)):
     }
 
 
+RADIO_CS = re.compile(r"([A-Z]{3})(\d[A-Z0-9]{0,4})")
+
+
+def _radio_callsigns(db: Session, board: dict) -> None:
+    """Pełny znak wywoławczy do okna lotu (Extended Label SDD, wiersz 1): telefonia linii z ICAO_Airlines + numer lotu,
+    np. DLH4AB → "LUFTHANSA 4AB". Znak bez prefiksu linii (SPKAT) albo prefiks bez telefonii: telephony = None."""
+    strips = [s for k in ("departures", "arrivals", "local", "planned") for s in board.get(k, [])]
+    parts = {s["callsign"]: m.groups() for s in strips if (m := RADIO_CS.fullmatch(str(s.get("callsign") or "")))}
+    prefixes = {p for p, _ in parts.values()}
+    tel = dict(db.execute(select(Callsign.icao, Callsign.telephony)
+                          .where(Callsign.icao.in_(prefixes), Callsign.telephony.is_not(None), Callsign.telephony != "")).all()) if prefixes else {}
+    for s in strips:
+        p, n = parts.get(s.get("callsign"), (None, None))
+        s["telephony"] = f"{tel[p].strip().upper()} {n}" if p in tel else None
+
+
 @router.get("/{icao}/strips")
 async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
-    """Paski postępu lotu do STRIP i AERODROME › RUCH (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
+    """Paski postępu lotu do STRIP i AERODROME › TRAFFIC (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
     vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese i kategoria turbulencji z bazy typów.
 
     Każdy pasek ma też pola DMAN/AMAN (services/dman.py): registration, a przylot entry_fix, eta_s, eldt_s, eldt.
-    ?dman=1 (widok DMAN/AMAN) dodatkowo pyta vIFF o ELDT przylotów (/ifps/callsign) i ustawienia A-CDM lotniska."""
+    ?dman=1 (widok DMAN/AMAN) dodatkowo pyta vIFF o ELDT przylotów (/ifps/callsign) i ustawienia A-CDM lotniska
+    i pomija loty OFFLINE (planned "viff": znane tylko z vIFF, bez połączenia z siecią VATSIM)."""
     ad = _ad(db, icao)
 
     async def from_viff():
@@ -238,6 +255,7 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
     use, atis = st["runway_in_use"], st["atis"]
     now = datetime.now(timezone.utc)
     board = strip_board(ad.icao, traffic, viff, use, wtc, now)
+    _radio_callsigns(db, board)
     procs = procedures().get(ad.icao, {})
     viff_etas = None
     if dman and not viff_error:
@@ -246,6 +264,10 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
         asked = sorted((s for s in board["arrivals"] if s["state"] == "air" or s["away"]),
                        key=lambda s: (s["dist_nm"] is None, s["dist_nm"] or 0))
         viff_etas = await viff_service.arrival_etas(ad.icao, [s["callsign"] for s in asked])
+    if dman:
+        # RUCH (DMAN/AMAN) bez lotów OFFLINE: planowane znane tylko z vIFF (pilot niepołączony, bez planu w sieci
+        # VATSIM) zostają w STRIP; prefile (plan złożony w sieci przed połączeniem) RUCH pokazuje dalej
+        board["planned"] = [s for s in board["planned"] if s.get("planned") != "viff"]
     dman_service.annotate(board, ad.icao, now, viff_etas)
     return {
         "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft, "now": now.strftime("%H%M"),

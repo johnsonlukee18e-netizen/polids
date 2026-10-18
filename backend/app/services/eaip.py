@@ -16,8 +16,11 @@ tego cyklu, sprawdzenie ponownie w tle. Pierwsze sprawdzenie startuje razem z se
 
 import asyncio
 import logging
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
+from html.parser import HTMLParser
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import httpx
 
@@ -182,3 +185,281 @@ async def resolved_links(today: date | None = None, links=tuple(PACKAGES)) -> di
 
 async def resolved_url(link: str, today: date | None = None) -> str:
     return (await resolved_links(today, (link,)))[link]
+
+
+# --- AD CIV (0.12.5, issue #18): przycisk lotniska prowadzi do listy map, a nie do opisu tekstowego. eAIP PAŻP nie ma
+# osobnej strony z listą map lotniska: mapy są w tabeli AD 2.24 ("AERONAUTICAL CHARTS RELATED TO AN AERODROME") na
+# końcu strony AD 2 lotniska (eAIP/AD 2 EPWA 1-en-GB.html, ta sama poprawka co index-v2.html), wiersz = tytuł mapy
+# i ikona z odnośnikiem do PDF-u .../documents/Root_WePub/AIP IFR/AD/EPZG/02/AD_2_EPZG_2-1.pdf. Serwer pobiera tę stronę
+# (kilka MB przy EPWA), wyciąga wiersze z PDF-ami map lotniska i trzyma wynik w pamięci (strona zmienia się z AIRAC).
+CHARTS_TTL = 6 * 3600        # s: lista map z poprawki (adres strony zawiera katalog poprawki)
+CHARTS_FAIL_TTL = 120        # s: po błędzie pobrania ponowna próba najwcześniej po 2 min (bez zapytań co kliknięcie)
+CHARTS_MAX_BYTES = 25 * 1024 * 1024
+CHART_FILE = re.compile(r"AD_2_([A-Z]{4})_(\d+)-(\d+)\.pdf$", re.I)
+PAGE_LABEL = re.compile(r"(?:AD\s*2\s+[A-Z]{4}\s+)?\d+\s*-\s*\d+", re.I)   # kolumna "Pages": "AD 2 EPZG 2-1" albo "2-1"
+# rodzaj mapy z tytułu (kolejność ma znaczenie: "PRECISION APPROACH TERRAIN CHART" to mapa terenu, nie podejścia,
+# a "VISUAL APPROACH CHART" to mapa VFR, nie podejście według przyrządów)
+CHART_KINDS = (("OBST", ("OBSTACLE", "TERRAIN")),
+               ("SID", ("STANDARD DEPARTURE", "INSTRUMENT DEPARTURE", "DEPARTURE CHART", "(SID)")),
+               ("STAR", ("STANDARD ARRIVAL", "INSTRUMENT ARRIVAL", "ARRIVAL CHART", "(STAR)")),
+               ("VFR", ("VISUAL", "VFR")), ("IAC", ("INSTRUMENT APPROACH", "APPROACH CHART")),
+               ("AD", ("AERODROME CHART", "PARKING", "DOCKING", "GROUND MOVEMENT")))
+
+# lotniska z częścią AD 2 eAIP IFR (AD 1.3, AIRAC AMDT 10-26); ta sama lista co AD2 w frontend/js/tabs/aip.js.
+# Inny kod EPxx nie trafia do PAŻP (każdy dawałby pobranie strony, której nie ma).
+AD2_AERODROMES = ("EPBY", "EPGD", "EPKK", "EPKT", "EPLB", "EPLL", "EPMO", "EPPO", "EPRA", "EPRZ", "EPSC", "EPSY", "EPWA",
+                  "EPWR", "EPZG")
+_charts: dict[str, tuple[float, dict]] = {}          # adres strony AD 2 -> (ważny do, wynik)
+_charts_inflight: dict[str, asyncio.Task] = {}
+
+
+def aerodrome_page_url(base: str, icao: str) -> str:
+    """Strona AD 2 lotniska z tej samej poprawki co index-v2.html (jak aeroPageUrl w tabs/aip.js); adres katalogu
+    bez "/" na końcu traktujemy jak katalog; ?query i #fragment odpadają."""
+    parts = urlsplit(base)
+    path = parts.path
+    if not path.endswith("/") and not re.search(r"\.[a-z0-9]+$", path, re.I):
+        path += "/"
+    root = urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+    return urljoin(root, quote(f"eAIP/AD 2 {icao} 1-en-GB.html"))
+
+
+def chart_kind(title: str) -> str:
+    t = title.upper()
+    return next((kind for kind, words in CHART_KINDS if any(w in t for w in words)), "OTHER")
+
+
+# znaczniki, które w przeglądarce rozdzielają słowa (tytuł mapy w dwóch liniach: "AERODROME<br/>GROUND MOVEMENT CHART")
+BREAKS = {"br", "p", "div", "li", "ul", "ol", "tr", "td", "th", "table", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+
+class _Rows(HTMLParser):
+    """Wiersze tabel (teksty komórek, odnośniki i ich zapasowe opisy: title odnośnika albo alt obrazka) oraz odnośniki
+    poza tabelami (adres, tekst). Odporny na eAIP: <br>/<p>/<div> rozdzielają słowa; tekst i odnośniki w <del> (zmiana
+    z poprawki: skreślone) pomijamy; <td> bez </td> i <tr> bez </tr> zamyka poprzednią komórkę / wiersz; tabela
+    zagnieżdżona w komórce należy do tej komórki; komórka z rowspan przechodzi do następnych wierszy (tytuł mapy
+    wspólny dla kilku PDF-ów), ale nie do następnej tabeli. Nie rzuca wyjątku na żadnej zbitce znaczników: <a> bez </a>
+    kończy się razem ze swoim wierszem (alt obrazka z dalszych wierszy nie trafia do cudzego odnośnika), odnośnik poza
+    tabelą bez </a> zamyka następny <a> albo koniec strony."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.rows: list[tuple[list[str], list[str], list[str]]] = []   # (komórki, odnośniki, opisy odnośników)
+        self.loose: list[tuple[str, str]] = []
+        self._stack: list[dict] = []          # otwarte wiersze (zagnieżdżone tabele): {cells, hrefs, alts, cell}
+        self._span: list[tuple[str, int]] = []   # komórka z rowspan z poprzedniego wiersza: (tekst, ile wierszy jeszcze)
+        # otwarty <a href>: adres, tekst, wiersz (None = poza tabelą) i numer odnośnika w tym wierszu
+        self._a: dict | None = None
+        self._del = 0
+        self._tables = 0                      # otwarte <table> (wiersz należy do najbardziej wewnętrznej)
+
+    @property
+    def _row(self):
+        return self._stack[-1] if self._stack else None
+
+    def _text(self, data: str):
+        if self._del:
+            return
+        row = self._row
+        if row is not None and row["cell"] is not None:
+            row["cell"].append(data)
+        if self._a is not None:
+            self._a["text"].append(data)
+
+    def _close_cell(self, row):
+        if row["cell"] is not None:
+            text = " ".join("".join(row["cell"]).split())
+            row["cells"].append(text)
+            if row["rowspan"] > 1 and row["depth"] == 1:
+                self._span = [(text, row["rowspan"] - 1)]
+            row["cell"] = None
+
+    def _close_row(self):
+        row = self._stack.pop()
+        self._close_cell(row)
+        if self._a is not None and self._a["row"] is row:
+            self._a = None                    # <a> bez </a> kończy się z wierszem
+        parent = self._row
+        if parent is not None and parent["cell"] is not None:
+            # wiersz tabeli zagnieżdżonej w komórce: tekst i odnośniki należą do komórki zewnętrznej
+            parent["cell"].append(" " + " ".join(row["cells"]) + " ")
+            parent["hrefs"] += row["hrefs"]
+            parent["alts"] += row["alts"]
+        else:
+            self.rows.append((row["cells"], row["hrefs"], row["alts"]))
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in BREAKS:
+            self._text(" ")
+        if tag == "del":
+            self._del += 1
+        elif tag == "table":
+            self._tables += 1
+        elif tag == "tr":
+            while self._row is not None and self._row["table"] >= self._tables:
+                self._close_row()                     # <tr> bez </tr> poprzedniego wiersza tej samej tabeli
+            carried = [t for t, n in self._span if n > 0] if not self._stack else []
+            self._span = [(t, n - 1) for t, n in self._span if n > 1] if not self._stack else self._span
+            self._stack.append({"cells": carried, "hrefs": [], "alts": [], "cell": None, "rowspan": 1,
+                                "depth": len(self._stack) + 1, "table": self._tables})
+        elif tag in ("td", "th") and self._row is not None:
+            row = self._row
+            self._close_cell(row)                     # <td> bez </td> poprzedniej komórki
+            row["cell"] = []
+            try:
+                row["rowspan"] = int(a.get("rowspan") or 1) if not row["cells"] else 1
+            except ValueError:
+                row["rowspan"] = 1
+        elif tag == "a" and (href := a.get("href")) and not self._del:
+            self._end_loose()                         # <a> w <a> (bez </a>): poprzedni odnośnik poza tabelą kończy się
+            row = self._row
+            self._a = {"href": href, "text": [], "row": row, "i": len(row["hrefs"]) if row is not None else -1}
+            if row is not None:
+                row["hrefs"].append(href)
+                row["alts"].append(a.get("title") or "")
+        elif tag == "img" and self._a is not None and self._a["row"] is not None and a.get("alt"):
+            alts, i = self._a["row"]["alts"], self._a["i"]
+            if 0 <= i < len(alts) and not alts[i]:
+                alts[i] = a["alt"]
+
+    def handle_endtag(self, tag):
+        if tag in BREAKS:
+            self._text(" ")
+        if tag == "del":
+            self._del = max(0, self._del - 1)
+        elif tag in ("td", "th") and self._row is not None:
+            self._close_cell(self._row)
+        elif tag == "tr" and self._row is not None:
+            self._close_row()
+        elif tag == "table":
+            while self._row is not None and self._row["table"] >= self._tables:
+                self._close_row()                     # tabela zamknięta bez </tr>
+            self._tables = max(0, self._tables - 1)
+            if not self._tables:
+                self._span = []                       # rowspan z ostatniego wiersza nie przechodzi do następnej tabeli
+        elif tag == "a" and self._a is not None:
+            self._end_loose()
+            self._a = None
+
+    def handle_data(self, data):
+        self._text(data)
+
+    def _end_loose(self):
+        """Odnośnik poza tabelą (otwarty bez wiersza) do listy loose z tekstem odnośnika."""
+        if self._a is not None and self._a["row"] is None:
+            self.loose.append((self._a["href"], " ".join("".join(self._a["text"]).split())))
+            self._a = None
+
+    def close(self):
+        super().close()
+        while self._stack:
+            self._close_row()
+        self._end_loose()
+
+
+def _chart_url(page_url: str, href: str) -> str | None:
+    url = urljoin(page_url, href.strip())
+    if urlsplit(url).scheme not in ("http", "https"):
+        return None
+    return quote(url, safe=":/?#[]@!$&'()*+,;=%~")   # spacje ("AIP IFR") → %20, istniejące %XX bez zmian
+
+
+def _clean_title(text: str, icao: str) -> str:
+    t = " ".join(text.split()).strip(" \"'“”„")
+    return re.sub(rf"^{icao}\s*[-–]\s*", "", t, flags=re.I)
+
+
+def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
+    """Mapy lotniska ze strony AD 2: wiersze tabeli z odnośnikiem do PDF-u AD_2_<ICAO>_<n>-<m>.pdf (tabela AD 2.24;
+    tytuł = pierwsza niepusta komórka poza numerem strony, bez przedrostka "<ICAO> - "), w kolejności strony,
+    bez powtórzeń adresu.
+    Bez tytułu w komórkach: title odnośnika albo alt obrazka. Odnośnik do mapy poza tabelą: tytuł z tekstu odnośnika. id "2-1" (numer z nazwy pliku, bez zer z przodu,
+    08-1 → 8-1), page "AD 2 EPWA 2-1", kind: AD, OBST, SID, STAR, IAC, VFR albo OTHER."""
+    icao = icao.upper()
+    p = _Rows()
+    p.feed(html)
+    p.close()
+    found = [(href, next((c for c in cells if c and not PAGE_LABEL.fullmatch(c)), "") or alt)
+             for cells, hrefs, alts in p.rows for href, alt in zip(hrefs, alts)]
+    found += p.loose
+    out, seen = [], set()
+    for href, text in found:
+        try:
+            m = CHART_FILE.search(urlsplit(href.strip()).path)
+            url = _chart_url(page_url, href) if m and m.group(1).upper() == icao else None
+        except ValueError:   # adres, którego urllib nie rozbierze ("http://[x/..."): ten jeden odnośnik pomijamy
+            continue
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        cid = f"{int(m.group(2))}-{int(m.group(3))}"
+        title = _clean_title(text, icao) or f"AD 2 {icao} {cid}"
+        out.append({"id": cid, "page": f"AD 2 {icao} {cid}", "title": title, "kind": chart_kind(title), "url": url})
+    return out
+
+
+def _page_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True,
+                             headers={"User-Agent": f"Mozilla/5.0 {settings.user_agent}"})
+
+
+def _fetch_error(exc: BaseException) -> str:
+    if isinstance(exc, ValueError):
+        return f"eAIP page could not be read ({exc})"
+    if isinstance(exc, httpx.TimeoutException):
+        return "no response from the eAIP server (timeout)"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"eAIP server: HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.TransportError):   # brak sieci, odmowa proxy, zerwane połączenie
+        return "cannot connect to the eAIP server"
+    return f"eAIP page could not be read ({type(exc).__name__})"
+
+
+async def _load_charts(page_url: str, icao: str) -> dict:
+    out = {"icao": icao, "page": page_url, "charts": [], "error": None}
+    try:
+        async with _page_client() as client:
+            async with client.stream("GET", page_url) as resp:
+                resp.raise_for_status()
+                chunks, size = [], 0
+                async for chunk in resp.aiter_bytes():
+                    size += len(chunk)
+                    if size > CHARTS_MAX_BYTES:
+                        raise ValueError(f"page larger than {CHARTS_MAX_BYTES // 1048576} MB")
+                    chunks.append(chunk)
+                raw, enc = b"".join(chunks), resp.encoding or "utf-8"
+        # strona AD 2 ma kilka MB: dekodowanie i parsowanie poza pętlą zdarzeń (inaczej serwer stoi 1-3 s)
+        out["charts"] = await asyncio.to_thread(lambda: parse_charts(raw.decode(enc, errors="replace"), page_url, icao))
+        if not out["charts"]:
+            out["error"] = "no charts found in AD 2.24 of the eAIP page"
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("eAIP %s: lista map z %s: %s", icao, page_url, exc)
+        out["error"] = _fetch_error(exc)
+    except Exception:   # nieprzewidziany błąd: komunikat zamiast 500, szczegóły w logu
+        log.exception("eAIP %s: lista map z %s", icao, page_url)
+        out["error"] = "eAIP page could not be read"
+    _charts[page_url] = (time.monotonic() + (CHARTS_FAIL_TTL if out["error"] else CHARTS_TTL), out)
+    return out
+
+
+def reset_charts() -> None:
+    _charts.clear()
+    _charts_inflight.clear()
+
+
+async def aerodrome_charts(icao: str, today: date | None = None) -> dict:
+    """AD CIV: lista map lotniska z AD 2.24 eAIP IFR bieżącej poprawki (resolved_url, adres z .env wygrywa):
+    {icao, page (strona AD 2), charts: [{id, page, title, kind, url}], error}. Jedno pobranie strony naraz
+    (single-flight), wynik w pamięci CHARTS_TTL, po błędzie CHARTS_FAIL_TTL."""
+    icao = icao.upper()
+    page_url = aerodrome_page_url(await resolved_url("aip_ifr", today), icao)
+    hit = _charts.get(page_url)
+    if hit and hit[0] > time.monotonic():
+        return hit[1]
+    task = _charts_inflight.get(page_url)
+    if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
+        task = asyncio.get_running_loop().create_task(_load_charts(page_url, icao))
+        _charts_inflight[page_url] = task
+        task.add_done_callback(lambda t: _charts_inflight.pop(page_url) if _charts_inflight.get(page_url) is t else None)
+    return await asyncio.shield(task)

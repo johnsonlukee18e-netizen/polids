@@ -45,11 +45,11 @@ async def check(url: str, ttl: int = 3600) -> dict:
                                      headers={"User-Agent": f"Mozilla/5.0 {settings.user_agent}"}) as client:
             resp = await client.get(url)
     except httpx.HTTPError as exc:
-        return {"url": url, "embeddable": None, "reason": f"brak połączenia: {exc.__class__.__name__}"}
+        return {"url": url, "embeddable": None, "reason": f"no connection: {exc.__class__.__name__}"}
     ok, reason = frame_policy(resp.headers)
     final = str(resp.url)
     if ok and re.search(r"log-?in|sign-?in|auth", final, re.I) and final != url:
-        reason = "strona przekierowuje do logowania"
+        reason = "page redirects to a login page"
     result = {"url": url, "final_url": final, "status": resp.status_code, "embeddable": ok, "reason": reason}
     _cache[url] = (time.monotonic(), result)
     return result

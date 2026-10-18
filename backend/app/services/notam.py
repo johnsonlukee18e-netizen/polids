@@ -240,10 +240,10 @@ def fir_item(n: dict, icao: str, now: datetime) -> dict:
             "text": f.get("E") or None, "raw": n["raw"], "active": is_active(n, now)}
 
 
-# --- błędy serwera NOTAM: krótko, po polsku i bez adresu (z kodem lokalizacji), żeby te same błędy różnych lokalizacji
+# --- błędy serwera NOTAM: krótko, po angielsku i bez adresu (z kodem lokalizacji), żeby te same błędy różnych lokalizacji
 # sklejały się w jedną linię: "EPGD, EPKK – HTTP 503" zamiast 16 różnych komunikatów httpx z adresem i linkiem MDN
-TIMEOUT_TEXT = "brak odpowiedzi (timeout)"
-STALE_TEXT = "brak odpowiedzi – starsze dane"
+TIMEOUT_TEXT = "no response (timeout)"
+STALE_TEXT = "no response – older data"
 FIR_FAIL_SECONDS = 90       # lokalizacja bez odpowiedzi: tyle sekund bez ponownych zapytań (wynik z pamięci)
 _fir_failed: dict[str, tuple[float, str]] = {}      # ICAO → (time.monotonic() błędu, opis)
 
@@ -255,9 +255,9 @@ def _error_text(exc: BaseException) -> str:
     if isinstance(cause, httpx.HTTPStatusError):
         return f"HTTP {cause.response.status_code}"
     if isinstance(cause, httpx.ConnectError):
-        return "brak połączenia"
+        return "no connection"
     if isinstance(cause, (httpx.NetworkError, httpx.ProtocolError)):
-        return "połączenie przerwane"
+        return "connection interrupted"
     msg = str(exc)
     if msg.startswith("http"):              # UpstreamError: "<adres>: <komunikat>"
         msg = msg.split(": ", 1)[1] if ": " in msg else ""
@@ -265,7 +265,7 @@ def _error_text(exc: BaseException) -> str:
     msg = re.sub(r"\s+", " ", msg).strip(" :")
     if len(msg) > 80:
         msg = msg[:79].rstrip() + "…"
-    return msg or f"błąd ({type(cause).__name__})"
+    return msg or f"error ({type(cause).__name__})"
 
 
 class _StillDown(Exception):
@@ -379,4 +379,4 @@ async def fir_notams(now: datetime | None = None, include_inactive: bool = False
     updated = (now - timedelta(seconds=max(ages))).isoformat(timespec="seconds") if ages else None
     return {"fir": FIR, "locations": locations, "now": now.isoformat(timespec="seconds"), "updated": updated,
             "source": settings.notam_server, "notams": items, "count": len(items), "inactive": inactive,
-            "failed": failed, "stale": stale, "error": f"Serwer NOTAM: {error}" if failed else None}
+            "failed": failed, "stale": stale, "error": f"NOTAM server: {error}" if failed else None}

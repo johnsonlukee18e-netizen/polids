@@ -44,7 +44,7 @@ EMBED_LINKS = {"phraseology": "phraseology_url", "inop": "inop_url", "aip_ifr": 
 async def embed_check(link: str):
     """Czy strona z linków aplikacji pozwala wyświetlić się w ramce (X-Frame-Options / CSP frame-ancestors)."""
     if link not in EMBED_LINKS:
-        raise HTTPException(404, f"Nieznany link: {link}")
+        raise HTTPException(404, f"Unknown link: {link}")
     # eAIP: ten sam adres co w /api/config (z .env albo sprawdzona poprawka bieżącego cyklu AIRAC)
     url = await eaip.resolved_url(link) if link in eaip.PACKAGES else getattr(settings, EMBED_LINKS[link])
     return await embed.check(url)

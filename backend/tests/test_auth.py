@@ -36,6 +36,7 @@ def test_public_paths_without_login(client):
     assert client.get("/healthz").json()["status"] == "ok"
     man = client.get("/manifest.webmanifest")
     assert man.status_code == 200 and man.json()["name"] == settings.name
+    assert man.json()["lang"] == "en"   # 0.12.5: aplikacja po angielsku
     assert man.headers["content-type"].startswith("application/manifest+json")
     assert {i["src"] for i in man.json()["icons"]} >= {"/static/icons/icon-192.png", "/static/icons/icon-512.png"}
     assert client.get("/static/icons/icon-192.png").status_code == 200
@@ -48,7 +49,7 @@ def test_public_paths_without_login(client):
 
 def test_gate_blocks_everything_else(client):
     r = client.get("/api/config")
-    assert r.status_code == 401 and r.json()["detail"] == "Wymagane logowanie"
+    assert r.status_code == 401 and r.json()["detail"] == "Login required"
     assert r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/openapi.json").status_code == 401
     for path in ("/", "/docs", "/static/js/app.js", "/files/docs/Doc_4444_pl.pdf"):
@@ -82,8 +83,8 @@ def test_admin_can_import(client, monkeypatch):
 def test_denied_login_shows_reason(client):
     r = dev_login(client, cid=STRANGER)
     assert r.status_code == 303 and r.headers["location"] == "/auth/login"
-    assert f"Brak dostępu dla CID {STRANGER}" in client.get("/auth/login").text
-    assert "Brak dostępu" not in client.get("/auth/login").text
+    assert f"No access for CID {STRANGER}" in client.get("/auth/login").text
+    assert "No access" not in client.get("/auth/login").text
     assert client.get("/api/config").status_code == 401
     assert [d["cid"] for d in access.denied_attempts()] == [STRANGER]
 
@@ -91,9 +92,9 @@ def test_denied_login_shows_reason(client):
 def test_access_rules(client):
     assert auth.access_denied_reason({"cid": ADMIN, "rating": 1}) is None
     assert auth.access_denied_reason({"cid": MEMBER, "rating": 1}) is None
-    assert "Brak dostępu" in auth.access_denied_reason({"cid": STRANGER, "rating": 12})
+    assert "No access" in auth.access_denied_reason({"cid": STRANGER, "rating": 12})
     for cid in (ADMIN, MEMBER):
-        assert "nieaktywne" in auth.access_denied_reason({"cid": cid, "rating": 0})
+        assert "inactive" in auth.access_denied_reason({"cid": cid, "rating": 0})
 
 
 def test_removed_user_loses_access_immediately(client):
@@ -161,7 +162,7 @@ def test_vatsim_login_flow(client, monkeypatch):
     monkeypatch.setattr(auth, "fetch_vatsim_user", stranger)
     state = parse_qs(urlsplit(client.get("/auth/vatsim").headers["location"]).query)["state"][0]
     assert client.get("/auth/callback", params={"code": "k", "state": state}).headers["location"] == "/auth/login"
-    assert f"Brak dostępu dla CID {STRANGER}" in client.get("/auth/login").text
+    assert f"No access for CID {STRANGER}" in client.get("/auth/login").text
     assert access.denied_attempts()[0] | {"last": None} == {"cid": STRANGER, "name": "Obcy Pilot", "rating": "OBS",
                                                              "last": None, "count": 1}
 
@@ -174,7 +175,7 @@ def test_vatsim_upstream_error(client, monkeypatch):
     monkeypatch.setattr(auth, "fetch_vatsim_user", down)
     state = parse_qs(urlsplit(client.get("/auth/vatsim").headers["location"]).query)["state"][0]
     assert client.get("/auth/callback", params={"code": "k", "state": state}).headers["location"] == "/auth/login"
-    assert "VATSIM Connect nie odpowiada" in client.get("/auth/login").text
+    assert "VATSIM Connect is not responding" in client.get("/auth/login").text
 
 
 def test_parse_vatsim_user_without_subdivision():

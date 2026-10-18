@@ -48,7 +48,7 @@ def test_aerodrome_status(client):
     # AIP AD 2.21: doloty 33, odloty 29 (wiatr 280/15 w limicie bocznego 15 kt)
     assert st["suggested_runway"] == "33" and (st["preferred"]["arr"], st["preferred"]["dep"]) == ("33", "29")
     # kontrola online z ATIS: pas w użyciu z ATIS, litera B
-    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "Z ATIS B"}
+    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "From ATIS B"}
     # konfiguracja preferowana z runway_config.json (AWOS › 2 PASY przy ATIS z jednym pasem), AIP AD 2.21 H24
     assert st["runway_config"] == {"arr": "33", "dep": "29"}
     assert st["lvp"]["applies"] and len(st["lvp"]["rules"]) == 3
@@ -69,7 +69,7 @@ def test_seed_from_aip(client):
     assert bk["frequencies"][0] == {"kind": "RADIO", "description": "BIAŁYSTOK RADIO", "mhz": "123.205", "hours": "AUP",
                                     "note": None, "source": "AIP VFR AD 4.9"}
     ra = client.get("/api/aerodromes/EPRA").json()["frequencies"]
-    assert [f["note"] for f in ra if f["kind"] == "TWR"] == ["TWR cywilna", "TWR wojskowa (MIL)"]
+    assert [f["note"] for f in ra if f["kind"] == "TWR"] == ["civil TWR", "military TWR (MIL)"]
     # EPSW: pas 07/25 z OurAirports nie istnieje
     assert not any(r["designator"] in ("07", "25") for r in client.get("/api/aerodromes/EPSW").json()["runways"])
     mo = client.get("/api/aerodromes/EPMO").json()
@@ -94,7 +94,7 @@ def test_status_cancelled_lvp_runway_choice_imc(client, monkeypatch):
         monkeypatch.setattr(aerodromes, "get_metars", fake_metars)
         st = client.get("/api/aerodromes/EPKT/status").json()
         states.append((st["lvp"]["state"], st["preferred"]["arr"], st["preferred"]["reason"].split(":")[0]))
-    assert states == [("LVP", "26", "LVP w mocy"), ("CANCELLED", "26", "Warunki IMC")]
+    assert states == [("LVP", "26", "LVP in force"), ("CANCELLED", "26", "IMC conditions")]
 
 
 def test_meteo_and_qnh(client):

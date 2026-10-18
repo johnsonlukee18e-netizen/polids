@@ -212,7 +212,7 @@ def test_board_stacks(board):
 def test_board_geo(client):
     d = client.get("/api/radio/board?geo=1").json()
     g = d["geo"]
-    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis"}
+    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis", "nb"}
     assert g["border"]["type"] == "MultiPolygon" and g["border"]["coordinates"]
     assert {f["id"] for f in g["firs"]} >= {"EDWW", "EDMM", "LKAA", "LZBB", "UKLV", "UMMV", "EYVL", "UMKK", "ESAA"}
     assert all("-" not in f["id"] and f["id"] != "EPWW" for f in g["firs"])
@@ -225,6 +225,32 @@ def test_board_geo(client):
     r = client.get("/api/radio/board?geo=1")
     assert r.headers["content-type"] == "application/json" and r.json()["geo"] == g
     assert set(d) - {"geo"} == set(client.get("/api/radio/board").json())
+
+
+def test_board_neighbour_areas(client):
+    """0.12.5 (Marek): na podglądach sektory ACC sąsiadów (wg poziomu podglądu, jak EPWW) i TMA/CTR lotnisk sąsiadów
+    przy granicy FIR EPWW (LZTT, LKMT, EDDB); obsadzone wg pierwszego stanowiska online z listy OWNER (d.nb)."""
+    d = client.get("/api/radio/board?geo=1").json()
+    nb = d["geo"]["nb"]
+    assert nb and len({a["id"] for a in nb}) == len(nb)
+    assert {a["kind"] for a in nb} == {"acc", "app", "twr"}
+    for a in nb:
+        assert set(a) == {"id", "fir", "name", "kind", "lo", "hi", "geometry"} and a["lo"] < a["hi"] <= rb.TOP_FT
+        assert a["geometry"]["type"] == "MultiPolygon" and a["geometry"]["coordinates"], a["name"]
+    acc_firs = {a["fir"] for a in nb if a["kind"] == "acc" and a["lo"] <= 30000 < a["hi"]}
+    assert {"EDWW", "EDMM", "ESAA", "LKAA", "LZBB", "EYVL", "UMKK", "UKLV", "UMMV"} <= acc_firs  # UMMV z pliku EPWW
+    names = {a["name"] for a in nb if a["kind"] != "acc"}
+    # Poprad (TWR z TMA), Ostrawa (APP), Berlin (APP przy granicy), Lwów (APP), Kaliningrad (APP)
+    assert {"LZTT_CTR", "LZTT_TMA3", "LKMT_TMA1", "LKMT_CTR", "EDWWDBAN1", "EDWWDBAS1", "UKLL_TMA",
+            "KALININGRAD TMA L"} <= names
+    # w głąb kraju nie: CTR Berlina i Pragi, TMA Pragi z dala od granicy
+    assert not names & {"EDDBTWRN", "EDDBTWRS", "LKPR24_TMA1_ARR_P1"}
+    assert not any(a["name"].startswith(("TECH ", "T-")) for a in nb)
+    # obsadzone: EDWW_FLG_CTR online (FEED) obsługuje wycinki, w których jest pierwszym stanowiskiem online
+    assert d["nb"] and all(o == "EDWW_FLG_CTR" for o in d["nb"].values())
+    flg = {a["id"] for a in nb if a["name"].startswith("EDWWFLG")}
+    assert flg and flg <= set(d["nb"])
+    assert "nb" in client.get("/api/radio/board").json()  # stan obsady przy każdym odświeżeniu, geometria raz
 
 
 def test_board_version_and_reimport(client):
@@ -886,15 +912,15 @@ def test_js_loa_panel(tmp_path):
     out = json.loads(r.stdout)
     e, f = out["edww"], firs["EDWW"]
     n_out = sum(t["dir"] == "out" for t in f["transfers"])
-    assert f"przekazania: {n_out} z EPWW · {len(f['transfers']) - n_out} do EPWW" in e
-    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Stanowiska i sektory wg LOA" in e
+    assert f"transfers: {n_out} from EPWW · {len(f['transfers']) - n_out} to EPWW" in e
+    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Positions and sectors per LOA" in e
     rows = len(f["transfers"]) + len(f["positions"]) + sum(len(f[k]) for k in ("silent", "vfr", "other"))
     assert e.count("data-f=") == rows
     assert 'data-coord="EDWW"' in e and "COORDINATION ›" in e
     assert 'href="/files/docs/LOA/LOA%20EPWW%20EDWW%20Bremen,%20EDUU%20Karlsruhe%20(AIRAC%202602).pdf"' in e
     assert "<td>Bremen Radar</td>" in e  # znak radiowy z tablicy RADIO, gdy LOA go nie podaje
-    assert "Brak LOA EPWW z UMKK" in out["none"] and "data-coord" not in out["none"] and "KALININGRAD" in out["none"]
-    assert "Wczytywanie LOA…" in out["loading"]
+    assert "No EPWW LOA with UMKK" in out["none"] and "data-coord" not in out["none"] and "KALININGRAD" in out["none"]
+    assert "Loading LOA…" in out["loading"]
     assert 'class="error">LOA: &lt;zły plik&gt;' in out["error"]
     ev = out["evil"]
     assert "<img" not in ev and "<b>X" not in ev and "<i>s" not in ev and "<s>" not in ev and 'C"OP' not in ev
@@ -957,20 +983,20 @@ def test_js_neighbour_stack(tmp_path):
     top = out["top"]
     # EYVL_CTR top-down: wszystkie kafelki z jego częstotliwością, skrót przy cudzych
     assert top.count('<span class="rb-fq">133.305</span>') == 4 and top.count('<i class="rb-by">EYVL</i>') == 3
-    assert "Teraz: EYVL_CTR 133.305 – Jonas" in top and top.count("Online: EYVL_CTR 133.305 – Jonas") == 1  # dymek nagłówka
-    assert "Nikt online – ADVISORY 122.800" in off and "Online:" not in off
-    # dymki kafelków: ADVISORY tylko, gdy nikt w całym stosie; w częściowo obsadzonym samo "Teraz nikt"
-    assert off.count("Teraz nikt – ADVISORY 122.800") == 4
-    assert part.count("Teraz nikt") == 3 and "ADVISORY" not in part
+    assert "Now: EYVL_CTR 133.305 – Jonas" in top and top.count("Online: EYVL_CTR 133.305 – Jonas") == 1  # dymek nagłówka
+    assert "Nobody online – ADVISORY 122.800" in off and "Online:" not in off
+    # dymki kafelków: ADVISORY tylko, gdy nikt w całym stosie; w częściowo obsadzonym samo "Now: unstaffed"
+    assert off.count("Now: unstaffed – ADVISORY 122.800") == 4
+    assert part.count("Now: unstaffed") == 3 and "ADVISORY" not in part
     # oś wysokości w dymku nagłówka tylko w stosie z osią
-    assert "granice pionowe (FL)" in off and "granice pionowe" not in out["flat"] and "nowy ciąg" not in off
+    assert "vertical limits (FL)" in off and "vertical limits" not in out["flat"] and "new band group" not in off
     # EDUU: 365, 285, kreska i "+315" nad SPE (nowy ciąg), bez 315 pod SPE
     eduu = out["eduu"]
     assert re.findall(r'class="rb-bd(?: rb-re)?"[^>]*><i>([^<]+)</i>', eduu) == ["365", "285", "+315"]
     assert eduu.index("<i>285</i>") < eduu.index('class="rb-sep"') < eduu.index("<i>+315</i>") < eduu.index(">EDUU SPE<")
-    assert "nowy ciąg pasm" in eduu
+    assert "new band group" in eduu
     assert 'class="rb-nb flat"' in out["flat"] and "rb-bd" not in out["flat"] and 'class="rb-nbh"' in out["flat"]
-    assert "brak sektorów VACS" in out["empty"] and "ADVISORY" not in out["empty"]
+    assert "no VACS sectors" in out["empty"] and "ADVISORY" not in out["empty"]
     # błąd VATSIM: nie wiadomo, czy ktoś jest online – bez linii ADVISORY i bez częstotliwości
     assert "rb-unicom" not in out["nonet"] and 'class="rb-fq"' not in out["nonet"]
     ev = out["evil"]
@@ -1106,3 +1132,17 @@ def test_frontend_imports_resolve():
     assert "sectors.css" not in index and not (FRONTEND / "css" / "sectors.css").exists()
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     assert "subtabs(" not in radio and "text-shadow" not in (FRONTEND / "css" / "radio.css").read_text("utf-8")
+
+
+def test_layer_column_buttons_fit_label():
+    """Runda 14 (przegląd): "TWR/ATIS" w jednej trzeciej rzędu LOW MID HIGH był ucięty przy 1280–1600 px. Przyciski
+    kolumny (APP, TWR, TWR/ATIS, FIS) mają szerokość jednej trzeciej, ale nie mniej niż napis z odstępem po bokach
+    (sprawdzone w przeglądarce: scrollWidth ≤ clientWidth przy 1280×720, 1366×768, 1366×657, 1600×900, 1920×1080)."""
+    css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
+    rule = re.search(r"\.rb-btns button:is\(([^)]*)\) \{([^}]*)\}", css)
+    assert rule, "reguła przycisków kolumny"
+    assert re.findall(r'data-ly="(\w+)"', rule.group(1)) == ["app", "twr", "twra", "fis"]
+    body = rule.group(2)
+    assert "min-width: max-content" in body and "grid-column: 1 / -1" in body and "justify-self: center" in body
+    assert re.search(r"padding: \d+px [1-9]\d*px", body)  # odstęp po bokach napisu
+    assert "border-radius: 0" in re.search(r"\.rb-btns button \{([^}]*)\}", css).group(1)

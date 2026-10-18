@@ -26,9 +26,17 @@ def local_photo(icao: str) -> dict | None:
         if img.exists():
             meta_file = settings.photos_dir / f"{code}.json"
             meta = json.loads(meta_file.read_text("utf-8")) if meta_file.exists() else {}
-            return {"url": f"/files/photos/{img.name}", "credit": meta.get("credit", "zdjęcie lokalne"),
+            return {"url": f"/files/photos/{img.name}", "credit": meta.get("credit", "local photo"),
                     "page": meta.get("page")}
     return None
+
+
+def photo_query(manufacturer: str | None, model: str | None) -> str:
+    """Hasło do wyszukiwarki Wikipedii z nazwy typu w ICAO_Aircraft.json, która wylicza wersje i nazwy wojskowe:
+    "A-300(B4/C4/F4)-600" -> "A-300-600", "737-800, BBJ2" -> "737-800", "172 Cutlass/Skyhawk, T-41" -> "172 Cutlass"."""
+    name = re.sub(r"\([^()]*\)", "", (model or "").split(",")[0])
+    name = " ".join(name.split("/")[0].split())
+    return f"{manufacturer or ''} {name}".strip()
 
 
 async def fetch_photo(icao: str, query: str) -> dict | None:

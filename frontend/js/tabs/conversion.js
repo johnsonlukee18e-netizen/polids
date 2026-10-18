@@ -91,27 +91,10 @@ export const fpmOf = (pct, gs) => (pct / 100) * FT_NM * gs / 60;
 export const pctOf = (fpm, gs) => (fpm * 60 / gs) / FT_NM * 100;
 
 // --- Czas w Polsce: CET (UTC+1), czas letni CEST (UTC+2) od ostatniej niedzieli marca do ostatniej niedzieli
-// października, zmiana zawsze o 01:00 UTC (zasady UE)
-const MIN = 60000, HOUR = 3600000;
+// października, zmiana zawsze o 01:00 UTC (zasady UE). 0.12.5 (issue #18): zamiast kalkulatora UTC a czas polski
+// dwa zegary obok siebie w nagłówku zakładki
+const HOUR = 3600000;
 const pad = (n) => String(n).padStart(2, "0");
-// "14:30", "1430", "14.30", "9:05", "1430Z" → minuta doby; zły tekst → null
-export function parseTime(s) {
-  const m = String(s ?? "").trim().replace(/\s*(z|utc)$/i, "").match(/^(\d{1,2})[:.\s]?(\d{2})$/);
-  if (!m) return null;
-  const hh = Number(m[1]), mm = Number(m[2]);
-  return hh < 24 && mm < 60 ? hh * 60 + mm : null;
-}
-// "2026-10-25" albo "25.10.2026" → północ UTC tego dnia (ms); zły tekst albo nieistniejący dzień → null
-export function parseDay(s) {
-  const t = String(s ?? "").trim();
-  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), y, mo, d;
-  if (m) [y, mo, d] = m.slice(1).map(Number);
-  else if ((m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/))) [d, mo, y] = m.slice(1).map(Number);
-  else return null;
-  const ms = Date.UTC(y, mo - 1, d);
-  const back = new Date(ms);
-  return back.getUTCFullYear() === y && back.getUTCMonth() === mo - 1 && back.getUTCDate() === d ? ms : null;
-}
 // ostatnia niedziela miesiąca (month 0–11) o północy UTC
 export function lastSunday(year, month) {
   const end = new Date(Date.UTC(year, month + 1, 0));
@@ -122,28 +105,19 @@ export function plOffset(ms) {
   const y = new Date(ms).getUTCFullYear();
   return ms >= lastSunday(y, 2) + HOUR && ms < lastSunday(y, 9) + HOUR ? 2 : 1;
 }
-export const zoneOf = (off) => (off === 2 ? "CEST, UTC+2" : "CET, UTC+1");
-const parts = (ms) => { const d = new Date(ms); return { date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) }; };
-// UTC → czas w Polsce: {date, time, offset, zone} albo null przy złej dacie / godzinie
-export function utcToPl(day, time) {
-  const d = parseDay(day), t = parseTime(time);
-  if (d === null || t === null) return null;
-  const ms = d + t * MIN, off = plOffset(ms);
-  return { ...parts(ms + off * HOUR), offset: off, zone: zoneOf(off) };
+export const zoneOf = (off) => (off === 2 ? "CEST" : "CET");
+const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+// chwila ms → {time "08:22:45", date "18.10.2026", day "SUN"} z pól UTC (dla Polski: ms przesunięte o offset)
+function stamp(ms) {
+  const d = new Date(ms);
+  return { time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`,
+    date: `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`, day: DAYS[d.getUTCDay()] };
 }
-// czas w Polsce → UTC. Przy zmianie czasu: note "gap" (godziny 02:00–02:59 w dniu przejścia na czas letni nie ma,
-// liczymy jak CET) albo "twice" (02:00–02:59 w dniu powrotu do CET jest dwa razy: wynik CEST, w alt drugi raz CET)
-export function plToUtc(day, time) {
-  const d = parseDay(day), t = parseTime(time);
-  if (d === null || t === null) return null;
-  const local = d + t * MIN;
-  const ok = [2, 1].filter((off) => plOffset(local - off * HOUR) === off);
-  const off = ok[0] ?? 1;
-  const out = { ...parts(local - off * HOUR), offset: off, zone: zoneOf(off), note: ok.length ? (ok.length > 1 ? "twice" : "") : "gap" };
-  if (ok.length > 1) out.alt = parts(local - HOUR);
-  return out;
+// oba zegary: {utc: {time, date, day}, pl: {time, date, day, offset, zone}}
+export function clocks(ms = Date.now()) {
+  const off = plOffset(ms);
+  return { utc: stamp(ms), pl: { ...stamp(ms + off * HOUR), offset: off, zone: zoneOf(off) } };
 }
-export const nowUtc = (now = new Date()) => ({ date: now.toISOString().slice(0, 10), time: `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}` });
 
 // --- Widok
 // name: etykieta przed polem; "" = wiersz bez kolumny etykiet, null = pusta kolumna etykiet (pola w jednej linii
@@ -156,32 +130,25 @@ const card = (key, title, body, note) => `<section class="card conv-card" data-k
 const U = (id, label) => ({ id, label });
 
 export const CARDS = [
-  card("pressure", "Ciśnienie", GROUPS.pressure.map((u) => row(u)).join(""), "1 inHg = 33.8639 hPa · 1 mmHg = 1.333224 hPa"),
-  card("height", "Wysokość", GROUPS.height.map((u) => row(u)).join(""),
-    "1 ft = 0.3048 m · FL = ft / 100 (wysokość ciśnieniowa przy 1013.25 hPa)"),
-  card("qnh", "Wysokość a FL przy QNH",
-    row(U("qnh", "hPa"), "QNH", "np. 998") + row(U("alt", "ft AMSL"), "ALT") + row(U("fl", ""), "FL", "np. 70"),
-    "ISA: poziom QNH = 145366.45 × (1 − (QNH / 1013.25)<sup>0.190284</sup>) ft wysokości ciśnieniowej; FL = (ALT + poziom QNH) / 100."
-    + " Reguła kciuka: ok. 27–30 ft na 1 hPa różnicy od 1013."),
-  card("distance", "Odległość", GROUPS.distance.map((u) => row(u)).join(""), "1 NM = 1.852 km · 1 SM (mila lądowa) = 1.609344 km"),
-  card("speed", "Prędkość", GROUPS.speed.map((u) => row(u)).join(""), "1 kt = 1 NM/h = 1.852 km/h · 1 m/s = 3.6 km/h · 1 mph = 1.609344 km/h"),
-  card("mach", "Mach, TAS i CAS na FL (ISA)",
-    row(U("fl", ""), "FL", "np. 350") + row(U("mach", ""), "Mach", "np. 0.78") + row(U("tas", "kt"), "TAS") + row(U("cas", "kt"), "CAS"),
-    "ISA: T = 15 °C − 1.98 °C / 1000 ft (od FL361 −56.5 °C); a = 661.48 kt × √(T / 288.15 K); TAS = M × a;"
-    + " CAS z ciśnienia dynamicznego (przepływ ściśliwy, M &lt; 1). Bez odchyłki od ISA i bez wiatru."),
-  card("vs", "Prędkość pionowa", GROUPS.vs.map((u) => row(u)).join(""), "1 ft/min = 0.00508 m/s · 1000 ft/min ≈ 5.08 m/s"),
-  card("gradient", "Gradient wznoszenia / zniżania",
+  card("pressure", "Pressure", GROUPS.pressure.map((u) => row(u)).join(""), "1 inHg = 33.8639 hPa · 1 mmHg = 1.333224 hPa"),
+  card("height", "Height", GROUPS.height.map((u) => row(u)).join(""),
+    "1 ft = 0.3048 m · FL = ft / 100 (pressure altitude at 1013.25 hPa)"),
+  card("qnh", "Altitude and FL at QNH",
+    row(U("qnh", "hPa"), "QNH", "e.g. 998") + row(U("alt", "ft AMSL"), "ALT") + row(U("fl", ""), "FL", "e.g. 70"),
+    "ISA: QNH level = 145366.45 × (1 − (QNH / 1013.25)<sup>0.190284</sup>) ft pressure altitude; FL = (ALT + QNH level) / 100."
+    + " Rule of thumb: approx. 27–30 ft per 1 hPa difference from 1013."),
+  card("distance", "Distance", GROUPS.distance.map((u) => row(u)).join(""), "1 NM = 1.852 km · 1 SM (statute mile) = 1.609344 km"),
+  card("speed", "Speed", GROUPS.speed.map((u) => row(u)).join(""), "1 kt = 1 NM/h = 1.852 km/h · 1 m/s = 3.6 km/h · 1 mph = 1.609344 km/h"),
+  card("mach", "Mach, TAS and CAS at FL (ISA)",
+    row(U("fl", ""), "FL", "e.g. 350") + row(U("mach", ""), "Mach", "e.g. 0.78") + row(U("tas", "kt"), "TAS") + row(U("cas", "kt"), "CAS"),
+    "ISA: T = 15 °C − 1.98 °C / 1000 ft (−56.5 °C from FL361); a = 661.48 kt × √(T / 288.15 K); TAS = M × a;"
+    + " CAS from impact pressure (compressible flow, M &lt; 1). No ISA deviation, no wind."),
+  card("vs", "Vertical speed", GROUPS.vs.map((u) => row(u)).join(""), "1 ft/min = 0.00508 m/s · 1000 ft/min ≈ 5.08 m/s"),
+  card("gradient", "Climb / descent gradient",
     GROUPS.gradient.map((u, i) => row(u, i ? null : "Grad")).join("") + row(U("gs", "kt"), "GS") + row(U("fpm", "ft/min"), "VS"),
-    "ft/NM = % × 60.76 · kąt = atan(% / 100) · ft/min = ft/NM × GS / 60 (3° ≈ 5.24 % ≈ 318 ft/NM ≈ 5.3 × GS)"),
-  card("temperature", "Temperatura", GROUPS.temperature.map((u) => row(u)).join(""), "°F = °C × 9/5 + 32 · K = °C + 273.15"),
-  card("mass", "Masa", GROUPS.mass.map((u) => row(u)).join(""), "1 lb = 0.45359237 kg · 1 t = 1000 kg"),
-  card("time", "Czas: UTC a czas w Polsce",
-    `<label class="conv-row"><span class="conv-name">UTC</span><input class="field conv-day" data-u="utc-day" type="date">
-      <input class="field conv-time" data-u="utc" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm"></label>
-    <label class="conv-row"><span class="conv-name">Polska</span><input class="field conv-day" data-u="pl-day" type="date">
-      <input class="field conv-time" data-u="pl" type="text" inputmode="numeric" autocomplete="off" placeholder="hh:mm"></label>
-    <div class="conv-row"><button type="button" class="btn conv-now">Teraz</button></div>`,
-    "CET = UTC+1, czas letni CEST = UTC+2 od ostatniej niedzieli marca do ostatniej niedzieli października; zmiana o 01:00 UTC."),
+    "ft/NM = % × 60.76 · angle = atan(% / 100) · ft/min = ft/NM × GS / 60 (3° ≈ 5.24 % ≈ 318 ft/NM ≈ 5.3 × GS)"),
+  card("temperature", "Temperature", GROUPS.temperature.map((u) => row(u)).join(""), "°F = °C × 9/5 + 32 · K = °C + 273.15"),
+  card("mass", "Mass", GROUPS.mass.map((u) => row(u)).join(""), "1 lb = 0.45359237 kg · 1 t = 1000 kg"),
 ];
 
 // pola karty: wartość, zaznaczenie złej wartości, wpis wyniku
@@ -220,7 +187,7 @@ export function linkQnh(el) {
     f("qnh").classList.toggle("bad", bad);
     if (!ok(q) || bad) {
       put(src === "alt" ? "fl" : "alt", null);
-      out.textContent = q === null ? "Wpisz QNH." : Number.isNaN(q) ? "Zła wartość QNH." : "QNH poza zakresem 850–1100 hPa.";
+      out.textContent = q === null ? "Enter QNH." : Number.isNaN(q) ? "Invalid QNH." : "QNH out of range 850–1100 hPa.";
       return;
     }
     const lvl = qnhLevelFt(q);
@@ -230,8 +197,8 @@ export function linkQnh(el) {
       else put("alt", v === null ? null : paToAlt(v * 100, q), 0);
     }
     const d = 1013.25 - q;
-    out.innerHTML = `Poziom QNH: ${signed(lvl, 0)} ft wysokości ciśnieniowej · FL = (ALT ${lvl < 0 ? "−" : "+"} ${fmtNum(Math.abs(lvl), 0)} ft) / 100`
-      + `<br>reguła kciuka: ${signed(d, 2)} hPa × 27…30 ft = <span class="conv-nowrap">${signed(d * 27, 0)}…${signed(d * 30, 0)} ft</span>`;
+    out.innerHTML = `QNH level: ${signed(lvl, 0)} ft pressure altitude · FL = (ALT ${lvl < 0 ? "−" : "+"} ${fmtNum(Math.abs(lvl), 0)} ft) / 100`
+      + `<br>rule of thumb: ${signed(d, 2)} hPa × 27…30 ft = <span class="conv-nowrap">${signed(d * 27, 0)}…${signed(d * 30, 0)} ft</span>`;
   };
   el.addEventListener("input", (e) => {
     if (e.target.dataset.u === "alt" || e.target.dataset.u === "fl") src = e.target.dataset.u;
@@ -247,8 +214,8 @@ export function linkMach(el) {
     const fl = val("fl");
     // bez poprawnego FL wyniki z poprzedniego FL znikają (zostaje tylko wpisana prędkość)
     const stop = (msg) => { ["mach", "tas", "cas"].forEach((id) => id !== src && put(id, null)); out.textContent = msg; };
-    if (!ok(fl)) return stop("Wpisz FL.");
-    if (fl < 0 || fl > 650) return stop("Wzory ISA w kalkulatorze: FL000–FL650.");
+    if (!ok(fl)) return stop("Enter FL.");
+    if (fl < 0 || fl > 650) return stop("ISA formulas valid FL000–FL650.");
     const ft = fl * 100;
     const v = val(src);
     let m = null;
@@ -258,8 +225,8 @@ export function linkMach(el) {
       if (src !== "tas") put("tas", m === null ? null : machToTas(m, ft), 0);
       if (src !== "cas") put("cas", m === null || m >= 1 ? null : machToCas(m, ft), 0);
     }
-    out.textContent = `ISA na FL${fmtNum(fl, 0).padStart(3, "0")}: ${signed(isaTempK(ft) - 273.15, 1)} °C · a = ${fmtNum(soundKt(ft), 0)} kt`
-      + ` · p = ${fmtNum(isaPressure(ft), 1)} hPa${m >= 1 ? " · M ≥ 1: CAS poza zakresem wzoru" : ""}`;
+    out.textContent = `ISA at FL${fmtNum(fl, 0).padStart(3, "0")}: ${signed(isaTempK(ft) - 273.15, 1)} °C · a = ${fmtNum(soundKt(ft), 0)} kt`
+      + ` · p = ${fmtNum(isaPressure(ft), 1)} hPa${m >= 1 ? " · M ≥ 1: CAS outside the formula range" : ""}`;
   };
   el.addEventListener("input", (e) => {
     if (["mach", "tas", "cas"].includes(e.target.dataset.u)) src = e.target.dataset.u;
@@ -294,48 +261,49 @@ export function linkGradient(el) {
   });
 }
 
-export function linkTime(el) {
-  const { f, out } = fields(el);
-  // pod polami strefa czasu w Polsce w tej chwili i ewentualna uwaga o zmianie czasu
-  const show = (r, from) => {
-    if (from === "utc" && r) { f("pl-day").value = r.date; f("pl").value = r.time; }
-    if (from === "pl" && r) { f("utc-day").value = r.date; f("utc").value = r.time; }
-    const note = from === "utc" || !r ? "" : r.note === "gap" ? "Tej godziny w Polsce nie ma: zegary przestawia się z 02:00 na 03:00 (liczone jak CET)."
-      : r.note === "twice" ? `Ta godzina jest w Polsce dwa razy: ${r.time} UTC (CEST) i ${r.alt.time} UTC (CET).` : "";
-    out.innerHTML = r ? `Polska: <span class="conv-zone">${esc(r.zone)}</span>${note ? `<br>${esc(note)}` : ""}` : "";
-  };
-  const fromUtc = () => {
-    const r = utcToPl(f("utc-day").value, f("utc").value);
-    f("utc").classList.toggle("bad", !!f("utc").value.trim() && parseTime(f("utc").value) === null);
-    show(r, "utc");
-  };
-  const fromPl = () => {
-    const r = plToUtc(f("pl-day").value, f("pl").value);
-    f("pl").classList.toggle("bad", !!f("pl").value.trim() && parseTime(f("pl").value) === null);
-    show(r, "pl");
-  };
-  const now = () => { const n = nowUtc(); f("utc-day").value = n.date; f("utc").value = n.time; fromUtc(); };
-  el.addEventListener("input", (e) => {
-    const id = e.target.dataset.u;
-    if (id === "utc" || id === "utc-day") fromUtc();
-    if (id === "pl" || id === "pl-day") fromPl();
-  });
-  el.querySelector(".conv-now").addEventListener("click", now);
-  now();
+// karty w czterech stałych kolumnach (wysokości kolumn zbliżone, cała strona bez przewijania przy 768 px wysokości);
+// stały przydział, bo kolumny CSS wyrównywane automatycznie przenosiłyby kartę, w której się pisze (wynik QNH, ISA)
+export const COLUMNS = [["pressure", "height", "distance"], ["qnh", "speed"], ["mach", "vs"], ["gradient", "temperature", "mass"]];
+const cardOf = (k) => CARDS.find((c) => c.includes(`data-k="${k}"`));
+export const gridHtml = () => COLUMNS.map((ks) => `<div class="conv-col">${ks.map(cardOf).join("")}</div>`).join("");
+
+// zegary w nagłówku: UTC i czas w Polsce (CET/CEST) obok siebie, co sekundę
+export const clocksHtml = () => `<div class="conv-clocks">
+  <div class="conv-clock" title="Coordinated Universal Time"><span class="conv-ck-l">UTC</span><b class="conv-ck-t" data-ck="utc"></b>
+    <span class="conv-ck-s" data-ck="utc-s"></span></div>
+  <div class="conv-clock" title="Poland local time: CET = UTC+1, summer time CEST = UTC+2 (last Sunday of March to last Sunday of October, change at 01:00 UTC)">
+    <span class="conv-ck-l">POLAND (LT)</span><b class="conv-ck-t" data-ck="pl"></b><span class="conv-ck-s" data-ck="pl-s"></span></div></div>`;
+export function drawClocks(box, ms = Date.now()) {
+  const c = clocks(ms);
+  const set = (k, t) => { const e = box.querySelector(`[data-ck="${k}"]`); if (e.textContent !== t) e.textContent = t; };
+  set("utc", `${c.utc.time}Z`);
+  set("utc-s", `${c.utc.day} ${c.utc.date}`);
+  set("pl", c.pl.time);
+  set("pl-s", `${c.pl.zone} · UTC+${c.pl.offset}${c.pl.date === c.utc.date ? "" : ` · ${c.pl.day} ${c.pl.date}`}`);
 }
 
 export default {
   mount(root) {
     const pane = h(`<div class="pane conv-pane">
-      <div class="conv-head"><h2 class="title">Przeliczanie jednostek</h2>
-        <span class="hint">Wpisz wartość w dowolne pole – pozostałe pola karty przeliczają się od razu. Przecinek albo kropka.</span></div>
-      <div class="conv-grid">${CARDS.join("")}</div></div>`);
+      <div class="conv-head"><h2 class="title">Unit conversion</h2>
+        <span class="hint conv-hint" title="Type a value in any field: the other fields of the card are converted at once. Comma or dot as the decimal separator.">Type in any field – the card converts instantly.</span>
+        ${clocksHtml()}</div>
+      <div class="conv-grid">${gridHtml()}</div></div>`);
     root.append(pane);
     const el = (k) => pane.querySelector(`.conv-card[data-k="${k}"]`);
     ["pressure", "height", "distance", "speed", "vs", "temperature", "mass"].forEach((k) => linkGroup(el(k), GROUPS[k]));
     linkQnh(el("qnh"));
     linkMach(el("mach"));
     linkGradient(el("gradient"));
-    linkTime(el("time"));
+    const box = pane.querySelector(".conv-clocks");
+    drawClocks(box);
+    // co sekundę tylko wtedy, gdy zakładka jest na ekranie; jak zegar w menu (app.js) tuż po pełnej sekundzie, więc oba
+    // zegary UTC pokazują tę samą sekundę
+    const loop = () => {
+      if (root.classList.contains("active") && !document.hidden) drawClocks(box);
+      setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+    };
+    setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+    return { activate: () => drawClocks(box) };
   },
 };

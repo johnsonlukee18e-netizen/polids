@@ -1,6 +1,7 @@
 """COORDINATION we frontendzie (frontend/js/agreements.js, tabs/coordination.js, docs.js) w Node, bez DOM: adres,
 dokument z adresu, filtr słowami, wybór stanowiska (ta sama kolejność przejmowania co backend), HTML z esc()."""
 import json
+import re
 import shutil
 import subprocess
 
@@ -81,7 +82,7 @@ out.sum = {
   allOff: sum({ off: new Set(data.firs) }), types: sum({ typesOff: new Set(["LOA"]) }),
   evil: A.sumHtml({ ...all, toks: ["<B>"] }, { pos: "<i>", firs: ["<X>", "EDWW"], off: new Set(["<X>"]) }),
 };
-const unreg = { ...data.documents[0], id: "plik-loa-x", registered: false, count: 0, note: "brak wpisu w data/seed/coordination.json",
+const unreg = { ...data.documents[0], id: "plik-loa-x", registered: false, count: 0, note: "no entry in data/seed/coordination.json",
   name: "LOA EPWW UMMV Minsk" };
 out.cards = { unreg: A.docCardHtml(unreg, {}), reg: A.docCardHtml(data.documents[0], {}) };
 out.coordFile = ["LOA/x.pdf", "lop/a/b.pdf", "LOA", "LOA/", "ICAO/doc.pdf", "", null, "LOAX/x.pdf"].map(docsMod.isCoordFile);
@@ -238,17 +239,17 @@ def test_document_card_to_agreements(out, data):
 
 def test_summary_says_what_is_hidden(out, data):
     s = out["sum"]
-    assert "ukryte" not in s["none"] and "tylko FIR" not in s["none"] and "wszystkie stanowiska" in s["none"]
-    assert "ukryte FIR-y <b>EDWW</b>" in s["one"]
-    assert "tylko FIR <b>UKLV</b>" in s["only"] and "stanowisko <b>EPWW_DBT_CTR</b>" in s["only"]
-    assert "wszystkie FIR-y wyłączone" in s["allOff"]
-    assert "ukryte <b>LOA</b>" in s["types"]
+    assert "hidden" not in s["none"] and "only FIR" not in s["none"] and "all positions" in s["none"]
+    assert "hidden FIRs <b>EDWW</b>" in s["one"]
+    assert "only FIR <b>UKLV</b>" in s["only"] and "position <b>EPWW_DBT_CTR</b>" in s["only"]
+    assert "all FIRs off" in s["allOff"]
+    assert "hidden <b>LOA</b>" in s["types"]
     assert "<B>" not in s["evil"] and "<i>" not in s["evil"] and "<X>" not in s["evil"] and "&lt;X&gt;" in s["evil"]
 
 
 def test_unregistered_card_and_old_doc_addresses(out):
     c = out["cards"]
-    assert 'class="cd-new"' in c["unreg"] and "brak wpisu w data/seed/coordination.json" in c["unreg"]
+    assert 'class="cd-new"' in c["unreg"] and "no entry in data/seed/coordination.json" in c["unreg"]
     assert "cd-agr" not in c["unreg"] and "cd-agr" in c["reg"] and "cd-new" not in c["reg"]
     # stary adres OTHER › DOCS z plikiem LOA/LOP → COORDINATION
     assert out["coordFile"] == [True, True, False, False, False, False, False, False]
@@ -257,20 +258,20 @@ def test_unregistered_card_and_old_doc_addresses(out):
 def test_html(out):
     h = out["html"]
     assert 'class="cr-cop hit">ALUKA</b>' in h["hit"] and 'data-doc="loa-edww-eduu"' in h["hit"]
-    assert "sektor nieokreślony w LOA" in h["unk"] and 'class="unk"' in h["unk"] and "J LOW" in h["unk"]
+    assert "sector not specified in LOA" in h["unk"] and 'class="unk"' in h["unk"] and "J LOW" in h["unk"]
     ev = h["evil"]
     for bad in ("<b>X", "<i>t", "<script>", "<u>FL1", "<s>", "<q>"):
         assert bad not in ev, bad
     assert "cr-doc" not in ev   # nieznany dokument: bez przycisku
-    assert "Brak przekazań dla tych ustawień." in h["block"] and "COPN" in h["block"]
-    assert "Przekazanie kontroli i łączności" in h["notes"] and "XXXX" not in h["notes"]
-    assert h["options"].startswith('<option value="">Wszystkie</option>') and 'value="EPWW_DBT_CTR" selected' in h["options"]
-    assert '<optgroup label="ACC / FIR">' in h["options"] and '<optgroup label="TWR / lotnisko">' in h["options"]
+    assert "No transfers for these settings." in h["block"] and "COPN" in h["block"]
+    assert "Transfer of control and communication" in h["notes"] and "XXXX" not in h["notes"]
+    assert h["options"].startswith('<option value="">All</option>') and 'value="EPWW_DBT_CTR" selected' in h["options"]
+    assert '<optgroup label="ACC / FIR">' in h["options"] and '<optgroup label="TWR / aerodrome">' in h["options"]
     assert 'class="cd-card on"' in h["card"] and "AIRAC 2602" in h["card"] and "PDF ↗" in h["card"]
     assert 'href="/files/docs/LOA/LOA%20EPWW%20EDWW%20Bremen,%20EDUU%20Karlsruhe%20(AIRAC%202602).pdf"' in h["card"]
     assert 'class="cd-tag airac cur"' in h["cardCur"] and 'class="cd-tag airac cur"' not in h["card"]
     assert "<img" not in h["cardEvil"] and "javascript:" not in h["cardEvil"] and "<b>" not in h["cardEvil"]
-    assert "brak pliku" in h["cardMissing"] and "href=" not in h["cardMissing"]
+    assert "missing file" in h["cardMissing"] and "href=" not in h["cardMissing"]
     up, indiv = out["level"]
     assert 'class="cr-c"' in up and "<b>FL230-FL270</b>" in up and "↑ FL" not in up
     assert 'class="cr-indiv"' in indiv and "uzgodniony z EPWW" in indiv
@@ -278,9 +279,9 @@ def test_html(out):
 
 def test_owner_shown(out):
     # B LOW z DBT online (127.025): kto teraz obsługuje sektor po stronie EPWW
-    assert '<span class="cr-by" title="obsługuje teraz">DBT 127.025</span>' in out["html"]["owner"]
+    assert '<span class="cr-by" title="now covered by">DBT 127.025</span>' in out["html"]["owner"]
     assert "cr-by" not in out["html"]["ownerSel"]
-    assert '<span class="cr-by" title="obsługuje teraz">DBT</span>' in out["html"]["ownerOther"]
+    assert '<span class="cr-by" title="now covered by">DBT</span>' in out["html"]["ownerOther"]
 
 
 def test_documents_and_other_docs(out, data):
@@ -300,6 +301,12 @@ def test_tab_wiring():
     assert 'stash("coordination", { top: main.scrollTop })' in src and 'const s = stashed("coordination");' in src
     assert "main.scrollTop = wantTop" in src
     assert "sumHtml(v, { pos: st.pos" in src and "data.errors" in src
+    # 0.12.5 (issue #18): podmenu "LoA" i "DOCUMENTS" zamiast POROZUMIENIA i DOKUMENTY, przycisk na karcie "LoA ›"
+    assert '{ id: "agreements", label: "LoA", fill: true,' in src and '{ id: "docs", label: "DOCUMENTS", fill: true,' in src
+    code = re.sub(r"//[^\n]*", "", src)   # komentarze zostają po polsku, w kodzie i tekstach już nie
+    assert "POROZUMIENIA" not in code and "DOKUMENTY" not in code
+    agr = (FRONTEND / "js" / "agreements.js").read_text("utf-8")
+    assert ">LoA ›</button>" in agr and "POROZUMIENIA" not in re.sub(r"//[^\n]*", "", agr)
 
 
 
@@ -311,12 +318,12 @@ def test_lop_cards_and_addresses(out, api_docs):
     c = lop["card"]
     assert 'data-doc="lop-twr-epwa"' in c and ">LOP TWR Warszawa Chopin (EPWA)<" in c
     assert '<span class="cd-tag ty">LOP</span><span class="cd-tag fir">EPWW</span>' in c and "AIRAC" not in c
-    assert '<div class="cd-pos"><span>EPWA TWR</span></div>' in c and "0 przekazań" in c and "treść w przygotowaniu" in c
-    assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="LOP/LOP TWR/LOP TWR Okęcie.pdf"' in c
-    assert "brak pliku" not in c and "cd-new" not in c
+    assert '<div class="cd-pos"><span>EPWA TWR</span></div>' in c and "0 transfers" in c and "content in preparation" in c
+    assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="Open the PDF: LOP TWR Warszawa Chopin (EPWA)"' in c
+    assert "missing file" not in c and "cd-new" not in c
     # 30 sektorów ACC: każda etykieta bez łamania w środku („B LOW”), łamanie tylko na „ · ”
     assert "<span>B LOW</span> · <span>B MID</span> · <span>B HIGH</span>" in lop["acc"] and "<span>T HIGH</span></div>" in lop["acc"]
-    assert len(lop["cards"]) == 20 and not any("cd-agr" in x or "POROZUMIENIA" in x for x in lop["cards"])
+    assert len(lop["cards"]) == 20 and not any("cd-agr" in x or "LoA ›" in x for x in lop["cards"])
     assert all('href="/files/docs/LOP/LOP%20' in x for x in lop["cards"])
     assert lop["refFile"] == "lop-twr-epwa" and lop["refId"] == "lop-app-epkk" and lop["docsArg"] == "docs/lop-twr-epwa"
     assert lop["arg"] == {"sub": "docs", "doc": "LOP/LOP TWR/LOP TWR Okęcie.pdf"}

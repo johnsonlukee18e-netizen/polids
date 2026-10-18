@@ -27,7 +27,8 @@ def import_icao_airlines(db: Session, path: Path) -> dict:
     rows = parse_icao_airlines(text)
     if not rows and len(text.strip().splitlines()) == 1:
         # w pakiecie sektorowym ICAO_Airlines.txt bywa tylko odnośnikiem do ../../ICAO/ICAO_Airlines.txt
-        raise ValueError(f"Plik zawiera tylko ścieżkę '{text.strip()}'. Skopiuj prawdziwy plik z folderu ICAO pakietu.")
+        raise ValueError(f"The file only contains the path '{text.strip()}'. Copy the real file from the package's ICAO "
+                         "folder.")
     for r in rows:
         db.merge(Callsign(source="sector-file", **r))
     db.commit()

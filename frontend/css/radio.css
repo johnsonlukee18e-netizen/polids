@@ -1,27 +1,40 @@
 /* RADIO (runda 10): jedna strona jak w PANDORZE. U góry pasek ATIS, po lewej podgląd LOW ze stosami sąsiadów
    z zachodu, północy i południa, w środku przyciski warstw i mały podgląd MID, po prawej podgląd HIGH ze stosami
-   ze wschodu. Czarne tło, zielone przyciski, Consolas; bez poświaty i cieni pod tekstem.
+   ze wschodu. Czarne tło, Consolas; bez poświaty i cieni pod tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP).
+   0.12.5 (Marek): kolory podglądów z pliku sektora EuroScope (#define COLOR_… w EPWW-Sector.sct i zrzut od Marka):
+   jasnoszare = nieobsadzone, ciemne = obsadzone – na LOW, MID, HIGH i u sąsiadów tak samo; granice sektorów, FIR i TMA
+   COLOR_FIRBorder/COLOR_TMA (70,70,70), CTR COLOR_TWR-CTR (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9),
+   lotniska turkusowe trójkąty (144,237,229). Przyciski, pola częstotliwości i pasek ATIS jak na zdjęciu PANDORY:
+   jasnoszare prostokąty z ciemnym tekstem, ID w prawym górnym rogu pola, ATIS jasnofioletowy.
    --rb-f: rozmiar częstotliwości na etykietach (mniejszy na 1366×768, większy na 1920×1080). */
-.rb { --rb-f: clamp(11px, .8vw, 15px); flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px;
+.rb { --rb-f: clamp(11px, .8vw, 15px);
+  --rb-unst: #1e1e1e; --rb-st: #020202; --rb-line: #464646; --rb-ctr: #612e36; --rb-act: #787b09; --rb-ad: #90ede5;
+  --rb-lbl: #c8d4ee; --rb-lbl2: #c8b686;
+  --rb-tile: #dcdace; --rb-tile-hi: #f4f2e6; --rb-tile-tx: #15191d; --rb-tile-id: #3d4247;
+  --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
+  --rb-btn-on: #e9e7da; --rb-btn-off: #85857c; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
+  flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px;
   padding: 4px 6px 6px; overflow: hidden; background: #000; }
 
-/* --- pasek ATIS: ICAO i częstotliwość, online z literą informacji */
+/* --- pasek ATIS: ICAO i częstotliwość jasnofioletowe jak w PANDORZE (offline przygaszone), online z literą informacji */
 .rb-atis { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px clamp(8px, 1vw, 18px); padding: 2px 4px 3px;
-  border-bottom: 1px solid #141a14; }
+  border-bottom: 1px solid #1a1a1a; }
 .rb-atis[hidden] { display: none; }
-.rb-at { display: inline-flex; align-items: baseline; gap: 5px; padding: 0 2px; background: none; border: 0; cursor: pointer;
-  font: 700 calc(var(--rb-f) + 3px)/1.25 var(--mono); color: #6f786f; white-space: nowrap; }
-.rb-at .rb-ati { font-size: calc(var(--rb-f) - 1px); color: #7d877d; }
+.rb-at { display: inline-flex; align-items: baseline; gap: 5px; padding: 0 2px; background: none; border: 0; border-radius: 0; cursor: pointer;
+  font: 700 calc(var(--rb-f) + 3px)/1.25 var(--mono); color: var(--rb-atis-off); white-space: nowrap; }
+.rb-at .rb-ati { font-size: calc(var(--rb-f) - 1px); color: inherit; }
 .rb-at .rb-fq { color: inherit; font: inherit; }
-.rb-at.on { color: #fff; }
-.rb-at.on .rb-ati { color: var(--green-hi); }
+.rb-at.on { color: var(--rb-atis); }
 .rb-at:hover .rb-ati { text-decoration: underline; }
 .rb-code { margin-left: 3px; padding: 0 3px; font: 700 calc(var(--rb-f) - 1px)/1.2 var(--mono); color: #000; background: var(--yellow);
-  border-radius: 2px; }
+  border-radius: 0; }
 
 /* --- siatka: [LOW + sąsiedzi] [przyciski + MID] [HIGH + sąsiedzi] */
 .rb-grid { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(200px, 16vw, 330px) minmax(0, 1fr); gap: 6px; }
-.rb-panel { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; border: 1px solid #121812; }
+.rb-panel { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; border: 1px solid #1a1a1a; }
+/* tło podglądu poza FIR EPWW i sektorami sąsiadów: jak przestrzeń nieobsadzona (nie wiemy o nikim) – ciemne jest tylko
+   to, co ktoś obsługuje */
+.rb-panel .rb-svg { background: var(--rb-unst); }
 .rb-svg { position: absolute; inset: 0; display: block; }
 .rb-frame { position: absolute; inset: 0; display: grid; gap: 6px; padding: 5px; pointer-events: none; }
 .rb-low .rb-frame { grid-template: "col top" auto "col free" minmax(0, 1fr) "col bot" auto / auto minmax(0, 1fr); }
@@ -38,47 +51,46 @@
 .rb-high .rb-top { justify-content: flex-end; padding-right: 8%; }
 .rb-high .rb-bot { justify-content: center; }
 
-/* --- podgląd: tło FIR-ów, FIR EPWW, obszary stanowisk ACC warstwy, warstwy APP/TWR/FIS (tylko LOW) */
+/* --- podgląd: tło FIR-ów, sektory ACC sąsiadów, FIR EPWW, obszary stanowisk ACC warstwy, warstwy APP/TWR/FIS (LOW).
+   Ta sama zasada na LOW, MID i HIGH (0.12.5, Marek: „czemu MID ma inny kolor skoro też jest nieobsadzony?”):
+   przestrzeń nieobsadzona jasnoszara (--rb-unst), obsadzona ciemna (--rb-st) z oliwkową granicą obszaru */
 .rb-svg path { fill: none; stroke-linejoin: round; }
-.rb-firs path { stroke: #1d261d; stroke-width: 1; }
-.rb-land { fill: #060906; }
-.rb-midmap .rb-land { fill: #2c312e; }   /* MID: szary podgląd jak w PANDORZE */
-.rb-midmap .rb-accg path { stroke: #8d968f; }
-.rb-midmap .rb-accg path.st { fill: rgba(95, 210, 58, .1); }
-.rb-midmap .rb-border { stroke: #c9d0c9; }
-/* sektory ACC (runda 12): jeden obszar na stanowisko (suma wycinków z dziurami: evenodd), sektorów bez nikogo nie ma;
-   fb = po błędzie sumy same wypełnienia wycinków, bez konturów między nimi */
-.rb-accg path { stroke: #5a7d5a; stroke-width: 1; fill-rule: evenodd; }
-.rb-accg path.st { fill: rgba(95, 210, 58, .07); }
+.rb-firs path { stroke: var(--rb-line); stroke-width: 1; }
+.rb-nbacc path { fill: var(--rb-unst); stroke: var(--rb-line); stroke-width: .8; }
+.rb-nbacc path.on { fill: var(--rb-st); }
+.rb-land { fill: var(--rb-unst); }
+/* sektory ACC EPWW (runda 12): jeden obszar na stanowisko (suma wycinków z dziurami: evenodd), sektorów bez nikogo nie
+   rysujemy (zostaje jasnoszary FIR); fb = po błędzie sumy same wypełnienia wycinków, bez konturów między nimi */
+.rb-accg path { fill: var(--rb-st); stroke: var(--rb-act); stroke-width: 1.2; fill-rule: evenodd; }
 .rb-accg path.fb { stroke: none; }
-/* obszar pod etykietą: jaśniejszy (zostaje zielony, tylko mocniej) */
-.rb-accg path.hl { stroke: #fff; stroke-width: 2; fill: rgba(255, 255, 255, .13); }
-.rb-accg path.st.hl { fill: rgba(95, 210, 58, .24); }
-.rb-border { stroke: #a9b3a9; stroke-width: 1.4; }
-.rb-tmag path { stroke: rgba(62, 199, 224, .55); stroke-width: 1; stroke-dasharray: 4 3; }
-.rb-ctrg path { stroke: rgba(242, 210, 27, .7); stroke-width: 1; }
-.rb-fisg path { stroke: rgba(176, 140, 255, .45); stroke-width: 1; stroke-dasharray: 1 3; }
-.rb-marks .rb-lead { stroke: #9aa59a; stroke-width: 1; }
-.rb-dot { fill: #c3cdc3; }
-.rb-dot.app { fill: var(--cyan); }
-.rb-dot.twr { fill: var(--yellow); }
-.rb-dot.fis { fill: #b08cff; }
+/* obszar pod etykietą: jaśniejsza granica */
+.rb-accg path.hl { stroke: var(--rb-lbl); stroke-width: 2; fill: #0c0c0c; }
+.rb-border { stroke: #8a8a8a; stroke-width: 1.3; }
+.rb-tmag path { stroke: var(--rb-line); stroke-width: 1.1; }
+.rb-ctrg path { stroke: var(--rb-ctr); stroke-width: 1.2; }
+.rb-tmag.nb path, .rb-ctrg.nb path { stroke-width: 1; }
+.rb-fisg path { stroke: var(--rb-line); stroke-width: 1; stroke-dasharray: 2 3; }
+.rb-marks .rb-lead { stroke: #9a9a9a; stroke-width: 1; }
+.rb-dot { fill: var(--rb-lbl); }
+.rb-dot.twr { fill: none; stroke: var(--rb-ad); stroke-width: 1.1; }
+.rb-dot.fis { fill: var(--rb-lbl2); }
 
-/* --- etykiety (sektory, APP, TWR, FIS) i pola stosów: małe ID w prawym górnym rogu, pod nim częstotliwość;
-   skrót stanowiska, które przejmuje (inne niż stanowisko sektora), przed częstotliwością. Częstotliwość tylko, gdy
-   ktoś obsługuje (runda 11, Marek): bez nikogo samo ID (etykieta w odmianie skróconej .cmp, pole stosu bez linii) */
+/* --- etykiety (sektory, APP, TWR, FIS) i pola stosów jak na zdjęciu PANDORY: jasne pole, małe ID w prawym górnym
+   rogu, pod nim duża ciemna częstotliwość; skrót stanowiska, które przejmuje (inne niż stanowisko sektora), przed
+   częstotliwością. Częstotliwość tylko, gdy ktoś obsługuje (runda 11, Marek): bez nikogo samo ID w ciemniejszym,
+   przygaszonym polu (etykieta w odmianie skróconej .cmp, pole stosu bez linii) */
 .rb-lbls { position: absolute; inset: 0; pointer-events: none; }
-.rb-lbl, .rb-box { display: inline-grid; justify-items: end; align-content: start; padding: 0 4px 1px; background: #030503;
-  border: 1px solid #222a22; border-radius: 2px; white-space: nowrap; line-height: 1.05; cursor: help; }
+.rb-lbl, .rb-box { display: inline-grid; justify-items: end; align-content: start; padding: 0 4px 1px; background: var(--rb-tile-off);
+  border: 1px solid var(--rb-tile-off-line); border-radius: 0; white-space: nowrap; line-height: 1.05; cursor: help; }
 .rb-lbl { position: absolute; left: 0; top: 0; pointer-events: auto; }
 /* ID sektora i liczby FL nie mniejsze niż 9 px (8 px na etykietach APP/TWR/FIS), także na 1366×768 */
-.rb-id { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.15 var(--mono); color: #7b847b; letter-spacing: .2px; }
+.rb-id { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.15 var(--mono); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
 .rb-ln { display: flex; align-items: baseline; gap: 4px; }
-.rb-fq { font: 700 var(--rb-f)/1.12 var(--mono); color: #fff; }
-.rb-by { font: 700 max(8px, calc(var(--rb-f) - 3px))/1 var(--mono); font-style: normal; color: var(--green-text); }
-.rb-more { font: 700 max(8px, calc(var(--rb-f) - 4px)) var(--mono); font-style: normal; color: var(--green-text); }
-.rb-lbl.on, .rb-box.on { background: #071305; border-color: var(--green-hi); }
-.rb-lbl.on .rb-id, .rb-box.on .rb-id { color: #b9e8a6; }
+.rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--mono); color: var(--rb-tile-tx); }
+.rb-by { font: 700 max(8px, calc(var(--rb-f) - 3px))/1 var(--mono); font-style: normal; color: #1f4f86; }
+.rb-more { font: 700 max(8px, calc(var(--rb-f) - 4px)) var(--mono); font-style: normal; color: #1f4f86; }
+.rb-lbl.on, .rb-box.on { background: var(--rb-tile); border-color: var(--rb-tile-hi); }
+.rb-lbl.on .rb-id, .rb-box.on .rb-id { color: var(--rb-tile-id); }
 /* APP, TWR i FIS mniejsze niż sektory ACC (na podglądzie LOW bywa ich kilkadziesiąt) */
 .rb-lbl.app, .rb-lbl.twr, .rb-lbl.fis { --rb-f: clamp(10px, .7vw, 13px); }
 .rb-lbl.app .rb-id, .rb-lbl.twr .rb-id, .rb-lbl.fis .rb-id { font-size: max(8px, calc(var(--rb-f) - 3px)); }
@@ -86,108 +98,120 @@
 .rb-lbl.cmp { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 3px; }
 .rb-lbl.cmp .rb-id { font-size: max(9px, calc(var(--rb-f) - 2px)); }
 /* wieża offline, którą przejmuje inne stanowisko (np. APP): częstotliwość przejmującego, ↑APP, kto – w dymku */
-.rb-lbl.cov { border-color: #2f6a24; border-style: dashed; }
+.rb-lbl.cov { background: #b9b7aa; border: 1px dashed #15191d; }
+.rb-lbl.cov .rb-id { color: var(--rb-tile-id); }
 .rb-lbl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-.rb-lbl.app { border-left: 3px solid var(--cyan); }
-.rb-lbl.twr { border-left: 3px solid var(--yellow); cursor: pointer; }
-.rb-lbl.fis { border-left: 3px solid #b08cff; }
-/* linia ATIS (TWR/ATIS) tylko z ATIS online: jasna także przy wieży offline albo przejmowanej */
-.rb-lbl .rb-atl .rb-by { color: var(--green-hi); }
-.rb-lbl .rb-atl .rb-fq { color: #fff; }
+/* rodzaj etykiety: pasek z lewej w kolorach pliku sektora (TMA szary, CTR czerwony; FIS oliwkowy), rozjaśnionych na polu */
+.rb-lbl.app { border-left: 3px solid #7c8a99; }
+.rb-lbl.twr { border-left: 3px solid #a04656; cursor: pointer; }
+.rb-lbl.fis { border-left: 3px solid #a3a62a; }
+/* linia ATIS (TWR/ATIS) tylko z ATIS online: czytelna także przy wieży offline albo przejmowanej */
+.rb-lbl .rb-atl .rb-by { color: #1f4f86; }
+.rb-lbl.off .rb-atl .rb-by, .rb-lbl.off .rb-atl .rb-fq { color: var(--rb-atis); }
 .rb-lbl .rb-atl .rb-code { font-size: max(8px, calc(var(--rb-f) - 4px)); }
-.rb-lbl:hover, .rb-box:hover { border-color: #fff; }
+.rb-lbl:hover, .rb-box:hover { outline: 1px solid #fff; }
 
-/* --- stosy sąsiadów (kafelki VACS): nagłówek FIR, ADVISORY, gdy nikt nie obsługuje sektorów przy granicy, pasma kafelków
-   o tym samym zakresie; każda granica pionowa (FL) raz, na osi między pasmami (liczba w lewym marginesie --rb-ax i linia) */
-.rb-nb { --rb-ax: calc(var(--rb-f) * 1.8 + 2px); pointer-events: auto; min-width: 0; padding: 1px 4px 3px; background: rgba(0, 0, 0, .86);
-  border: 1px solid #1a221a; border-radius: 2px; }
-.rb-nb.flat { --rb-ax: 0px; }
-.rb-nbh { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.3 var(--mono); color: var(--muted); white-space: nowrap; cursor: help; }
-.rb-nbh b { font-size: calc(var(--rb-f) - 1px); color: var(--yellow); }
-.rb-unicom { margin: 1px 0 1px var(--rb-ax); font: 700 calc(var(--rb-f) - 1px)/1.25 var(--mono); color: #c3cdc3; white-space: nowrap; }
-.rb-bd { display: flex; align-items: center; gap: 3px; margin-top: 2px; font: 400 max(9px, calc(var(--rb-f) - 3px))/1 var(--mono);
-  color: #a0a8a0; cursor: help; }
-.rb-bd i { flex: none; width: calc(var(--rb-ax) - 3px); font-style: normal; text-align: right; }
-.rb-bd::after { content: ""; flex: 1; border-top: 1px solid #2f3a2f; }
+/* --- stosy sąsiadów (kafelki VACS) jak na zdjęciu PANDORY: nazwa FIR żółta, ADVISORY, gdy nikt nie obsługuje sektorów
+   przy granicy, pasma kafelków o tym samym zakresie; każda granica pionowa (FL) raz, małą białą liczbą między polami */
+.rb-nb { --rb-ax: 0px; pointer-events: auto; min-width: 0; padding: 1px 4px 3px; background: rgba(30, 30, 30, .9); border: 0; border-radius: 0; }
+.rb-nbh { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.3 var(--mono); color: #8c8c8c; white-space: nowrap; cursor: help; }
+.rb-nbh b { font-size: calc(var(--rb-f) + 1px); color: var(--yellow); }
+.rb-unicom { margin: 1px 0 1px var(--rb-ax); font: 700 calc(var(--rb-f) - 1px)/1.25 var(--mono); color: #fff; white-space: nowrap; }
+.rb-bd { display: flex; align-items: center; gap: 3px; margin: 1px 0 0 2px; font: 700 max(9px, calc(var(--rb-f) - 3px))/1.05 var(--mono);
+  color: #fff; cursor: help; }
+.rb-bd i { flex: none; font-style: normal; }
 /* nowy ciąg pasm (EDUU SPE po OSE12/HVL12): krótka kreska, pod nią zakres pasma (+315) zamiast granicy pod nim */
-.rb-sep { width: 34%; margin: 6px 0 1px calc(var(--rb-ax) + 4px); border-top: 2px solid #3d4a3d; }
-.rb-bd.rb-re i { width: auto; min-width: calc(var(--rb-ax) - 3px); color: #c3cdc3; }
-.rb-bxs { display: flex; flex-wrap: wrap; gap: 2px; margin: 2px 0 0 var(--rb-ax); font: 700 var(--rb-f) var(--mono); }
+.rb-sep { width: 34%; margin: 5px 0 1px 2px; border-top: 2px solid #6a6a6a; }
+.rb-bd.rb-re i { color: #fff; }
+.rb-bxs { display: flex; flex-wrap: wrap; gap: 2px; margin: 1px 0 0 var(--rb-ax); font: 700 var(--rb-f) var(--mono); }
 /* boczna kolumna: jedno pole w linii (wąsko, mapa zostaje duża); u góry i u dołu do czterech obok siebie */
 .rb-col .rb-bxs { flex-direction: column; align-items: stretch; }
 .rb-top .rb-bxs, .rb-bot .rb-bxs { max-width: calc(32ch + 50px); }
-.rb-box { min-width: calc(7ch + 10px); }
-.rb-none { font: 11px var(--mono); color: #5c665c; padding: 2px 0; }
+.rb-box { min-width: calc(7ch + 12px); }
+.rb-none { font: 11px var(--mono); color: #6a6a6a; padding: 2px 0; }
 
 /* --- tytuł podglądu (warstwa, zakres) i suwak wysokości LOW */
 .rb-title { position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 1px 4px; font: 11px var(--mono);
-  color: var(--muted); white-space: nowrap; background: rgba(0, 0, 0, .7); }
+  color: #9a9a9a; white-space: nowrap; background: rgba(30, 30, 30, .9); }
 .rb-title b { font-size: 13px; color: #fff; letter-spacing: 1px; }
 /* LOW i HIGH: w rogu wolnego pola przy środkowej kolumnie (miejsce ustawia radio.js), MID: lewy górny róg */
 .rb-low .rb-title { right: 4px; top: 3px; }
 .rb-high .rb-title, .rb-midmap .rb-title { left: 4px; top: 3px; }
-/* suwak: zielony uchwyt na ciemnym torze, kreski pod torem = granice wycinków ACC (tam zmieniają się kształty) */
+/* suwak: jasnoszary uchwyt (jak przyciski) na ciemnym torze, kreski pod torem = granice wycinków ACC (tam zmieniają się
+   kształty) */
 .rb-lvl { position: relative; display: inline-flex; align-items: center; width: clamp(96px, 8.5vw, 170px); height: 18px; }
 .rb-cut { width: 100%; height: 18px; margin: 0; padding: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.rb-cut::-webkit-slider-runnable-track { height: 4px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; }
-.rb-cut::-webkit-slider-thumb { width: 9px; height: 14px; margin-top: -6px; background: #45a832; border: 1px solid #1f5a16; border-radius: 1px;
+.rb-cut::-webkit-slider-runnable-track { height: 4px; background: #111; border: 1px solid #464646; border-radius: 0; }
+.rb-cut::-webkit-slider-thumb { width: 9px; height: 14px; margin-top: -6px; background: var(--rb-btn-on); border: 1px solid #000; border-radius: 0;
   -webkit-appearance: none; appearance: none; }
-.rb-cut::-moz-range-track { height: 4px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; }
-.rb-cut::-moz-range-thumb { width: 9px; height: 14px; background: #45a832; border: 1px solid #1f5a16; border-radius: 1px; }
-.rb-cut:hover::-webkit-slider-thumb { background: #52bd3c; }
-.rb-cut:hover::-moz-range-thumb { background: #52bd3c; }
+.rb-cut::-moz-range-track { height: 4px; background: #111; border: 1px solid #464646; border-radius: 0; }
+.rb-cut::-moz-range-thumb { width: 9px; height: 14px; background: var(--rb-btn-on); border: 1px solid #000; border-radius: 0; }
+.rb-cut:hover::-webkit-slider-thumb { background: #fff; }
+.rb-cut:hover::-moz-range-thumb { background: #fff; }
 .rb-cut:focus { outline: none; }
-.rb-cut:focus-visible { outline: 1px solid var(--green-hi); outline-offset: 1px; }
+.rb-cut:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 .rb-ticks { position: absolute; left: 5px; right: 5px; bottom: 0; height: 4px; pointer-events: none; }
-.rb-ticks i { position: absolute; top: 0; width: 1px; height: 4px; background: #5c665c; }
-.rb-cutv { min-width: 5ch; font: 700 12px var(--mono); color: var(--green-text); }
+.rb-ticks i { position: absolute; top: 0; width: 1px; height: 4px; background: #8a8a8a; }
+.rb-cutv { min-width: 5ch; font: 700 12px var(--mono); color: #fff; }
 
 /* --- środkowa kolumna: przyciski warstw (LOW MID HIGH w jednym rzędzie), stan sieci, legenda, podgląd MID */
 .rb-mid { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
-/* przyciski rozłożone w pionie jak w PANDORZE (ATIS / LOW MID HIGH / APP / TWR / TWR/ATIS / FIS), MID przy dole */
+/* przyciski jak na zdjęciu PANDORY: jasnoszare prostokąty z ciemnym tekstem, kąty proste, krzyż ATIS / LOW MID HIGH,
+   pod nim w kolumnie APP / TWR / TWR/ATIS / FIS (OAT pomijamy). Włączona warstwa: jasne pole i czarny pogrubiony tekst,
+   wyłączona: ciemniejsze szare pole */
 .rb-btns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(26px, 40px); align-content: space-evenly; gap: 4px; padding: 2px 8%; }
-.rb-btns button { grid-column: 1 / -1; min-height: 0; padding: 3px 2px; background: #0b100b; border: 1px solid #2a4a22; border-radius: 2px;
-  color: #8fa58a; font: 700 13px/1.2 var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; overflow: hidden; }
-.rb-btns button[data-ly="low"], .rb-btns button[data-ly="mid"], .rb-btns button[data-ly="high"] { grid-column: auto; }
-.rb-btns button:hover { border-color: var(--green-hi); color: #fff; }
-.rb-btns button.on { background: linear-gradient(#45a832, #2f8a22); border-color: #1f5a16; color: #f4fff0; }
-.rb-btns button.on:hover { background: linear-gradient(#52bd3c, #36992a); }
-.rb-status { flex: none; font: 11px/1.35 var(--mono); color: var(--muted); text-align: center; overflow-wrap: anywhere; }
-.rb-legend { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font: 10px/1.3 var(--mono); color: #7b847b; }
+  grid-template-rows: auto auto repeat(4, minmax(0, 1fr)); align-items: center; gap: 4px; padding: 6px 6% 2px; }
+.rb-btns button { grid-column: 2; height: clamp(24px, 4.4vh, 38px); min-height: 0; padding: 2px; background: var(--rb-btn-off);
+  border: 1px solid #000; border-radius: 0; color: #1a1a1a; font: 400 clamp(11px, .85vw, 15px)/1.2 var(--ui); letter-spacing: .3px;
+  cursor: pointer; white-space: nowrap; overflow: hidden; }
+.rb-btns button[data-ly="low"] { grid-column: 1; }
+.rb-btns button[data-ly="high"] { grid-column: 3; }
+/* kolumna APP / TWR / TWR/ATIS / FIS: szerokość jednej trzeciej rzędu LOW MID HIGH, ale nie węższa niż napis z odstępem
+   po bokach (runda 14, przegląd: "TWR/ATIS" przy 1280–1600 px nie mieścił się w jednej trzeciej i był ucięty). Jak na
+   zdjęciu PANDORY: TWR/A trochę szerszy od TWR, reszta równa; czcionka o stałej szerokości, więc pogrubienie (włączona
+   warstwa) szerokości nie zmienia */
+.rb-btns button:is([data-ly="app"], [data-ly="twr"], [data-ly="twra"], [data-ly="fis"]) { grid-column: 1 / -1; justify-self: center;
+  width: calc((100% - 8px) / 3); min-width: max-content; padding: 2px 5px; }
+.rb-btns button:hover { outline: 1px solid #fff; outline-offset: 0; }
+.rb-btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.rb-btns button.on { background: var(--rb-btn-on); color: #000; font-weight: 700; }
+.rb-status { flex: none; font: 11px/1.35 var(--mono); color: #9a9a9a; text-align: center; overflow-wrap: anywhere; }
+.rb-legend { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font: 10px/1.3 var(--mono); color: #9a9a9a; }
 .rb-legend span { display: inline-flex; align-items: center; gap: 4px; }
-.rb-sw { display: inline-block; width: 11px; height: 9px; border: 1px solid #222a22; background: #030503; }
-.rb-sw.on { border-color: var(--green-hi); background: #071305; }
-.rb-sw.cov { border: 1px dashed #2f6a24; }
+.rb-sw { display: inline-block; width: 11px; height: 9px; border: 1px solid var(--rb-line); background: var(--rb-unst); }
+.rb-sw.on { border-color: var(--rb-act); background: var(--rb-st); }
+.rb-sw.cov { border: 1px dashed #c4c4ba; background: #b9b7aa; }
+.rb-ln-sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--rb-line); }
+.rb-ln-sw.ctr { border-color: var(--rb-ctr); }
 .rb-midmap { flex: none; aspect-ratio: .9; max-height: 55%; --rb-f: clamp(10px, .68vw, 13px); }
 
 /* --- stos sąsiada: nagłówek otwiera LOA */
 .rb-nbh[role="button"] { cursor: pointer; }
 .rb-nbh:hover b, .rb-nbh.sel b { text-decoration: underline; }
 .rb-nbh.sel { color: #fff; }
-.rb-nbh:focus-visible { outline: 1px solid var(--green-hi); outline-offset: 1px; }
+.rb-nbh:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 
 /* --- panel LOA EPWW z sąsiadem: nad podglądem po przeciwnej stronie niż kliknięty stos */
 .rb-loa { position: absolute; z-index: 5; top: 0; right: 0; width: min(1120px, 72%); max-height: 100%; display: flex; flex-direction: column;
-  background: #050705; border: 1px solid var(--green); border-radius: 2px; }
+  background: #050705; border: 1px solid var(--green); border-radius: 0; }
 .rb-loa.at-left { right: auto; left: 0; }
 .rb-loa[hidden] { display: none; }
 .rb-loa-h { flex: none; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 4px 8px; background: var(--head);
   border-bottom: 1px solid var(--head-line); font: 12px var(--mono); white-space: nowrap; }
-.rb-loa-tag { flex: none; padding: 0 6px; border: 1px solid var(--green); border-radius: 2px; color: var(--green-hi); font: 700 11px/16px var(--mono); }
+.rb-loa-tag { flex: none; padding: 0 6px; border: 1px solid var(--green); border-radius: 0; color: var(--green-hi); font: 700 11px/16px var(--mono); }
 .rb-loa-fir { flex: none; color: var(--muted); }
 .rb-loa-fir b { color: var(--yellow); }
 .rb-loa-t { flex: 0 1 auto; min-width: 12ch; overflow: hidden; text-overflow: ellipsis; color: #fff; font-weight: 700; }
 .rb-loa-v { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .rb-loa-n { flex: none; font: 11px var(--mono); color: #b9c2b9; }
 .rb-loa-sp { flex: 1; }
-.rb-loa-a, .rb-loa-x { flex: none; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 2px; color: #c3cdc3;
+.rb-loa-a, .rb-loa-x { flex: none; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #c3cdc3;
   font: 12px/18px var(--mono); text-decoration: none; cursor: pointer; }
 .rb-loa-a:hover, .rb-loa-x:hover { border-color: var(--green-hi); color: #fff; }
 .rb-loa-b { min-height: 0; overflow: auto; padding: 0 10px 8px; }
 .rb-loa-b > p { margin: 8px 0; font: 12px var(--mono); }
 .rb-loa-tools { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; height: 32px; background: #050705; }
-.rb-loa-q { flex: 0 1 260px; min-width: 120px; padding: 2px 6px; background: #000; border: 1px solid #2f3a2f; border-radius: 2px; color: var(--text); font: 12px var(--mono); }
+.rb-loa-q { flex: 0 1 260px; min-width: 120px; padding: 2px 6px; background: #000; border: 1px solid #2f3a2f; border-radius: 0; color: var(--text); font: 12px var(--mono); }
 .rb-loa-q:focus { outline: none; border-color: var(--green-hi); }
 .rb-loa-tools .hint, .rb-loa-cnt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--muted); }
 .rb-loa-cnt:empty { display: none; }
@@ -217,7 +241,7 @@
 
 /* --- dymek (jeden, przy kursorze) */
 .rb-tip { position: fixed; z-index: 3000; max-width: 480px; padding: 5px 8px; background: #0d110d; border: 1px solid var(--green);
-  border-radius: 2px; color: var(--text); font: 12px/1.35 var(--mono); white-space: pre-wrap; pointer-events: none; }
+  border-radius: 0; color: var(--text); font: 12px/1.35 var(--mono); white-space: pre-wrap; pointer-events: none; }
 
 @media (max-height: 820px) {
   .rb-btns button { font-size: 12px; }

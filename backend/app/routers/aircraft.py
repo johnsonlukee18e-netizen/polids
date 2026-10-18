@@ -3,18 +3,19 @@ import unicodedata
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import AircraftType
-from ..services.photos import fetch_photo, local_photo
+from ..services.photos import fetch_photo, local_photo, photo_query
 
 router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
 
-FIELDS = ["id", "icao", "iata", "manufacturer", "model", "aircraft_type", "engine_type", "engine_count",
-          "description", "wtc", "recat", "wingspan", "length", "height", "mtow", "mlw", "ceiling_ft",
-          "vmo_kt", "mmo", "use", "remarks", "source"]
+# jeden rekord na oznaczenie typu z ICAO_Aircraft.json; *_max: górna granica osiągów, gdy wersje typu się różnią
+FIELDS = ["id", "icao", "iata", "manufacturer", "model", "description", "wtc", "wtg", "recat", "wingspan", "length",
+          "height", "mtow", "use", "engine_count", "engine_type", "mlw", "mlw_max", "ceiling_ft", "ceiling_ft_max",
+          "vmo_kt", "vmo_kt_max", "mmo", "mmo_max", "source"]
 
 
 def _dict(a: AircraftType) -> dict:
@@ -46,6 +47,18 @@ def _norm(text: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
+def _squash(col):
+    """Kolumna bez myślników, spacji, kropek i ukośników (w SQL), do porównania z _key()."""
+    for ch in "- ./":
+        col = func.replace(col, ch, "")
+    return col
+
+
+def _key(text: str) -> str:
+    """Szukany tekst bez znaków przestankowych: "A300" i "a 300" znajdują model "A-300(B4/C4/F4)-600"."""
+    return re.sub(r"[^A-Za-z0-9]+", "", text)
+
+
 def maker_matches(key: str, manufacturer: str | None, model: str | None, icao: str | None) -> bool:
     m = MAKERS[key]
     return ((icao or "").upper() in m.get("icao", ())
@@ -59,15 +72,28 @@ def search(q: str = "", prefix: str = "", wtc: str = "", recat: str = "", maker:
            db: Session = Depends(get_db)):
     maker = maker.strip().lower()
     if maker and maker not in MAKERS:
-        raise HTTPException(400, f"Nieznany producent: {maker} (dostępne: {', '.join(MAKERS)})")
+        raise HTTPException(400, f"Unknown manufacturer: {maker} (available: {', '.join(MAKERS)})")
     limit = min(limit, 2000)
-    stmt = select(AircraftType).order_by(AircraftType.icao, AircraftType.model)
+    stmt = select(AircraftType)
     if not maker:
         stmt = stmt.limit(limit)
+    q = q.strip()
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(AircraftType.icao.ilike(like), AircraftType.model.ilike(like),
-                              AircraftType.manufacturer.ilike(like), AircraftType.iata.ilike(like)))
+        found = [AircraftType.icao.ilike(like), AircraftType.model.ilike(like), AircraftType.manufacturer.ilike(like),
+                 AircraftType.iata.ilike(like)]
+        if key := _key(q):  # "A300" -> "A-300…"
+            found.append(_squash(AircraftType.model).ilike(f"%{key}%"))
+            if " " in q:  # "airbus a320" -> "AIRBUS" + "A-320"
+                found.append(_squash(func.coalesce(AircraftType.manufacturer, "") + AircraftType.model)
+                             .ilike(f"%{key}%"))
+        # najpierw dokładny kod ICAO, potem kody od szukanego tekstu ("A30": A306, A30B przed PA30), dalej wg kodu
+        code = q.upper()
+        stmt = stmt.where(or_(*found)).order_by(
+            case((AircraftType.icao == code, 0), (AircraftType.icao.startswith(code, autoescape=True), 1), else_=2),
+            AircraftType.icao)
+    else:
+        stmt = stmt.order_by(AircraftType.icao)
     if prefix:
         stmt = stmt.where(AircraftType.icao.startswith(prefix.upper()))
     if wtc:
@@ -89,15 +115,15 @@ async def photo(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depen
     """Zdjęcie typu z data/photos/; przy pierwszym wywołaniu pobierane z Wikipedii i zapisywane lokalnie."""
     a = db.get(AircraftType, aircraft_id)
     if not a:
-        raise HTTPException(404, "Nie ma takiego typu")
+        raise HTTPException(404, "No such aircraft type")
     if found := local_photo(a.icao):
         return found
     try:
-        found = await fetch_photo(a.icao, f"{a.manufacturer or ''} {a.model}".strip())
+        found = await fetch_photo(a.icao, photo_query(a.manufacturer, a.model))
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(502, f"Nie udało się pobrać zdjęcia z Wikipedii: {exc}") from exc
+        raise HTTPException(502, f"Could not fetch the photo from Wikipedia: {exc}") from exc
     if not found:
-        raise HTTPException(404, "Brak zdjęcia tego typu")
+        raise HTTPException(404, "No photo of this type")
     return found
 
 
@@ -105,5 +131,5 @@ async def photo(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depen
 def get_one(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depends(get_db)):
     a = db.get(AircraftType, aircraft_id)
     if not a:
-        raise HTTPException(404, "Nie ma takiego typu")
+        raise HTTPException(404, "No such aircraft type")
     return _dict(a)

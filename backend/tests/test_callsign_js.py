@@ -1,5 +1,5 @@
 """0.12.3: CALLSIGN › ALL („Wszystkie rekordy”) pobiera najwyżej LIMIT znaków wywoławczych (w bazie ~7000). Obcięta lista
-nie może udawać pełnej: licznik mówi „pokazano pierwsze N” i podpowiada literę albo wyszukiwanie, jak AIRCRAFT.
+nie może udawać pełnej: licznik mówi „first N shown” i podpowiada literę albo wyszukiwanie, jak AIRCRAFT.
 Zakładka montowana w Node z zastępczym api.js (h, api, letterMenu), bez przeglądarki."""
 import json
 import shutil
@@ -67,13 +67,13 @@ def js(tmp_path_factory):
 
 def test_all_says_when_the_list_is_cut(js):
     # 6969 w bazie, pobrane 1000: licznik nie udaje pełnej listy
-    assert js["6969"] == "1000 wyników (pokazano pierwsze 1000 – wybierz literę lub wpisz szukany kod)"
+    assert js["6969"] == "1000 results (first 1000 shown – pick a letter or type a code)"
     # dokładnie 1000 też może być obcięte (API nie podaje sumy), więc też z podpowiedzią
-    assert js["1000"].startswith("1000 wyników (pokazano pierwsze 1000")
+    assert js["1000"].startswith("1000 results (first 1000 shown")
 
 
 def test_short_list_has_plain_count(js):
-    assert js["999"] == "999 wyników" and "pokazano" not in js["3"]
+    assert js["999"] == "999 results" and js["3"] == "3 results" and "shown" not in js["3"]
 
 
 def test_limit_in_request_matches_hint(js):

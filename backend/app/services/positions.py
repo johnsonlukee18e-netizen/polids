@@ -58,11 +58,11 @@ def sim_twins(stations: list, prefer: Collection[str]) -> dict[str, str]:
 
 # --- drzewo "Pozycje" w MAP (runda 12, Marek): FIR → ACC / FIS / lotniska → stanowiska
 # kolejność FIR-ów: najpierw EPWW, potem sąsiedzi (zakładki RADIO; EDGG osobno, choć w vacs-data jest w katalogu EDMM)
-TREE_FIRS = ("EPWW", "EDWW", "EDMM", "EDUU", "EDGG", "EKDK", "ESAA", "EYVL", "LKAA", "LZBB", "UKLV", "UMKK", "UMMV", "INNE")
+TREE_FIRS = ("EPWW", "EDWW", "EDMM", "EDUU", "EDGG", "EKDK", "ESAA", "EYVL", "LKAA", "LZBB", "UKLV", "UMKK", "UMMV", "OTHER")
 TREE_FIR_NAMES = {"EPWW": "FIR Warszawa", "EDWW": "FIR Bremen", "EDMM": "FIR München", "EDUU": "UIR Rhein, UAC Maastricht",
                   "EDGG": "FIR Langen", "EKDK": "FIR København", "ESAA": "FIR Sverige", "EYVL": "FIR Vilnius",
                   "LKAA": "FIR Praha", "LZBB": "FIR Bratislava", "UKLV": "FIR Lviv", "UMKK": "FIR Kaliningrad",
-                  "UMMV": "FIR Minsk", "INNE": "inne"}
+                  "UMMV": "FIR Minsk", "OTHER": "other FIRs"}
 TREE_LABELS = {"EDUU": "EDUU/EDYY", "ESAA": "ESAA/ESMM/ESOS"}
 # kolejność w grupie lotniska: APP/DEP, TWR, GND, DEL, ATIS, potem reszta (wg nazwy)
 TREE_FACILITY_ORDER = {"APP": 0, "DEP": 0, "TWR": 1, "GND": 2, "RMP": 2, "DEL": 3, "ATIS": 4}
@@ -75,9 +75,9 @@ def tree_place(p: dict) -> tuple[str, str]:
     parts = cs.split("_")
     pre = (p.get("prefix") or parts[0]).upper()
     tab = neighbour_tab(p)
-    # EDGG: ACC z prefiksu (w vacs-data katalog EDMM), lotniska i APP z pakietu EDGG.ese (fir EDGG, zakładka RADIO INNE,
+    # EDGG: ACC z prefiksu (w vacs-data katalog EDMM), lotniska i APP z pakietu EDGG.ese (fir EDGG, zakładka RADIO OTHER,
     # np. EDDS_STG_APP, ETHN_TWR); EDUU/EDYY zostają w swojej zakładce
-    edgg = pre == "EDGG" or parts[0] == "EDGG" or (tab == "INNE" and (p.get("fir") or "").upper() == "EDGG")
+    edgg = pre == "EDGG" or parts[0] == "EDGG" or (tab == "OTHER" and (p.get("fir") or "").upper() == "EDGG")
     fir = "EPWW" if tab is None else "EDGG" if edgg else tab
     fac = p.get("facility") or ""
     if fac in ("CTR", "FSS", "APP") and INFO_MID & set(parts[1:-1]):

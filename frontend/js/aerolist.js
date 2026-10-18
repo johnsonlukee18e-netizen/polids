@@ -7,8 +7,8 @@ import { colorize, wxLines } from "./tabs/meteo.js";
 
 export const FIR_KEYS = ["EPWW", "ESAA", "ED", "ET", "LKAA", "LZBB", "UMKK", "EYVL", "UMMV", "UKLV"];
 export const FIR_LABELS = {
-  EPWW: "Polska", ESAA: "Szwecja", ED: "Niemcy, lotniska cywilne", ET: "Niemcy, lotniska wojskowe", LKAA: "Czechy",
-  LZBB: "Słowacja", UMKK: "Kaliningrad", EYVL: "Litwa", UMMV: "Białoruś", UKLV: "Ukraina, FIR Lwów",
+  EPWW: "Poland", ESAA: "Sweden", ED: "Germany, civil aerodromes", ET: "Germany, military aerodromes", LKAA: "Czechia",
+  LZBB: "Slovakia", UMKK: "Kaliningrad", EYVL: "Lithuania", UMMV: "Belarus", UKLV: "Ukraine, FIR Lviv",
 };
 // rodzaje stanowisk jak na plakietkach lotnisk na MAP (airspace.js FACILITIES): kolory .ab-* w style.css
 const FAC = [["DEL", "D"], ["GND", "G"], ["TWR", "T"], ["ATIS", "A"], ["APP", "APP"]];
@@ -96,8 +96,8 @@ export const splitArg = (a) => {
   return { code, view: VIEWS.includes(view) ? view : "overview" };
 };
 
-// odmiana: 1 lotnisko, 2–4 lotniska (też 22–24 …), 5–21 lotnisk (jak overview.js)
-export const lotnisk = (n) => (n === 1 ? "lotnisko" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "lotniska" : "lotnisk");
+// liczba pojedyncza tylko dla 1: "1 aerodrome", "2 aerodromes" (jak overview.js)
+export const adWord = (n) => (n === 1 ? "aerodrome" : "aerodromes");
 
 // listy lotnisk: raz na sesję (navdata zmienia się co AIRAC), błąd nie zostaje w pamięci
 const lists = {};
@@ -127,17 +127,17 @@ export function mountFirList(el, key, state, { onOpen, onChange }) {
   el.innerHTML = `<div class="alist">
     <div class="alist-bar">
       <input class="alist-q" type="text" autocomplete="off" spellcheck="false" maxlength="40"
-        placeholder="ICAO albo nazwa lotniska" aria-label="Szukaj lotniska" value="${esc(state.q || "")}">
-      <button class="alist-btn alist-go" type="button">WYŚWIETL</button>
-      <button class="alist-btn alist-clear" type="button">WYCZYŚĆ</button>
+        placeholder="ICAO or aerodrome name" aria-label="Search aerodrome" value="${esc(state.q || "")}">
+      <button class="alist-btn alist-go" type="button">SHOW</button>
+      <button class="alist-btn alist-clear" type="button">CLEAR</button>
       <span class="alist-title"><b>${esc(key)}</b> ${esc(FIR_LABELS[key] || "")}</span>
       <span class="alist-n hint"></span>
       <span style="flex:1"></span>
-      <span class="alist-legend hint" title="Plakietki przy lotnisku: kontrola online (DEL, GND, TWR, ATIS, APP), jak na MAP.
-Enter = WYŚWIETL (dokładny ICAO, inaczej zaznaczone trafienie: główne lotnisko miasta przed mniejszymi), ↑ ↓ = wybór, PgUp PgDn = wybór o ekran, Esc = WYCZYŚĆ.">${FAC.map(([k, l]) =>
+      <span class="alist-legend hint" title="Badges next to the aerodrome: ATC online (DEL, GND, TWR, ATIS, APP), as on MAP.
+Enter = SHOW (exact ICAO, otherwise the highlighted match: the main aerodrome of a city before smaller ones), ↑ ↓ = select, PgUp PgDn = select a screen further, Esc = CLEAR.">${FAC.map(([k, l]) =>
         `<span class="ab ab-${k.toLowerCase()}">${l}</span>`).join("")} online · ↑↓ Enter Esc</span>
     </div>
-    <div class="alist-box"><div class="alist-msg hint">Ładowanie listy lotnisk…</div><div class="alist-rows"></div></div>
+    <div class="alist-box"><div class="alist-msg hint">Loading the aerodrome list…</div><div class="alist-rows"></div></div>
   </div>`;
   const $ = (s) => el.querySelector(s);
   const input = $(".alist-q"), box = $(".alist-box"), rows = $(".alist-rows"), msg = $(".alist-msg");
@@ -178,12 +178,12 @@ Enter = WYŚWIETL (dokładny ICAO, inaczej zaznaczone trafienie: główne lotnis
       it.el.classList.toggle("odd", vis.length % 2 === 1);   // pasy jak w PANDORZE, po widocznych wierszach
       vis.push(it);
     }
-    $(".alist-n").textContent = forms.length ? `${vis.length} z ${data.length}` : `${data.length} ${lotnisk(data.length)}`;
+    $(".alist-n").textContent = forms.length ? `${vis.length} of ${data.length}` : `${data.length} ${adWord(data.length)}`;
     msg.hidden = vis.length > 0;
     if (!vis.length) {
       const q = fold(input.value);
-      msg.innerHTML = `Brak lotniska pasującego do „${esc(input.value.trim())}” w ${esc(key)}.`
-        + (isIcao(q) ? ` Enter albo WYŚWIETL otworzy <b>${esc(q)}</b>.` : "");
+      msg.innerHTML = `No aerodrome matching “${esc(input.value.trim())}” in ${esc(key)}.`
+        + (isIcao(q) ? ` Enter or SHOW opens <b>${esc(q)}</b>.` : "");
     }
     select(forms.length ? bestMatch(vis, forms) : null, "center");
     // pole skasowane do końca (Backspace, wycięcie): jak Esc, lista od góry i bez wyboru
@@ -309,7 +309,7 @@ Enter = WYŚWIETL (dokładny ICAO, inaczej zaznaczone trafienie: główne lotnis
 
 const TYPE_LABEL = { APP: "APP", TWR: "TWR", GND: "GND", DEL: "DEL", ATIS: "ATIS" };
 // odpowiedź 404 karty (backend: routers/aerodromes.py card): takiego lotniska nie ma w danych
-const UNKNOWN = /^Nie znam lotniska/;
+const UNKNOWN = /^Unknown aerodrome /;
 
 // Czas obserwacji METAR (np. 051630Z) i ile minut temu (też PRZEGLĄD w aerodrome.js)
 export function obsAge(time) {
@@ -325,19 +325,19 @@ export function obsInfo(time) {
   const m = /^\d{2}(\d{2})(\d{2})Z$/.exec(time || "");
   if (!m) return { text: "", stale: false };
   const age = obsAge(time);
-  return { text: `obs. ${m[1]}:${m[2]}Z${age !== null ? ` · ${age} min temu` : ""}`, stale: age !== null && age > 70 };
+  return { text: `obs. ${m[1]}:${m[2]}Z${age !== null ? ` · ${age} min ago` : ""}`, stale: age !== null && age > 70 };
 }
 
 function positionsTable(ps, unknown) {
-  if (!ps.length) return `<p class="hint">Brak stanowisk APP, TWR, GND, DEL i ATIS tego lotniska w danych PolIDS${unknown ? "" : " i nikt nie jest teraz zalogowany"}.</p>`;
-  return `<table class="data acard-pos"><thead><tr><th>Typ</th><th>Stanowisko</th><th>Częst.</th><th>Stan</th></tr></thead><tbody>
+  if (!ps.length) return `<p class="hint">No APP, TWR, GND, DEL or ATIS positions for this aerodrome in PolIDS data${unknown ? "" : " and nobody is logged in now"}.</p>`;
+  return `<table class="data acard-pos"><thead><tr><th>Type</th><th>Position</th><th>Freq.</th><th>Status</th></tr></thead><tbody>
     ${ps.map((p) => {
       const on = p.online;
-      const logged = on && on.callsign && on.callsign !== p.callsign ? ` jako&nbsp;${esc(on.callsign)}` : "";
+      const logged = on && on.callsign && on.callsign !== p.callsign ? ` as&nbsp;${esc(on.callsign)}` : "";
       const freq = (on && on.frequency) || p.frequency;
       // bez danych z sieci VATSIM stan jest nieznany: nie "offline"; "od 16:34Z" i "jako X" z twardą spacją (nie rozrywa ich zawijanie)
-      const state = unknown ? `<span class="acard-unk">brak danych</span>` : !on ? "offline"
-        : `<b>${esc(on.name || "?")}</b> · od&nbsp;${esc(hhmm(on.logon_time))}${logged}${p.type === "ATIS" && on.atis_code ? ` · <b class="acard-letter">${esc(on.atis_code)}</b>` : ""}`;
+      const state = unknown ? `<span class="acard-unk">no data</span>` : !on ? "offline"
+        : `<b>${esc(on.name || "?")}</b> · since&nbsp;${esc(hhmm(on.logon_time))}${logged}${p.type === "ATIS" && on.atis_code ? ` · <b class="acard-letter">${esc(on.atis_code)}</b>` : ""}`;
       return `<tr class="${on ? "on" : "off"}"><td><span class="ab ab-${esc(p.type.toLowerCase())}">${esc(TYPE_LABEL[p.type] || p.type)}</span></td>
         <td class="acard-cs">${esc(p.callsign)}${p.name ? `<span class="acard-pn">${esc(p.name)}</span>` : ""}</td>
         <td><span class="freq ${on ? "on" : ""}">${esc(freq || "–")}</span></td><td class="acard-st">${state}</td></tr>`;
@@ -350,13 +350,13 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
   el.innerHTML = `<div class="acard">
     <div class="acard-head"><b>${esc(icao)}</b><span class="acard-name"></span><span class="acard-fir hint"></span></div>
     <div class="aero-errors"></div>
-    <div class="metar-head"><div class="wx"><span class="hint">Ładowanie METAR…</span></div><div class="obs"></div></div>
+    <div class="metar-head"><div class="wx"><span class="hint">Loading METAR…</span></div><div class="obs"></div></div>
     <div class="acard-grid">
       <div class="acard-col">
         <div class="card acard-taf-card"><h3>TAF</h3><div class="scroll acard-taf wx"></div></div>
         <div class="card acard-atis-card"><h3 class="acard-atis-h">ATIS</h3><div class="scroll acard-atis"></div></div>
       </div>
-      <div class="card acard-pos-card"><h3>Stanowiska APP · TWR · GND · DEL · ATIS<span class="acard-upd"></span></h3><div class="scroll acard-pos-body"></div></div>
+      <div class="card acard-pos-card"><h3>Positions APP · TWR · GND · DEL · ATIS<span class="acard-upd"></span></h3><div class="scroll acard-pos-body"></div></div>
     </div>
   </div>`;
   const $ = (s) => el.querySelector(s);
@@ -375,15 +375,15 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
       if (UNKNOWN.test(e.message)) {
         stop();
         el.innerHTML = `<div class="acard"><div class="acard-head"><b>${esc(icao)}</b></div>
-          <div class="acard-missing"><p>Nie znam lotniska <b>${esc(icao)}</b>: nie ma go w navdata ani w danych stanowisk PolIDS.</p>
-          <p class="hint">Sprawdź kod ICAO. ← wraca do poprzedniego ekranu.</p></div></div>`;
+          <div class="acard-missing"><p>Unknown aerodrome <b>${esc(icao)}</b>: it is neither in navdata nor in the PolIDS position data.</p>
+          <p class="hint">Check the ICAO code. ← returns to the previous screen.</p></div></div>`;
         onMissing?.();
         return;
       }
       $(".aero-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`;
       if (!loaded) {   // nic jeszcze nie wczytano: "brak danych", nie NIL (NIL = lotnisko nie nadaje METAR)
-        $(".metar-head .wx").innerHTML = `<span class="hint">METAR: brak danych</span>`;
-        $(".acard-taf").innerHTML = $(".acard-atis").innerHTML = `<span class="hint">brak danych</span>`;
+        $(".metar-head .wx").innerHTML = `<span class="hint">METAR: no data</span>`;
+        $(".acard-taf").innerHTML = $(".acard-atis").innerHTML = `<span class="hint">no data</span>`;
       }
       return;
     }
@@ -393,7 +393,7 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
     const net = !!d.network_error;
     $(".acard-name").textContent = d.name || "";
     $(".acard-fir").textContent = [d.fir ? `${d.fir}${d.fir_label ? " · " + d.fir_label : ""}` : "",
-      d.kind === "MIL" ? "lotnisko wojskowe" : "", d.elevation_ft !== null && d.elevation_ft !== undefined ? `elev ${Math.round(d.elevation_ft)} ft` : ""]
+      d.kind === "MIL" ? "military aerodrome" : "", d.elevation_ft !== null && d.elevation_ft !== undefined ? `elev ${Math.round(d.elevation_ft)} ft` : ""]
       .filter(Boolean).join(" · ");
     const errs = [...(d.errors || []), ...(net ? [d.network_error] : [])];
     $(".aero-errors").innerHTML = errs.length ? `<p class="error">${errs.map(esc).join("<br>")}</p>` : "";
@@ -407,9 +407,9 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
     const atis = d.positions.filter((p) => p.type === "ATIS" && p.online);
     $(".acard-atis-h").textContent = `ATIS ${atis.map((p) => p.online.atis_code || "").filter(Boolean).join(" / ")}`;
     $(".acard-atis").innerHTML = atis.length ? atis.map((p) => `<div class="acard-atis-one">
-        <div class="hint">${esc(p.online.callsign || p.callsign)} ${esc(p.online.frequency || p.frequency)} · ${esc(p.online.name || "?")} · od&nbsp;${esc(hhmm(p.online.logon_time))}</div>
-        <div class="mono atis-text">${atisHtml(p.online.text_atis) || '<span class="hint">bez tekstu</span>'}</div></div>`).join("")
-      : `<span class="hint">${net ? "Brak danych z sieci VATSIM (błąd powyżej)." : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`;
+        <div class="hint">${esc(p.online.callsign || p.callsign)} ${esc(p.online.frequency || p.frequency)} · ${esc(p.online.name || "?")} · since&nbsp;${esc(hhmm(p.online.logon_time))}</div>
+        <div class="mono atis-text">${atisHtml(p.online.text_atis) || '<span class="hint">no text</span>'}</div></div>`).join("")
+      : `<span class="hint">${net ? "No data from the VATSIM network (error above)." : "No ATIS is broadcast on the VATSIM network now."}</span>`;
     $(".acard-upd").textContent = `VATSIM ${d.updated ? hhmm(d.updated) : "–"}`;
   };
   load();

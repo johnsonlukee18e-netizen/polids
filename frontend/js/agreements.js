@@ -111,30 +111,30 @@ export const shortCs = (cs) => String(cs).replace(/^EPWW_/, "").replace(/_CTR$/,
 // FL: strzałka ↑/↓ (we wznoszeniu / w zniżaniu), potem tekst z LOA bez strzałki
 export function levelHtml(r) {
   const txt = String(r.level_text).replace(/^[↑↓]\s*/, "");
-  const arrow = r.transfer === "C" ? `<span class="cr-c" title="przekazanie we wznoszeniu">↑</span>`
-    : r.transfer === "D" ? `<span class="cr-d" title="przekazanie w zniżaniu">↓</span>` : "";
+  const arrow = r.transfer === "C" ? `<span class="cr-c" title="transfer climbing">↑</span>`
+    : r.transfer === "D" ? `<span class="cr-d" title="transfer descending">↓</span>` : "";
   return r.level === null || r.level === undefined
-    ? `${arrow}<span class="cr-indiv" title="koordynacja indywidualna">${esc(txt) || "koord. indyw."}</span>`
+    ? `${arrow}<span class="cr-indiv" title="individual coordination">${esc(txt) || "indiv. coord."}</span>`
     : `${arrow}<b>${esc(txt)}</b>`;
 }
 export function aeroHtml(r) {
   const parts = [];
-  if (r.adep.length) parts.push(`<span class="cr-dep" title="odloty">↗ ${esc(r.adep.join(", "))}</span>`);
-  if (r.ades.length) parts.push(`<span class="cr-arr" title="przyloty">↘ ${esc(r.ades.join(", "))}</span>`);
+  if (r.adep.length) parts.push(`<span class="cr-dep" title="departures">↗ ${esc(r.adep.join(", "))}</span>`);
+  if (r.ades.length) parts.push(`<span class="cr-arr" title="arrivals">↘ ${esc(r.ades.join(", "))}</span>`);
   return parts.length ? parts.join(" ") : r.traffic ? `<span class="muted">${esc(r.traffic)}</span>` : dash;
 }
 // strona polska: sektor z LOA (pusty – "nieokreślony") i kto go teraz obsługuje: pierwszy z kolejności, który jest
 // online albo jest wybranym stanowiskiem (wybrany sam siebie nie podpisuje, jak w ATCISS)
 function epHtml(r, data, x) {
   if (r.ep_unknown) {
-    const sc = r.scope.length ? ` Wiersz dla stanowisk obsługujących sektory wymienione w LOA: ${r.scope.join(", ")}.` : "";
+    const sc = r.scope.length ? ` Row for positions covering the sectors listed in the LOA: ${r.scope.join(", ")}.` : "";
     return `<span class="cr-unk" title="${esc(data.unknown_label + "." + sc)}">${esc(data.unknown_label)}</span>`;
   }
   const on = x.pos ? new Set([...x.online, x.pos]) : x.online;
   const by = [...new Set(r.ep_chains.map((k) => firstOnline(data.chains[k] || [], on)).filter(Boolean))]
     .filter((cs) => cs !== x.pos);
   const who = by.map((cs) => `${shortCs(cs)}${x.freq?.(cs) ? " " + x.freq(cs) : ""}`).join(", ");
-  return `<span class="cr-ep">${esc(r.ep)}</span>${who ? ` <span class="cr-by" title="obsługuje teraz">${esc(who)}</span>` : ""}`;
+  return `<span class="cr-ep">${esc(r.ep)}</span>${who ? ` <span class="cr-by" title="now covered by">${esc(who)}</span>` : ""}`;
 }
 const nbHtml = (r) => (r.nb ? `<span class="cr-nb">${esc(r.nb)}</span>` : dash);
 
@@ -145,7 +145,7 @@ export function rowHtml(r, data, x = {}) {
     : r.cop ? `<span class="muted">${esc(r.cop)}</span>` : dash;
   const ep = epHtml(r, data, ctx), nb = nbHtml(r);
   const doc = (data.documents || []).find((d) => d.id === r.doc);
-  const tag = doc ? `<button type="button" class="cr-doc" data-doc="${esc(doc.id)}" title="${esc(doc.name)} – otwórz w DOKUMENTY">${esc(r.type)} ${esc(r.fir)}</button>`
+  const tag = doc ? `<button type="button" class="cr-doc" data-doc="${esc(doc.id)}" title="${esc(doc.name)} – open in DOCUMENTS">${esc(r.type)} ${esc(r.fir)}</button>`
     : `<span class="muted">${esc(r.type)} ${esc(r.fir)}</span>`;
   return `<tr data-id="${esc(r.id)}"${r.ep_unknown ? ` class="unk"` : ""}><td class="c-cop">${cop}</td><td class="c-aero">${aeroHtml(r)}</td>`
     + `<td class="c-fl">${levelHtml(r)}</td><td class="c-cond">${r.conditions ? esc(r.conditions) : ""}</td>`
@@ -153,11 +153,11 @@ export function rowHtml(r, data, x = {}) {
 }
 
 export function blockHtml(dir, rows, data, x = {}) {
-  const head = dir === "out" ? ["WYJŚCIE (COPX)", "EPWW → sąsiad", "COPX"] : ["WEJŚCIE (COPN)", "sąsiad → EPWW", "COPN"];
+  const head = dir === "out" ? ["EXIT (COPX)", "EPWW → neighbour", "COPX"] : ["ENTRY (COPN)", "neighbour → EPWW", "COPN"];
   const body = rows.length ? rows.map((r) => rowHtml(r, data, x)).join("")
-    : `<tr class="none"><td colspan="7" class="muted">Brak przekazań dla tych ustawień.</td></tr>`;
+    : `<tr class="none"><td colspan="7" class="muted">No transfers for these settings.</td></tr>`;
   return `<div class="cr-block" data-dir="${dir}"><h3 class="cr-bh">${head[0]} <small>${head[1]} · ${rows.length}</small></h3>
-    <table class="data cr-tab"><thead><tr><th>${head[2]}</th><th>ADEP/ADES</th><th>FL</th><th>WARUNKI</th><th>OD</th><th>DO</th><th>DOKUMENT</th></tr></thead>
+    <table class="data cr-tab"><thead><tr><th>${head[2]}</th><th>ADEP/ADES</th><th>FL</th><th>CONDITIONS</th><th>FROM</th><th>TO</th><th>DOCUMENT</th></tr></thead>
     <tbody>${body}</tbody></table></div>`;
 }
 
@@ -166,13 +166,13 @@ export function blockHtml(dir, rows, data, x = {}) {
 export function sumHtml(v, { pos = "", firs = [], off = new Set(), typesOff = new Set() } = {}) {
   const hidden = firs.filter((f) => off.has(f)), on = firs.filter((f) => !off.has(f));
   const types = ["LOA", "LOP"].filter((t) => typesOff.has(t));
-  const firTxt = !hidden.length ? "" : !on.length ? " · <b>wszystkie FIR-y wyłączone</b>"
-    : hidden.length > on.length ? ` · tylko FIR <b>${esc(on.join(", "))}</b>` : ` · ukryte FIR-y <b>${esc(hidden.join(", "))}</b>`;
-  return `<b>${v.shown}</b> z ${v.total} przekazań`
-    + (pos ? ` · stanowisko <b>${esc(pos)}</b>` : " · wszystkie stanowiska")
-    + (v.toks.length ? ` · filtr <b>${esc(v.toks.join(" "))}</b>` : "")
-    + `<span class="cr-off">${firTxt}${types.length ? ` · ukryte <b>${esc(types.join(", "))}</b>` : ""}</span>`
-    + `<span class="hint"> · wyciąg z PDF (data/seed/loa.json), w razie wątpliwości obowiązuje PDF</span>`;
+  const firTxt = !hidden.length ? "" : !on.length ? " · <b>all FIRs off</b>"
+    : hidden.length > on.length ? ` · only FIR <b>${esc(on.join(", "))}</b>` : ` · hidden FIRs <b>${esc(hidden.join(", "))}</b>`;
+  return `<b>${v.shown}</b> of ${v.total} transfers`
+    + (pos ? ` · position <b>${esc(pos)}</b>` : " · all positions")
+    + (v.toks.length ? ` · filter <b>${esc(v.toks.join(" "))}</b>` : "")
+    + `<span class="cr-off">${firTxt}${types.length ? ` · hidden <b>${esc(types.join(", "))}</b>` : ""}</span>`
+    + `<span class="hint"> · PDF extract (data/seed/loa.json), the PDF prevails</span>`;
 }
 
 // zasady z LOA (przekazanie kontroli, VFR, inne) dla FIR-ów z tabeli
@@ -181,16 +181,16 @@ export function notesHtml(data, firs) {
   return firs.filter((f) => data.notes?.[f]).map((f) => {
     const n = data.notes[f];
     return `<div class="cr-note"><h4>${esc(n.title || f)} <small>${esc(n.version)}</small></h4>`
-      + list("Przekazanie kontroli i łączności", n.silent) + list("VFR", n.vfr) + list("Inne zasady", n.other) + "</div>";
+      + list("Transfer of control and communication", n.silent) + list("VFR", n.vfr) + list("Other rules", n.other) + "</div>";
   }).join("");
 }
 
 // stanowiska do listy: grupy ACC / APP / TWR, opis "EPWW_DBT_CTR · 127.025 Warszawa Radar"
 export function positionOptions(positions, selected) {
-  const groups = [["ACC", "ACC / FIR"], ["APP", "APP / zbliżanie"], ["TWR", "TWR / lotnisko"]];
+  const groups = [["ACC", "ACC / FIR"], ["APP", "APP / approach"], ["TWR", "TWR / aerodrome"]];
   const opt = (p) => `<option value="${esc(p.callsign)}"${p.callsign === selected ? " selected" : ""}>${esc(p.callsign)}`
     + `${p.frequency ? " · " + esc(p.frequency) : ""}</option>`;
-  return `<option value=""${selected ? "" : " selected"}>Wszystkie</option>` + groups.map(([k, label]) => {
+  return `<option value=""${selected ? "" : " selected"}>All</option>` + groups.map(([k, label]) => {
     const ps = positions.filter((p) => p.kind === k);
     return ps.length ? `<optgroup label="${esc(label)}">${ps.map(opt).join("")}</optgroup>` : "";
   }).join("");
@@ -202,19 +202,19 @@ export function docCardHtml(d, { selected = false, airac = "" } = {}) {
   const firs = d.firs.filter((f) => f !== "EPWW" || d.type === "LOP");
   const tags = [`<span class="cd-tag ty">${esc(d.type)}</span>`, ...firs.map((f) => `<span class="cd-tag fir">${esc(f)}</span>`)];
   if (d.airac) {
-    tags.push(`<span class="cd-tag airac${d.current ? " cur" : ""}" title="${d.current ? "bieżący cykl AIRAC" : `bieżący cykl: ${esc(airac)}`}">AIRAC ${esc(d.airac)}</span>`);
+    tags.push(`<span class="cd-tag airac${d.current ? " cur" : ""}" title="${d.current ? "current AIRAC cycle" : `current cycle: ${esc(airac)}`}">AIRAC ${esc(d.airac)}</span>`);
   }
-  const meta = [dmy(d.effective) && `od ${dmy(d.effective)}`, d.version, `${d.count} przekazań`].filter(Boolean).map(esc).join(" · ")
-    + (d.registered === false ? ` · <span class="cd-new">${esc(d.note || "brak wpisu w coordination.json")}</span>` : "");
+  const meta = [dmy(d.effective) && `from ${dmy(d.effective)}`, d.version, `${d.count} transfers`].filter(Boolean).map(esc).join(" · ")
+    + (d.registered === false ? ` · <span class="cd-new">${esc(d.note || "no entry in coordination.json")}</span>` : "");
   const url = String(d.url || "").startsWith("/files/docs/") && d.exists ? d.url : "";
   return `<div class="cd-card${selected ? " on" : ""}" data-doc="${esc(d.id)}" tabindex="0" title="${esc(d.note || d.name)}">
     <div class="cd-name">${esc(d.name)}</div>
     <div class="cd-tags">${tags.join("")}</div>
     <div class="cd-meta">${meta}</div>
     ${d.positions.length ? `<div class="cd-pos">${d.positions.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</div>` : ""}
-    <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="${esc(d.file)}">PDF ↗</a>`
-      : `<span class="error">brak pliku ${esc(d.file)}</span>`}
-      ${d.count ? `<button type="button" class="btn cd-agr" title="Porozumienia z tego dokumentu">POROZUMIENIA ›</button>` : ""}</div>
+    <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="Open the PDF: ${esc(d.name)}">PDF ↗</a>`
+      : `<span class="error">missing file ${esc(d.file)}</span>`}
+      ${d.count ? `<button type="button" class="btn cd-agr" title="Transfers from this document">LoA ›</button>` : ""}</div>
   </div>`;
 }
 export const docFilter = (docs, { fir = "", type = "" } = {}) => docs.filter((d) => (!fir || d.firs.includes(fir)) && (!type || d.type === type));

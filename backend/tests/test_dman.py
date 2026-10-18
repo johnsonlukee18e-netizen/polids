@@ -324,6 +324,35 @@ def test_strips_dman_not_slower_when_viff_down(client, monkeypatch):
     assert "/etfms/getCadAirports" not in calls
 
 
+def test_strips_dman_without_offline_flights(client, monkeypatch):
+    """RUCH (DMAN/AMAN, ?dman=1) bez lotów OFFLINE: planowany odlot znany tylko z vIFF (pilot niepołączony, bez planu
+    w sieci VATSIM) zostaje w STRIP (zwykłe /strips), prefile (plan złożony w sieci) RUCH pokazuje dalej."""
+    async def feed():
+        return {**FEED, "prefiles": [{"callsign": "PRE1", "name": "Jan", "cid": 1, "flight_plan": {
+            "aircraft_short": "B738", "departure": "EPWA", "arrival": "EGLL", "deptime": "1300", "altitude": "36000",
+            "flight_rules": "I", "route": "SOXER"}}]}
+
+    async def fake_get(path, params=None, ttl=None):
+        if path == "/ifps/depAirport":
+            return [{"callsign": "GATE1", "arrival": "EDDF", "eobt": "1210", "taxi": 12, "cdmData": {"tsat": "121500"}},
+                    {"callsign": "OFF1", "arrival": "LOWW", "eobt": "1240", "cdmData": {"tsat": "124500"}}]
+        if path == "/etfms/getCadAirport":
+            return {"isCdm": True}
+        if path == "/etfms/getCadAirports":
+            return [{"icao": "EPWA", "rate": 34, "taxiTime": 15, "isCdm": True}]
+        if path == "/ifps/callsign":
+            return None
+        raise AssertionError(path)
+
+    monkeypatch.setattr(aerodromes, "get_feed", feed)
+    monkeypatch.setattr(viff, "_get", fake_get)
+    strip = {s["callsign"]: s["planned"] for s in client.get("/api/aerodromes/EPWA/strips").json()["planned"]}
+    assert strip == {"PRE1": "prefile", "OFF1": "viff"}
+    ruch = client.get("/api/aerodromes/EPWA/strips?dman=1").json()
+    assert {s["callsign"]: s["planned"] for s in ruch["planned"]} == {"PRE1": "prefile"}
+    assert "OFF1" not in {s["callsign"] for k in ("departures", "arrivals", "local", "planned") for s in ruch[k]}
+
+
 # --- frontend -----------------------------------------------------------------------------------------------------
 
 NODE_SCRIPT = r"""
@@ -469,7 +498,9 @@ def test_strip_tab_and_ruch_wiring():
     assert "export function mountDman(" in dm and "strips?dman=1" in dm and 'navigate("map"' in dm
     # STRIP i AERODROME › RUCH: paski EFES tylko w zakładce STRIP; PASKI tylko dla lotnisk z podzakładką w STRIP
     assert "import { mountStrips" not in dm and "mountStrips(" not in dm
-    assert "STRIP_AIRPORTS.includes(icao)" in dm and "Paski tylko dla 15 głównych lotnisk" in dm
+    assert "STRIP_AIRPORTS.includes(icao)" in dm and "Strips only for the 15 main aerodromes" in dm
+    # RUCH bez lotów OFFLINE (planowane tylko z vIFF): filtr także w przeglądarce, bez statusu OFFLINE w szczegółach
+    assert 'd.planned = (d.planned || []).filter((s) => s.planned !== "viff");' in dm and '"OFFLINE"' not in dm
     # widok DMAN/AMAN ↔ AMAN w adresie AERODROME (#aerodrome/EPWA/aman): kliknięcie = krok do cofnięcia
     ad = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
     assert "onView?.(v, {})" in dm and "onView?.(st.view, { replace: true })" in dm and "setView(v) {" in dm
@@ -487,7 +518,7 @@ def test_strip_tab_and_ruch_wiring():
     # przed pierwszymi danymi A-CDM nieznane: nazwy puste, przycisk czasu odlotów ukryty, dymki zakresów od razu
     assert "const cdm = () => (data ? !!data.cdm : null)" in dm and 'b.style.visibility = name ? "" : "hidden"' in dm
     assert 'data-sort="t">${lbl().obt}' not in dm and "sortAll();\n    renderSpans();\n  };" in dm
-    assert 'L.obt || "odlotów"' in dm and "if (!data) return;   // sortowanie" in dm
+    assert 'L.obt || "departure"' in dm and "if (!data) return;   // sortowanie" in dm
     # brązowy callsign = etykieta na CTOT (także bez A-CDM, gdy CTOT później niż ETOT; po starcie ATOT, nie brązowa)
     assert 'csCls: t.ttotSrc === "CTOT" ? "ctot"' in dm and "!!s.viff?.ctot" not in dm
     # bez A-CDM bez pustych wierszy TOBT/TSAT/TTOT w szczegółach lotu; CTOT zawsze widoczny
@@ -495,7 +526,7 @@ def test_strip_tab_and_ruch_wiring():
     # bez A-CDM wyróżniony wiersz, na którym stoi etykieta drabiny ETOT (ATOT, CTOT albo ETOT), nie zawsze ETOT
     assert 'const lad = (k) => !c && t.ttotSrc === k;' in dm
     assert 'R("ATOT", hm(v.atot), lad("ATOT") ? "hl"' in dm and '(c ? v.ctot : lad("CTOT")) ? "hl"' in dm
-    assert '!c ? (lad("ETOT") ? "hl" : "")' in dm and '"to samo co etykieta na drabinie ETOT"})' not in dm
+    assert '!c ? (lad("ETOT") ? "hl" : "")' in dm and '"same as the label on the ETOT ladder"})' not in dm
     # przepustowość odlotów: "vIFF A-CDM" tylko na lotnisku z A-CDM
     assert 'cdm() ? "vIFF A-CDM" : ' in dm and "/h (vIFF A-CDM)." not in dm
     for css in ("dman.css", "strips.css"):

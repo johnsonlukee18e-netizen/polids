@@ -168,7 +168,7 @@ def test_moved_docs(js):
 
 
 def test_home_greeting(js):
-    assert js["hello"] == ["Witaj", "Witaj", "Witaj, Jan Kowalski (1234567)", "Witaj, 1234567", "Witaj, <b>X</b> (7)"]
+    assert js["hello"] == ["Welcome", "Welcome", "Welcome, Jan Kowalski (1234567)", "Welcome, 1234567", "Welcome, <b>X</b> (7)"]
     # HOME pokazuje powitanie przez esc() (imię z VATSIM to dane z zewnątrz)
     assert "${esc(greeting(ctx.me))}" in (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
     assert js["noop"] == [None, None, None, None]
@@ -180,3 +180,110 @@ def test_aerodrome_uses_navigation_api():
     assert "history.replaceState" not in src and 'remember("aerodrome", a)' in src
     assert "mountDman(" in src and "mountStrips(" not in src
     assert "export function mountDman(" in (FRONTEND / "js" / "dman.js").read_text("utf-8")
+
+
+SHELL_JS = ["js/app.js", "js/api.js", "js/tabs/home.js", "js/tabs/admin.js", "js/tabs/soon.js", "sw.js"]
+POLISH = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+
+
+def test_shell_in_english():
+    """0.12.5 (issue #18): cała aplikacja po angielsku. Strony powłoki z lang="en", a w kodzie powłoki (bez komentarzy
+    i logów konsoli) żadnych polskich napisów; komentarze w kodzie zostają po polsku."""
+    for name in ("index.html", "login.html", "offline.html"):
+        html = (FRONTEND / name).read_text("utf-8")
+        assert '<html lang="en">' in html, name
+        text = re.sub(r"<!--.*?-->|/\*.*?\*/", "", html, flags=re.S)
+        assert not POLISH.search(text), name
+    for name in SHELL_JS:
+        src = re.sub(r"/\*.*?\*/", "", (FRONTEND / name).read_text("utf-8"), flags=re.S)
+        src = re.sub(r"(^|\s)//.*$", r"\1", src, flags=re.M)
+        bad = [line.strip() for line in src.splitlines() if POLISH.search(line) and "console." not in line]
+        assert not bad, f"{name}: {bad}"
+    home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
+    assert "PREPARE SESSION → AERODROME" in home and "<h3>Position</h3>" in home
+
+
+def test_sharp_edges():
+    """0.12.5 (issue #18): ostre krawędzie jak w PANDORZE: w style.css i na stronach logowania / offline żadnych
+    zaokrągleń (border-radius tylko 0); kontrolki i dymki Leafleta też bez zaokrągleń z leaflet.css."""
+    for name in ("css/style.css", "login.html", "offline.html"):
+        text = re.sub(r"/\*.*?\*/", "", (FRONTEND / name).read_text("utf-8"), flags=re.S)
+        radii = re.findall(r"border(?:-[a-z]+)*-radius:\s*([^;}]+)", text)
+        assert radii and all(r.strip() == "0" for r in radii), (name, radii)
+    css = (FRONTEND / "css" / "style.css").read_text("utf-8")
+    assert ".leaflet-bar, .leaflet-control-layers, .leaflet-tooltip, .leaflet-popup-content-wrapper," in css
+    # przełącznik .sw: kwadratowy tor i kwadratowa gałka
+    assert re.search(r"\.sw input \{[^}]*border-radius: 0;", css)
+    assert re.search(r"\.sw input::after \{[^}]*border-radius: 0;", css)
+
+
+def test_square_native_controls_and_no_drop_shadows():
+    """Runda 14 (przegląd): natywne pola wyboru i suwak HORIZON (AMAN) Chromium rysuje z zaokrągleniami mimo
+    border-radius 0, więc jeden globalny kwadratowy checkbox (appearance: none, jak .sw) i suwak jak .rb-cut w RADIO.
+    Dymki i okienka Leafleta, dymki [data-tip] i panele bez cieni (płasko jak w PANDORZE)."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
+    base = re.search(r"(?m)^input\[type=checkbox\] \{([^}]*)\}", css)
+    assert base and "appearance: none" in base.group(1) and "border-radius: 0" in base.group(1)
+    assert re.search(r"input\[type=checkbox\]:checked::after \{", css)
+    assert re.search(r"input\[type=checkbox\]:indeterminate::after \{", css)
+    # przełącznik .sw (ta sama waga selektora, później w pliku) zeruje obramowanie i ptaszek z reguły globalnej
+    assert css.index("input[type=checkbox] {") < css.index(".sw input {")
+    assert re.search(r"\.sw input \{[^}]*border: 0;", css) and re.search(r"\.sw input::after \{[^}]*transform: none;", css)
+    dman = (FRONTEND / "css" / "dman.css").read_text("utf-8")
+    assert re.search(r"\.am-hor input \{[^}]*appearance: none;", dman)
+    for part in ("-webkit-slider-runnable-track", "-webkit-slider-thumb", "-moz-range-track", "-moz-range-thumb"):
+        assert re.search(r"\.am-hor input::" + part + r" \{[^}]*border-radius: 0;", dman), part
+    # accent-color przy appearance: none nic nie daje (zostaje tylko przy polach radio w pasku narzędzi)
+    for name in ("style.css", "map.css", "dman.css"):
+        text = (FRONTEND / "css" / name).read_text("utf-8")
+        assert not re.search(r"(checkbox\]|\.chk-row > input|\.am-hor input) \{[^}]*accent-color", text), name
+    # cienie: tylko none, wewnętrzne (inset) albo obrys bez rozmycia (0 0 0 Npx)
+    for name in ("style.css", "map.css", "dman.css", "radio.css"):
+        text = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / name).read_text("utf-8"), flags=re.S)
+        bad = [v.strip() for v in re.findall(r"box-shadow:\s*([^;}]+)", text)
+               if not (v.strip() == "none" or v.strip().startswith("inset") or re.match(r"0 0 0 \d+px", v.strip()))]
+        assert not bad, (name, bad)
+    assert ".leaflet-tooltip, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-bar, .leaflet-control-layers { box-shadow: none; }" in css
+
+
+def _media(css, query):
+    """Treść bloku @media (query) { ... } (jeden poziom zagnieżdżenia)."""
+    i = css.index(f"@media ({query}) {{")
+    depth, j = 0, css.index("{", i)
+    for k in range(j, len(css)):
+        depth += {"{": 1, "}": -1}.get(css[k], 0)
+        if not depth:
+            return css[j + 1:k]
+    raise AssertionError(query)
+
+
+def test_menu_fits_low_windows():
+    """Runda 14 (audyt): przy 1366x657 (laptop 1366x768) lewe menu się przewijało, a EMERGENCY chował się do połowy pod
+    zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
+    przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
+    zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
+    bez zmian (reguły bez @media nietknięte)."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
+    low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")
+    assert ".menu nav { display: flex; flex-direction: column; }" in low
+    btn = re.search(r"#tabs button \{([^}]*)\}", low).group(1)
+    assert "flex: 0 1 auto" in btn and "padding-top: 0; padding-bottom: 0" in btn
+    height = float(re.search(r"(?<![-\w])height: ([\d.]+)px", btn).group(1))
+    min_h = float(re.search(r"min-height: ([\d.]+)px", btn).group(1))
+    line = float(re.search(r"line-height: ([\d.]+)px", btn).group(1))
+    # wysokość bez ściskania jak przy paddingu 5 px (od 900 px), linia mieści się w najniższym przycisku (tekst na środku)
+    assert height == 5 + 14 * 1.2 + 5 + 2 and line <= min_h - 2
+    assert re.search(r"#tabs button \{ height: 24\.8px; margin-bottom: 1px; \}", lower)   # 3 + 16,8 + 3 + ramka
+    # w flex marginesy się nie łączą: odstęp nad EMERGENCY / ADMIN jak w układzie blokowym (10 px, od 820 px 6 px)
+    assert "#tabs button.red, #tabs button.admin { margin-top: 8px; }" in low
+    assert "#tabs button.red, #tabs button.admin { margin-top: 5px; }" in lower
+    assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
+    assert ".menu nav { flex: 1; overflow-y: auto; }" in css
+    # budżet 600 px (pomiary Playwright przy 1366x600): logo z paddingiem menu 45,5 px, zegar z AIRAC 49,8 px,
+    # użytkownik z wylogowaniem 66 px; 23 przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie
+    n, margins = 23, 23 * 1 + 5 + 5
+    for user in (0, 66):
+        nav = 600 - 45.5 - 49.8 - user - 6
+        assert n * min_h + margins <= nav, (user, nav)
+    # kolejność: niskie okno przed 820 px (te same selektory, niższe okno nadpisuje)
+    assert css.index("@media (max-height: 899px)") < css.index("@media (max-height: 820px)")

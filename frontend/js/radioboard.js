@@ -3,14 +3,14 @@
 
 // Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
 export const LAYERS = [
-  { id: "atis", label: "ATIS", tip: "Pasek ATIS polskich lotnisk u góry (online z literą)" },
-  { id: "low", label: "LOW", tip: "Sektory ACC na lewym podglądzie: LOW" },
-  { id: "mid", label: "MID", tip: "Sektory ACC na małym podglądzie: MID" },
-  { id: "high", label: "HIGH", tip: "Sektory ACC na prawym podglądzie: HIGH" },
-  { id: "app", label: "APP", tip: "TMA i częstotliwości APP (na podglądzie LOW)" },
-  { id: "twr", label: "TWR", tip: "CTR lotnisk i częstotliwości TWR (na podglądzie LOW)" },
-  { id: "twra", label: "TWR/ATIS", tip: "CTR lotnisk: TWR i ATIS lotniska (na podglądzie LOW)" },
-  { id: "fis", label: "FIS", tip: "Rejony FIS i częstotliwości Warszawa Information (na podglądzie LOW)" },
+  { id: "atis", label: "ATIS", tip: "ATIS bar of Polish aerodromes at the top (online with the information letter)" },
+  { id: "low", label: "LOW", tip: "ACC sectors on the left preview: LOW" },
+  { id: "mid", label: "MID", tip: "ACC sectors on the small preview: MID" },
+  { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH" },
+  { id: "app", label: "APP", tip: "TMAs and APP frequencies, neighbour TMAs at the FIR border (on the LOW preview)" },
+  { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies, neighbour CTRs at the FIR border (on the LOW preview)" },
+  { id: "twra", label: "TWR/ATIS", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
+  { id: "fis", label: "FIS", tip: "FIS areas and Warszawa Information frequencies (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];

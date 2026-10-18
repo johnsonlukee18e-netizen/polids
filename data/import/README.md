@@ -13,7 +13,7 @@ Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyt
 | `ICAO_Airlines.txt` | baza callsignów (zakładka CALLSIGN) |
 | `GRpluginOperatorInfo.txt` | oznaczenie operatorów CARGO (`C`) i wojskowych (`Mil`) w zakładce CALLSIGN |
 | `ICAO_Aircraft.json` | typy samolotów z WTC / RECAT-EU / wymiarami (zakładka AIRCRAFT) |
-| `qnh_pansa.png` | zrzut mapy rejonów QNH z AIP Polska (PAŻP): wzór dla `scripts/trace_qnh_regions.py --image` (aplikacja go nie czyta) |
+| `qnh_pansa.png` | zrzut mapy rejonów QNH z AIP Polska (PAŻP): wzór linii rejonów i MTMA/MCTR dla `scripts/trace_qnh_regions.py` (kontrola: `--overlay plik.png`, dopasowanie siatki: `--fit`; aplikacja go nie czyta) |
 | `eurocontrol-icao-eur-cal-v4-13.xls` | EUROCONTROL CAL v4.13: źródło pul kodów SSR w zakładce SQUAWK, importer niżej (aplikacja go nie czyta) |
 
 ## neighbours/
@@ -80,3 +80,7 @@ treści) i `generator` (wersja i ustawienia generatora: FIR-y pakietów, rejon, 
 środki okręgów wokół lotnisk z `data/seed/airports.csv` albo `icao.txt`). Gdy nie pasują do plików i kodu (np. po
 podmianie pliku `.ese`), `--check` i test `backend/tests/test_sectors_geojson.py` przypominają o ponownym wygenerowaniu,
 aplikacja przy starcie zapisuje ostrzeżenie w logu, a build obrazu Dockera się przerywa (działający kontener zostaje).
+
+Po nowej sektorówce odśwież też mapę QNH (METEO › QNH): `python scripts/trace_qnh_regions.py` bierze granicę FIR
+i obrysy TMA/CTR z `.sct`/`.ese` i zapisuje `data/seed/qnh_regions.json` (potrzebne numpy i shapely z `requirements-dev.txt`,
+do `--overlay` i `--fit` także Pillow).

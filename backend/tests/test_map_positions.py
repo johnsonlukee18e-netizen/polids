@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.app.services.positions import sim_twins, tree_place
+from backend.app.services.positions import TREE_FIR_NAMES, TREE_FIRS, sim_twins, tree_place
 from backend.app.services.radio import Station
 
 JS = Path(__file__).resolve().parents[2] / "frontend" / "js"
@@ -24,14 +24,22 @@ JS = Path(__file__).resolve().parents[2] / "frontend" / "js"
     ({"callsign": "EDDB_N_TWR", "prefix": "EDDB", "fir": "EDWW", "facility": "TWR"}, ("EDWW", "EDDB")),
     ({"callsign": "EDYY_CL_CTR", "prefix": "EDYY", "fir": "EDWW", "facility": "CTR"}, ("EDUU", "ACC")),
     ({"callsign": "EDGG_BAD_CTR", "prefix": "EDGG", "fir": "EDMM", "facility": "CTR"}, ("EDGG", "ACC")),
-    # stanowiska z pakietu EDGG.ese (fir EDGG) bez prefiksu EDGG: lotnisko w FIR Langen, nie "inne"
+    # stanowiska z pakietu EDGG.ese (fir EDGG) bez prefiksu EDGG: lotnisko w FIR Langen, nie w grupie OTHER
     ({"callsign": "EDDS_STG_APP", "prefix": "EDDS", "fir": "EDGG", "facility": "APP"}, ("EDGG", "EDDS")),
     ({"callsign": "ETHN_TWR", "prefix": "ETHN", "fir": "EDGG", "facility": "TWR"}, ("EDGG", "ETHN")),
     ({"callsign": "LKAA_FIC_FSS", "prefix": "LKAA", "fir": "LK", "facility": "FSS"}, ("LKAA", "FIS")),
     ({"callsign": "UMKK_CTR", "prefix": "UMKK", "fir": "UMKK", "facility": "CTR"}, ("UMKK", "ACC")),
+    # spoza zakładek sąsiadów (BALT, EUC-EN, EURN): grupa OTHER (do 0.12.5 polskie "INNE")
+    ({"callsign": "EURN_FSS", "prefix": "EURN", "facility": "FSS"}, ("OTHER", "ACC")),
 ])
 def test_tree_place(p, want):
     assert tree_place(p) == want
+
+
+def test_tree_fir_names_english():
+    """Nazwy grup FIR-ów w drzewie po angielsku (ICAO albo angielska nazwa), ostatnia grupa OTHER."""
+    assert TREE_FIRS[-1] == "OTHER" and TREE_FIR_NAMES["OTHER"] == "other FIRs" and "INNE" not in TREE_FIR_NAMES
+    assert set(TREE_FIR_NAMES) == set(TREE_FIRS)
 
 
 def test_sim_twins():
@@ -190,7 +198,7 @@ def test_simulate_and_hide(js):
     a = js["act"]
     # EKDK_UN_CTR to ten sam kontroler co EKDK_CTR: znika razem z nim; symulacja z częstotliwością stanowiska
     assert sorted(a["positions"]) == ["EPGD_TWR", "EPWA_APP"]
-    assert a["positions"]["EPGD_TWR"] == {"callsign": "EPGD_TWR", "frequency": "118.105", "name": "symulacja", "sim": True}
+    assert a["positions"]["EPGD_TWR"] == {"callsign": "EPGD_TWR", "frequency": "118.105", "name": "simulation", "sim": True}
     assert a["gone"] == ["EKDK_CTR", "EPWA_W_APP", "EPWW_N_CTR"] and a["sims"] == ["EPGD_TWR"]
     # ukryci znikają z listy zalogowanych i z plakietek FIR-ów (VATSpy)
     assert a["controllers"] == ["EPWA_APP", "EPKK_OBS"] and a["firs"] == []
@@ -257,7 +265,7 @@ def test_simulated_twin(js):
     # symulacja EKDK_CTR: ten sam symulowany kontroler pod EKDK_UN_CTR (jak alias_of zalogowanego), jedna symulacja
     tw = js["twin"]
     assert tw["ovr"] == {"EKDK_CTR": True} and tw["sims"] == ["EKDK_CTR"] and tw["live"] == ["EKDK_CTR"]
-    assert tw["un"] == {"callsign": "EKDK_CTR", "frequency": "136.555", "name": "symulacja", "sim": True, "alias_of": "EKDK_CTR"}
+    assert tw["un"] == {"callsign": "EKDK_CTR", "frequency": "136.555", "name": "simulation", "sim": True, "alias_of": "EKDK_CTR"}
     assert tw["states"] == ["sim", "sim"]
     assert tw["off"] == {"ovr": {"EKDK_CTR": True, "EKDK_UN_CTR": False}, "positions": ["EKDK_CTR"]}
     assert tw["taken"] == "Ole"  # na drugim znaku ktoś naprawdę siedzi: zostaje on
@@ -265,5 +273,12 @@ def test_simulated_twin(js):
 
 def test_simulated_acc_fir_badge(js):
     f = js["firBadge"]
-    assert f["sim"] == {"EPWW-N": [{"callsign": "EPWW_N_CTR", "frequency": "130.675", "name": "symulacja", "sim": True}]}
+    assert f["sim"] == {"EPWW-N": [{"callsign": "EPWW_N_CTR", "frequency": "130.675", "name": "simulation", "sim": True}]}
     assert f["of"] == [["EPWW-N"], ["EPWW"], ["LKAA"], [], ["EKDK"], []] and f["noData"] == []
+
+
+def test_map_unstaffed_wording():
+    """Runda 14 (przegląd): MAP pisał "no controller", a RADIO, jego legenda i ABOUT "unstaffed" o tym samym stanie."""
+    for name in ("tabs/map.js", "airspace.js"):
+        src = (JS / name).read_text("utf-8")
+        assert "no controller" not in src and "unstaffed" in src, name

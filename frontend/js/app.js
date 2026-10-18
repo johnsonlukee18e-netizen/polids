@@ -20,16 +20,6 @@ import squawk from "./tabs/squawk.js";
 import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
-// Leaflet po polsku, raz dla wszystkich map (RADIO, METEO › QNH, MAP itd.), zanim którakolwiek się zbuduje:
-// dymki przycisków powiększenia i odnośnika "Leaflet" w atrybucji (sama treść atrybucji bez zmian)
-if (window.L) {
-  L.Control.Zoom.mergeOptions({ zoomInTitle: "Przybliż", zoomOutTitle: "Oddal" });
-  const prefix = L.Control.Attribution.prototype.options.prefix;
-  if (typeof prefix === "string") {
-    L.Control.Attribution.mergeOptions({ prefix: prefix.replace(/title="[^"]*"/, 'title="Leaflet: biblioteka JavaScript do map interaktywnych"') });
-  }
-}
-
 const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
   checklist, sytop, aup, strip, squawk, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
@@ -152,14 +142,15 @@ function tick() {
   const d = new Date();
   document.getElementById("utc").textContent = d.toISOString().slice(11, 19) + "Z";
 }
-setInterval(tick, 1000);
-tick();
+// zegar UTC tuż po pełnej sekundzie (setInterval z dowolnej chwili rozjeżdżał się z zegarami w CONVERSION)
+const tickLoop = () => { tick(); setTimeout(tickLoop, 1000 - (Date.now() % 1000) + 5); };
+tickLoop();
 
 (async () => {
   try {
     ctx.config = await api("/api/config");
     document.getElementById("airac").textContent = `AIRAC ${ctx.config.airac.ident}`;
-    document.getElementById("airac").title = `od ${ctx.config.airac.effective}, następny ${ctx.config.airac.next}`;
+    document.getElementById("airac").title = `effective ${ctx.config.airac.effective}, next ${ctx.config.airac.next}`;
   } catch (e) {
     ctx.config = { links: {}, default_aerodrome: "EPWA", airac: {} };
     console.error(e);
@@ -183,7 +174,7 @@ async function showUser() {
   const box = document.getElementById("userbox");
   box.innerHTML = `<div class="who" title="CID ${esc(u.cid)}${u.subdivision ? " · " + esc(u.subdivision) : ""}">${esc(u.name || "CID " + u.cid)}</div>
     <div class="hint">${esc(u.cid)} · ${esc(u.rating_short || "")}${me.mode === "dev" ? ' · <span class="dev">DEV</span>' : ""}</div>
-    <form method="post" action="/auth/logout"><button type="submit">Wyloguj</button></form>`;
+    <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>`;
   box.hidden = false;
 }
 

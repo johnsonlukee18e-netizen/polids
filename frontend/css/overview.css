@@ -2,7 +2,7 @@
    Styl jak reszta treści – panele NM UI z paskiem tytułu, gęste tabele, płaskie przyciski, bez poświaty.
    Każdy panel przewija się w sobie; strona nie przewija się w ogóle. */
 
-.aero-pane.ov-mode > .toolbar .aero-view { display: none; }   /* PRZEGLĄD/AWOS/RUCH dotyczą jednego lotniska */
+.aero-pane.ov-mode > .toolbar .aero-view { display: none; }   /* INFO/AWOS/TRAFFIC dotyczą jednego lotniska */
 .ov { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ov > .toolbar.ov-bar { margin: 0 0 6px; }
 .ov-bar label.sc { gap: 6px; }

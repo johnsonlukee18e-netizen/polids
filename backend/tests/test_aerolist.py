@@ -224,7 +224,7 @@ def test_fir_lists_from_navdata(client):
 
 def test_card_foreign_airport(client, fakes):
     d = client.get("/api/aerodromes/ukll/card").json()
-    assert (d["icao"], d["fir"], d["fir_label"]) == ("UKLL", "UKLV", "Ukraina, FIR Lwów") and d["name"] == "LVIV INTL"
+    assert (d["icao"], d["fir"], d["fir_label"]) == ("UKLL", "UKLV", "Ukraine, FIR Lviv") and d["name"] == "LVIV INTL"
     assert d["metar"].startswith("UKLL ") and d["parsed"]["qnh"] == 1015 and d["taf"].startswith("TAF UKLL")
     types = [p["type"] for p in d["positions"]]
     assert types == sorted(types, key=aerolist.TYPE_ORDER.index) and {"APP", "TWR", "GND", "ATIS"} <= set(types)
@@ -239,7 +239,12 @@ def test_card_foreign_airport(client, fakes):
     assert client.get("/api/aerodromes/EPWA/card").json()["name"] == "WARSZAWA CHOPIN"
     # nieznany kod: 404 z komunikatem, po którym karta (aerolist.js UNKNOWN) pokazuje jeden komunikat i nie odpytuje
     r = client.get("/api/aerodromes/ZZZZ/card")
-    assert r.status_code == 404 and r.json()["detail"].startswith("Nie znam lotniska")
+    assert r.status_code == 404 and r.json()["detail"].startswith("Unknown aerodrome ")
+    import re
+
+    from backend.app.config import ROOT_DIR
+    unknown = re.search(r"const UNKNOWN = /(.+)/;", (ROOT_DIR / "frontend" / "js" / "aerolist.js").read_text("utf-8"))
+    assert unknown and re.match(unknown.group(1), r.json()["detail"])
     # lądowisko śmigłowców nie jest na liście ESAA, ale jego karta się otwiera (z navdata)
     assert client.get("/api/aerodromes/ESHC/card").json()["name"] == "STOCKHOLM/SODERSJUKHUSET"
     assert client.get("/api/aerodromes/E%3CB%3E/card").status_code == 404
@@ -340,7 +345,7 @@ console.log(JSON.stringify({
   split: ["EPWA", "EPWA/awos", "EPWA/ruch", "0"].map(m.splitArg),
   ep: Object.fromEntries(qs.map((q) => [q, pick(ep, q)])),
   ed: Object.fromEntries(dq.map((q) => [q, pick(ed, q)])),
-  plural: [1, 2, 4, 5, 12, 22, 32, 33, 93, 119, 469].map((n) => n + " " + m.lotnisk(n)),
+  plural: [1, 2, 4, 5, 12, 22, 32, 33, 93, 119, 469].map((n) => n + " " + m.adWord(n)),
   step: [[-1, 10, 1], [-1, 10, -1], [-1, 10, 18], [0, 10, -1], [3, 10, 1], [3, 10, -1], [9, 10, 1], [2, 10, 18],
     [9, 10, -18], [5, 0, 1], [-1, 0, -1]].map(([i, n, d]) => m.stepSel(i, n, d)),
   page: [[684, 38], [708, 38], [38, 38], [0, 38], [684, 0], [684, NaN]].map(([h, r]) => m.pageRows(h, r)),
@@ -403,8 +408,9 @@ def test_js_search_umlauts_and_aliases(aerojs):
 
 
 def test_js_plural(aerojs):
-    assert aerojs["plural"] == ["1 lotnisko", "2 lotniska", "4 lotniska", "5 lotnisk", "12 lotnisk", "22 lotniska",
-                                "32 lotniska", "33 lotniska", "93 lotniska", "119 lotnisk", "469 lotnisk"]
+    assert aerojs["plural"] == ["1 aerodrome", "2 aerodromes", "4 aerodromes", "5 aerodromes", "12 aerodromes",
+                                "22 aerodromes", "32 aerodromes", "33 aerodromes", "93 aerodromes", "119 aerodromes",
+                                "469 aerodromes"]
 
 
 def test_js_step_selection(aerojs):

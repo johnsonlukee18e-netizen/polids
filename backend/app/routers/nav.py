@@ -63,9 +63,9 @@ def _bbox(bbox: str):
     try:
         s, w, n, e = (float(x) for x in bbox.split(","))
     except ValueError as exc:
-        raise HTTPException(400, "bbox = poludnie,zachod,polnoc,wschod") from exc
+        raise HTTPException(400, "bbox = south,west,north,east") from exc
     if (n - s) * (e - w) > 400:
-        raise HTTPException(400, "Za duży obszar, przybliż mapę")
+        raise HTTPException(400, "Area too large, zoom in")
     return s, w, n, e
 
 
@@ -194,7 +194,7 @@ async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     try:
         data = await get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed niedostępny: {exc}") from exc
+        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
     positions = db.scalars(select(AtcPosition)).all()
     online = match_positions(data.get("controllers", []), positions)
     by_id = {p.position_id: online[p.callsign] | {"position": p.callsign}
@@ -270,7 +270,7 @@ def group_label(kind: str, group: str, name: str = "") -> str:
     FIS Gdańsk, CTA 02, EDWW Bremen. name = nazwa wycinka (potrzebna tylko do części N/S TMA Poznań)."""
     city = EP_CITY.get(group, group)
     if kind == "acc":
-        return f"Sektor {group}"
+        return f"Sector {group}"
     if kind == "tma":
         part = m.group(1) if (m := _TMA_PART.match(name.upper())) else ""
         return f"TMA {city} {part}".rstrip()

@@ -28,9 +28,9 @@ from .vatsim import FACILITY_TYPES, controller_info, fir_boundaries, match_posit
 # kolejność podzakładek AERODROME (po "0" = OVERVIEW)
 FIR_KEYS = ("EPWW", "ESAA", "ED", "ET", "LKAA", "LZBB", "UMKK", "EYVL", "UMMV", "UKLV")
 FIR_LABELS = {
-    "EPWW": "Polska", "ESAA": "Szwecja", "ED": "Niemcy, lotniska cywilne", "ET": "Niemcy, lotniska wojskowe",
-    "LKAA": "Czechy", "LZBB": "Słowacja", "UMKK": "Kaliningrad", "EYVL": "Litwa", "UMMV": "Białoruś",
-    "UKLV": "Ukraina, FIR Lwów",
+    "EPWW": "Poland", "ESAA": "Sweden", "ED": "Germany, civil aerodromes", "ET": "Germany, military aerodromes",
+    "LKAA": "Czechia", "LZBB": "Slovakia", "UMKK": "Kaliningrad", "EYVL": "Lithuania", "UMMV": "Belarus",
+    "UKLV": "Ukraine, FIR Lviv",
 }
 # prefiksy ICAO, od najdłuższego (UMK przed UM)
 _PREFIX_FIR = (("UMK", "UMKK"), ("EP", "EPWW"), ("ES", "ESAA"), ("ED", "ED"), ("ET", "ET"), ("LK", "LKAA"),

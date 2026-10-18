@@ -4,6 +4,10 @@
 katalog contrib/ac-data/aircraft-db). Kategorie WTC / RECAT-EU liczone tak jak w atciss
 (MIT), z nadpisaniami z pliku data/seed/wtc_overrides.csv.
 
+Od 0.12.5 plik nie jest listą typów: lista AIRCRAFT to jeden rekord na oznaczenie z data/import/ICAO_Aircraft.json,
+a z aircraft.csv aplikacja bierze tylko osiągi, których tamten plik nie ma (silniki, MLW, pułap, Vmo, Mmo); wiersze
+wersji jednego typu łączy w zakres od–do (backend/app/importers/aircraft_json.py), typy spoza pliku json pomija.
+
 Użycie:
     python scripts/build_aircraft_seed.py ŚCIEŻKA/DO/aircraft-db
 """
@@ -25,6 +29,16 @@ PROPS = {
     "ceiling": "1ec989bb-f1f3-68c6-9933-d379390912fd",
     "vmo": "1ec96fa2-ebe3-6f04-9933-fd26352c594f",
     "mmo": "1ec96fa3-9b42-6be4-9933-8d57c1daa4aa",
+}
+
+# pomyłki w aircraft-database.com poprawione ręcznie (runda 14, przegląd; importer i tak pomija liczby spoza granic
+# wiarygodności, backend/app/importers/aircraft_json.py BOUNDS): (ICAO, nazwa wersji) → pola (klucze jak w PROPS)
+FIXES = {
+    ("B732", "737-200C"): {"vmo": 350.0, "mmo": 0.82},  # Vmo i Mmo zamienione (0 i 350), wartości jak 737-200
+    ("C408", "408 SkyCourier"): {"mmo": None},  # turbośmigłowy bez Mmo: 240 to prędkość w węzłach
+    ("B230", "230"): {"ceiling": None},  # pułap 120 ft
+    ("GA8", "GA8 Airvan"): {"mlw": None},  # MLW 114 kg przy MTOW 1814 kg
+    ("AN28", "An-28"): {"mlw": None},  # MLW 1961 kg przy MTOW 6500 kg (mniej niż masa pustego)
 }
 
 FIELDS = [
@@ -104,6 +118,7 @@ def main(src: Path):
         for k, pid in PROPS.items():
             v = num(props.get(pid))
             r[k] = v
+        r.update(FIXES.get((icao, r["model"]), {}))
         r["ceiling_ft"] = r.pop("ceiling")
         r["vmo_kt"] = r.pop("vmo")
         if icao in overrides:

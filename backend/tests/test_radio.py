@@ -85,7 +85,7 @@ def test_position_range():
 
 
 def test_sector_kind_and_group():
-    cases = {("EPWW", "EPWWB"): ("acc", "Sektor B"), ("EPWW", "EPWWR-N"): ("acc", "Sektor R"),
+    cases = {("EPWW", "EPWWB"): ("acc", "Sector B"), ("EPWW", "EPWWR-N"): ("acc", "Sector R"),
              ("EPWW", "EPWA_APP_N_A"): ("tma", "TMA Warszawa"), ("EPWW", "EPWA_DIR11_A"): ("tma", "TMA Warszawa"),
              ("EPWW", "EPKK_DEP07"): ("tma", "TMA Kraków"), ("EPWW", "CTA01_N"): ("tma", "CTA 01"),
              ("EPWW", "EPPO_TMA_N_A"): ("tma", "TMA Poznań N"), ("EPWW", "EPPO_TMA_S_G"): ("tma", "TMA Poznań S"),
@@ -154,7 +154,7 @@ def test_radio_sectors(client):
 
 def test_neighbour_tab():
     """Zakładki sąsiadów: EDUU i EDYY osobno (choć w vacs-data i plikach sąsiadów są w katalogach EDWW/EDMM),
-    dalej katalog FIR-u z vacs-data, bez niego prefiks; Polska = None, reszta = INNE."""
+    dalej katalog FIR-u z vacs-data, bez niego prefiks; Polska = None, reszta = OTHER."""
     cases = {("EDUU_O12_CTR", "EDUU", "EDUU"): "EDUU", ("EDYY_BB_CTR", "EDYY", "EDWW"): "EDUU",
              ("EDYY_MH_CTR", "EDYY", "EDWW"): "EDUU", ("EDUU_SPE_CTR", "EDUU", None): "EDUU",
              ("EDWW_FLG_CTR", "EDWW", "EDWW"): "EDWW", ("EDDB_N_TWR", "EDDB", "EDWW"): "EDWW",
@@ -163,7 +163,7 @@ def test_neighbour_tab():
              ("LKAA_N_CTR", "LKAA", "LK"): "LKAA", ("LZBB_CTR", "LZBB", None): "LZBB", ("UKLV_CTR", "UKLV", None): "UKLV",
              ("UMMS_CTR", "UMMS", None): "UMMV", ("UMKK_CTR", "UMKK", "UMKK"): "UMKK", ("RU-NWC_FSS", "RU-NWC", None): "UMKK",
              ("EYVL_CTR", "EYVL", "EY"): "EYVL", ("ESMM_6_CTR", "ESMM", "ES"): "ESAA", ("EKCH_FW_CTR", "EKDK", "EK"): "EKDK",
-             ("EURN_FSS", "EURN", None): "INNE", ("XXXX_CTR", "XXXX", "XX"): "INNE",
+             ("EURN_FSS", "EURN", None): "OTHER", ("XXXX_CTR", "XXXX", "XX"): "OTHER",
              ("EPWA_APP", "EPWA", None): None, ("EPWW_C_CTR", None, None): None}
     for (cs, pre, fir), want in cases.items():
         assert neighbour_tab({"callsign": cs, "prefix": pre, "fir": fir}) == want, cs
@@ -239,7 +239,7 @@ def test_radio_positions_names_and_tabs(client):
     assert ps["LKAA_N_CTR"]["sector_src"] == "loa" and ps["LKAA_N_CTR"]["nb_tab"] == "LKAA"
     assert (ps["LKAA_WU_CTR"]["radio"], ps["LKAA_WU_CTR"]["radio_src"]) == ("Praha Radar", "prefix")
     assert ps["EPWA_APP"]["nb_tab"] is None and ps["EPWA_APP"]["radio"] is None
-    assert ps["EURN_FSS"]["nb_tab"] == "INNE"
+    assert ps["EURN_FSS"]["nb_tab"] == "OTHER"
 
 
 def test_radio_loa(client):

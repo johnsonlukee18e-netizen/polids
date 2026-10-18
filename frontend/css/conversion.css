@@ -1,23 +1,40 @@
-/* CONVERSION (0.12.3): karty przeliczania jednostek w siatce; pola po prawej wyrównane, jednostka za polem,
-   pod kartą stała albo wzór małym szarym tekstem */
+/* CONVERSION (0.12.3): karty przeliczania jednostek; pola po prawej wyrównane, jednostka za polem,
+   pod kartą stała albo wzór małym szarym tekstem.
+   0.12.5 (issue #18): bez kalkulatora czasu – zegary UTC i czas w Polsce obok siebie w nagłówku; karty w czterech
+   stałych kolumnach (COLUMNS w conversion.js), więc cała strona mieści się bez paska przewijania przy 1600×900
+   i 1366×768; ostre krawędzie jak w PANDORZE */
 .conv-pane { padding: 8px 14px; }
-.conv-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
-.conv-head h2.title { margin: 0; }
-.conv-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-items: start; }
-.conv-card { display: flex; flex-direction: column; }
-.conv-rows { display: flex; flex-direction: column; gap: 4px; }
+.conv-head { display: flex; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+.conv-head h2.title { flex: none; margin: 0; }
+.conv-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* zegary: UTC i POLAND (LT) obok siebie, cyfry jak zegar w menu */
+.conv-clocks { flex: none; display: flex; gap: 6px; margin-left: auto; }
+.conv-clock { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px; background: #000; border: 1px solid var(--line);
+  border-left: 3px solid var(--green-hi); border-radius: 0; white-space: nowrap; }
+.conv-ck-l { color: var(--green-text); font: 700 11px/1.3 var(--sans); letter-spacing: .8px; }
+.conv-ck-t { color: #fff; font: 700 20px/1.2 var(--mono); }
+.conv-ck-s { color: var(--muted); font: 12px var(--mono); }
+
+/* cztery kolumny kart; węższe okno (poniżej ok. 1150 px): dwie kolumny jedna pod drugą */
+.conv-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start; }
+@media (max-width: 1150px) { .conv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.conv-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.conv-card { --cy: 8px; }
+.conv-pane .card, .conv-pane .card h3 { border-radius: 0; }
+.conv-card h3 { margin-bottom: 6px; }
+.conv-rows { display: flex; flex-direction: column; gap: 3px; }
 .conv-row { display: flex; align-items: center; gap: 8px; }
 .conv-name { flex: none; width: 6ch; color: var(--green-text); font: 700 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
-.conv-row input.field { flex: none; width: 130px; padding: 3px 8px; font: 15px/1.3 var(--mono); text-align: right; }
+.conv-row input.field { flex: none; width: 130px; padding: 2px 8px; border-radius: 0; font: 15px/1.3 var(--mono); text-align: right; }
 .conv-row input.field.bad { border-color: var(--bad); }
-.conv-row input.conv-day { width: 136px; text-align: left; color-scheme: dark; }
-.conv-row input.conv-time { width: 66px; }
 .conv-unit { color: var(--text); font: 13px var(--mono); white-space: nowrap; }
-.conv-zone { color: var(--yellow); }
-.conv-row .btn { margin-top: 2px; }
-/* wynik pośredni (poziom QNH, ISA na FL, uwaga o zmianie czasu) */
+/* wynik pośredni (poziom QNH, ISA na FL) */
 .conv-out { margin-top: 6px; color: var(--cyan); font: 12px/1.45 var(--mono); }
 .conv-out:empty { display: none; }
+/* miejsce na pełny wynik od początku: karty pod QNH i Mach nie przesuwają się w trakcie pisania */
+.conv-card[data-k="qnh"] .conv-out { min-height: calc(5 * 1.45em); }
+.conv-card[data-k="mach"] .conv-out { min-height: calc(2 * 1.45em); }
 .conv-nowrap { white-space: nowrap; }
-.conv-note { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid #1c221c; color: var(--muted); font: 11px/1.45 var(--sans); }
+.conv-note { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #1c221c; color: var(--muted); font: 11px/1.4 var(--sans); }
 .conv-note sup { font-size: 9px; }

@@ -137,19 +137,19 @@ function metarAge(time, now = Date.now()) {
     .reduce((a, b) => (Math.abs(b - now) < Math.abs(a - now) ? b : a));
   return Math.max(0, Math.round((now - t) / 60000));
 }
-const ageText = (m) => (m < 60 ? `${m} min` : m < 2880 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.round(m / 1440)} dni`);
+const ageText = (m) => (m < 60 ? `${m} min` : m < 2880 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.round(m / 1440)} days`);
 
 // pora dnia z godzin UTC "HH:MM" (BMCT – SR – SS – EECT)
 function sunPhase(sun) {
   const now = new Date(), cur = now.getUTCHours() * 60 + now.getUTCMinutes();
   const m = (t) => (t ? +t.slice(0, 2) * 60 + +t.slice(3, 5) : null);
   const [dawn, sr, ss, dusk] = [sun.civil_dawn, sun.sunrise, sun.sunset, sun.civil_dusk].map(m);
-  if (sr === null || ss === null) return sun.day ? "DZIEŃ" : "NOC";
+  if (sr === null || ss === null) return sun.day ? "DAY" : "NIGHT";
   const inside = (a, b) => (a <= b ? cur >= a && cur < b : cur >= a || cur < b);
-  if (inside(sr, ss)) return "DZIEŃ";
-  if (dawn !== null && inside(dawn, sr)) return "ŚWIT";
-  if (dusk !== null && inside(ss, dusk)) return "ZMIERZCH";
-  return "NOC";
+  if (inside(sr, ss)) return "DAY";
+  if (dawn !== null && inside(dawn, sr)) return "DAWN";
+  if (dusk !== null && inside(ss, dusk)) return "DUSK";
+  return "NIGHT";
 }
 
 // VMC w strefie kontrolowanej lotniska (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft
@@ -193,8 +193,8 @@ function rvrCode(m) {
   return pad(Math.floor(m / step) * step, 4);
 }
 // przeliczenie widzialności na RVR jak CMV przy światłach HI: dzień ×1,5, noc ×2 (świt i zmierzch pośrodku)
-const RVR_K = { "DZIEŃ": 1.5, "ŚWIT": 1.75, "ZMIERZCH": 1.75, "NOC": 2 };
-const RVR_TXT = { "DZIEŃ": "dzień", "ŚWIT": "świt, światła HI", "ZMIERZCH": "zmierzch, światła HI", "NOC": "noc, światła HI" };
+const RVR_K = { DAY: 1.5, DAWN: 1.75, DUSK: 1.75, NIGHT: 2 };
+const RVR_TXT = { DAY: "day", DAWN: "dawn, HI lights", DUSK: "dusk, HI lights", NIGHT: "night, HI lights" };
 // czujnik dla kierunku pasa i miejsca: [klucz pasa fizycznego, nr czujnika 0–2 od progu kierunku pierwszego w kluczu]
 function rvrSlot(des, pos) {
   const d = rwyNorm(des), o = rwyNorm(recip(d)) || d, ends = [d, o].sort();
@@ -212,16 +212,16 @@ function rvrFor(p, des, pos, sims, phase) {
   if (!p || !d) return null;
   const met = (p.rvr || []).filter((x) => rwyNorm(x.runway) === d);
   if (met.length) {
-    return { src: "METAR", list: met, tip: `RVR z METAR: ${met.map((x) => `R${x.runway}/${x.value}${x.trend || ""}`).join(" ")}` };
+    return { src: "METAR", list: met, tip: `RVR from METAR: ${met.map((x) => `R${x.runway}/${x.value}${x.trend || ""}`).join(" ")}` };
   }
   if (!has(p.visibility_m)) return null;
   if (p.cavok || p.visibility_m >= 1500) {
     return { src: "P2000", list: [{ runway: d, value: "P2000" }],
-      tip: `RVR powyżej 2000 m (P2000): METAR bez grup RVR, ${p.cavok ? "CAVOK" : `widzialność ${p.visibility_m >= 9999 ? "10 km lub więcej" : p.visibility_m + " m"}`} (≥ 1500 m)` };
+      tip: `RVR above 2000 m (P2000): METAR without RVR groups, ${p.cavok ? "CAVOK" : `visibility ${p.visibility_m >= 9999 ? "10 km or more" : p.visibility_m + " m"}`} (≥ 1500 m)` };
   }
   const [key, i] = rvrSlot(d, pos), q = sims?.get(key)?.s[i];
   if (!q || !q.hist.length) return null;
-  const k = RVR_K[phase] || RVR_K["DZIEŃ"];
+  const k = RVR_K[phase] || RVR_K.DAY;
   const others = (p.rvr || []).map((x) => rvrNum(x.value)).filter(has);
   const base = others.length ? mean(others) : p.visibility_m * k;
   const value = rvrCode(base * mean(q.hist.slice(-60)));
@@ -230,10 +230,10 @@ function rvrFor(p, des, pos, sims, phase) {
     const t = base * (mean(q.hist.slice(-300)) - mean(q.hist.slice(-600, -300)));
     trend = t >= 100 ? "U" : t <= -100 ? "D" : "N";
   }
-  const from = others.length ? `ze średniej RVR innych pasów z METAR (${Math.round(base)} m)`
-    : `z widzialności ${p.visibility_m} m × ${String(k).replace(".", ",")} (${RVR_TXT[phase] || "dzień: brak danych o słońcu"})`;
+  const from = others.length ? `the mean RVR of other runways in METAR (${Math.round(base)} m)`
+    : `visibility ${p.visibility_m} m × ${k} (${RVR_TXT[phase] || "day: no sun data"})`;
   return { src: "SYM", list: [{ runway: d, value, trend }],
-    tip: `RVR ${pos} SYMULOWANY: METAR nie podaje RVR dla pasa ${d}; podstawa ${from}, średnia 1 min, tendencja z 10 min` };
+    tip: `RVR ${pos} SIMULATED: METAR gives no RVR for runway ${d}; based on ${from}, 1 min mean, trend over 10 min` };
 }
 const windStr = (dir, spd) => `${dir}/${pad(spd, 2)} KT`;
 
@@ -298,8 +298,8 @@ function arcPath(a, b, r = 80) {
   return `M${x1},${y1} A${r},${r} 0 ${ext > 180 ? 1 : 0} 1 ${x2},${y2}`;
 }
 
-const SYM = "wiatr chwilowy symulowany z METAR";
-const SYM_RVR = "RVR symulowany z widzialności (METAR nie podaje RVR dla tego pasa)";
+const SYM = "instantaneous wind simulated from METAR";
+const SYM_RVR = "RVR simulated from visibility (METAR gives no RVR for this runway)";
 // pos: miejsce czujnika RVR (kolumny DEP / ARR pokazują RVR strefy przyziemienia)
 const COLS_SPLIT = [{ k: "dep", title: "DEP", sel: "dep", lag: 0, pos: "TDZ" }, { k: "arr", title: "ARR", sel: "arr", lag: 2, pos: "TDZ" }];
 const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0, pos: "TDZ" }, { k: "mid", title: "MID", sel: "rwy", lag: 1, pos: "MID" },
@@ -308,8 +308,8 @@ const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0, pos: "TDZ" }, { 
 const LAGS = [...new Set([...COLS_SPLIT, ...COLS_ONE].map((c) => c.lag))];
 const ROWS = [["inst", `INST <i class="aw-sym" title="${SYM}">SYM</i>`], ["avg", "2 MIN"], ["rng", "2 MIN MIN/MAX"], ["max", "10 MIN MAX"],
   ["hw", "HW / TW"], ["xw", "XW"], ["rvr", "RVR"], ["vis", "VIS"], ["cld", "CLD"], ["t", "T / TD"]];
-const MODES = [["one", "1 PAS", "Jeden pas: wiatr i RVR w strefach TDZ / MID / END wybranego kierunku"],
-  ["split", "2 PASY", "Dwa pasy: kolumny DEP i ARR, w każdej osobny wybór pasa (wiatr, składowe, RVR TDZ)"]];
+const MODES = [["one", "1 RWY", "One runway: wind and RVR in the TDZ / MID / END zones of the selected direction"],
+  ["split", "2 RWYS", "Two runways: DEP and ARR columns, each with its own runway choice (wind, components, RVR TDZ)"]];
 
 // układ bez ręcznego wyboru: 2 PASY, gdy pas do lądowania i do startu w użyciu (ATIS albo sugestia) są różne
 const autoMode = (u) => (u?.arr && u?.dep && u.arr !== u.dep ? "split" : "one");
@@ -323,10 +323,10 @@ const autoMode = (u) => (u?.arr && u?.dep && u.arr !== u.dep ? "split" : "one");
 // kierunek lądowań).
 function autoRunways(st) {
   const u = st?.runway_in_use || {}, rwys = st?.runways || [];
-  const src = u.source === "ATIS" ? "ATIS" : "sugestia", why = `pas w użyciu (${u.source === "ATIS" ? "ATIS" : "sugestia systemu"})`;
+  const src = u.source === "ATIS" ? "ATIS" : "suggested", why = `runway in use (${u.source === "ATIS" ? "ATIS" : "system suggestion"})`;
   const x = u.arr || u.dep || rwys[0]?.designator || null, use = (des) => ({ des, src, why });
   if (u.arr && u.dep && u.arr !== u.dep) return { rwy: use(u.arr), arr: use(u.arr), dep: use(u.dep) };
-  for (const [p, s, label] of [[st?.preferred, "sugestia", "sugestia systemu"], [st?.runway_config, "auto", "konfiguracja preferowana lotniska"]]) {
+  for (const [p, s, label] of [[st?.preferred, "suggested", "system suggestion"], [st?.runway_config, "auto", "preferred aerodrome configuration"]]) {
     if (!p?.arr || !p?.dep || p.arr === p.dep || ![p.arr, p.dep].includes(x)) continue;
     const r = rwys.find((q) => q.designator === (p.arr === x ? p.dep : p.arr));
     if (!r || (r.headwind ?? 0) < -5) continue;
@@ -336,8 +336,8 @@ function autoRunways(st) {
   const other = rwys.filter((r) => r.designator !== x && r.designator !== recip(x));
   const y = (other.length ? other : rwys.filter((r) => r.designator !== x))
     .sort((a, b) => (b.headwind ?? -99) - (a.headwind ?? -99) || Math.abs(a.crosswind ?? 0) - Math.abs(b.crosswind ?? 0))[0];
-  const yWhy = other.length ? `drugi pas dobrany automatycznie: kierunek innego pasa z największą składową czołową (w użyciu tylko ${x})`
-    : `lotnisko z jednym pasem: przeciwny kierunek ${x}`;
+  const yWhy = other.length ? `second runway chosen automatically: direction of another runway with the largest headwind component (only ${x} in use)`
+    : `single-runway aerodrome: opposite direction of ${x}`;
   return { rwy: use(x), arr: use(x), dep: y ? { des: y.designator, src: "auto", why: yWhy } : use(x) };
 }
 
@@ -406,9 +406,9 @@ function notamValidity(n, now = Date.now()) {
   const d = (iso) => { const t = new Date(iso); return `${pad(t.getUTCDate(), 2)}.${pad(t.getUTCMonth() + 1, 2)} ${t.toISOString().slice(11, 16)}Z`; };
   const s = n.start ? Date.parse(n.start) : null, e = n.end ? Date.parse(n.end) : null;
   const end = n.perm ? "PERM" : e ? d(n.end) + (n.est ? " EST" : "") : "?";
-  if (e && e < now) return ["expired", `WYGASŁ ${d(n.end)}`];
-  if (s && s > now) return ["future", `OD ${d(n.start)} DO ${end}`];
-  return ["active", n.perm ? "AKTYWNY · PERM" : `AKTYWNY DO ${end}`];
+  if (e && e < now) return ["expired", `EXPIRED ${d(n.end)}`];
+  if (s && s > now) return ["future", `FROM ${d(n.start)} UNTIL ${end}`];
+  return ["active", n.perm ? "ACTIVE · PERM" : `ACTIVE UNTIL ${end}`];
 }
 
 // --- widok --------------------------------------------------------------------------------------------
@@ -429,11 +429,11 @@ export function mountAwos(el, icao) {
     <div class="aw-mid">
       <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-wbar">
         <span class="aw-mode">${MODES.map(([m, l, tip]) => `<button data-mode="${m}" title="${tip}">${l}</button>`).join("")}</span>
-        <button class="aw-auto" title="Automat: układ i pasy z ATIS (bez ATIS z sugestii systemu), 2 PASY przy różnych pasach do lądowania i startu.
-Kliknij, żeby skasować ręczny wybór układu i pasów dla ${esc(icao)}; sam wygasa przy zmianie pasów w użyciu albo po 12 h.">AUTO</button><span class="aw-man" hidden>RĘCZNIE</span><div class="aw-simnote" title="VATSIM nie ma czujników wiatru ani RVR. Symulowany czujnik mierzy wiatr co 1 s, ekran odświeża się co ${WIND_REFRESH_S} s: INST = ostatni pomiar, 2 MIN = średnia z pomiarów z 2 min, 10 MIN MAX = największy pomiar z 10 min.
-RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (9999, CAVOK) >2000 M, przy mniejszej RVR symulowany z widzialności (SYM). VIS, chmury i temperatura są z METAR."><b>SYM</b> ${SYM} · INST co ${WIND_REFRESH_S} s, średnia 2 min i maks. 10 min z pomiarów co 1 s</div></div></div>
+        <button class="aw-auto" title="Automatic: layout and runways from ATIS (without ATIS from the system suggestion), 2 RWYS when the landing and take-off runways differ.
+Click to clear the manual choice of layout and runways for ${esc(icao)}; it also lapses when the runways in use change or after 12 h.">AUTO</button><span class="aw-man" hidden>MANUAL</span><div class="aw-simnote" title="VATSIM has no wind or RVR sensors. The simulated sensor measures the wind every 1 s, the screen refreshes every ${WIND_REFRESH_S} s: INST = last measurement, 2 MIN = mean of the measurements over 2 min, 10 MIN MAX = highest measurement over 10 min.
+RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥ 1500 m (9999, CAVOK), RVR simulated from visibility (SYM) when lower. VIS, clouds and temperature are from METAR."><b>SYM</b> ${SYM} · INST every ${WIND_REFRESH_S} s, 2 min mean and 10 min max from 1 s measurements</div></div></div>
       <div class="aw-atis"></div>
-      <div class="aw-ovl" hidden><div class="aw-h"><span class="t"></span><button class="aw-x" title="Zamknij (Esc)">ZAMKNIJ ✕</button></div><div class="aw-ovl-body"></div></div>
+      <div class="aw-ovl" hidden><div class="aw-h"><span class="t"></span><button class="aw-x" title="Close (Esc)">CLOSE ✕</button></div><div class="aw-ovl-body"></div></div>
     </div>
     <div class="aw-bot">
       ${[["wind", "WIND (METAR)"], ["temp", "TEMP"], ["dew", "DEW"], ["qnh", "QNH"], ["vis", "VIS"], ["cld", "CLOUDS"]]
@@ -500,29 +500,29 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
       const use = !!st && b.dataset.mode === am;
       b.classList.toggle("active", b.dataset.mode === modeKey);
       b.classList.toggle("use", use);
-      b.title = MODES.find(([m]) => m === b.dataset.mode)[2] + (use ? `\nUkład automatu (${u?.source === "ATIS" ? "ATIS" : "sugestia systemu"})` : "");
+      b.title = MODES.find(([m]) => m === b.dataset.mode)[2] + (use ? `\nAutomatic layout (${u?.source === "ATIS" ? "ATIS" : "system suggestion"})` : "");
     });
     $(".aw-auto").classList.toggle("active", !!st && !man);
     $(".aw-man").hidden = !man;
-    $(".aw-man").title = man ? `Układ albo pas wybrany ręcznie przy pasach w użyciu ARR ${u?.arr || "–"} / DEP ${u?.dep || "–"}`
-      + ` (${u?.source === "ATIS" ? "ATIS" : "sugestia systemu"}), zapamiętany dla ${icao} w tej przeglądarce.\nWraca do automatu`
-      + ` (teraz ${am === "split" ? "2 PASY" : "1 PAS"}) po kliknięciu AUTO, przy zmianie tych pasów albo o`
-      + ` ${new Date(manual.t + MAN_TTL).toISOString().slice(11, 16)}Z (12 h od wyboru).` : "";
+    $(".aw-man").title = man ? `Layout or runway chosen manually with runways in use ARR ${u?.arr || "–"} / DEP ${u?.dep || "–"}`
+      + ` (${u?.source === "ATIS" ? "ATIS" : "system suggestion"}), remembered for ${icao} in this browser.\nReturns to automatic`
+      + ` (now ${am === "split" ? "2 RWYS" : "1 RWY"}) after clicking AUTO, when these runways change or at`
+      + ` ${new Date(manual.t + MAN_TTL).toISOString().slice(11, 16)}Z (12 h after the choice).` : "";
   };
 
   // części kolumny zależne od METAR i wyboru pasa (po każdym wczytaniu statusu i po kliknięciu pasa, układu albo AUTO)
   const drawColStatic = (c) => {
     const des = selOf(c), p = st?.parsed, def = auto[c.sel] || {}, man = !!manual[c.sel];
     c.el.querySelector(".rwy").innerHTML = des ? `RWY <b>${esc(des)}</b> <span class="src${man ? " man" : ""}"
-      title="${esc(man ? `wybrany ręcznie; automat: ${def.des || "–"} (${def.src || "–"}), wraca kliknięcie podkreślonego pasa albo AUTO` : def.why || "")}">${man ? "ręcznie" : esc(def.src || "")}</span>` : "brak pasa";
+      title="${esc(man ? `chosen manually; automatic: ${def.des || "–"} (${def.src || "–"}), click the underlined runway or AUTO to return` : def.why || "")}">${man ? "manual" : esc(def.src || "")}</span>` : "no runway";
     c.el.querySelector(".aw-rsel").innerHTML = runwayPairs(st?.runways || []).map((g) => `<span class="aw-pair">${g.ends.map((e) =>
       `<button data-rwy="${esc(e.designator)}" class="${e.designator === des ? "sel" : ""} ${e.designator === def.des ? "use" : ""}"
-        title="${e.designator === def.des ? esc(def.why) : "pokaż wiatr dla tego kierunku"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
+        title="${e.designator === def.des ? esc(def.why) : "show the wind for this direction"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
     c.stat.innerHTML = dialStatic(st?.runways || [], des);
     c.row.vis.textContent = visText(p);
     c.row.cld.innerHTML = cloudList(p).map(esc).join("<br>") || "–";
     const spread = has(p?.temperature) && has(p?.dewpoint) && p.temperature - p.dewpoint <= 2;
-    c.row.t.innerHTML = p ? `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C${spread ? ` <span class="warn" title="mały spread: ryzyko mgły">Δ${p.temperature - p.dewpoint}</span>` : ""}` : "–";
+    c.row.t.innerHTML = p ? `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C${spread ? ` <span class="warn" title="small spread: risk of fog">Δ${p.temperature - p.dewpoint}</span>` : ""}` : "–";
   };
 
   // RVR kolumny (METAR, P2000 albo SYM; symulacja zmienia się razem z wiatrem)
@@ -531,7 +531,7 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
     c.row.rvr.innerHTML = r ? r.list.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;
     c.row.rvr.classList.toggle("warn", !!r && r.list.some((x) => !String(x.value).startsWith("P")));
     c.rvrTh.innerHTML = r?.src === "SYM" ? `RVR <i class="aw-sym" title="${SYM_RVR}">SYM</i>` : "RVR";
-    c.rvrTr.title = r ? r.tip : "RVR: brak danych (METAR bez widzialności albo brak pasa)";
+    c.rvrTr.title = r ? r.tip : "RVR: no data (METAR without visibility or no runway)";
   };
 
   // wartości zmieniające się co WIND_REFRESH_S sekund
@@ -585,11 +585,11 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
     box.innerHTML = list.length ? list.map((a) => {
       const kind = /_D_ATIS$/.test(a.callsign) ? "DEP" : /_A_ATIS$/.test(a.callsign) ? "ARR" : "";
       const fresh = changed[a.callsign] && Date.now() - changed[a.callsign] < 180000;
-      return `<div class="aw-atiscol"><div class="aw-h"><span>ATIS ${kind}</span>${fresh ? `<span class="aw-new">NOWA LITERA</span>` : ""}</div>
+      return `<div class="aw-atiscol"><div class="aw-h"><span>ATIS ${kind}</span>${fresh ? `<span class="aw-new">NEW LETTER</span>` : ""}</div>
         <div class="aw-letter"><b>${esc(a.letter)}</b><span class="aw-stn">${a.callsign.split(" / ").map(esc).join("<br>")}<br><em>${esc(a.freq || "")}</em></span></div>
-        <div class="aw-atistxt">${atisLines(a.lines).map((l) => `<div class="ln">${esc(l) || "&nbsp;"}</div>`).join("") || `<span class="dim">brak tekstu ATIS</span>`}</div></div>`;
+        <div class="aw-atistxt">${atisLines(a.lines).map((l) => `<div class="ln">${esc(l) || "&nbsp;"}</div>`).join("") || `<span class="dim">no ATIS text</span>`}</div></div>`;
     }).join("") : `<div class="aw-atiscol off"><div class="aw-h"><span>ATIS</span></div><div class="aw-letter"><b>–</b></div>
-      <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : `Brak stacji ATIS ${esc(icao)} w sieci VATSIM.`}</span></div></div>`;
+      <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : `No ATIS station for ${esc(icao)} on the VATSIM network.`}</span></div></div>`;
   };
 
   const drawTop = () => {
@@ -602,15 +602,15 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
     // stan LVP z progami z AIP: w mocy, przygotowanie, odwołane (30 min), n/d = AIP nie przewiduje LVP
     const ls = lvpState(st.lvp);
     lv.className = "aw-box aw-lvp" + ({ lvp: " on", prep: " prep", cancel: " cancel", na: " na" }[ls.cls] || "");
-    lv.innerHTML = { prep: "LVP<small>PRZYGOT.</small>", cancel: `LVP<small>ODWOŁ. ${esc(lvp.since || "")}</small>`,
-      na: "LVP<small>N/D</small>" }[ls.cls] || "LVP";
+    lv.innerHTML = { prep: "LVP<small>PREP</small>", cancel: `LVP<small>CNL ${esc(lvp.since || "")}</small>`,
+      na: "LVP<small>N/A</small>" }[ls.cls] || "LVP";
     lv.title = [ls.label, ...(lvp.reasons || []), lvpTip(st.lvp)].filter(Boolean).join("\n");
     const v = vmc(p), vm = $(".aw-vmc");
     vm.className = "aw-box aw-vmc " + (v || "").toLowerCase();
     vm.innerHTML = `${v || "–"}${p?.flight_category ? `<small>${esc(p.flight_category)}</small>` : ""}`;
-    vm.title = "VMC w CTR (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft" + (p?.flight_category ? `\nkategoria METAR: ${p.flight_category}` : "");
-    $(".aw-sun").innerHTML = sun ? `<span class="k">Słońce UTC · ${sunPhase(sun)}</span><span class="aw-sunrow">${[["BMCT", sun.civil_dawn, "początek zmierzchu cywilnego rano"],
-      ["SR", sun.sunrise, "wschód"], ["SS", sun.sunset, "zachód"], ["EECT", sun.civil_dusk, "koniec zmierzchu cywilnego wieczorem"]]
+    vm.title = "VMC in the CTR (SERA.5005): visibility ≥ 5 km and cloud ceiling ≥ 1500 ft" + (p?.flight_category ? `\nMETAR category: ${p.flight_category}` : "");
+    $(".aw-sun").innerHTML = sun ? `<span class="k">Sun UTC · ${sunPhase(sun)}</span><span class="aw-sunrow">${[["BMCT", sun.civil_dawn, "beginning of morning civil twilight"],
+      ["SR", sun.sunrise, "sunrise"], ["SS", sun.sunset, "sunset"], ["EECT", sun.civil_dusk, "end of evening civil twilight"]]
       .map(([k, t, tip]) => `<span title="${tip}"><i>${k}</i>${t || "--:--"}</span>`).join("")}</span>` : "";
     $(".aw-sun").hidden = !sun;
     const errs = [loadErr, ...(st.errors || []), st.network_error].filter(Boolean);
@@ -620,7 +620,7 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
   const drawAge = () => {
     const p = st?.parsed, age = metarAge(p?.time), box = $(".aw-age");
     box.querySelector(".v").textContent = p?.time ? `${p.time.slice(2, 4)}:${p.time.slice(4, 6)}Z` : "–";
-    box.querySelector(".aw-sub").textContent = age !== null ? ageText(age) + " temu" : "";
+    box.querySelector(".aw-sub").textContent = age !== null ? ageText(age) + " ago" : "";
     box.classList.toggle("stale", age !== null && age > 70);
   };
   const drawBottom = () => {
@@ -633,25 +633,25 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
   // --- nakładka METAR / TAF / NOTAM
   // RVR bez grup w METAR: co wtedy pokazuje AWOS w kolumnach
   const rvrNone = (p) => (!has(p.visibility_m) ? "–" : p.cavok || p.visibility_m >= 1500
-    ? "brak w METAR · widzialność ≥ 1500 m: AWOS >2000 M" : "brak w METAR · AWOS: RVR symulowany z widzialności (SYM)");
+    ? "not in METAR · visibility ≥ 1500 m: AWOS >2000 M" : "not in METAR · AWOS: RVR simulated from visibility (SYM)");
   const decoded = (p) => {
     const age = metarAge(p.time);
-    const rows = [["Obserwacja", p.time ? `dzień ${p.time.slice(0, 2)}, ${p.time.slice(2, 4)}:${p.time.slice(4, 6)} UTC${age !== null ? ` (${ageText(age)} temu)` : ""}` : "–"],
-      ["Wiatr", `${metarWind(p)}${has(p.wind_speed) ? ` · ${Math.round(p.wind_speed * 0.514)} m/s` : ""}`], ["Widzialność", visText(p)],
-      ["RVR", (p.rvr || []).map((x) => `R${x.runway} ${rvrText(x)}`).join(" · ") || rvrNone(p)], ["Zjawiska", (p.weather || []).join(" ") || "–"],
-      ["Chmury", cloudList(p).join(" · ")], ["Podstawa (ceiling)", has(p.ceiling_ft) ? p.ceiling_ft + " ft" : "–"],
-      ["Temperatura / punkt rosy", `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C`], ["QNH / QFE", `${p.qnh ?? "–"} / ${st.qfe ?? "–"} hPa`],
-      ["Trend", p.trend || "–"], ["Kategoria", p.flight_category || "–"]];
+    const rows = [["Observation", p.time ? `day ${p.time.slice(0, 2)}, ${p.time.slice(2, 4)}:${p.time.slice(4, 6)} UTC${age !== null ? ` (${ageText(age)} ago)` : ""}` : "–"],
+      ["Wind", `${metarWind(p)}${has(p.wind_speed) ? ` · ${Math.round(p.wind_speed * 0.514)} m/s` : ""}`], ["Visibility", visText(p)],
+      ["RVR", (p.rvr || []).map((x) => `R${x.runway} ${rvrText(x)}`).join(" · ") || rvrNone(p)], ["Weather", (p.weather || []).join(" ") || "–"],
+      ["Clouds", cloudList(p).join(" · ")], ["Ceiling", has(p.ceiling_ft) ? p.ceiling_ft + " ft" : "–"],
+      ["Temperature / dew point", `${tempText(p.temperature)} / ${tempText(p.dewpoint)} °C`], ["QNH / QFE", `${p.qnh ?? "–"} / ${st.qfe ?? "–"} hPa`],
+      ["Trend", p.trend || "–"], ["Category", p.flight_category || "–"]];
     return `<table class="aw-dec">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>`;
   };
   const drawNotams = () => {
-    if (!notams) return `<span class="dim">Ładowanie NOTAM…</span>`;
+    if (!notams) return `<span class="dim">Loading NOTAM…</span>`;
     if (notams.error) return `<span class="bad">${esc(notams.error)}</span>`;
     const list = [...notams.notams].sort((a, b) => (a.id || "").localeCompare(b.id || ""));
     return list.length ? `<div class="dim">${list.length} NOTAM · ${esc(icao)}</div>` + list.map((n) => {
       const [cls, txt] = notamValidity(n);
       return `<div class="aw-notam ${cls}"><div><b>${esc(n.id || "")}</b><span>${esc(txt)}</span>${n.schedule ? `<span class="dim">${esc(n.schedule)}</span>` : ""}</div><pre>${esc(n.raw)}</pre></div>`;
-    }).join("") : `<span class="dim">Brak NOTAM-ów dla ${esc(icao)}.</span>`;
+    }).join("") : `<span class="dim">No NOTAMs for ${esc(icao)}.</span>`;
   };
   const drawOvl = () => {
     const box = $(".aw-ovl");
@@ -680,7 +680,7 @@ RVR: z METAR; gdy METAR nie podaje RVR dla pasa: przy widzialności ≥ 1500 m (
   const draw = () => {
     if (!st) {
       $(".aw-err").textContent = loadErr;
-      $(".aw-winds").innerHTML = `<div class="aw-none"><b>Brak danych AWOS dla ${esc(icao)}</b><span>${esc(loadErr)}</span></div>`;
+      $(".aw-winds").innerHTML = `<div class="aw-none"><b>No AWOS data for ${esc(icao)}</b><span>${esc(loadErr)}</span></div>`;
       return;
     }
     drawTop(); drawAge(); drawBottom(); drawMode();

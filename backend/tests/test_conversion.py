@@ -1,6 +1,8 @@
 """0.12.3 (issue #13): CONVERSION, kalkulator jednostek dla kontrolera. Czyste funkcje z tabs/conversion.js w Node:
-znane wartości, przeliczenia w obie strony, ISA (QNH a FL, Mach/TAS/CAS), czas w Polsce (CET/CEST wg zasad UE)."""
+znane wartości, przeliczenia w obie strony, ISA (QNH a FL, Mach/TAS/CAS), czas w Polsce (CET/CEST wg zasad UE).
+0.12.5 (issue #18): zamiast kalkulatora UTC a czas polski zegary UTC i POLAND (LT) obok siebie."""
 import json
+import re
 import shutil
 import subprocess
 
@@ -54,18 +56,10 @@ console.log(JSON.stringify({
     return Number.isNaN(v) ? "NaN" : v;
   }),
   fmt: [[29.9, 2], [760.04, 1], [-0.01, 1], [1234.5678, 0], [NaN, 1], [null, 1], [1e21 * 0 + 5, 3]].map(([v, d]) => c.fmtNum(v, d)),
-  times: ["14:30", "1430", "14.30", "9:05", "1430Z", "0005 UTC", "24:00", "12:60", "x", ""].map(c.parseTime),
-  days: ["2026-10-25", "25.10.2026", "2026-02-30", "2026-2-3", "29.02.2028", "x", ""].map((d) => {
-    const ms = c.parseDay(d);
-    return ms === null ? null : new Date(ms).toISOString().slice(0, 10);
-  }),
   sundays: [[2026, 2], [2026, 9], [2027, 2], [2027, 9], [2025, 2], [2025, 9]].map(([y, m]) => new Date(c.lastSunday(y, m)).toISOString()),
-  utc2pl: [["2026-07-01", "12:00"], ["2026-01-15", "23:30"], ["2026-03-29", "00:59"], ["2026-03-29", "01:00"],
-    ["2026-10-25", "00:59"], ["2026-10-25", "01:00"], ["2026-12-31", "23:30"], ["2026-13-01", "12:00"], ["2026-07-01", "25:00"]]
-    .map(([d, t]) => c.utcToPl(d, t)),
-  pl2utc: [["2026-07-01", "14:00"], ["2026-01-01", "00:30"], ["2026-03-29", "02:30"], ["2026-03-29", "03:00"],
-    ["2026-10-25", "02:30"], ["2026-10-25", "03:30"]].map(([d, t]) => c.plToUtc(d, t)),
-  now: c.nowUtc(new Date(Date.UTC(2026, 9, 15, 7, 5, 59))),
+  // zegary w chwilach UTC: lato, zima, sekunda przed i w chwili zmiany czasu (01:00 UTC), przełom roku
+  clocks: ["2026-07-01T12:00:00Z", "2026-01-15T23:30:05Z", "2026-03-29T00:59:59Z", "2026-03-29T01:00:00Z",
+    "2026-10-25T00:59:59Z", "2026-10-25T01:00:00Z", "2026-12-31T23:30:00Z"].map((t) => c.clocks(Date.parse(t))),
 }));
 """
 
@@ -127,6 +121,7 @@ console.log(JSON.stringify({
      ["gs", "140"], ["pct", "5.24"], ["gs", ""], ["gs", "abc"], ["gs", "140"], ["pct", ""]]),
   mach: steps(c.linkMach, ["fl", "mach", "tas", "cas"],
     [["fl", "350"], ["mach", "0.78"], ["fl", ""], ["fl", "700"], ["fl", "350"], ["mach", "1.2"]]),
+  columns: c.COLUMNS, grid: [...c.gridHtml().matchAll(/data-k="([^"]+)"/g)].map((m) => m[1]),
   rows: c.CARDS.map((h) => {
     const rows = h.split('<label class="conv-row">').slice(1);
     return [h.match(/data-k="([^"]+)"/)[1], rows.filter((r) => r.trimStart().startsWith('<span class="conv-name">')).length, rows.length];
@@ -142,13 +137,13 @@ def cards(tmp_path_factory):
 
 def test_qnh_card_marks_bad_qnh(cards):
     q = cards["qnh"]
-    assert q[0]["out"] == "Wpisz QNH." and q[0]["v"]["alt"] == ""
+    assert q[0]["out"] == "Enter QNH." and q[0]["v"]["alt"] == ""
     assert q[1]["v"]["alt"] == "6581" and q[1]["bad"] == []
     # tekst zamiast liczby: czerwona ramka, wynik znika, komunikat o złej wartości (nie o zakresie)
-    assert q[2]["bad"] == ["qnh"] and q[2]["v"]["alt"] == "" and q[2]["out"] == "Zła wartość QNH."
-    assert q[3]["bad"] == ["qnh"] and q[3]["v"]["alt"] == "" and q[3]["out"] == "QNH poza zakresem 850–1100 hPa."
-    assert q[4]["bad"] == [] and q[4]["out"] == "Wpisz QNH."
-    assert q[5]["bad"] == [] and q[5]["v"]["alt"] == "7000" and q[5]["out"].startswith("Poziom QNH: 0 ft")
+    assert q[2]["bad"] == ["qnh"] and q[2]["v"]["alt"] == "" and q[2]["out"] == "Invalid QNH."
+    assert q[3]["bad"] == ["qnh"] and q[3]["v"]["alt"] == "" and q[3]["out"] == "QNH out of range 850–1100 hPa."
+    assert q[4]["bad"] == [] and q[4]["out"] == "Enter QNH."
+    assert q[5]["bad"] == [] and q[5]["v"]["alt"] == "7000" and q[5]["out"].startswith("QNH level: 0 ft")
     assert q[6]["bad"] == ["fl"]
 
 
@@ -168,10 +163,18 @@ def test_gradient_card_clears_stale_results(cards):
 def test_mach_card_clears_without_fl(cards):
     m = cards["mach"]
     assert m[1]["v"]["tas"] == "450" and m[1]["v"]["cas"] == "264"
-    assert m[2]["v"] == {"fl": "", "mach": "0.78", "tas": "", "cas": ""} and m[2]["out"] == "Wpisz FL."
-    assert m[3]["v"]["tas"] == "" and m[3]["out"] == "Wzory ISA w kalkulatorze: FL000–FL650."
+    assert m[2]["v"] == {"fl": "", "mach": "0.78", "tas": "", "cas": ""} and m[2]["out"] == "Enter FL."
+    assert m[3]["v"]["tas"] == "" and m[3]["out"] == "ISA formulas valid FL000–FL650."
     assert m[4]["v"]["tas"] == "450"
-    assert m[5]["v"]["cas"] == "" and m[5]["out"].endswith("M ≥ 1: CAS poza zakresem wzoru")
+    assert m[5]["v"]["cas"] == "" and m[5]["out"].endswith("M ≥ 1: CAS outside the formula range")
+
+
+def test_fixed_columns(cards):
+    # każda karta dokładnie raz, w stałej kolumnie (wynik QNH albo ISA nie przenosi karty, w której się pisze)
+    keys = [k for k, _, _ in cards["rows"]]
+    assert sorted(cards["grid"]) == sorted(keys) and len(cards["grid"]) == len(set(cards["grid"])) == 10
+    assert cards["columns"] == [["pressure", "height", "distance"], ["qnh", "speed"], ["mach", "vs"],
+                                ["gradient", "temperature", "mass"]]
 
 
 def test_inputs_share_one_column(cards):
@@ -254,39 +257,40 @@ def test_isa_mach_tas_cas(js):
 def test_parsing_and_formatting(js):
     assert js["parse"] == [1013.25, 29.92, 10000, 100, 35, None, "NaN", -5, "NaN", 0.5, 7, None]
     assert js["fmt"] == ["29.9", "760", "0", "1235", "", "", "5"]
-    assert js["times"] == [870, 870, 870, 545, 870, 5, None, None, None, None]
-    assert js["days"] == ["2026-10-25", "2026-10-25", None, "2026-02-03", "2028-02-29", None, None]
 
 
 def test_poland_time_eu_dst(js):
     # ostatnie niedziele marca i października (zmiana czasu o 01:00 UTC)
     assert [s[:10] for s in js["sundays"]] == ["2026-03-29", "2026-10-25", "2027-03-28", "2027-10-31", "2025-03-30", "2025-10-26"]
-    u = js["utc2pl"]
-    assert u[0] == {"date": "2026-07-01", "time": "14:00", "offset": 2, "zone": "CEST, UTC+2"}
-    assert u[1] == {"date": "2026-01-16", "time": "00:30", "offset": 1, "zone": "CET, UTC+1"}
-    assert [(x["time"], x["offset"]) for x in u[2:6]] == [("01:59", 1), ("03:00", 2), ("02:59", 2), ("02:00", 1)]
-    assert u[6]["date"] == "2027-01-01" and u[6]["time"] == "00:30"
-    assert u[7] is None and u[8] is None
-    p = js["pl2utc"]
-    assert (p[0]["time"], p[0]["note"]) == ("12:00", "") and (p[1]["date"], p[1]["time"]) == ("2025-12-31", "23:30")
-    # 02:30 w dniu przejścia na czas letni nie istnieje; 03:00 to już CEST
-    assert p[2]["note"] == "gap" and p[3] == {"date": "2026-03-29", "time": "01:00", "offset": 2, "zone": "CEST, UTC+2", "note": ""}
-    # 02:30 w dniu powrotu do CET jest dwa razy: 00:30 UTC (CEST) i 01:30 UTC (CET)
-    assert (p[4]["time"], p[4]["offset"], p[4]["note"], p[4]["alt"]["time"]) == ("00:30", 2, "twice", "01:30")
-    assert (p[5]["time"], p[5]["offset"], p[5]["note"]) == ("02:30", 1, "")
-    assert js["now"] == {"date": "2026-10-15", "time": "07:05"}
+    c = js["clocks"]
+    assert c[0] == {"utc": {"time": "12:00:00", "date": "01.07.2026", "day": "WED"},
+                    "pl": {"time": "14:00:00", "date": "01.07.2026", "day": "WED", "offset": 2, "zone": "CEST"}}
+    # zimą CET; po 23:00 UTC w Polsce już następny dzień
+    assert c[1]["pl"] == {"time": "00:30:05", "date": "16.01.2026", "day": "FRI", "offset": 1, "zone": "CET"}
+    assert c[1]["utc"]["date"] == "15.01.2026"
+    # przejście na czas letni: 01:59:59 CET → 03:00:00 CEST; powrót do CET: 02:59:59 CEST → 02:00:00 CET
+    assert [(x["pl"]["time"], x["pl"]["zone"]) for x in c[2:6]] == [("01:59:59", "CET"), ("03:00:00", "CEST"),
+                                                                  ("02:59:59", "CEST"), ("02:00:00", "CET")]
+    assert c[6]["pl"]["date"] == "01.01.2027" and c[6]["pl"]["time"] == "00:30:00" and c[6]["utc"]["date"] == "31.12.2026"
 
 
 def test_view():
     """Karty w kolejności z issue (najpierw hPa/inHg/mmHg i ft/m, potem "i takie tam"), pod każdą stała albo wzór,
-    bez przycisku "przelicz"."""
-    titles = ["Ciśnienie", "Wysokość", "Wysokość a FL przy QNH", "Odległość", "Prędkość", "Mach, TAS i CAS na FL (ISA)",
-              "Prędkość pionowa", "Gradient wznoszenia / zniżania", "Temperatura", "Masa", "Czas: UTC a czas w Polsce"]
+    bez przycisku "przelicz". 0.12.5: bez karty kalkulatora czasu, zegary UTC i POLAND (LT) obok siebie w nagłówku,
+    karty w czterech stałych kolumnach (strona bez paska przewijania)."""
+    titles = ["Pressure", "Height", "Altitude and FL at QNH", "Distance", "Speed", "Mach, TAS and CAS at FL (ISA)",
+              "Vertical speed", "Climb / descent gradient", "Temperature", "Mass"]
     pos = [CONV.index(f'"{t}"') for t in titles]
     assert pos == sorted(pos)
     assert CONV.count('<p class="conv-note">') == 1 and CONV.count("card(\"") == len(titles)
-    # jedyny przycisk to "Teraz" w karcie czasu; przeliczenie na każde wpisanie znaku (zdarzenie input)
-    assert CONV.count("<button") == 1 and ">Teraz</button>" in CONV and 'addEventListener("input"' in CONV
+    # bez przycisków; przeliczenie na każde wpisanie znaku (zdarzenie input)
+    assert "<button" not in CONV and 'addEventListener("input"' in CONV
     assert "soon(" not in CONV
+    # kalkulator czasu usunięty: zostały zegary
+    assert 'data-u="utc' not in CONV and "linkTime" not in CONV and "plToUtc" not in CONV
+    assert 'data-ck="utc"' in CONV and 'data-ck="pl"' in CONV and ">POLAND (LT)<" in CONV and "drawClocks(box)" in CONV
     css = (FRONTEND / "css" / "conversion.css").read_text("utf-8")
     assert ".conv-grid" in css and "text-shadow" not in css and "glow" not in css
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in css and ".conv-col" in css
+    assert '<div class="conv-grid">${gridHtml()}</div>' in CONV
+    assert all(v.strip().startswith("0") for v in re.findall(r"border-radius:([^;]+);", css))

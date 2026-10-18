@@ -24,17 +24,17 @@ def _seed(name: str, required: bool = False) -> dict:
         data = seed_json(path)
     except FileNotFoundError as exc:
         if required:
-            raise HTTPException(404, f"COORDINATION: brak pliku data/seed/{name}") from exc
+            raise HTTPException(404, f"COORDINATION: file data/seed/{name} missing") from exc
         log.warning("COORDINATION: brak pliku data/seed/%s", name)
         return {}
     except (OSError, ValueError) as exc:
         if required:
-            raise HTTPException(500, f"COORDINATION: nie da się odczytać pliku data/seed/{name} ({exc})") from exc
+            raise HTTPException(500, f"COORDINATION: cannot read file data/seed/{name} ({exc})") from exc
         log.warning("COORDINATION: pomijam data/seed/%s (%s)", name, exc)
         return {}
     if not isinstance(data, dict):
         if required:
-            raise HTTPException(500, f"COORDINATION: plik data/seed/{name} nie jest obiektem JSON")
+            raise HTTPException(500, f"COORDINATION: file data/seed/{name} is not a JSON object")
         return {}
     return data
 
@@ -59,8 +59,8 @@ def _files() -> list[str]:
 
 
 @router.get("")
-def coordination(position: str = Query("", description="Znak stanowiska EPWW, np. EPWW_DBT_CTR (puste = wszystkie)"),
-                 online: str = Query("", description="Stanowiska online po przecinku (kolejność przejmowania)"),
+def coordination(position: str = Query("", description="EPWW position callsign, e.g. EPWW_DBT_CTR (empty = all)"),
+                 online: str = Query("", description="Online positions, comma-separated (coverage order)"),
                  db: Session = Depends(get_db)):
     """Wszystko do zakładki COORDINATION: dokumenty LOA/LOP z data/seed/coordination.json (nazwa, PDF, FIR-y,
     sektory, AIRAC – `current`, gdy to bieżący cykl), przekazania z loa.json i z dokumentów jako wiersze (COP,
@@ -69,10 +69,10 @@ def coordination(position: str = Query("", description="Znak stanowiska EPWW, np
     bez wpisu w coordination.json: karta z nazwą pliku (`registered: false`) i uwaga w `errors`.
     `position` (+ `online`): sektory obsługiwane przez stanowisko i przy każdym wierszu `applies`."""
     if position and not CALLSIGN.fullmatch(position):
-        raise HTTPException(400, "Znak stanowiska to litery, cyfry i podkreślenia (np. EPWW_DBT_CTR)")
+        raise HTTPException(400, "Position callsign: letters, digits and underscores (e.g. EPWW_DBT_CTR)")
     on = {cs.strip().upper() for cs in online.split(",") if cs.strip()}
     if any(not CALLSIGN.fullmatch(cs) for cs in on):
-        raise HTTPException(400, "online: znaki stanowisk po przecinku (litery, cyfry i podkreślenia)")
+        raise HTTPException(400, "online: comma-separated position callsigns (letters, digits and underscores)")
     coord = _seed("coordination.json", required=True)
     names = {p.callsign: {"name": p.name, "frequency": p.frequency} for p in db.scalars(select(AtcPosition))}
     data = coord_service.build(coord, _seed("loa.json"), _seed("ownership.json"), names=names, file_exists=_exists,

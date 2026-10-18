@@ -21,7 +21,7 @@ export default {
       const head = pane.querySelector(".title"), upd = pane.querySelector(".upd");
       strips = mountStrips(pane.querySelector(".strip-body"), icao, { onUpdate: (d) => {
         head.textContent = `${d.icao} · ${d.name}  (elev ${fmt(d.elevation_ft, 0)} ft)`;
-        upd.textContent = `Aktualizacja ${d.now.slice(0, 2)}:${d.now.slice(2)}Z · co 30 s`;
+        upd.textContent = `Updated ${d.now.slice(0, 2)}:${d.now.slice(2)}Z · every 30 s`;
       } });
       const mine = strips;
       return { destroy() { mine.destroy(); if (strips === mine) strips = null; } };

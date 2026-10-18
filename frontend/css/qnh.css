@@ -1,95 +1,113 @@
-/* METEO › QNH: mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP: jasny podkład, siatka, zielone rejony,
-   pomarańczowe pasy 15–17, liliowe TMA, czarne opisy BELOW i szare oznaczenia TMA/CTR) z granatowymi ramkami QNH jak
-   w vAWOS i panel boczny w stylu NM UI. Bez poświaty i cieni pod tekstem. */
+/* METEO › QNH: mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP): biały podkład, siatka, zielone granice
+   rejonów na jasnoniebieskiej otoczce, pomarańczowe pasy 15–17, granica FIR (jedna oliwkowa linia jak na mapie),
+   liliowe TMA/MTMA z ciemnym obrysem, CTR/MCTR ciemniejsze z przerywanym obrysem, czarne
+   opisy BELOW, szare oznaczenia TMA/CTR, duże numery rejonów z QNH w małej ramce i panel boczny z tabelami.
+   Ostre rogi (zaokrąglone tylko kółka lotnisk), bez poświaty i cieni pod tekstem. Wymiary napisów (czcionka, wiersz,
+   ramki, odstępy) zgadzają się z modelem w backend/app/services/qnh.py (test nakładania w test_qnh.py). */
 .qrwrap {
   --qr-paper: #fff;            /* podkład mapy */
-  --qr-grid: #b9bdc2;          /* siatka 1° i kreski co 10′ */
-  --qr-coast: #b4bac1;
-  --qr-fir: #8c7a22;           /* granica FIR EPWW (oliwkowa) */
-  --qr-reg: #34994f;           /* granice i numery rejonów (kolory z mapy AIP) */
-  --qr-band: #e48013;          /* linie 53°N i 51°N oraz numery pasów 15–17 */
-  --qr-tma: #e4ddec;           /* wypełnienie TMA (liliowe jak na mapie AIP) */
-  --qr-tma-edge: #3c3850;
-  --qr-tma-in: #8f89a8;
-  --qr-ink: #1d1f24;           /* kody lotnisk, opisy BELOW */
-  --qr-des: #8c8c8c;           /* szare oznaczenia TMA/CTR z mapy AIP */
-  --qr-box: #161e2b;           /* ramki QNH jak w vAWOS: granatowe tło i obwódka */
-  --qr-box-line: #3a4a6a;
-  --qr-amber: #f0a42a;         /* nazwa TMA w ramce */
-  --qr-sek: #a3b1c4;           /* "SEKTOR n" w ramce */
+  --qr-grid: #c3c7cc;          /* siatka 1° i kreski co 10′ */
+  --qr-coast: #c8ccd1;         /* linia brzegowa (szara jak na mapie) */
+  --qr-case: #c2d9ec;          /* jasnoniebieska otoczka granic rejonów */
+  --qr-reg: #30964e;           /* granice i numery rejonów 1–14 */
+  --qr-band: #e47e12;          /* linie 53°N i 51°N, numery pasów 15–17 */
+  --qr-fir: #a18f37;           /* granica FIR: średni kolor pikseli linii FIR na mapie PAŻP (oliwkowy) */
+  --qr-tma: #e4d8ea;           /* wypełnienie TMA/MTMA (liliowe) */
+  --qr-tma-over: #c9b9d6;      /* część wspólna dwóch obszarów (np. TMA EPGD i MTMA EPMB) */
+  --qr-tma-edge: #262330;      /* obrys obszaru "BELOW … QNH FROM" */
+  --qr-tma-in: #4a4656;        /* cienkie linie części TMA */
+  --qr-ctr: rgba(110, 104, 120, .2);
+  --qr-ctr-edge: #6f6a78;
+  --qr-ink: #1b1c20;           /* kody lotnisk, opisy BELOW, QNH w ramkach */
+  --qr-des: #8c8c8c;           /* szare oznaczenia TMA/CTR */
+  --k: 1;                      /* skala napisów (labelScale() w qnhmap.js) */
   flex: 1; min-height: 0; display: flex;
 }
 .qrmapbox { flex: 1; min-width: 0; position: relative; display: flex; }
-.qrwrap .qrmap.leaflet-container { flex: 1; background: var(--qr-paper); }
-.qrwrap .leaflet-bar { border-radius: 0; }
+.qrwrap .qrmap.leaflet-container { flex: 1; background: var(--qr-paper); font-family: var(--mono); }
+.qrwrap .leaflet-bar { border-radius: 0; box-shadow: none; border: 1px solid #9aa0a6; }
 .qrwrap .leaflet-bar a { background: #fff; color: #222; border-bottom-color: #ccc; border-radius: 0; }
 
 /* linie mapy: kolory i grubości z CSS (Leaflet wpisuje własne atrybuty SVG, CSS je nadpisuje) */
 .qrmap path.qr-gl { stroke: var(--qr-grid); stroke-width: 1; }
 .qrmap path.qr-gl.tick { stroke-width: .8; }
-.qrmap path.qr-coast { stroke: var(--qr-coast); stroke-width: 1.2; fill: none; }
-.qrmap path.qr-rline { stroke: var(--qr-reg); stroke-width: 1.6; stroke-linejoin: round; }
-.qrmap path.qr-bline { stroke: var(--qr-band); stroke-width: 3; }
-.qrmap path.qr-fir { stroke: var(--qr-fir); stroke-width: 2.6; stroke-linejoin: round; }
-.qrmap path.qr-tedge { stroke: var(--qr-tma-edge); stroke-width: 1.8; stroke-linejoin: round; }
+.qrmap path.qr-coast { stroke: var(--qr-coast); stroke-width: 1.1; fill: none; }
 .qrmap path.qr-tfill { fill: var(--qr-tma); }
-.qrmap path.qr-tin { stroke: var(--qr-tma-in); stroke-width: .8; }
-.qrmap path.qr-tline { stroke: var(--qr-tma-edge); stroke-width: 1.2; fill: none; }
+.qrmap path.qr-tover { fill: var(--qr-tma-over); }
+.qrmap path.qr-ctr { fill: var(--qr-ctr); stroke: var(--qr-ctr-edge); stroke-width: 1; stroke-dasharray: 3 2; }
+.qrmap path.qr-tin { stroke: var(--qr-tma-in); stroke-width: .7; stroke-linejoin: round; }
+.qrmap path.qr-tedge { stroke: var(--qr-tma-edge); stroke-width: 1.4; stroke-linejoin: round; }
+.qrmap path.qr-rcase { stroke: var(--qr-case); stroke-width: 4.5; stroke-linejoin: round; }
+.qrmap path.qr-rline { stroke: var(--qr-reg); stroke-width: 1.6; stroke-linejoin: round; }
+.qrmap path.qr-bline { stroke: var(--qr-band); stroke-width: 3.2; }
+.qrmap path.qr-fir { stroke: var(--qr-fir); stroke-width: 3.4; stroke-linejoin: round; }
 .qrmap path.qr-hl { stroke: #0b6fd1; stroke-width: 3; fill: #0b6fd1; fill-opacity: .1; }
 
 /* opisy stopni siatki przy krawędziach (długość u góry, szerokość z lewej i prawej) */
 .qr-grat { position: absolute; inset: 0; pointer-events: none; z-index: 450; overflow: hidden; }
-.qr-grat span { position: absolute; transform: translateX(-50%); padding: 0 2px; background: rgba(255,255,255,.85);
+.qr-grat span { position: absolute; transform: translateX(-50%); padding: 0 2px; background: rgba(255, 255, 255, .85);
   font: 10px/1.2 var(--mono); color: #6b7076; }
 .qr-grat span.lat { transform: translateY(-50%); }
 
-/* ikony divIcon: sam środek; napis wyśrodkowany w punkcie z pliku, przy zoomie mniejszym od domyślnego maleje razem
-   z mapą (--qs z JS), ale nie poniżej --qf: ramki do 85% (przy 1366x768 mapa 81%, nazwa ok. 8,5 px, QNH ok. 10 px),
-   reszta do 86%; po oddaleniu (qr-far, bez kodów i opisów) ramki do 70% */
+/* ikony divIcon: napis wyśrodkowany w punkcie z pliku, przy zoomie mniejszym od domyślnego maleje razem z mapą
+   (--k: 2^(zoom − 7,5), nie mniej niż 60%) */
 .leaflet-marker-icon.qr-icon { background: none; border: 0; }
-.qr-icon > div { position: absolute; left: 0; top: 0; white-space: nowrap; }
-.qr-icon > .qr-pos { --qf: .86; transform: translate(-50%, -50%) scale(max(var(--qf), var(--qs, 1))); }
-.qr-icon > .qr-lbl, .qr-icon > .qr-box { --qf: .85; }
-.qrwrap.qr-far .qr-icon > .qr-lbl, .qrwrap.qr-far .qr-icon > .qr-box { --qf: .7; }
+.qr-icon > div { position: absolute; left: 0; top: 0; white-space: nowrap; transform: translate(-50%, -50%) scale(var(--k)); }
 
-/* numery rejonów */
-.qr-num { font: 400 30px/1 var(--ui); color: var(--qr-reg); }
+/* numery rejonów jak na mapie (1–14 zielone, 15–17 pomarańczowe), QNH rejonu w małej ramce obok numeru po stronie
+   'qnh_at' (e, w, n, s; w narożniku ne/nw/se/sw dolny albo górny brzeg ramki na wysokości środka numeru) */
+.qr-num { font: 400 28px/20px var(--mono); color: var(--qr-reg); }
 .qr-num.band { color: var(--qr-band); }
+.qr-num .q { position: absolute; font: 700 11px/13px var(--mono); color: var(--qr-ink); background: #fff;
+  border: 1px solid var(--qr-reg); padding: 0 2px; border-radius: 0; }
+.qr-num.band .q { border-color: var(--qr-band); }
+.qr-num .q.nil { color: #8a8f95; }
+.qr-num .q-e, .qr-num .q-ne, .qr-num .q-se { left: calc(100% + 2px); }
+.qr-num .q-w, .qr-num .q-nw, .qr-num .q-sw { right: calc(100% + 2px); }
+.qr-num .q-e, .qr-num .q-w { top: 50%; transform: translateY(-50%); }
+.qr-num .q-n, .qr-num .q-s { left: 50%; transform: translateX(-50%); }
+.qr-num .q-n { bottom: calc(100% + 2px); }
+.qr-num .q-s { top: calc(100% + 2px); }
+.qr-num .q-ne, .qr-num .q-nw { bottom: 50%; }
+.qr-num .q-se, .qr-num .q-sw { top: 50%; }
+.qr-num.on, .qr-cap.on { outline: 2px solid #0b6fd1; outline-offset: 1px; }
 
-/* ramki jak w vAWOS (ok. 30% większe względem mapy przy 1600x900): granatowe tło, u góry mała nazwa, pod nią QNH;
-   SEKTOR n: szary napis i QNH rejonu turkusowe, TMA/MTMA: bursztynowa nazwa i QNH lotniska zielone (jak w tabelach
-   obok). Wiersz nazwy wyższy od czcionki i 1 px od góry, żeby kreski nad Ś, Ń, Ó, Ź nie wchodziły na obwódkę.
-   Wymiary (72x27 i 88x27 px, dłuższe nazwy szersze) sprawdza test układu w backend/tests/test_qnh.py. */
-.qr-lbl, .qr-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  min-width: 72px; height: 27px; padding: 1px 4px 0; background: var(--qr-box); border: 1px solid var(--qr-box-line); }
-.qr-box { min-width: 88px; }
-.qr-lbl small, .qr-box small { font: 10px/1.3 var(--ui); text-transform: uppercase; color: var(--qr-sek); }
-.qr-box small { color: var(--qr-amber); }
-.qr-lbl b, .qr-box b { font: 700 12px/1 var(--mono); color: var(--cyan); }
-.qr-box b { color: var(--green-hi); }
-.qr-lbl.nil b, .qr-box.nil b { color: #6f7787; }
-.qr-lbl.on, .qr-box.on { outline: 2px solid #0b6fd1; }
+/* opisy "BELOW TMA / QNH FROM EPxx" czarnym napisem jak na mapie, QNH lotniska w ramce na końcu drugiego wiersza */
+.qr-cap { display: flex; flex-direction: column; align-items: center; font: 700 9px/11px var(--mono); color: var(--qr-ink); }
+.qr-cap > span { display: block; height: 11px; }
+.qr-cap .q { display: inline-block; font: inherit; line-height: 9px; padding: 0 1px; border: 1px solid var(--qr-ink);
+  background: #fff; border-radius: 0; }
+.qr-cap .q.nil { color: #8a8f95; }
 
-/* opisy "BELOW TMA / QNH FROM EPxx" czarnym napisem jak na mapie AIP; wspólny opis kilku lotnisk: kody obok siebie */
-.qr-cap { display: flex; flex-direction: column; align-items: center; font: 700 8.5px/1.15 var(--ui); color: var(--qr-ink);
-  letter-spacing: .2px; }
-.qr-cap .m { display: flex; gap: 10px; }
+/* szare oznaczenia przestrzeni z mapy (rodzaj nad kodem), małe jak na mapie */
+.qr-des { display: flex; flex-direction: column; align-items: center; font: 7.5px/8px var(--mono); color: var(--qr-des); }
 
-/* szare oznaczenia przestrzeni z mapy AIP (rodzaj nad kodem), małe jak na mapie */
-.qr-des { display: flex; flex-direction: column; align-items: center; font: 8px/1 var(--ui); color: var(--qr-des); }
-
-/* lotniska: romb (bez METAR-u) albo kółko z kropką (lotnisko kontrolowane / z METAR-em) i kod ICAO */
-.qr-aero { transform: translate(-6.5px, -6.5px); display: flex; align-items: center; gap: 2px; }
-.qr-aero i { width: 7px; height: 7px; margin: 1.5px; border: 1.5px solid var(--qr-ink); background: #fff; transform: rotate(45deg); flex: none; }
-.qr-aero.ctl i { width: 9px; height: 9px; margin: 0.5px; border-radius: 50%; transform: none;
-  background: radial-gradient(circle, var(--qr-ink) 0 1.6px, #fff 2px); }
-.qr-aero span { font: 700 9px/1 var(--ui); color: var(--qr-ink); background: rgba(255,255,255,.6); padding: 0 1px; }
-.qrwrap.qr-far .qr-aero span, .qrwrap.qr-far .qr-cap, .qrwrap.qr-far .qr-des { display: none; }
-.leaflet-tooltip.qr-tip { background: var(--qr-box); color: #fff; border: 1px solid var(--qr-box-line); border-radius: 0; box-shadow: none;
+/* lotniska: kółko z kropką (lotnisko kontrolowane, z METAR-em) albo romb (pozostałe) i kod ICAO po stronie 'label'
+   2 px od symbolu 9x9 px (w narożniku dolny albo górny brzeg kodu na wysokości symbolu) */
+.qr-icon > .qr-aero { width: 0; height: 0; transform: scale(var(--k)); transform-origin: 0 0; }
+.qr-aero i { position: absolute; left: -3.2px; top: -3.2px; width: 6.4px; height: 6.4px; box-sizing: border-box;
+  border: 1.2px solid var(--qr-ink); background: #fff; transform: rotate(45deg); border-radius: 0; }
+.qr-aero.ctl i { left: -4.5px; top: -4.5px; width: 9px; height: 9px; border-width: 1.3px; border-radius: 50%; transform: none;
+  background: radial-gradient(circle, var(--qr-ink) 0 1.5px, #fff 1.9px); }
+.qr-aero span { position: absolute; font: 700 8px/9px var(--mono); color: var(--qr-ink); }
+.qr-aero.s-e span, .qr-aero.s-ne span, .qr-aero.s-se span { left: 6.5px; }
+.qr-aero.s-w span, .qr-aero.s-nw span, .qr-aero.s-sw span { right: 6.5px; }
+.qr-aero.s-e span, .qr-aero.s-w span { top: -4.5px; }
+.qr-aero.s-n span, .qr-aero.s-s span { left: 0; transform: translateX(-50%); }
+.qr-aero.s-n span { bottom: 6.5px; }
+.qr-aero.s-s span { top: 6.5px; }
+.qr-aero.s-ne span, .qr-aero.s-nw span { bottom: 0; }
+.qr-aero.s-se span, .qr-aero.s-sw span { top: 0; }
+/* poziomy napisów (labelTier() w qnhmap.js): qr-mid bez szarych oznaczeń, qr-far ("z daleka") tylko numery rejonów
+   z ramką QNH i symbole lotnisk z METAR-em */
+.qrwrap.qr-mid .qr-des { display: none; }
+.qrwrap.qr-far .qr-aero span, .qrwrap.qr-far .qr-cap, .qrwrap.qr-far .qr-des,
+.qrwrap.qr-far .qr-aero:not(.ctl) { display: none; }
+.leaflet-tooltip.qr-tip { background: #fff; color: var(--qr-ink); border: 1px solid #555; border-radius: 0; box-shadow: none;
   font: 700 11px var(--mono); padding: 1px 5px; }
 .leaflet-tooltip.qr-tip::before { display: none; }
 
-/* panel boczny (NM UI): pasek tytułu, przełączniki warstw, gęste tabele */
+/* panel boczny: pasek tytułu, przełączniki warstw, gęste tabele */
 .qrside { width: 360px; flex: none; overflow: auto; background: #050705; border-left: 1px solid var(--line); padding: 8px;
   display: flex; flex-direction: column; gap: 8px; }
 .qr-head { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 0; }
@@ -98,14 +116,15 @@
 .qr-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 6px; border: 1px solid var(--line); background: var(--panel);
   font: 11px var(--sans, var(--ui)); color: var(--muted); }
 .qr-tools label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: .5px; }
-.qr-tools input { accent-color: var(--green); margin: 0; }
+.qr-tools input { accent-color: var(--green); margin: 0; border-radius: 0; }
 .qr-err { font: 12px var(--mono); color: var(--bad); }
 .qr-err:empty { display: none; }
-.qr-card { background: var(--panel); border: 1px solid var(--line); }
+.qr-card { background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
 .qr-card h4 { margin: 0; padding: 4px 8px; background: var(--head, var(--panel-2)); border-bottom: 1px solid var(--head-line, var(--line));
   font: 700 11px/1.3 var(--sans, var(--ui)); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px;
   display: flex; justify-content: space-between; gap: 8px; }
 .qr-card h4 span { font-weight: 400; color: var(--muted); letter-spacing: .3px; text-transform: none; }
+.qrside table.data { width: 100%; }
 .qrside table.data th { position: static; padding: 3px 5px; font-size: 10px; }
 .qrside table.data td { padding: 2px 5px; font-size: 12px; vertical-align: top; }
 .qrside table.data td.num { font-size: 12px; white-space: nowrap; }   /* "----" bez łamania na myślnikach */
@@ -114,6 +133,7 @@
 .qrside table.data td.sta { font: 11px/1.45 var(--mono); color: var(--muted); }
 .qrside td.sta .low { color: var(--text); }
 .qrside td.sta .nil { color: #555c55; }
+.qrside td.sta .of { white-space: nowrap; }   /* "of 17 AD" w jednym wierszu */
 .qrside tr.band td { color: var(--muted); }
 .qrside tr.band td.q { color: var(--qr-band); }
 .qrside tr[data-r], .qrside tr[data-t] { cursor: default; }

@@ -39,13 +39,13 @@ export const vacsShort = (vacs, cs) => vacs?.acc_positions?.[cs]?.short || cs;
 
 // --- Plakietki stanowisk online jak w VATSIM Radar: lotnisko = ICAO + D/G/T/A/APP, FIR = CTR + id.
 // Po najechaniu dymek z listą: znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy online, ATIS.
-export const FACILITIES = [["DEL", "D", "zezwolenia (DEL)"], ["GND", "G", "kontrola naziemna (GND)"], ["TWR", "T", "wieża (TWR)"],
-  ["ATIS", "A", "ATIS"], ["APP", "APP", "zbliżanie / odloty (APP, DEP)"]];
+export const FACILITIES = [["DEL", "D", "clearance delivery (DEL)"], ["GND", "G", "ground (GND)"], ["TWR", "T", "tower (TWR)"],
+  ["ATIS", "A", "ATIS"], ["APP", "APP", "approach / departure (APP, DEP)"]];
 const RATINGS = { 1: "OBS", 2: "S1", 3: "S2", 4: "S3", 5: "C1", 6: "C2", 7: "C3", 8: "I1", 9: "I2", 10: "I3", 11: "SUP", 12: "ADM" };
 const since = (iso) => {
   if (!iso) return "";
   const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  return `od ${new Date(iso).toISOString().slice(11, 16)}Z (${min < 60 ? min + " min" : Math.floor(min / 60) + " h " + (min % 60) + " min"})`;
+  return `since ${new Date(iso).toISOString().slice(11, 16)}Z (${min < 60 ? min + " min" : Math.floor(min / 60) + " h " + (min % 60) + " min"})`;
 };
 const tag = (kind, letter) => `<span class="ab ab-${kind.toLowerCase()}">${letter}</span>`;
 
@@ -141,7 +141,7 @@ export function drawSectors(layer, gj, online = null, { labels = true, tipPane =
     const vc = online?.vacs?.[pr.name];
     const color = online && !own ? "#555" : colorFor(vc?.key || cs || pr.name);
     const ch = chain && vc ? `<br><span class="muted">${esc(vc.layer)}:</span> ${vc.chain.map((x) => (x === vc.owner ? `<b>${esc(x)}</b>` : esc(x))).join(" › ")}` : "";
-    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">brak kontrolera</span>`)
+    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">unstaffed</span>`)
       : `${esc(cs || "")} ${esc(freq || "")}`;
     const poly = L.geoJSON(f, { style: { color, weight: 1.2, fillColor: color, fillOpacity: online && !own ? 0 : 0.16 } })
       .bindTooltip(`<b>${esc(pr.name)}</b> ${fl(pr.lower_ft)}–${fl(pr.upper_ft)}<br>${who}${ch}`, { sticky: true, pane: tipPane, opacity: 1 });
@@ -195,13 +195,70 @@ export const altLabel = (ft) => (!ft ? "GND" : ft <= 6500 ? `${ft} ft` : fl(ft))
 export const PLANE_PATH = "M0,-9.5 C0.9,-9.5 1.3,-8.4 1.3,-7 L1.3,-2.6 L9,1.6 L9,3.3 L1.3,1 L1.1,5.6 L3.6,7.6 L3.6,8.9 L0,8 "
   + "L-3.6,8.9 L-3.6,7.6 L-1.1,5.6 L-1.3,1 L-9,3.3 L-9,1.6 L-1.3,-2.6 L-1.3,-7 C-1.3,-8.4 -0.9,-9.5 0,-9.5 Z";
 
-// Samolot: sylwetka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
-// cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP).
-export function aircraftMarker(p, { label = true, detail = false, cls = "" } = {}) {
-  const fl = p.altitude !== null && p.altitude !== undefined ? "FL" + String(Math.round(p.altitude / 100)).padStart(3, "0") : "";
+// Poziom przejściowy do etykiety samolotu: w FIR EPWW normalnie FL080 (OM PL vACC, services/tl.py; FL090 dopiero przy
+// QNH ≤ 995 hPa na którymś lotnisku). MAP nie pobiera METAR-ów do ruchu, więc stała wartość normalna.
+export const TL_FT = 8000;
+// zmiana wysokości od poprzedniego odczytu (climbRates: co najmniej 25 s, feed VATSIM co 15–30 s), od której etykieta ma
+// strzałkę wznoszenia albo zniżania; mniejsza to wahania wysokości w locie poziomym
+export const VS_ARROW_FT = 100;
+
+// RFL z planu lotu VATSIM (pole altitude: "35000", "FL350", "F350", "A045", "350") w stopach albo null
+export function rflFeet(v) {
+  const t = String(v ?? "").trim().toUpperCase();
+  let m = /^F(?:L)?(\d{2,3})$/.exec(t);
+  if (m) return +m[1] * 100;
+  if ((m = /^A(\d{2,3})$/.exec(t))) return +m[1] * 100;
+  if (!/^\d{2,5}$/.test(t)) return null;
+  const n = +t;
+  return n > 0 && n < 1000 ? n * 100 : n >= 1000 ? n : null;  // 350 = FL350, 35000 = 35000 ft
+}
+
+// Etykieta samolotu jak w PEGASUS_21 (PAŻP; Marek, 0.12.5): cztery linijki czcionką o stałej szerokości, bez ramki
+// i tła. 1: znak wywoławczy i prędkość względem ziemi w węzłach (3 cyfry); 2: poziom z Mode C, poniżej poziomu
+// przejściowego "A" i wysokość w setkach stóp ("A 53" = 5300 ft), wyżej FL ("270"), ze strzałką ↑ / ↓, gdy wysokość
+// zmieniła się od poprzedniego odczytu (p.vs z climbRates); 3: typ z kategorią turbulencji ("DC10H") i lotnisko
+// docelowe, a tranzyt i odlot z EP** za granicę punkt wyjścia z FIR-u (exit, z serwera), gdy znany; 4: "h  s  r"
+// (przydzielone kurs, prędkość i prędkość pionowa: na VATSIM ich nie ma, pola puste) i poziom: VATSIM nie podaje
+// poziomu z zezwolenia, więc RFL z planu lotu w dziesiątkach FL dwiema cyframi ("24" = FL240, "08" = FL080; poziom
+// niepodzielny przez 10 trzema cyframi, poniżej TL jak linijka 2: "A 45" = 4500 ft).
+export function p21Lines(p, { exit = null } = {}) {
+  const gs = p.groundspeed === null || p.groundspeed === undefined ? "" : String(Math.max(0, Math.round(p.groundspeed))).padStart(3, "0");
+  const l1 = gs ? `${String(p.callsign || "").padEnd(8)} ${gs}` : String(p.callsign || "");
+  const a = p.altitude;
+  const lvl = a === null || a === undefined ? "" : a < TL_FT ? `A${String(Math.max(0, Math.round(a / 100))).padStart(3)}`
+    : String(Math.round(a / 100)).padStart(3, "0");
+  const arrow = !lvl || p.vs === null || p.vs === undefined ? "" : p.vs >= VS_ARROW_FT ? "↑" : p.vs <= -VS_ARROW_FT ? "↓" : "";
+  const l3 = [`${p.aircraft || ""}${p.aircraft ? p.wake || "" : ""}`, exit || p.arrival || ""].filter(Boolean).join(" ");
+  const ft = rflFeet(p.rfl), f = ft === null ? null : Math.round(ft / 100);
+  // dziesiątki FL zawsze dwiema cyframi (FL080 → "08", jak "24" w P21: jedna cyfra wyglądałaby jak inne pole),
+  // poniżej TL jak linijka 2 ("A 45" = 4500 ft)
+  const rfl = ft === null ? "" : ft < TL_FT ? `A${String(f).padStart(3)}` : f % 10 ? String(f).padStart(3, "0") : String(f / 10).padStart(2, "0");
+  return [l1, lvl + arrow, l3, `h  s  r${rfl ? " " + rfl : ""}`];
+}
+
+// Linijki etykiety jako HTML (aircraftMarker, wzór w legendzie MAP): sam znak wywoławczy albo (detail) pełna etykieta
+// PEGASUS_21 (p21Lines; pusta trzecia linijka, np. bez planu lotu, odpada). W linijce 1 tylko znak w <b class="cs">
+// (zielony, wybrany lot pomarańczowy, map.css), prędkość w osobnym <b class="gs"> w kolorze linijek 2-4, jak na
+// etykiecie DOM004 z P21; tekst linijki (textContent) bez zmian. Nie <span>: ".acicon span" w style.css to dawna
+// etykieta z tłem i pozycją absolute.
+export function p21Html(p, { detail = true, exit = null } = {}) {
+  const cs = String(p.callsign || "");
+  const lines = detail ? p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2) : [[cs, 0]];
+  return lines.map(([t, i]) => {
+    if (i) return `<i class="l${i + 1}">${esc(t)}</i>`;
+    const [, gap = "", gs = ""] = /^(\s*)(.*)$/.exec(t.slice(cs.length)) || [];
+    return `<i class="l1"><b class="cs">${esc(cs)}</b>${gs ? `${gap}<b class="gs">${esc(gs)}</b>` : ""}</i>`;
+  }).join("");
+}
+
+// Samolot: sylwetka obrócona wg kursu (14 px, mniejsza niż do 0.12.4) i etykieta p21Html (sam znak albo, detail,
+// pełna etykieta PEGASUS_21). Bez tła: znak na zielono, reszta na biało (map.css). cls: dodatkowa klasa ikony
+// (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP); exit: punkt
+// wyjścia z FIR-u tranzytu albo odlotu za granicę (trzecia linijka zamiast lotniska docelowego).
+export function aircraftMarker(p, { label = true, detail = false, cls = "", exit = null } = {}) {
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
-    + (label ? `<span>${esc(p.callsign)}${detail ? `<br>${fl} ${esc(p.aircraft || "")} ${p.groundspeed ?? ""}` : ""}</span>` : "") + "</div>";
-  return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
+    + (label ? `<span class="p21">${p21Html(p, { detail, exit })}</span>` : "") + "</div>";
+  return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [14, 14], iconAnchor: [7, 7] }) });
 }
 
 // Wznoszenie / zniżanie (MAP, loty krajowe): p.vs = zmiana wysokości od odczytu sprzed co najmniej minAge ms.
@@ -220,29 +277,69 @@ export function climbRates(pilots, hist, now, minAge = 25000) {
 }
 
 // Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).
-// Linie: [[x, y], ...] rysowane jako łamana; okrąg: {circle: promień}.
+// Linie: [[x, y], ...] rysowane jako łamana, a gdy ostatni punkt = pierwszy, jako zamknięty wielokąt (closePath, bez
+// rozłączenia w narożniku startowym); okrąg: {circle: promień}.
+// Lotnisko (Marek, 0.12.5): jeden zamknięty, symetryczny sześciokąt wokół punktu lotniska. Do 0.12.4 sześć osobnych
+// odcinków, z których ostatni zaczynał się w (-4, -2) zamiast (-6, -2): na lewym końcu wystawał "ogonek" i zostawała dziura.
 export const SYMBOLS = {
-  aerodrome: [[[-2, -4], [4, -4]], [[4, -4], [7, -1]], [[7, -1], [4, 2]], [[4, 2], [-2, 2]], [[-2, 2], [-6, -2]], [[-4, -2], [-2, -4]]],
+  aerodrome: [[[-3, -3], [3, -3], [6, 0], [3, 3], [-3, 3], [-6, 0], [-3, -3]]],
   vor: [[[-4, 0], [-2, 2], [2, 2], [4, 0], [2, -2], [-2, -2], [-4, 0]]],
   ndb: [[[0, -4], [-2, 0], [0, 4], [2, 0], [0, -4]]],
   vfr: { circle: 3 },
   fix: { circle: 4 },
 };
 export const symbolFor = (kind) => ({ AD: "aerodrome", VOR: "vor", "VOR-DME": "vor", VORTAC: "vor", DME: "vor", NDB: "ndb", "NDB-DME": "ndb", VFR: "vfr" }[kind] || "fix");
+const closed = (line) => line.length > 2 && line[0][0] === line[line.length - 1][0] && line[0][1] === line[line.length - 1][1];
+// połowa szerokości symbolu w jednostkach SYMBOLS (nazwa punktu obok, obszar trafienia)
+export const symbolHalf = (name) => {
+  const sym = SYMBOLS[name] || SYMBOLS.fix;
+  return sym.circle || Math.max(...sym.flat().map(([x]) => Math.abs(x)));
+};
 
-// Ikona SVG symbolu (legenda, przyciski warstw)
-export function symbolSvg(name, color = "currentColor", size = 18, scale = 1.6) {
+// Zasięg symbolu z obrysem grubości w (jednostki SYMBOLS): największe |x| albo |y| razem z ostrzem narożnika
+// (stroke-linejoin miter: wierzchołek o kącie θ wystaje o w/2 / sin(θ/2) wzdłuż dwusiecznej; powyżej miterlimit 4
+// SVG ścina narożnik, wtedy najwyżej w/2) i z połową obrysu przy końcach łamanej
+export function symbolReach(name, w) {
+  const sym = SYMBOLS[name] || SYMBOLS.fix;
+  if (sym.circle) return sym.circle + w / 2;
+  let r = 0;
+  sym.forEach((line) => {
+    const ring = closed(line), pts = ring ? line.slice(0, -1) : line, n = pts.length;
+    pts.forEach(([x, y], i) => {
+      r = Math.max(r, Math.abs(x) + w / 2, Math.abs(y) + w / 2);
+      if (!ring && (i === 0 || i === n - 1)) return;
+      const [ax, ay] = pts[(i + n - 1) % n], [bx, by] = pts[(i + 1) % n];
+      const la = Math.hypot(ax - x, ay - y), lb = Math.hypot(bx - x, by - y);
+      const ux = (ax - x) / la + (bx - x) / lb, uy = (ay - y) / la + (by - y) / lb, lu = Math.hypot(ux, uy);
+      const cos = ((ax - x) * (bx - x) + (ay - y) * (by - y)) / (la * lb), sinHalf = Math.sqrt((1 - cos) / 2);
+      if (lu < 1e-9 || sinHalf < 1e-9 || 1 / sinHalf > 4) return;
+      const d = w / 2 / sinHalf;  // ostrze po stronie przeciwnej do dwusiecznej (na zewnątrz kąta)
+      r = Math.max(r, Math.abs(x - (ux / lu) * d), Math.abs(y - (uy / lu) * d));
+    });
+  });
+  return r;
+}
+
+// Ikona SVG symbolu (legenda, przyciski warstw); zamknięta łamana jako <polygon>. Skala 1.2 px na jednostkę, gdy
+// symbol się mieści; większy (lotnisko: ±6 i ostrza narożników) dostaje szerszy viewBox, żeby cały wielokąt z obrysem
+// był w ikonie (do 0.12.5 lewy i prawy wierzchołek sześciokąta lotniska były ucięte). Obrys zawsze ok. 1.3 px.
+export function symbolSvg(name, color = "currentColor", size = 14, scale = 1.2) {
   const sym = SYMBOLS[name];
-  const v = size / 2 / scale;
+  let v = size / 2 / scale;
+  // obrys 1.3 px na ekranie zależy od viewBox, a viewBox od obrysu: dwa przybliżenia wystarczą (zasięg rośnie wolno)
+  for (let k = 0; k < 3; k++) v = Math.max(size / 2 / scale, symbolReach(name, 1.3 * 2 * v / size) + 0.15);
+  v = Math.round(v * 1000) / 1000;
+  const sw = Math.round(1.3 * 2 * v / size * 1000) / 1000;
+  const pts = (line) => line.map(([x, y]) => `${x},${y}`).join(" ");
   const body = sym.circle ? `<circle cx="0" cy="0" r="${sym.circle}"/>`
-    : sym.map((line) => `<polyline points="${line.map(([x, y]) => `${x},${y}`).join(" ")}"/>`).join("");
-  return `<svg class="sym" width="${size}" height="${size}" viewBox="${-v} ${-v} ${2 * v} ${2 * v}" fill="none" stroke="${color}" stroke-width="${1.4 / scale * 1.4}">${body}</svg>`;
+    : sym.map((line) => (closed(line) ? `<polygon points="${pts(line.slice(0, -1))}"/>` : `<polyline points="${pts(line)}"/>`)).join("");
+  return `<svg class="sym" width="${size}" height="${size}" viewBox="${-v} ${-v} ${2 * v} ${2 * v}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linejoin="miter">${body}</svg>`;
 }
 
 // Marker rysowany na kanwie (mapa z preferCanvas): kształt z SYMBOLS, skalowany. Obsługuje dymki i kliknięcia
 // jak CircleMarker (obszar trafienia = promień).
 export const SymbolMarker = L.CircleMarker.extend({
-  options: { symbol: "fix", scale: 1.6, fill: false, weight: 1.6, radius: 8 },
+  options: { symbol: "fix", scale: 1, fill: false, weight: 1.3, radius: 6, lineJoin: "miter" },
   _updatePath() {
     const r = this._renderer;
     if (!r._ctx) { r._updateCircle(this); return; }
@@ -253,7 +350,12 @@ export const SymbolMarker = L.CircleMarker.extend({
       ctx.moveTo(p.x + sym.circle * s, p.y);
       ctx.arc(p.x, p.y, sym.circle * s, 0, Math.PI * 2);
     } else {
-      sym.forEach((line) => line.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, p.x + x * s, p.y + y * s)));
+      // zamknięty wielokąt bez ostatniego punktu (= pierwszy) i z closePath: narożnik startowy połączony jak pozostałe
+      sym.forEach((line) => {
+        const ring = closed(line);
+        (ring ? line.slice(0, -1) : line).forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, p.x + x * s, p.y + y * s));
+        if (ring) ctx.closePath();
+      });
     }
     r._fillStroke(ctx, this);
   },

@@ -17,10 +17,10 @@ def positions(db: Session = Depends(get_db)):
 
 
 @router.get("")
-async def overview(position: str = Query("", description="Znak stanowiska, np. EPWA_APP (puste = cały FIR)"),
+async def overview(position: str = Query("", description="Position callsign, e.g. EPWA_APP (empty = whole FIR)"),
                    db: Session = Depends(get_db)):
     """Wszystko do widoku AERODROME › OVERVIEW: poziom przejściowy, METAR/TAF z LVP, obowiązujące NOTAM-y,
     restrykcje ECFMP i vIFF oraz Airport Monitor vIFF dla lotnisk wybranego stanowiska."""
     if position and not re.fullmatch(r"[A-Za-z0-9_]{3,20}", position):
-        raise HTTPException(400, "Znak stanowiska to litery, cyfry i podkreślenia (np. EPWA_APP)")
+        raise HTTPException(400, "Position callsign: letters, digits and underscores only (e.g. EPWA_APP)")
     return await overview_service.overview(db, position or None)

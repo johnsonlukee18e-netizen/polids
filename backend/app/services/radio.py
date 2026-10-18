@@ -164,7 +164,7 @@ def sector_group(fir: str, name: str, kind: str | None = None) -> str:
         # krótkie nazwy bez kodu ICAO (LZBB "CTR", LKAA "NL") z kodem FIR-u
         return g if g[:2] == fir[:2] or re.match(r"^[ELU][A-Z]{3}[ _]", g) or len(g) > 12 else f"{fir} {g}"
     if kind == "acc":
-        return f"Sektor {_ACC.match(n).group(1)}"
+        return f"Sector {_ACC.match(n).group(1)}"
     if m := re.match(r"^CTA(\d+)", n):
         return f"CTA {m.group(1)}"
     if n == "EPWW-MIDSEA":
@@ -211,7 +211,7 @@ TAB_BY_PREFIX = (("LK", "LKAA"), ("LZ", "LZBB"), ("UK", "UKLV"), ("UM", "UMMV"),
 
 
 def neighbour_tab(p: dict) -> str | None:
-    """Zakładka sąsiada: EDWW, EDMM, EDUU (EDUU/EDYY), LKAA, LZBB, UKLV, UMMV, UMKK, EYVL, ESAA, EKDK albo INNE;
+    """Zakładka sąsiada: EDWW, EDMM, EDUU (EDUU/EDYY), LKAA, LZBB, UKLV, UMMV, UMKK, EYVL, ESAA, EKDK albo OTHER;
     None = stanowisko polskie (EP**). Najpierw EDUU/EDYY (prefiks, katalog vacs-data albo początek znaku), potem
     katalog FIR-u z vacs-data, bez niego prefiks stanowiska."""
     cs = (p.get("callsign") or "").upper()
@@ -223,12 +223,12 @@ def neighbour_tab(p: dict) -> str | None:
     if UPPER_DE & {pre, head, fir}:
         return "EDUU"
     if fir:
-        return TAB_BY_DIR.get(fir, "INNE")
+        return TAB_BY_DIR.get(fir, "OTHER")
     if pre.startswith("ED"):
         return "EDWW" if pre in EDWW_PREFIXES else "EDMM"
     if pre == "UMKK" or pre.startswith("RU-"):
         return "UMKK"
-    return next((tab for start, tab in TAB_BY_PREFIX if pre.startswith(start)), "INNE")
+    return next((tab for start, tab in TAB_BY_PREFIX if pre.startswith(start)), "OTHER")
 
 
 # --- znaki radiowe i nazwy sektorów stanowisk sąsiadów
