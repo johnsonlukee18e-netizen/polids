@@ -152,7 +152,7 @@ def test_build_documents(built):
     x, lop = built["documents"]
     assert x["url"] == "/files/docs/LOA/x.pdf" and x["current"] and x["exists"] and x["count"] == 3
     assert not lop["current"] and not lop["exists"] and lop["count"] == 1   # zły kierunek pominięty
-    assert built["errors"][0] == "loa-x: brak FIR ZZZZ w loa.json"
+    assert built["errors"][0] == "loa-x: FIR ZZZZ missing in loa.json"
     assert built["current_airac"] == "2610" and built["firs"] == ["EPWW", "EDWW"]
     assert built["notes"]["EDWW"]["silent"] == ["Transfer of control na granicy AoR."]
     assert built["cops"] == ["ALUKA", "BINKA", "RASAN", "SOXER"]
@@ -171,7 +171,7 @@ def test_build_unregistered_pdf():
         ("LOA", "LOA EPWW UMMV Minsk (AIRAC 2611)", "LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf", ["EPWW"], 0, False, True)
     assert ummv["url"] == "/files/docs/LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf" and not ummv["current"]
     assert (new["type"], new["name"]) == ("LOP", "nowy lop")
-    assert any(e.startswith("LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF bez wpisu") for e in d["errors"])
+    assert any(e.startswith("LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF without an entry") for e in d["errors"])
     assert not any(e.startswith("LOA/x.pdf") for e in d["errors"])
     # ten sam id już zajęty: kolejny numer
     assert cs.unregistered_doc("LOA/a.pdf", {"plik-loa-a-pdf"})["id"] == "plik-loa-a-pdf-2"
@@ -239,7 +239,7 @@ def test_endpoint(client):
     # wiersze z pustą stroną polską (LKAA, LZBB): adnotacja i sektory z LOA
     lkaa = [r for r in d["agreements"] if r["fir"] == "LKAA"]
     assert all(r["ep_unknown"] and "J LOW" in r["ep_chains"] and "T LOW" in r["ep_chains"] for r in lkaa)
-    assert d["unknown_label"] == "sektor nieokreślony w LOA"
+    assert d["unknown_label"] == "sector not specified in LOA"
     assert {"ALUKA", "ARSAP", "DIBED", "RASAN"} <= set(d["cops"]) and "-" not in d["cops"]
     ps = {p["callsign"]: p for p in d["positions"]}
     assert {"EPWW_DBT_CTR", "EPWW_ALL_CTR", "EPSC_TWR", "EPGD_APP", "EPPO_S_APP"} <= set(ps)
@@ -319,8 +319,8 @@ def test_endpoint_unregistered_pdf(client, monkeypatch, tmp_path):
     extra = [x for x in d["documents"] if not x["registered"]]
     assert [x["file"] for x in extra] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf"]
     assert extra[0]["exists"] and extra[0]["type"] == "LOA" and extra[0]["name"] == "LOA EPWW UMMV Minsk (AIRAC 2611)"
-    assert d["errors"] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF bez wpisu w data/seed/coordination.json "
-                           "(dopisz nazwę, FIR-y i AIRAC)"]
+    assert d["errors"] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF without an entry in data/seed/coordination.json "
+                           "(add its name, FIRs and AIRAC)"]
 
 
 def test_endpoint_errors(client, monkeypatch, tmp_path):
