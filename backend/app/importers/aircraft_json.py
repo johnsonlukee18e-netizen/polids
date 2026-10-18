@@ -24,9 +24,12 @@ PERF_SOURCE = "aircraft-database.com"
 RANGES = ("mlw", "ceiling_ft", "vmo_kt", "mmo")  # liczby z aircraft.csv: najmniejsza i największa z wersji typu
 # granice wiarygodności tych liczb (runda 14, przegląd): aircraft-database.com ma pomyłki, np. 737-200C z Vmo 0
 # i Mmo 350 (zamienione kolumny; w zakresie typu B732 dawało "M0.82–350"), C408 z Mmo 240 (Vmo w węzłach), B230
-# z pułapem 120 ft, GA8 z MLW 114 kg. Wartość spoza granic pomijamy, zakres typu liczymy z pozostałych wersji.
+# z pułapem 120 ft, GA8 z MLW 114 kg, AN28 z MLW 1961 kg (MTOW 6500 kg, mniej niż masa pustego). Wartość spoza granic
+# pomijamy, zakres typu liczymy z pozostałych wersji.
 BOUNDS = {"mlw": (50, 700000), "ceiling_ft": (1000, 80000), "vmo_kt": (40, 700), "mmo": (0.1, 1.0)}
-MLW_MTOW = (0.3, 1.1)  # MLW wersji względem jej MTOW z tego samego wiersza (gdy jest)
+# MLW wersji względem jej MTOW z tego samego wiersza (gdy jest); najniższy prawdziwy stosunek w danych ok. 0,63 (707-300B,
+# A340-500), Concorde ok. 0,6
+MLW_MTOW = (0.5, 1.1)
 # opis ICAO (Doc 8643, np. L2J): rodzaj statku, liczba silników, rodzaj silników; pasujące aircraft_type / engine_type
 # z aircraft-database.com (znak spoza tabel, np. "-" w opisie "---": bez sprawdzania)
 KINDS = {"L": {"airplane", "glider"}, "S": {"airplane", "amphibious"}, "A": {"airplane", "amphibious"},

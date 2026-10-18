@@ -110,6 +110,8 @@ def test_performance_skips_implausible_values():
     assert "mlw" not in p["GA8"]
     assert plausible("mmo", 0.82) and not plausible("mmo", 350) and not plausible("vmo_kt", 0.82)
     assert plausible("mlw", 60781, {"mtow": "57153"}) and not plausible("mlw", 114, {"mtow": "1814"})
+    # AN28 w aircraft.csv: MLW 1961 kg przy MTOW 6500 kg (stosunek 0,30); prawdziwe najniższe ok. 0,63 (707-300B)
+    assert not plausible("mlw", 1961, {"mtow": "6500"}) and plausible("mlw", 93894, {"mtow": "148325"})
 
 
 def test_aircraft_csv_values_are_plausible():

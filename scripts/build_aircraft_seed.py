@@ -38,6 +38,7 @@ FIXES = {
     ("C408", "408 SkyCourier"): {"mmo": None},  # turbośmigłowy bez Mmo: 240 to prędkość w węzłach
     ("B230", "230"): {"ceiling": None},  # pułap 120 ft
     ("GA8", "GA8 Airvan"): {"mlw": None},  # MLW 114 kg przy MTOW 1814 kg
+    ("AN28", "An-28"): {"mlw": None},  # MLW 1961 kg przy MTOW 6500 kg (mniej niż masa pustego)
 }
 
 FIELDS = [

@@ -107,7 +107,7 @@ AN2,,Antonov,An-2,airplane,piston,1,L,F,1817,12.4,5.35,5500,5250,14800,,
 AN22,,Antonov,An-22 Antei,airplane,turboprop,4,,,64.4,57.84,12.54,,,29900,,
 AN24,,Antonov,An-24,airplane,turboprop,2,,,29.2,23.53,8.32,,,29900,,
 AN26,,Antonov,An-26,airplane,turboprop,2,M,E,29.19,23.8,8.58,24000,24000,23000,,
-AN28,,Antonov,An-28,airplane,turboprop,2,L,F,22.06,12.95,4.5,6500,1961,13800,189,
+AN28,,Antonov,An-28,airplane,turboprop,2,L,F,22.06,12.95,4.5,6500,,13800,189,
 AN3,,Antonov,An-3,airplane,turboprop,1,L,,,,,5800,5800,12800,138,
 AN30,,Antonov,An-30,airplane,turboprop,2,,,29.2,23.8,8.32,,,27200,,
 AN32,,Antonov,An-32,airplane,turboprop,2,M,E,29.2,23.68,8.75,27000,25000,26200,248,0.65
