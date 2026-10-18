@@ -74,7 +74,10 @@ export function chartRows(charts, { kind = "", selected = "" } = {}) {
 
 // lista map lotniska (GET /api/docs/charts/<ICAO>, AD 2.24 eAIP) z PDF-em obok; chart = mapa z adresu ("" = pierwsza),
 // onPick(id) po kliknięciu mapy (krok historii)
-const cache = new Map();   // ICAO → odpowiedź serwera (bez ponownego pobierania przy powrocie do lotniska)
+// ICAO → { t, d }: odpowiedź serwera bez ponownego pobierania przy powrocie do lotniska; po godzinie pytamy znowu
+// (serwer i tak trzyma listę 6 h, a sesja przez zmianę AIRAC dostaje wtedy nowe PDF-y)
+const cache = new Map();
+const CACHE_MS = 3600 * 1000;
 export function mountCharts(pane, { icao, name, base, chart = "", onPick = () => {} }) {
   const text = aeroPageUrl(base, icao);
   const el = h(`<div class="mapwrap chl-wrap">
@@ -108,6 +111,7 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     const c = charts.find((x) => x.id === sel) || charts[0];
     const label = c.page || `AD 2 ${icao} ${c.id}`;
     sel = c.id;
+    if (kind && c.kind !== kind) kind = "";   // mapa z adresu albo historii ukryta filtrem: filtr wyłączamy
     $(".chl-kinds").innerHTML = kindButtons(charts, kind);
     $(".chl-list").innerHTML = chartRows(charts, { kind, selected: sel });
     $(".chl-list .chl-row.on")?.scrollIntoView({ block: "nearest" });
@@ -129,8 +133,9 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     const row = e.target.closest?.(".chl-row");
     if (row && e.target === row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); row.click(); }
   });
-  const got = (d) => { data = d; if (!d.error) cache.set(icao, d); draw(); };
-  if (cache.has(icao)) got(cache.get(icao));
+  const got = (d) => { data = d; if (!d.error) cache.set(icao, { t: Date.now(), d }); draw(); };
+  const hit = cache.get(icao);
+  if (hit && Date.now() - hit.t < CACHE_MS) got(hit.d);
   else api(`/api/docs/charts/${icao}`).then(got).catch((e) => got({ page: text, charts: [], error: e.message }));
   // mapa z adresu (←, Wstecz): "" = pierwsza
   return { pick(id) { sel = id; draw(); }, current: () => sel };

@@ -2,6 +2,7 @@
 liczy się z cyklu na dziś (UTC), więc po 29.10.2026 zakładki nie pokazują po cichu starej poprawki 10-26."""
 import asyncio
 import os
+import re
 import tempfile
 import time
 from datetime import date
@@ -13,7 +14,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app import main  # noqa: E402
-from backend.app.config import settings  # noqa: E402
+from backend.app.config import ROOT_DIR, settings  # noqa: E402
 from backend.app.services import eaip, embed  # noqa: E402
 from backend.app.services.airac import current_airac  # noqa: E402
 
@@ -476,3 +477,44 @@ def test_charts_endpoint(monkeypatch):
         assert r.status_code == 400, bad
         assert r.json()["detail"] == "Aerodrome charts: ICAO code of a Polish aerodrome (EP + 2 letters)"
     assert seen == ["EPZG"]
+    # EP-kod bez części AD 2 w eAIP: 404 bez pobierania strony u PAŻP
+    r = client.get("/api/docs/charts/EPKS")
+    assert r.status_code == 404 and seen == ["EPZG"]
+
+
+def test_ad2_list_matches_frontend():
+    js = (ROOT_DIR / "frontend" / "js" / "tabs" / "aip.js").read_text("utf-8")
+    block = js[js.index("export const AD2 = ["):js.index("]];") + 3]
+    assert tuple(re.findall(r'\["(EP[A-Z]{2})"', block)) == eaip.AD2_AERODROMES
+
+
+VARIANT_HTML = """<html><body><table>
+<tr><td>EPWA - AERODROME<br/>GROUND MOVEMENT CHART - ICAO</td><td><a href="AD_2_EPWA_3-1.pdf"><img src="p.gif"></a></td></tr>
+<tr><td><p>STANDARD DEPARTURE CHART</p><p>INSTRUMENT (SID) - ICAO RWY 29</p></td><td><a href="AD_2_EPWA_4-1.pdf"></a></td></tr>
+<tr><td><del>OLD AERODROME CHART</del><ins>AERODROME CHART - ICAO</ins></td><td><a href="AD_2_EPWA_2-1.pdf"></a></td></tr>
+<tr><td><del>WITHDRAWN CHART</del></td><td><del><a href="AD_2_EPWA_9-1.pdf"></a></del></td></tr>
+<tr><td rowspan="2">INSTRUMENT APPROACH CHART - ICAO RWY 33</td><td><a href="AD_2_EPWA_12-1.pdf"></a></td></tr>
+<tr><td><a href="AD_2_EPWA_12-2.pdf"></a></td></tr>
+<tr><td>VISUAL APPROACH CHART - ICAO</td><td><table><tr><td><a href="AD_2_EPWA_13-1.pdf"></a></td></tr></table></td></tr>
+<tr><td>AIRCRAFT PARKING/DOCKING CHART - ICAO<td><a href="AD_2_EPWA_5-1.pdf"></a>
+<tr><td></td><td><a href="AD_2_EPWA_6-1.pdf" title="BIRD CONCENTRATION CHART"></a></td></tr>
+<tr><td></td><td><a href="AD_2_EPWA_7-1.pdf"><img src="p.gif" alt="AERODROME OBSTACLE CHART - ICAO TYPE A"></a></td></tr>
+</table></body></html>"""
+
+
+def test_parse_charts_real_eaip_variants():
+    # <br>/<p> rozdzielają słowa, <del> (skreślone w poprawce) pomijamy, rowspan i tabela w komórce, brak </td>/</tr>,
+    # tytuł z title odnośnika albo alt obrazka
+    page = "https://docs.pansa.pl/ais/eaipifr/X/eAIP/AD%202%20EPWA%201-en-GB.html"
+    got = {c["id"]: (c["title"], c["kind"]) for c in eaip.parse_charts(VARIANT_HTML, page, "EPWA")}
+    assert got == {
+        "3-1": ("AERODROME GROUND MOVEMENT CHART - ICAO", "AD"),
+        "4-1": ("STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO RWY 29", "SID"),
+        "2-1": ("AERODROME CHART - ICAO", "AD"),
+        "12-1": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "IAC"),
+        "12-2": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "IAC"),
+        "13-1": ("VISUAL APPROACH CHART - ICAO", "VFR"),
+        "5-1": ("AIRCRAFT PARKING/DOCKING CHART - ICAO", "AD"),
+        "6-1": ("BIRD CONCENTRATION CHART", "OTHER"),
+        "7-1": ("AERODROME OBSTACLE CHART - ICAO TYPE A", "OBST"),
+    }

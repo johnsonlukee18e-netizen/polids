@@ -32,6 +32,9 @@
 /* wynik pośredni (poziom QNH, ISA na FL) */
 .conv-out { margin-top: 6px; color: var(--cyan); font: 12px/1.45 var(--mono); }
 .conv-out:empty { display: none; }
+/* miejsce na pełny wynik od początku: karty pod QNH i Mach nie przesuwają się w trakcie pisania */
+.conv-card[data-k="qnh"] .conv-out { min-height: calc(5 * 1.45em); }
+.conv-card[data-k="mach"] .conv-out { min-height: calc(2 * 1.45em); }
 .conv-nowrap { white-space: nowrap; }
 .conv-note { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #1c221c; color: var(--muted); font: 11px/1.4 var(--sans); }
 .conv-note sup { font-size: 9px; }

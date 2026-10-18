@@ -205,6 +205,10 @@ CHART_KINDS = (("OBST", ("OBSTACLE", "TERRAIN")),
                ("VFR", ("VISUAL", "VFR")), ("IAC", ("INSTRUMENT APPROACH", "APPROACH CHART")),
                ("AD", ("AERODROME CHART", "PARKING", "DOCKING", "GROUND MOVEMENT")))
 
+# lotniska z częścią AD 2 eAIP IFR (AD 1.3, AIRAC AMDT 10-26); ta sama lista co AD2 w frontend/js/tabs/aip.js.
+# Inny kod EPxx nie trafia do PAŻP (każdy dawałby pobranie strony, której nie ma).
+AD2_AERODROMES = ("EPBY", "EPGD", "EPKK", "EPKT", "EPLB", "EPLL", "EPMO", "EPPO", "EPRA", "EPRZ", "EPSC", "EPSY", "EPWA",
+                  "EPWR", "EPZG")
 _charts: dict[str, tuple[float, dict]] = {}          # adres strony AD 2 -> (ważny do, wynik)
 _charts_inflight: dict[str, asyncio.Task] = {}
 
@@ -225,44 +229,116 @@ def chart_kind(title: str) -> str:
     return next((kind for kind, words in CHART_KINDS if any(w in t for w in words)), "OTHER")
 
 
+# znaczniki, które w przeglądarce rozdzielają słowa (tytuł mapy w dwóch liniach: "AERODROME<br/>GROUND MOVEMENT CHART")
+BREAKS = {"br", "p", "div", "li", "ul", "ol", "tr", "td", "th", "table", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+
 class _Rows(HTMLParser):
-    """Wiersze tabel (teksty komórek i odnośniki) oraz odnośniki poza tabelami (adres, tekst)."""
+    """Wiersze tabel (teksty komórek, odnośniki i ich zapasowe opisy: title odnośnika albo alt obrazka) oraz odnośniki
+    poza tabelami (adres, tekst). Odporny na eAIP: <br>/<p>/<div> rozdzielają słowa; tekst i odnośniki w <del> (zmiana
+    z poprawki: skreślone) pomijamy; <td> bez </td> i <tr> bez </tr> zamyka poprzednią komórkę / wiersz; tabela
+    zagnieżdżona w komórce należy do tej komórki; komórka z rowspan przechodzi do następnych wierszy (tytuł mapy
+    wspólny dla kilku PDF-ów)."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.rows: list[tuple[list[str], list[str]]] = []
+        self.rows: list[tuple[list[str], list[str], list[str]]] = []   # (komórki, odnośniki, opisy odnośników)
         self.loose: list[tuple[str, str]] = []
-        self._row: tuple[list[str], list[str]] | None = None
-        self._cell: list[str] | None = None
+        self._stack: list[dict] = []          # otwarte wiersze (zagnieżdżone tabele): {cells, hrefs, alts, cell}
+        self._span: list[tuple[str, int]] = []   # komórka z rowspan z poprzedniego wiersza: (tekst, ile wierszy jeszcze)
         self._a: tuple[str, list[str]] | None = None
+        self._del = 0
+        self._tables = 0                      # otwarte <table> (wiersz należy do najbardziej wewnętrznej)
+
+    @property
+    def _row(self):
+        return self._stack[-1] if self._stack else None
+
+    def _text(self, data: str):
+        if self._del:
+            return
+        row = self._row
+        if row is not None and row["cell"] is not None:
+            row["cell"].append(data)
+        if self._a is not None:
+            self._a[1].append(data)
+
+    def _close_cell(self, row):
+        if row["cell"] is not None:
+            text = " ".join("".join(row["cell"]).split())
+            row["cells"].append(text)
+            if row["rowspan"] > 1 and row["depth"] == 1:
+                self._span = [(text, row["rowspan"] - 1)]
+            row["cell"] = None
+
+    def _close_row(self):
+        row = self._stack.pop()
+        self._close_cell(row)
+        parent = self._row
+        if parent is not None and parent["cell"] is not None:
+            # wiersz tabeli zagnieżdżonej w komórce: tekst i odnośniki należą do komórki zewnętrznej
+            parent["cell"].append(" " + " ".join(row["cells"]) + " ")
+            parent["hrefs"] += row["hrefs"]
+            parent["alts"] += row["alts"]
+        else:
+            self.rows.append((row["cells"], row["hrefs"], row["alts"]))
 
     def handle_starttag(self, tag, attrs):
-        if tag == "tr":
-            self._row, self._cell = ([], []), None
+        a = dict(attrs)
+        if tag in BREAKS:
+            self._text(" ")
+        if tag == "del":
+            self._del += 1
+        elif tag == "table":
+            self._tables += 1
+        elif tag == "tr":
+            while self._row is not None and self._row["table"] >= self._tables:
+                self._close_row()                     # <tr> bez </tr> poprzedniego wiersza tej samej tabeli
+            carried = [t for t, n in self._span if n > 0] if not self._stack else []
+            self._span = [(t, n - 1) for t, n in self._span if n > 1] if not self._stack else self._span
+            self._stack.append({"cells": carried, "hrefs": [], "alts": [], "cell": None, "rowspan": 1,
+                                "depth": len(self._stack) + 1, "table": self._tables})
         elif tag in ("td", "th") and self._row is not None:
-            self._cell = []
-        elif tag == "a" and (href := dict(attrs).get("href")):
+            row = self._row
+            self._close_cell(row)                     # <td> bez </td> poprzedniej komórki
+            row["cell"] = []
+            try:
+                row["rowspan"] = int(a.get("rowspan") or 1) if not row["cells"] else 1
+            except ValueError:
+                row["rowspan"] = 1
+        elif tag == "a" and (href := a.get("href")) and not self._del:
             self._a = (href, [])
             if self._row is not None:
-                self._row[1].append(href)
+                self._row["hrefs"].append(href)
+                self._row["alts"].append(a.get("title") or "")
+        elif tag == "img" and self._a is not None and self._row is not None and a.get("alt") and not self._row["alts"][-1]:
+            self._row["alts"][-1] = a["alt"]
 
     def handle_endtag(self, tag):
-        if tag in ("td", "th") and self._row is not None and self._cell is not None:
-            self._row[0].append(" ".join("".join(self._cell).split()))
-            self._cell = None
+        if tag in BREAKS:
+            self._text(" ")
+        if tag == "del":
+            self._del = max(0, self._del - 1)
+        elif tag in ("td", "th") and self._row is not None:
+            self._close_cell(self._row)
         elif tag == "tr" and self._row is not None:
-            self.rows.append(self._row)
-            self._row = self._cell = None
+            self._close_row()
+        elif tag == "table":
+            while self._row is not None and self._row["table"] >= self._tables:
+                self._close_row()                     # tabela zamknięta bez </tr>
+            self._tables = max(0, self._tables - 1)
         elif tag == "a" and self._a is not None:
             if self._row is None:
                 self.loose.append((self._a[0], " ".join("".join(self._a[1]).split())))
             self._a = None
 
     def handle_data(self, data):
-        if self._cell is not None:
-            self._cell.append(data)
-        if self._a is not None:
-            self._a[1].append(data)
+        self._text(data)
+
+    def close(self):
+        super().close()
+        while self._stack:
+            self._close_row()
 
 
 def _chart_url(page_url: str, href: str) -> str | None:
@@ -281,14 +357,14 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
     """Mapy lotniska ze strony AD 2: wiersze tabeli z odnośnikiem do PDF-u AD_2_<ICAO>_<n>-<m>.pdf (tabela AD 2.24;
     tytuł = pierwsza niepusta komórka poza numerem strony, bez przedrostka "<ICAO> - "), w kolejności strony,
     bez powtórzeń adresu.
-    Odnośnik do mapy poza tabelą: tytuł z tekstu odnośnika. id "2-1" (numer z nazwy pliku, bez zer z przodu,
+    Bez tytułu w komórkach: title odnośnika albo alt obrazka. Odnośnik do mapy poza tabelą: tytuł z tekstu odnośnika. id "2-1" (numer z nazwy pliku, bez zer z przodu,
     08-1 → 8-1), page "AD 2 EPWA 2-1", kind: AD, OBST, SID, STAR, IAC, VFR albo OTHER."""
     icao = icao.upper()
     p = _Rows()
     p.feed(html)
     p.close()
-    found = [(href, next((c for c in cells if c and not PAGE_LABEL.fullmatch(c)), "")) for cells, hrefs in p.rows
-             for href in hrefs]
+    found = [(href, next((c for c in cells if c and not PAGE_LABEL.fullmatch(c)), "") or alt)
+             for cells, hrefs, alts in p.rows for href, alt in zip(hrefs, alts)]
     found += p.loose
     out, seen = [], set()
     for href, text in found:
@@ -334,8 +410,9 @@ async def _load_charts(page_url: str, icao: str) -> dict:
                     if size > CHARTS_MAX_BYTES:
                         raise ValueError(f"page larger than {CHARTS_MAX_BYTES // 1048576} MB")
                     chunks.append(chunk)
-                html = b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace")
-        out["charts"] = parse_charts(html, page_url, icao)
+                raw, enc = b"".join(chunks), resp.encoding or "utf-8"
+        # strona AD 2 ma kilka MB: dekodowanie i parsowanie poza pętlą zdarzeń (inaczej serwer stoi 1-3 s)
+        out["charts"] = await asyncio.to_thread(lambda: parse_charts(raw.decode(enc, errors="replace"), page_url, icao))
         if not out["charts"]:
             out["error"] = "no charts found in AD 2.24 of the eAIP page"
     except (httpx.HTTPError, ValueError) as exc:

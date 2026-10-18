@@ -28,7 +28,7 @@ export default {
     function mountAgreements(pane) {
       const el = h(`<div class="cr-wrap">
         <div class="cr-main"><div class="cr-sum"></div><div class="cr-blocks"><p class="hint">Loading LoA…</p></div>
-          <details class="cr-notes"><summary>LOA rules</summary><div class="cr-notes-b"></div></details></div>
+          <details class="cr-notes"><summary>LoA rules</summary><div class="cr-notes-b"></div></details></div>
         <div class="cr-side">
           <div class="ms-card"><h4>Points / filter</h4>
             <input type="search" class="field cr-q" list="cr-cops" placeholder="e.g. ALUKA EPKS" autocomplete="off" spellcheck="false" aria-label="Points and filter">
@@ -74,12 +74,12 @@ export default {
         if (st.pos) {
           const keys = ownedKeys(data.chains, st.pos, online);
           const ons = data.positions.filter((p) => online.has(p.callsign) && p.callsign !== st.pos).map((p) => shortCs(p.callsign));
-          own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LOA sector now (covered by a position higher in the order).")
+          own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LoA sector now (covered by a position higher in the order).")
             + (net === false ? " No VATSIM data: computed as if nobody were online."
               : net ? ` Online: ${ons.length ? esc(ons.join(", ")) : "none of these positions"}.` : "");
         } else own.textContent = "All transfers, not split by sector.";
         const firs = [...new Set([...v.out, ...v.in].map((r) => r.fir))];
-        $(".cr-notes summary").textContent = `LOA rules: transfer of control, VFR, other${firs.length ? " – " + firs.join(", ") : ""}`;
+        $(".cr-notes summary").textContent = `LoA rules: transfer of control, VFR, other${firs.length ? " – " + firs.join(", ") : ""}`;
         $(".cr-notes-b").innerHTML = notesHtml(data, firs) || `<p class="hint">No rules for the selected FIRs.</p>`;
         if (wantTop !== null) { main.scrollTop = wantTop; wantTop = null; }
       };
@@ -120,7 +120,7 @@ export default {
     function mountDocuments(pane) {
       const el = h(`<div class="mapwrap cd-wrap">
         <div class="mapside">
-          <div class="ms-card"><h4>LOA and LOP documents</h4>
+          <div class="ms-card"><h4>LoA and LOP documents</h4>
             <div class="ms-row"><select class="field cd-fir" aria-label="FIR"><option value="">All FIRs</option></select>
               <select class="field cd-type" aria-label="Type"><option value="">LOA and LOP</option><option>LOA</option><option>LOP</option></select></div>
             <div class="cd-list"><p class="hint">Loading…</p></div></div>

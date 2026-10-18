@@ -142,8 +142,9 @@ function tick() {
   const d = new Date();
   document.getElementById("utc").textContent = d.toISOString().slice(11, 19) + "Z";
 }
-setInterval(tick, 1000);
-tick();
+// zegar UTC tuż po pełnej sekundzie (setInterval z dowolnej chwili rozjeżdżał się z zegarami w CONVERSION)
+const tickLoop = () => { tick(); setTimeout(tickLoop, 1000 - (Date.now() % 1000) + 5); };
+tickLoop();
 
 (async () => {
   try {

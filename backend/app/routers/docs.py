@@ -30,4 +30,6 @@ async def aerodrome_charts(icao: str):
     icao = icao.strip().upper()
     if not EP_ICAO.fullmatch(icao):
         raise HTTPException(400, "Aerodrome charts: ICAO code of a Polish aerodrome (EP + 2 letters)")
+    if icao not in eaip.AD2_AERODROMES:
+        raise HTTPException(404, f"Aerodrome charts: {icao} has no AD 2 part in the eAIP")
     return await eaip.aerodrome_charts(icao)

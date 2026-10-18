@@ -297,8 +297,13 @@ export default {
     linkGradient(el("gradient"));
     const box = pane.querySelector(".conv-clocks");
     drawClocks(box);
-    // co sekundę tylko wtedy, gdy zakładka jest na ekranie
-    setInterval(() => { if (root.classList.contains("active") && !document.hidden) drawClocks(box); }, 1000);
+    // co sekundę tylko wtedy, gdy zakładka jest na ekranie; jak zegar w menu (app.js) tuż po pełnej sekundzie, więc oba
+    // zegary UTC pokazują tę samą sekundę
+    const loop = () => {
+      if (root.classList.contains("active") && !document.hidden) drawClocks(box);
+      setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
+    };
+    setTimeout(loop, 1000 - (Date.now() % 1000) + 5);
     return { activate: () => drawClocks(box) };
   },
 };
