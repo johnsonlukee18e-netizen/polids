@@ -498,7 +498,7 @@ def test_strip_tab_and_ruch_wiring():
     assert "export function mountDman(" in dm and "strips?dman=1" in dm and 'navigate("map"' in dm
     # STRIP i AERODROME › RUCH: paski EFES tylko w zakładce STRIP; PASKI tylko dla lotnisk z podzakładką w STRIP
     assert "import { mountStrips" not in dm and "mountStrips(" not in dm
-    assert "STRIP_AIRPORTS.includes(icao)" in dm and "Paski tylko dla 15 głównych lotnisk" in dm
+    assert "STRIP_AIRPORTS.includes(icao)" in dm and "Strips only for the 15 main aerodromes" in dm
     # RUCH bez lotów OFFLINE (planowane tylko z vIFF): filtr także w przeglądarce, bez statusu OFFLINE w szczegółach
     assert 'd.planned = (d.planned || []).filter((s) => s.planned !== "viff");' in dm and '"OFFLINE"' not in dm
     # widok DMAN/AMAN ↔ AMAN w adresie AERODROME (#aerodrome/EPWA/aman): kliknięcie = krok do cofnięcia
@@ -518,7 +518,7 @@ def test_strip_tab_and_ruch_wiring():
     # przed pierwszymi danymi A-CDM nieznane: nazwy puste, przycisk czasu odlotów ukryty, dymki zakresów od razu
     assert "const cdm = () => (data ? !!data.cdm : null)" in dm and 'b.style.visibility = name ? "" : "hidden"' in dm
     assert 'data-sort="t">${lbl().obt}' not in dm and "sortAll();\n    renderSpans();\n  };" in dm
-    assert 'L.obt || "odlotów"' in dm and "if (!data) return;   // sortowanie" in dm
+    assert 'L.obt || "departure"' in dm and "if (!data) return;   // sortowanie" in dm
     # brązowy callsign = etykieta na CTOT (także bez A-CDM, gdy CTOT później niż ETOT; po starcie ATOT, nie brązowa)
     assert 'csCls: t.ttotSrc === "CTOT" ? "ctot"' in dm and "!!s.viff?.ctot" not in dm
     # bez A-CDM bez pustych wierszy TOBT/TSAT/TTOT w szczegółach lotu; CTOT zawsze widoczny
@@ -526,7 +526,7 @@ def test_strip_tab_and_ruch_wiring():
     # bez A-CDM wyróżniony wiersz, na którym stoi etykieta drabiny ETOT (ATOT, CTOT albo ETOT), nie zawsze ETOT
     assert 'const lad = (k) => !c && t.ttotSrc === k;' in dm
     assert 'R("ATOT", hm(v.atot), lad("ATOT") ? "hl"' in dm and '(c ? v.ctot : lad("CTOT")) ? "hl"' in dm
-    assert '!c ? (lad("ETOT") ? "hl" : "")' in dm and '"to samo co etykieta na drabinie ETOT"})' not in dm
+    assert '!c ? (lad("ETOT") ? "hl" : "")' in dm and '"same as the label on the ETOT ladder"})' not in dm
     # przepustowość odlotów: "vIFF A-CDM" tylko na lotnisku z A-CDM
     assert 'cdm() ? "vIFF A-CDM" : ' in dm and "/h (vIFF A-CDM)." not in dm
     for css in ("dman.css", "strips.css"):

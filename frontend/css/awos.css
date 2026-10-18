@@ -1,5 +1,5 @@
 /* AWOS (AERODROME › AWOS): wygląd jak NM UI: cienkie ramki 1px, paski tytułów małymi literami z odstępami,
-   wartości monospace, bez poświaty. Przełącznik PRZEGLĄD / AWOS na pasku narzędzi AERODROME. */
+   wartości monospace, bez poświaty. Przełącznik INFO / AWOS na pasku narzędzi AERODROME. */
 .aero-view { display: inline-flex; border: 1px solid var(--line); }
 .aero-view button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 5px 12px;
   font: 700 11px var(--ui); letter-spacing: 1.5px; cursor: pointer; }

@@ -345,7 +345,7 @@ console.log(JSON.stringify({
   split: ["EPWA", "EPWA/awos", "EPWA/ruch", "0"].map(m.splitArg),
   ep: Object.fromEntries(qs.map((q) => [q, pick(ep, q)])),
   ed: Object.fromEntries(dq.map((q) => [q, pick(ed, q)])),
-  plural: [1, 2, 4, 5, 12, 22, 32, 33, 93, 119, 469].map((n) => n + " " + m.lotnisk(n)),
+  plural: [1, 2, 4, 5, 12, 22, 32, 33, 93, 119, 469].map((n) => n + " " + m.adWord(n)),
   step: [[-1, 10, 1], [-1, 10, -1], [-1, 10, 18], [0, 10, -1], [3, 10, 1], [3, 10, -1], [9, 10, 1], [2, 10, 18],
     [9, 10, -18], [5, 0, 1], [-1, 0, -1]].map(([i, n, d]) => m.stepSel(i, n, d)),
   page: [[684, 38], [708, 38], [38, 38], [0, 38], [684, 0], [684, NaN]].map(([h, r]) => m.pageRows(h, r)),
@@ -408,8 +408,9 @@ def test_js_search_umlauts_and_aliases(aerojs):
 
 
 def test_js_plural(aerojs):
-    assert aerojs["plural"] == ["1 lotnisko", "2 lotniska", "4 lotniska", "5 lotnisk", "12 lotnisk", "22 lotniska",
-                                "32 lotniska", "33 lotniska", "93 lotniska", "119 lotnisk", "469 lotnisk"]
+    assert aerojs["plural"] == ["1 aerodrome", "2 aerodromes", "4 aerodromes", "5 aerodromes", "12 aerodromes",
+                                "22 aerodromes", "32 aerodromes", "33 aerodromes", "93 aerodromes", "119 aerodromes",
+                                "469 aerodromes"]
 
 
 def test_js_step_selection(aerojs):
