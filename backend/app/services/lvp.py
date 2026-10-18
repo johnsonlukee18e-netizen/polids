@@ -19,9 +19,9 @@ CANCEL_HOLD = timedelta(minutes=30)
 MAX_GAP = timedelta(minutes=90)   # dłuższa przerwa między METAR w pamięci: liczymy od nowa, jak po starcie aplikacji
 OPS = {"<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operator.ge}
 SYM = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
-LABEL = {"rvr_m": "RVR", "vis_m": "widzialność", "ceiling_ft": "podstawa"}
+LABEL = {"rvr_m": "RVR", "vis_m": "visibility", "ceiling_ft": "ceiling"}
 UNIT = {"rvr_m": "m", "vis_m": "m", "ceiling_ft": "ft"}
-PHASES = (("prep", "Przygotowanie"), ("lvp", "LVP"), ("cancel", "Odwołanie"))
+PHASES = (("prep", "Preparation"), ("lvp", "LVP"), ("cancel", "Cancellation"))
 
 # icao -> {"obs": czas METAR, "prev": (stan, od kiedy) przed tym METAR, "cur": (stan, od kiedy) po nim, "reasons": [...]}
 _memory: dict[str, dict] = {}
@@ -51,15 +51,15 @@ def _cond_text(key: str, spec, eq: int | None = None) -> str:
 
 
 def phase_text(phase: dict | None) -> str:
-    """'RVR < 550 m lub podstawa < 200 ft' (do dymków w interfejsie)."""
+    """'RVR < 550 m or ceiling < 200 ft' (do dymków w interfejsie)."""
     if not phase:
-        return "AIP nie podaje"
+        return "not in AIP"
     parts = [_cond_text(k, phase[k], phase.get("rvr_eq_m") if k == "vis_m" else None) for k in LABEL if k in phase]
-    return (" i " if phase.get("logic") == "and" else " lub ").join(parts)
+    return (" and " if phase.get("logic") == "and" else " or ").join(parts)
 
 
 def rules(cfg: dict) -> list[str]:
-    """Progi trzech faz do dymka: ['Przygotowanie: …', 'LVP: …', 'Odwołanie: …']."""
+    """Progi trzech faz do dymka: ['Preparation: …', 'LVP: …', 'Cancellation: …']."""
     return [f"{name}: {phase_text(cfg.get(key))}" for key, name in PHASES]
 
 
@@ -71,13 +71,13 @@ def _values(key: str, cond: dict, m: Metar) -> list[tuple[str, int | None, int]]
     if key == "rvr_m":
         if rvrs:
             return [(lbl, v, limit) for lbl, v in rvrs]
-        return [("widzialność", m.visibility_m, limit)] if m.visibility_m is not None else []
+        return [("visibility", m.visibility_m, limit)] if m.visibility_m is not None else []
     if key == "vis_m":
         if m.visibility_m is not None:
-            return [("widzialność", m.visibility_m, limit)]
+            return [("visibility", m.visibility_m, limit)]
         eq = cond.get("rvr_eq_m")
         return [(lbl, v, eq) for lbl, v in rvrs] if eq else []
-    return [("podstawa", m.ceiling_ft, limit)]
+    return [("ceiling", m.ceiling_ft, limit)]
 
 
 def _check(phase: dict, m: Metar) -> dict:
@@ -92,7 +92,7 @@ def _check(phase: dict, m: Metar) -> dict:
         vals = _values(key, phase, m)
         if not vals:
             results.append(False)
-            missing.append(f"{_cond_text(key, phase[key])} (brak w METAR)")
+            missing.append(f"{_cond_text(key, phase[key])} (not in METAR)")
             continue
         ok = [v is None and not worse or v is not None and fn(v, lim) for _, v, lim in vals]
         met = any(ok) if worse else all(ok)
@@ -101,7 +101,7 @@ def _check(phase: dict, m: Metar) -> dict:
             if worse and good:
                 hits.append(f"{lbl} {v} {unit} {SYM[op]} {lim} {unit}")
             elif not worse and not good:
-                missing.append(f"{lbl} {SYM[op]} {lim} {unit} (jest {v} {unit})")
+                missing.append(f"{lbl} {SYM[op]} {lim} {unit} (now {v} {unit})")
         if not worse and met:   # wartości faktycznie porównane (np. RVR zamiast widzialności, której brak w METAR)
             hits += [f"{lbl} {v} {unit} {SYM[op]} {lim} {unit}" if v is not None else f"{lbl} {SYM[op]} {lim} {unit}"
                      for lbl, v, lim in vals]
@@ -138,13 +138,13 @@ def transition(cfg: dict, m: Metar, prev: tuple[str | None, datetime | None], ob
     if state == "LVP":
         cancel = _check(cfg["cancel"], m) if cfg.get("cancel") else {"met": True, "hits": [], "missing": []}
         if not cancel["met"]:
-            return "LVP", since, [f"do odwołania: {x}" for x in cancel["missing"]]
-        return "CANCELLED", obs, [f"warunki odwołania: {' i '.join(cancel['hits'])}" if cancel["hits"]
-                                  else "warunki wprowadzenia ustały"]
+            return "LVP", since, [f"to cancel: {x}" for x in cancel["missing"]]
+        return "CANCELLED", obs, [f"cancellation criteria: {' and '.join(cancel['hits'])}" if cancel["hits"]
+                                  else "activation criteria no longer met"]
     prep = _check(cfg["prep"], m) if cfg.get("prep") else None
     if state == "CANCELLED" and since is not None and obs is not None and obs - since < CANCEL_HOLD:
-        extra = [f"przygotowanie: {x}" for x in prep["hits"]] if prep and prep["met"] else []
-        return "CANCELLED", since, ["warunki odwołania spełnione", *extra]
+        extra = [f"preparation: {x}" for x in prep["hits"]] if prep and prep["met"] else []
+        return "CANCELLED", since, ["cancellation criteria met", *extra]
     if prep and prep["met"]:
         return "PREP", since if state == "PREP" and since is not None else obs, prep["hits"]
     return None, None, []
@@ -190,6 +190,6 @@ def evaluate(m: Metar | None, icao: str, now: datetime | None = None) -> dict:
     if state == "CANCELLED" and since is not None and (now or datetime.now(timezone.utc)) >= since + CANCEL_HOLD:
         state, since, reasons = transition(cfg, m, (None, None), obs)
     if state == "LVP" and since is not None and ref is not None and since < ref:
-        reasons = [f"w mocy od {_hhmm(since)}", *reasons]
+        reasons = [f"in force since {_hhmm(since)}", *reasons]
     return {**base, "state": state, "reasons": reasons, "since": _hhmm(since) if state else None,
             "until": _hhmm(since + CANCEL_HOLD) if state == "CANCELLED" and since else None}

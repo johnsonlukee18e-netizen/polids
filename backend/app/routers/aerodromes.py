@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/aerodromes", tags=["aerodrome"])
 def _ad(db: Session, icao: str) -> Aerodrome:
     ad = db.get(Aerodrome, icao.upper())
     if not ad:
-        raise HTTPException(404, f"Nie znam lotniska {icao}")
+        raise HTTPException(404, f"Unknown aerodrome {icao}")
     return ad
 
 
@@ -52,7 +52,7 @@ def fir_list(key: str, db: Session = Depends(get_db)):
     główne lotnisko miasta, 1 = ze stanowiskami ATC, 2 = pozostałe; alias = inne nazwy do wyszukiwania)."""
     k = key.upper()
     if k not in FIR_KEYS:
-        raise HTTPException(404, f"Nie znam listy lotnisk {key[:8]}")
+        raise HTTPException(404, f"Unknown aerodrome list {key[:8]}")
     return [{"icao": a["icao"], "name": a["name"], "kind": a["kind"], "rank": a["rank"], "alias": a["alias"]}
             for a in fir_lists(db)[k]]
 
@@ -75,11 +75,11 @@ async def card(icao: str, db: Session = Depends(get_db)):
     ATIS ze stanem w sieci VATSIM (kto, od kiedy, litera i tekst ATIS)."""
     code = icao.upper()
     if not re.fullmatch(r"[A-Z0-9]{4}", code):
-        raise HTTPException(404, f"Nie znam lotniska {icao[:8]}")
+        raise HTTPException(404, f"Unknown aerodrome {icao[:8]}")
     local = await run_in_threadpool(_card_local, db, code)
     entry, known = local["entry"], local["known"]
     if not entry and not known:
-        raise HTTPException(404, f"Nie znam lotniska {code}")
+        raise HTTPException(404, f"Unknown aerodrome {code}")
 
     async def safe(label, coro, errs=(UpstreamError,)):
         try:
@@ -182,7 +182,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
         net_error = f"VATSIM: {exc}"
     if atis and (atis["arr"] or atis["dep"]):
         in_use = {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
-                  "reason": f"Z ATIS {atis['letter'] or ''}".strip()}
+                  "reason": f"From ATIS {atis['letter'] or ''}".strip()}
     else:
         in_use = {**pref, "source": "SUGGESTED"}
 
@@ -203,7 +203,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
 
 @router.get("/{icao}/strips")
 async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
-    """Paski postępu lotu do STRIP i AERODROME › RUCH (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
+    """Paski postępu lotu do STRIP i AERODROME › TRAFFIC (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
     vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese i kategoria turbulencji z bazy typów.
 
     Każdy pasek ma też pola DMAN/AMAN (services/dman.py): registration, a przylot entry_fix, eta_s, eldt_s, eldt.

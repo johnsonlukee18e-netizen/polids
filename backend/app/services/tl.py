@@ -26,12 +26,12 @@ def fl_text(fl: int | None) -> str:
 def from_qnh(qnh: float | None) -> dict:
     """Poziom przejściowy z najniższego QNH kontrolowanych lotnisk FIR EPWW.
 
-    Zwraca {"fl": 80 albo 90, "rule": opis po polsku} albo {"fl": None, ...}, gdy nie ma żadnego QNH."""
+    Zwraca {"fl": 80 albo 90, "rule": opis (po angielsku)} albo {"fl": None, ...}, gdy nie ma żadnego QNH."""
     if qnh is None:
-        return {"fl": None, "rule": "brak QNH z METAR-ów – nie można wyznaczyć poziomu przejściowego"}
+        return {"fl": None, "rule": "no QNH from METARs – transition level cannot be determined"}
     if qnh <= LOW_QNH_HPA:
-        return {"fl": FL_LOW_QNH, "rule": f"QNH ≤ {LOW_QNH_HPA} hPa na co najmniej jednym lotnisku → {fl_text(FL_LOW_QNH)}"}
-    return {"fl": FL_NORMAL, "rule": f"QNH na wszystkich lotniskach > {LOW_QNH_HPA} hPa → {fl_text(FL_NORMAL)}"}
+        return {"fl": FL_LOW_QNH, "rule": f"QNH ≤ {LOW_QNH_HPA} hPa at one or more aerodromes → {fl_text(FL_LOW_QNH)}"}
+    return {"fl": FL_NORMAL, "rule": f"QNH > {LOW_QNH_HPA} hPa at all aerodromes → {fl_text(FL_NORMAL)}"}
 
 
 def fir_level(qnhs: dict[str, float | None]) -> dict:
@@ -48,8 +48,8 @@ def fir_level(qnhs: dict[str, float | None]) -> dict:
     # FL080 jest pewne tylko wtedy, gdy znamy QNH wszystkich lotnisk: brakujące mogło być ≤ 995 hPa
     uncertain = level["fl"] == FL_NORMAL and bool(missing)
     if uncertain:
-        level["rule"] = (f"QNH > {LOW_QNH_HPA} hPa na {len(have)} z {len(qnhs)} lotnisk "
-                         f"(brak QNH: {', '.join(missing)}) → {fl_text(FL_NORMAL)}")
+        level["rule"] = (f"QNH > {LOW_QNH_HPA} hPa at {len(have)} of {len(qnhs)} aerodromes "
+                         f"(no QNH: {', '.join(missing)}) → {fl_text(FL_NORMAL)}")
     return {**level, "text": fl_text(level["fl"]), "qnh_min": qnh, "qnh_icao": icao,
             "low": sorted(i for i, q in have.items() if q <= LOW_QNH_HPA),
             "stations": len(have), "missing": missing, "uncertain": uncertain,

@@ -224,7 +224,7 @@ def test_fir_lists_from_navdata(client):
 
 def test_card_foreign_airport(client, fakes):
     d = client.get("/api/aerodromes/ukll/card").json()
-    assert (d["icao"], d["fir"], d["fir_label"]) == ("UKLL", "UKLV", "Ukraina, FIR Lwów") and d["name"] == "LVIV INTL"
+    assert (d["icao"], d["fir"], d["fir_label"]) == ("UKLL", "UKLV", "Ukraine, FIR Lviv") and d["name"] == "LVIV INTL"
     assert d["metar"].startswith("UKLL ") and d["parsed"]["qnh"] == 1015 and d["taf"].startswith("TAF UKLL")
     types = [p["type"] for p in d["positions"]]
     assert types == sorted(types, key=aerolist.TYPE_ORDER.index) and {"APP", "TWR", "GND", "ATIS"} <= set(types)
@@ -239,7 +239,12 @@ def test_card_foreign_airport(client, fakes):
     assert client.get("/api/aerodromes/EPWA/card").json()["name"] == "WARSZAWA CHOPIN"
     # nieznany kod: 404 z komunikatem, po którym karta (aerolist.js UNKNOWN) pokazuje jeden komunikat i nie odpytuje
     r = client.get("/api/aerodromes/ZZZZ/card")
-    assert r.status_code == 404 and r.json()["detail"].startswith("Nie znam lotniska")
+    assert r.status_code == 404 and r.json()["detail"].startswith("Unknown aerodrome ")
+    import re
+
+    from backend.app.config import ROOT_DIR
+    unknown = re.search(r"const UNKNOWN = /(.+)/;", (ROOT_DIR / "frontend" / "js" / "aerolist.js").read_text("utf-8"))
+    assert unknown and re.match(unknown.group(1), r.json()["detail"])
     # lądowisko śmigłowców nie jest na liście ESAA, ale jego karta się otwiera (z navdata)
     assert client.get("/api/aerodromes/ESHC/card").json()["name"] == "STOCKHOLM/SODERSJUKHUSET"
     assert client.get("/api/aerodromes/E%3CB%3E/card").status_code == 404

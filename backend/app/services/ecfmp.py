@@ -23,26 +23,26 @@ FIR_EPWW = "EPWW"
 CACHE_SECONDS = 120
 FIR_CACHE_SECONDS = 86400
 
-# rodzaje restrykcji (FlowMeasureType w ECFMP) po polsku
-TYPE_PL = {
-    "minimum_departure_interval": "minimalny odstęp między startami",
-    "average_departure_interval": "średni odstęp między startami",
-    "per_hour": "liczba lotów na godzinę",
-    "miles_in_trail": "odstęp w milach (MIT)",
-    "max_ias": "maksymalna prędkość IAS",
-    "max_mach": "maksymalna liczba Macha",
-    "ias_reduction": "redukcja prędkości IAS",
-    "mach_reduction": "redukcja liczby Macha",
-    "prohibit": "zakaz lotów",
-    "mandatory_route": "trasa obowiązkowa",
-    "ground_stop": "wstrzymanie startów (ground stop)",
+# rodzaje restrykcji (FlowMeasureType w ECFMP) do panelu OVERVIEW
+TYPE_TXT = {
+    "minimum_departure_interval": "minimum departure interval",
+    "average_departure_interval": "average departure interval",
+    "per_hour": "flights per hour",
+    "miles_in_trail": "miles in trail (MIT)",
+    "max_ias": "maximum IAS",
+    "max_mach": "maximum Mach",
+    "ias_reduction": "IAS reduction",
+    "mach_reduction": "Mach reduction",
+    "prohibit": "prohibited",
+    "mandatory_route": "mandatory route",
+    "ground_stop": "ground stop",
 }
-# rodzaje warunków (FilterType w ECFMP) po polsku
-FILTER_PL = {
-    "ADEP": "odlot z", "ADES": "przylot do", "waypoint": "przez punkt",
-    "level_above": "powyżej poziomu", "level_below": "poniżej poziomu", "level": "poziom",
-    "member_event": "uczestnicy eventu", "member_not_event": "poza eventem",
-    "range_to_destination": "odległość do lotniska docelowego",
+# rodzaje warunków (FilterType w ECFMP) do panelu OVERVIEW
+FILTER_TXT = {
+    "ADEP": "departing", "ADES": "arriving", "waypoint": "via",
+    "level_above": "above level", "level_below": "below level", "level": "level",
+    "member_event": "event members", "member_not_event": "non-event members",
+    "range_to_destination": "range to destination",
 }
 _SECONDS_TYPES = ("minimum_departure_interval", "average_departure_interval")
 
@@ -52,7 +52,7 @@ def value_text(kind: str, value) -> str:
     if value is None:
         return ""
     if kind in _SECONDS_TYPES and isinstance(value, (int, float)):
-        return f"co {value / 60:g} min" if value >= 60 else f"co {value:g} s"
+        return f"every {value / 60:g} min" if value >= 60 else f"every {value:g} s"
     if kind == "per_hour":
         return f"{value}/h"
     if kind in ("miles_in_trail", "range_to_destination"):
@@ -86,7 +86,7 @@ def _levels(filters: list[dict]) -> list[str]:
     for f in filters:
         kind = f.get("type")
         if kind in ("level", "level_above", "level_below"):
-            out.append(f"{FILTER_PL[kind]} {f.get('value')}")
+            out.append(f"{FILTER_TXT[kind]} {f.get('value')}")
     return out
 
 
@@ -99,7 +99,7 @@ def measure(raw: dict, firs: dict[int, str], now: datetime) -> dict:
     start, end = _dt(raw.get("starttime")), _dt(raw.get("endtime"))
     return {
         "ident": raw.get("ident") or "", "reason": raw.get("reason") or "",
-        "type": kind, "type_label": TYPE_PL.get(kind, kind), "value": m.get("value"),
+        "type": kind, "type_label": TYPE_TXT.get(kind, kind), "value": m.get("value"),
         "value_text": value_text(kind, m.get("value")),
         "start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
         "adep": pick("ADEP"), "ades": pick("ADES"), "waypoints": pick("waypoint"), "levels": _levels(filters),
@@ -126,7 +126,7 @@ def viff_measure(raw: dict, now: datetime) -> dict:
               if isinstance(r, dict)]
     return {
         "ident": raw.get("ident") or "", "reason": raw.get("reason") or "",
-        "type": kind, "type_label": TYPE_PL.get(kind, kind), "value": seconds,
+        "type": kind, "type_label": TYPE_TXT.get(kind, kind), "value": seconds,
         "value_text": value_text(kind, seconds),
         "start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
         "adep": [str(x) for x in raw.get("ADEP") or []], "ades": [str(x) for x in raw.get("ADES") or []],
@@ -167,14 +167,14 @@ async def measures(airports=(), now: datetime | None = None) -> dict:
         items = [measure(m, fir_ids, now) for m in raw if isinstance(m, dict)]
         return _result(items, ads, "ECFMP", None)
     except (UpstreamError, ValueError, KeyError, TypeError, AttributeError) as exc:   # Attribute: np. "measure" nie jako obiekt
-        ecfmp_error = f"ECFMP niedostępny: {exc}"
+        ecfmp_error = f"ECFMP unavailable: {exc}"
     from . import viff as viff_service  # import tutaj, żeby nie robić zależności na starcie
     try:
         data = await viff_service._get("/etfms/ecfmp", ttl=CACHE_SECONDS)
         items = [viff_measure(m, now) for m in (data if isinstance(data, list) else []) if isinstance(m, dict)]
-        return _result(items, ads, "vIFF", f"{ecfmp_error} – dane z vIFF (/etfms/ecfmp)")
+        return _result(items, ads, "vIFF", f"{ecfmp_error} – data from vIFF (/etfms/ecfmp)")
     except Exception as exc:  # noqa: BLE001 - zapas: każdy błąd vIFF kończy się komunikatem w panelu
-        return {"measures": [], "source": None, "error": f"{ecfmp_error}; zapas vIFF też nie odpowiedział: {exc}"}
+        return {"measures": [], "source": None, "error": f"{ecfmp_error}; vIFF fallback did not respond either: {exc}"}
 
 
 def _result(items: list[dict], airports: set[str], source: str, note: str | None) -> dict:

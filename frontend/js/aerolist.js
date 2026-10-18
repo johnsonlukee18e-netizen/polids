@@ -309,7 +309,7 @@ Enter = WYŚWIETL (dokładny ICAO, inaczej zaznaczone trafienie: główne lotnis
 
 const TYPE_LABEL = { APP: "APP", TWR: "TWR", GND: "GND", DEL: "DEL", ATIS: "ATIS" };
 // odpowiedź 404 karty (backend: routers/aerodromes.py card): takiego lotniska nie ma w danych
-const UNKNOWN = /^Nie znam lotniska/;
+const UNKNOWN = /^Unknown aerodrome /;
 
 // Czas obserwacji METAR (np. 051630Z) i ile minut temu (też PRZEGLĄD w aerodrome.js)
 export function obsAge(time) {

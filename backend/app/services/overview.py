@@ -42,7 +42,7 @@ _SLICE = re.compile(r"^(EP[A-Z]{2})_(?:M?CTR|[LU]?TMA|APP|DEP|DIR)", re.I)
 _ACC = re.compile(r"^EPWW_[A-Z0-9_]*(?:CTR|FSS)$")
 _FIS = re.compile(r"information", re.I)       # FIS ma własne sektory, nie lotniska – pomijamy w filtrze
 TOWER_SUFFIXES = ("TWR", "GND", "DEL", "RMP")
-GROUPS = [("ACC", "ACC / FIR"), ("APP", "APP / zbliżanie"), ("TWR", "TWR / lotnisko")]
+GROUPS = [("ACC", "ACC / FIR"), ("APP", "APP / approach"), ("TWR", "TWR / aerodrome")]
 
 
 def _kind(callsign: str, name: str) -> str | None:
@@ -222,7 +222,7 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
                               "schedule": n.get("schedule"), "raw": n.get("raw")})
     items.sort(key=lambda n: (n["icao"], n["id"] or ""))
     error = "; ".join(f"{', '.join(ads)}: {msg}" for msg, ads in errors.items())
-    return {"notams": items, "error": f"Serwer NOTAM: {error}" if errors else None}
+    return {"notams": items, "error": f"NOTAM server: {error}" if errors else None}
 
 
 def tv_restrictions(volumes, now: datetime) -> list[dict]:
@@ -252,7 +252,7 @@ async def _flow(airports: list[str], now: datetime) -> dict:
                                            {"filter": "EP", "active": "false", "activeAndDisabled": "true"}, ttl=300)
             return tv_restrictions(data, now), None
         except Exception as exc:  # noqa: BLE001 - vIFF nie ma dokumentacji błędów, panel pokazuje treść wyjątku
-            return [], f"vIFF niedostępny: {exc}"
+            return [], f"vIFF unavailable: {exc}"
 
     measures, (restrictions, viff_error) = await asyncio.gather(
         ecfmp_service.measures(airports, now), viff_tvs())
@@ -316,7 +316,7 @@ async def _monitor(icaos: list[str], now: datetime) -> dict:
                      "known": bool(info), "regulated": regs,
                      "avg_delay": round(sum(delays) / len(delays)) if delays else None}
     errors = [e for e in (e1, e2, e3) if e]
-    return {"airports": out, "error": "vIFF niedostępny: " + "; ".join(errors) if errors else None}
+    return {"airports": out, "error": "vIFF unavailable: " + "; ".join(errors) if errors else None}
 
 
 async def overview(db: Session, position: str | None = None, now: datetime | None = None) -> dict:
