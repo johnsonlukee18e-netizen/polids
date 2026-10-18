@@ -48,7 +48,8 @@ a { color: var(--green-text); }
 .menu nav button.active, .submenu button.active {
   background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06;
 }
-/* menu główne ciaśniej niż podmenu: 22 przyciski + logo, zegar i użytkownik mieszczą się bez przewijania od 900 px wysokości */
+/* menu główne ciaśniej niż podmenu: 22 przyciski + logo, zegar i użytkownik (także ADMIN) mieszczą się bez przewijania
+   od 900 px wysokości */
 .menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }
 /* display:block wyżej przykrywa [hidden] przeglądarki: ADMIN (hidden dla nie-administratorów) zajmował miejsce w menu */
 .menu nav button[hidden] { display: none; }
@@ -63,7 +64,7 @@ a { color: var(--green-text); }
 
 .menu { width: 150px; flex: none; background: #050605; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; }
 .menu nav { flex: 1; overflow-y: auto; }
-.menu .brand { display: block; padding: 4px 4px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.menu .brand { display: block; padding: 4px 4px 5px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
 .menu .brand img { display: block; width: 100%; height: auto; max-height: 40px; object-fit: contain; }
 .clockbox { text-align: center; padding: 8px 0 4px; border-top: 1px solid var(--line); }
 .clock { font: 700 20px var(--mono); color: #fff; }
@@ -74,6 +75,14 @@ a { color: var(--green-text); }
 .userbox button { width: 100%; padding: 3px 6px; background: none; border: 1px solid var(--line); border-radius: 0;
   color: var(--muted); font-size: 11px; cursor: pointer; }
 .userbox button:hover { color: var(--text); border-color: var(--green); }
+/* zalogowany administrator na 1366x768: zegar i użytkownik ciaśniej, żeby ADMIN nie chował się pod zegarem
+   (po regułach wyżej, bo te same selektory) */
+@media (max-height: 820px) {
+  .clockbox { padding: 4px 0 2px; }
+  .clock { font-size: 18px; }
+  .userbox { padding-top: 4px; }
+  .userbox form { margin-top: 2px; }
+}
 
 main { flex: 1; min-width: 0; position: relative; }
 .view { position: absolute; inset: 0; display: none; }
