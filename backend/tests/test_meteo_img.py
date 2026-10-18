@@ -93,7 +93,10 @@ def js(tmp_path_factory):
     d = tmp_path_factory.mktemp("meteo")
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
     (d / "solar.mjs").write_text((FRONTEND / "js" / "solar.js").read_text("utf-8"), "utf-8")
-    (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"').replace('"../solar.js"', '"./solar.mjs"'), "utf-8")
+    # mapa QNH (qnhmap.js, z Leafletem) poza testem: zaślepka
+    (d / "qnhmap.mjs").write_text("export const qnhMap = () => ({ destroy() {} });\n", "utf-8")
+    (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"').replace('"../solar.js"', '"./solar.mjs"')
+                                 .replace('"../qnhmap.js"', '"./qnhmap.mjs"'), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "meteo.mjs").as_uri()], capture_output=True, text=True, timeout=60)
