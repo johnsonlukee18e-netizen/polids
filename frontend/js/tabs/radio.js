@@ -116,7 +116,7 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
     + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span><span class="rb-loa-v" title="${esc(f.version)}">${esc(f.version)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
     + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Open the LOA in COORDINATION › DOCUMENTS (← returns to RADIO)">COORDINATION ›</button>`
-      + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="${esc(pdf)}">PDF ↗</a>` : "")
+      + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="Open the LOA PDF">PDF ↗</a>` : "")
     + `<button type="button" class="rb-loa-x" title="Close (Esc)">✕</button></div>`;
   if (!f) {
     return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Loading LOA…"

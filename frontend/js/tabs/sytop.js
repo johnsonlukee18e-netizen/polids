@@ -197,7 +197,7 @@ export default {
       const at = hm(data?.updated || data?.now);
       upd.classList.toggle("stale", !!(data && (error || down || stale.length)));
       upd.textContent = !data ? "" : down ? `attempt ${hm(data.now)} · no data`
-        : `updated ${at}${error ? " · refresh failed" : ""}`;
+        : `Updated ${at}${error ? " · refresh failed" : ""}`;
       upd.title = !data ? "" : error ? `Last refresh attempt: ${error}`
         : down ? "UTC time of the last attempt – the PL vACC NOTAM server did not respond"
           : `UTC time the NOTAMs were fetched from the PL vACC server (oldest data on the list); checked ${hm(data.now)}`;

@@ -212,7 +212,7 @@ export function docCardHtml(d, { selected = false, airac = "" } = {}) {
     <div class="cd-tags">${tags.join("")}</div>
     <div class="cd-meta">${meta}</div>
     ${d.positions.length ? `<div class="cd-pos">${d.positions.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</div>` : ""}
-    <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="${esc(d.file)}">PDF ↗</a>`
+    <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="Open the PDF: ${esc(d.name)}">PDF ↗</a>`
       : `<span class="error">missing file ${esc(d.file)}</span>`}
       ${d.count ? `<button type="button" class="btn cd-agr" title="Transfers from this document">LoA ›</button>` : ""}</div>
   </div>`;

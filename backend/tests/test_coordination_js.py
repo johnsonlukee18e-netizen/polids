@@ -319,7 +319,7 @@ def test_lop_cards_and_addresses(out, api_docs):
     assert 'data-doc="lop-twr-epwa"' in c and ">LOP TWR Warszawa Chopin (EPWA)<" in c
     assert '<span class="cd-tag ty">LOP</span><span class="cd-tag fir">EPWW</span>' in c and "AIRAC" not in c
     assert '<div class="cd-pos"><span>EPWA TWR</span></div>' in c and "0 transfers" in c and "content in preparation" in c
-    assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="LOP/LOP TWR/LOP TWR Okęcie.pdf"' in c
+    assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="Open the PDF: LOP TWR Warszawa Chopin (EPWA)"' in c
     assert "missing file" not in c and "cd-new" not in c
     # 30 sektorów ACC: każda etykieta bez łamania w środku („B LOW”), łamanie tylko na „ · ”
     assert "<span>B LOW</span> · <span>B MID</span> · <span>B HIGH</span>" in lop["acc"] and "<span>T HIGH</span></div>" in lop["acc"]

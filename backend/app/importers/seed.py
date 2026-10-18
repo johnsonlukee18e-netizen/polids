@@ -155,6 +155,13 @@ def seed_callsigns(db: Session):
         db.merge(Callsign(source="seed", **r))
 
 
+# tytuły dokumentów, których nazwa pliku nic nie mówi po angielsku (polskie wydania ICAO)
+DOC_TITLES = {
+    "Doc_4444_pl.pdf": "ICAO Doc 4444 PANS-ATM (Polish edition)",
+    "Doc_9432_pl.pdf": "ICAO Doc 9432 Manual of Radiotelephony (Polish edition)",
+}
+
+
 def register_docs(db: Session):
     settings.docs_dir.mkdir(parents=True, exist_ok=True)
     known = set(db.scalars(select(Document.filename)))
@@ -163,10 +170,16 @@ def register_docs(db: Session):
         if rel in known:
             continue
         stem = p.stem.upper()
-        cat = "ICAO" if stem.startswith(("DOC", "ICAO")) else ("EUROCONTROL" if "EUROCONTROL" in stem else "INNE")
+        cat = "ICAO" if stem.startswith(("DOC", "ICAO")) else ("EUROCONTROL" if "EUROCONTROL" in stem else "OTHER")
         if "/" in rel:
             cat = rel.split("/")[0].upper()
-        db.add(Document(title=p.stem.replace("_", " ").replace("-", " "), category=cat, filename=rel))
+        db.add(Document(title=DOC_TITLES.get(rel) or p.stem.replace("_", " ").replace("-", " "), category=cat, filename=rel))
+    # bazy sprzed 0.12.5: grupa "INNE" i tytuły z nazw plików
+    for d in db.scalars(select(Document)).all():
+        if d.category == "INNE":
+            d.category = "OTHER"
+        if d.filename in DOC_TITLES:
+            d.title = DOC_TITLES[d.filename]
     # usuń wpisy, których pliki zniknęły
     for d in db.scalars(select(Document)).all():
         if not (settings.docs_dir / d.filename).exists():

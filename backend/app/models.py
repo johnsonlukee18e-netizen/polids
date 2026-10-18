@@ -141,7 +141,7 @@ class Document(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(200))
-    category: Mapped[str] = mapped_column(String(60), default="INNE")
+    category: Mapped[str] = mapped_column(String(60), default="OTHER")
     filename: Mapped[str] = mapped_column(String(255), unique=True)
     description: Mapped[str | None] = mapped_column(Text)
 

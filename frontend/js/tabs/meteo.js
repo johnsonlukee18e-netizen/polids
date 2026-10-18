@@ -562,7 +562,7 @@ function gametTab(pane) {
     wrap.querySelectorAll(".gmt-areas button").forEach((b) => b.classList.toggle("active", b.dataset.area === area));
     const hint = $(".gmt-hint");
     const at = data?.fetched_at ? `fetched ${data.fetched_at.slice(11, 16)}Z` : "";
-    hint.textContent = ["IMGW · EPWW FIR", at, data?.stale ? "old data: IMGW server not responding" : ""].filter(Boolean).join(" · ");
+    hint.textContent = ["IMGW · FIR EPWW", at, data?.stale ? "old data: IMGW server not responding" : ""].filter(Boolean).join(" · ");
     hint.title = `GAMET (area forecast for low-level flights) from the IMGW aviation website, refreshed every ${GAMET_REFRESH / 60000} min.`;
     if (!data && !err) return;
     const link = `<a href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer">awiacja.imgw.pl › GAMET ↗</a>`;
@@ -867,7 +867,7 @@ export default {
       { sep: true },
       { id: "gamet", label: "GAMET", fill: true, render: gametTab },
       { id: "sigwx", label: "SIGWX", fill: true, render: imgView({ key: "sigwx", title: "SIGWX", frames: [{ label: "", url: SIGWX_URL }],
-        note: "IMGW · SFC–FL100", desc: "significant weather chart SFC–FL100 (EPWW FIR), IMGW" }) },
+        note: "IMGW · SFC–FL100", desc: "significant weather chart SFC–FL100 (FIR EPWW), IMGW" }) },
       { id: "icing", label: "ICING", fill: true, render: icingTab },
       { id: "qnh", label: "QNH", fill: true, render: qnhMap },
       { id: "sat-eur", label: "SAT EUR", fill: true, render: windy("sat-eur") },
