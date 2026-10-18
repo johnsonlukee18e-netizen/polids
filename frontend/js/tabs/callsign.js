@@ -10,11 +10,11 @@ export default {
     const letters = letterMenu(root, (l) => { prefix = l; load(); });
     const pane = h(`<div class="pane">
       <div class="toolbar">
-        <input type="search" class="q" placeholder="Szukaj: kod ICAO, callsign, operator, kraj…" size="46" autofocus>
-        <select class="cat"><option value="">Wszystkie</option><option value="CARGO">tylko CARGO</option><option value="MIL">tylko MILITARY</option></select>
+        <input type="search" class="q" placeholder="Search: ICAO code, callsign, operator, country…" size="46" autofocus>
+        <select class="cat"><option value="">All</option><option value="CARGO">CARGO only</option><option value="MIL">MILITARY only</option></select>
         <span class="hint count"></span>
       </div>
-      <table class="data callsigns"><thead><tr><th>ICAO</th><th>Callsign</th><th>Operator</th><th>Kraj</th><th>Info</th></tr></thead><tbody></tbody></table>
+      <table class="data callsigns"><thead><tr><th>ICAO</th><th>Callsign</th><th>Operator</th><th>Country</th><th>Info</th></tr></thead><tbody></tbody></table>
     </div>`);
     root.append(pane);
     const q = pane.querySelector(".q");
@@ -25,8 +25,8 @@ export default {
       try {
         const rows = await api(`/api/callsigns?q=${encodeURIComponent(q.value.trim())}&prefix=${prefix}&category=${pane.querySelector(".cat").value}&limit=${LIMIT}`);
         if (my !== seq) return;
-        pane.querySelector(".count").textContent = `${rows.length} wyników`
-          + (rows.length === LIMIT ? ` (pokazano pierwsze ${LIMIT} – wybierz literę lub wpisz szukany kod)` : "");
+        pane.querySelector(".count").textContent = `${rows.length} ${rows.length === 1 ? "result" : "results"}`
+          + (rows.length === LIMIT ? ` (first ${LIMIT} shown – pick a letter or type a code)` : "");
         body.innerHTML = rows.map((r) => `<tr><td class="icao">${esc(r.icao)}</td><td class="tel">${esc(r.telephony || "–")}</td>
           <td class="minor">${esc(r.name)}</td><td class="minor">${esc(r.country)}</td>
           <td>${r.category ? `<span class="tag ${r.category.toLowerCase()}">${CATEGORY[r.category] || esc(r.category)}</span>` : ""}</td></tr>`).join("");
