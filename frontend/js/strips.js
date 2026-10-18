@@ -310,14 +310,15 @@ export const XL_LINES = [
     { k: "surv", l: "SUR", w: 15, v: (s, d, x) => x.eq.surv || null },
     { k: "pbn", l: "PBN", w: 16, v: (s, d, x) => x.f18.PBN || null },
   ] },
-  // Mode S: adres ICAO, wybrana wysokość, IAS, Mach, TAS, zmiana i przechylenie nie istnieją w danych VATSIM
+  // Mode S: adres ICAO, wybrana wysokość, IAS, Mach, TAS, zmiana i przechylenie nie istnieją w danych VATSIM;
+  // szerokości z Table 2-13: IAS i TAS 0..1023, Mach "0,99" (4 znaki); HDG z VATSIM to kurs 000..359 (3 cyfry)
   { gap: true, f: [
     { k: "addr", l: "ICAO ADDR", w: 6, v: () => null },
     { k: "sel", l: "SEL", w: 3, v: () => null },
     { k: "hdg", l: "HDG", w: 3, v: (s) => (live(s) && s.state === "air" ? pad3(s.heading) : null) },
-    { k: "ias", l: "IAS", w: 3, v: () => null },
-    { k: "mach", l: "MACH", w: 3, v: () => null },
-    { k: "tas", l: "TAS", w: 3, v: () => null },
+    { k: "ias", l: "IAS", w: 4, v: () => null },
+    { k: "mach", l: "MACH", w: 4, v: () => null },
+    { k: "tas", l: "TAS", w: 4, v: () => null },
   ] },
   { f: [
     { k: "gs", l: "GS", w: 4, v: (s) => (live(s) && has(s.groundspeed) ? pad3(s.groundspeed) : null) },

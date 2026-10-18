@@ -402,6 +402,9 @@ def test_extended_label_lines_fit_window(xl):
     assert (w["adep"], w["ades"], w["altn"], w["proc"], w["rwy"], w["nfq"]) == ((4, 4), (4, 4), (11, 11), (7, 7), (6, 6), (7, 7))
     assert (w["route"], w["xfl"], w["cfl"], w["rfl"], w["free"], w["rvr"]) == ((41, 41), (4, 4), (3, 3), (3, 3), (20, 20), (6, 6))
     assert (w["navcom"], w["surv"], w["pbn"]) == ((18, 18), (15, 15), (16, 16))
+    # Mode S: adres 6, SEL 3, IAS / TAS 0..1023 i Mach "0,99" po 4 znaki, GS 0..1023 i VV ze znakiem po 4
+    assert (w["addr"], w["sel"], w["ias"], w["mach"], w["tas"], w["gs"], w["vv"]) == (
+        (6, 6), (3, 3), (4, 4), (4, 4), (4, 4), (4, 4), (4, 4))
     # wyrenderowane okna (6 lotów, z KEY i bez): 8 wierszy, żaden szerszy niż XL_WIDTH, żadna wartość ponad limit pola
     assert len(xl["htmlAll"]) == 12
     for i, html in enumerate(xl["htmlAll"]):
