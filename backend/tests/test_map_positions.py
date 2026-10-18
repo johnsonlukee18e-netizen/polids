@@ -190,7 +190,7 @@ def test_simulate_and_hide(js):
     a = js["act"]
     # EKDK_UN_CTR to ten sam kontroler co EKDK_CTR: znika razem z nim; symulacja z częstotliwością stanowiska
     assert sorted(a["positions"]) == ["EPGD_TWR", "EPWA_APP"]
-    assert a["positions"]["EPGD_TWR"] == {"callsign": "EPGD_TWR", "frequency": "118.105", "name": "symulacja", "sim": True}
+    assert a["positions"]["EPGD_TWR"] == {"callsign": "EPGD_TWR", "frequency": "118.105", "name": "simulation", "sim": True}
     assert a["gone"] == ["EKDK_CTR", "EPWA_W_APP", "EPWW_N_CTR"] and a["sims"] == ["EPGD_TWR"]
     # ukryci znikają z listy zalogowanych i z plakietek FIR-ów (VATSpy)
     assert a["controllers"] == ["EPWA_APP", "EPKK_OBS"] and a["firs"] == []
@@ -257,7 +257,7 @@ def test_simulated_twin(js):
     # symulacja EKDK_CTR: ten sam symulowany kontroler pod EKDK_UN_CTR (jak alias_of zalogowanego), jedna symulacja
     tw = js["twin"]
     assert tw["ovr"] == {"EKDK_CTR": True} and tw["sims"] == ["EKDK_CTR"] and tw["live"] == ["EKDK_CTR"]
-    assert tw["un"] == {"callsign": "EKDK_CTR", "frequency": "136.555", "name": "symulacja", "sim": True, "alias_of": "EKDK_CTR"}
+    assert tw["un"] == {"callsign": "EKDK_CTR", "frequency": "136.555", "name": "simulation", "sim": True, "alias_of": "EKDK_CTR"}
     assert tw["states"] == ["sim", "sim"]
     assert tw["off"] == {"ovr": {"EKDK_CTR": True, "EKDK_UN_CTR": False}, "positions": ["EKDK_CTR"]}
     assert tw["taken"] == "Ole"  # na drugim znaku ktoś naprawdę siedzi: zostaje on
@@ -265,5 +265,5 @@ def test_simulated_twin(js):
 
 def test_simulated_acc_fir_badge(js):
     f = js["firBadge"]
-    assert f["sim"] == {"EPWW-N": [{"callsign": "EPWW_N_CTR", "frequency": "130.675", "name": "symulacja", "sim": True}]}
+    assert f["sim"] == {"EPWW-N": [{"callsign": "EPWW_N_CTR", "frequency": "130.675", "name": "simulation", "sim": True}]}
     assert f["of"] == [["EPWW-N"], ["EPWW"], ["LKAA"], [], ["EKDK"], []] and f["noData"] == []

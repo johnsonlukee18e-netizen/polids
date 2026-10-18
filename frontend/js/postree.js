@@ -3,7 +3,7 @@
 // rysujemy tak, jakby ktoś na nim był), false = ukryj zalogowanego. Z zestawu aktywnego korzysta sektoryzacja
 // (obsada wg kontrolerów online), plakietki lotnisk i FIR-ów. Funkcje czyste (testy w Node), widok w tabs/map.js.
 
-export const SIM_NAME = "symulacja";
+export const SIM_NAME = "simulation";
 
 // rodzaj plakietki lotniska ze znaku (jak w airspace.js): EPGD_L_APP → APP, EPWA_DEL → DEL
 const BADGE = { DEL: "DEL", GND: "GND", RMP: "GND", TWR: "TWR", APP: "APP", DEP: "APP", ATIS: "ATIS" };
