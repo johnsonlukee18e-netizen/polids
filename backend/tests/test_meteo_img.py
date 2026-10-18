@@ -1,6 +1,7 @@
 """METEO (runda 10): SAT PL i SAT EUR (Windy z własnym środkiem i zoomem), TURB (8 klatek IMGW co 3 h, odtwarzacz)
 i SIGWX (mapa IMGW odświeżana co 15 min). Obrazy IMGW wczytuje przeglądarka użytkownika, nie serwer PolIDS.
-0.12.3 (issue #13): kolejność podzakładek, GAMET (rejony A1–A5 i ALL), ICING (Windy z poziomem), SUN."""
+0.12.3 (issue #13): kolejność podzakładek, GAMET (rejony A1–A5 i ALL), ICING (Windy z poziomem), SUN.
+0.12.5 (issue #18): WIND i RADAR jako środkowa grupa podzakładek, WIND zawsze od 0 ft."""
 import json
 import re
 import shutil
@@ -102,17 +103,17 @@ def js(tmp_path_factory):
 
 
 def test_submenu_order():
-    """Kolejność z issue #13: METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN; METAR i TAF jak dotąd
-    (PL, MIL, INTL), WIND i RADAR (spoza listy w issue) po odstępie na końcu."""
+    """Kolejność z issue #13 i #18: METAR i TAF jak dotąd (PL, MIL, INTL), po odstępie WIND i RADAR (środkowa grupa,
+    issue #18), po drugim odstępie GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN."""
     mount = METEO[METEO.index("export default {"):]
     items = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', mount)
     assert items == [("metar-pl", "METAR PL"), ("metar-mil", "METAR MIL"), ("metar-intl", "METAR INTL"), ("taf-pl", "TAF PL"),
-                     ("taf-intl", "TAF INTL"), ("gamet", "GAMET"), ("sigwx", "SIGWX"), ("icing", "ICING"), ("qnh", "QNH"),
-                     ("sat-eur", "SAT EUR"), ("sat-pl", "SAT PL"), ("turb", "TURB"), ("sun", "SUN"), ("wind", "WIND"),
-                     ("radar", "RADAR")]
-    # odstępy: po grupie METAR/TAF i przed WIND/RADAR
+                     ("taf-intl", "TAF INTL"), ("wind", "WIND"), ("radar", "RADAR"), ("gamet", "GAMET"), ("sigwx", "SIGWX"),
+                     ("icing", "ICING"), ("qnh", "QNH"), ("sat-eur", "SAT EUR"), ("sat-pl", "SAT PL"), ("turb", "TURB"),
+                     ("sun", "SUN")]
+    # odstępy: po grupie METAR/TAF i po grupie WIND/RADAR (trzy grupy)
     seq = [i or "|" for i, _ in re.findall(r'\{ (?:id: "([^"]+)"|(sep): true)', mount)]
-    assert seq.index("|") == 5 and seq[-3:] == ["|", "wind", "radar"] and seq.count("|") == 2
+    assert seq[5:9] == ["|", "wind", "radar", "|"] and seq.count("|") == 2 and seq[-1] == "sun"
     # id podzakładek są częścią adresu "#meteo/<id>": bez "/"
     assert all("/" not in i for i, _ in items)
 
@@ -251,6 +252,18 @@ def test_images_loaded_by_browser():
     assert re.search(r"setInterval\(\s*tick\s*,\s*TURB_MS\s*\)", view)
     # animacja i odświeżanie tylko, gdy METEO jest na ekranie (ukryte zakładki zostają w DOM)
     assert re.search(r"offsetParent\s*!==\s*null", view)
+
+
+def test_wind_opens_at_0ft():
+    """Issue #18: WIND zawsze otwiera się na wietrze przy ziemi (0 ft); 3000 ft tylko do zamknięcia podzakładki, bez
+    zapamiętywania (wcześniej zapamiętany wybór 3000 ft w localStorage jest pomijany)."""
+    view = METEO[METEO.index("function windTab("):METEO.index("// --- GAMET")]
+    assert re.search(r'let mode = "0";', view)
+    assert not re.search(r'lsSet\("meteo\.wind\.mode"', METEO) and not re.search(r'lsGet\("meteo\.wind\.mode"', METEO)
+    # pozostałe wybory WIND (lotnisko, pas lotniska) nadal zapamiętane
+    assert 'lsGet("meteo.wind.ad")' in view and "lsGet(rwyKey())" in view
+    # przyciski 0 ft / 3000 ft: 0 ft pierwszy
+    assert '<button data-m="0">0 ft</button><button data-m="3000">3000 ft (podejście)</button>' in view
 
 
 def test_no_glow():

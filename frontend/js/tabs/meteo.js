@@ -588,7 +588,9 @@ function windTab(pane) {
   </div>`);
   pane.append(wrap);
   const $ = (s) => wrap.querySelector(s);
-  let mode = lsGet("meteo.wind.mode") === "3000" ? "3000" : "0";
+  // WIND zawsze otwiera się na wietrze przy ziemi (0 ft, issue #18): 3000 ft tylko do zamknięcia podzakładki, bez
+  // zapamiętywania (wcześniej zapamiętany wybór 3000 ft, klucz "meteo.wind.mode", jest pomijany)
+  let mode = "0";
   let icao = (lsGet("meteo.wind.ad") || "EPWA").toUpperCase();
   let ads = [], ad = null, rwy = null, inUse = null, aw = null, awErr = "", ptsErr = "", src = "", seq = 0, dead = false;
   const rwyKey = () => `meteo.wind.rwy.${icao}`;
@@ -692,7 +694,6 @@ function windTab(pane) {
     const b = e.target.closest("button[data-m]");
     if (!b || b.dataset.m === mode) return;
     mode = b.dataset.m;
-    lsSet("meteo.wind.mode", mode);
     bar();
     frame();
     side();
@@ -1082,13 +1083,17 @@ function sunTab(ctx) {
 
 export default {
   mount(root, ctx) {
-    // kolejność z issue #13: METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN; WIND i RADAR (spoza listy) na końcu
+    // kolejność z issue #13 i #18: METAR i TAF, odstęp, WIND i RADAR (środkowa grupa, issue #18), odstęp, GAMET, SIGWX,
+    // ICING, QNH, SAT EUR, SAT PL, TURB, SUN
     subtabs(root, [
       { id: "metar-pl", label: "METAR PL", render: wxList("metar", PL_CIV, "meteo.metar.pl") },
       { id: "metar-mil", label: "METAR MIL", render: wxList("metar", PL_MIL, "meteo.metar.mil") },
       { id: "metar-intl", label: "METAR INTL", render: wxList("metar", INTL, "meteo.metar.intl") },
       { id: "taf-pl", label: "TAF PL", render: wxList("taf", PL_CIV, "meteo.taf.pl") },
       { id: "taf-intl", label: "TAF INTL", render: wxList("taf", INTL, "meteo.taf.intl") },
+      { sep: true },
+      { id: "wind", label: "WIND", fill: true, render: windTab },
+      { id: "radar", label: "RADAR", fill: true, render: windy("radar") },
       { sep: true },
       { id: "gamet", label: "GAMET", fill: true, render: gametTab },
       { id: "sigwx", label: "SIGWX", fill: true, render: imgView({ key: "sigwx", title: "SIGWX", frames: [{ label: "", url: SIGWX_URL }],
@@ -1100,9 +1105,6 @@ export default {
       { id: "turb", label: "TURB", fill: true, render: imgView({ key: "turb", title: "TURB", frames: turbFrames(),
         note: "IMGW · DWD · statki rejsowe", desc: "prognoza turbulencji IMGW (model DWD), statki rejsowe" }) },
       { id: "sun", label: "SUN", fill: true, render: sunTab(ctx) },
-      { sep: true },
-      { id: "wind", label: "WIND", fill: true, render: windTab },
-      { id: "radar", label: "RADAR", fill: true, render: windy("radar") },
     ]);
   },
 };
