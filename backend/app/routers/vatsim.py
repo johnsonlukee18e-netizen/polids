@@ -142,7 +142,8 @@ async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db:
     (services/eptraffic.py). ep=1 (MAP): tylko samoloty z relacją. keep: znaki po przecinku, które są w odpowiedzi
     zawsze, także bez relacji i poza bbox (MAP: wybrany lot i loty z wykresu vIFF); te, które są w niej tylko dzięki
     keep (poza bbox albo, przy ep=1, bez relacji), mają "kept": true i nie liczą się do ruchu w obszarze.
-    exit: punkt wyjścia z FIR EPWW tranzytu (nazwany punkt trasy z planu lotu, etykieta samolotu na MAP) albo null."""
+    exit: punkt wyjścia z FIR EPWW tranzytu i odlotu z EP** za granicę (nazwany punkt trasy z planu lotu, etykieta
+    samolotu na MAP) albo null."""
     try:
         s, w, n, e = (float(x) for x in bbox.split(","))
     except ValueError as exc:

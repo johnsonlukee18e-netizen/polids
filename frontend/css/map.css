@@ -41,7 +41,7 @@
 .pk-i small { flex: none; color: var(--muted); }
 .pk-i.off { color: #6f786f; }
 .pk-i.off small { color: #535b53; }
-.pk input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; accent-color: var(--green-hi); cursor: pointer; }
+.pk input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; cursor: pointer; }
 .pk-none { padding: 6px; color: var(--muted); font: 11px var(--mono); }
 /* sąsiednie FIR-y: domyślnie same nazwy FIR-ów, kliknięcie rozwija sektory; ● = ilu kontrolerów obsadza sektory FIR-u */
 .pk-g.fold { position: static; border-bottom-color: #1b241b; }
@@ -85,7 +85,7 @@
 .pt-i.on span { color: #9dff6e; }
 .pt-i.sim span { color: #fff; }
 .pt-i.hid span { color: #9dff6e; text-decoration: line-through; opacity: .65; }
-.pt-i input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; accent-color: var(--green-hi); cursor: pointer; }
+.pt-i input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; cursor: pointer; }
 .pos-tree .pk-none { padding: 6px; }
 /* stanowisko symulowane na mapie: "SYM" w etykiecie, plakietka lotniska z przerywaną ramką */
 .pos-sim { padding: 0 2px; border: 1px dashed var(--yellow); color: var(--yellow); font-weight: 400; }
@@ -203,4 +203,3 @@
 .mapwrap .leaflet-container .leaflet-bar a:first-child, .mapwrap .leaflet-container .leaflet-bar a:last-child,
 .mapwrap .leaflet-control.viff-chart, .mapwrap .leaflet-control.fd-panel, .mapwrap .leaflet-control-attribution { border-radius: 0; }
 .mapside .sw input, .mapside .sw input::after { border-radius: 0; }
-.mapwrap .leaflet-tooltip.atc-tip, .mapwrap .leaflet-tooltip.aero-tip, .mapwrap .leaflet-popup-content-wrapper { box-shadow: none; }

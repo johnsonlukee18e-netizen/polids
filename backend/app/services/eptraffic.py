@@ -18,9 +18,10 @@ w pamięci (klucz: znak, lotniska, trasa), więc przy odświeżaniu co 30 s licz
 pozycji wchodzi w FIR. Gdy trasy nie da się rozpisać (błąd bazy nawigacyjnej, np. w trakcie importu), lot ma relację
 tylko z lotnisk i pozycji, a trasę rozpisujemy przy następnym odświeżeniu.
 
-Punkt wyjścia z FIR-u (etykieta tranzytu na MAP, trzecia linijka jak w PEGASUS_21): nazwany punkt trasy najbliżej
-miejsca, w którym trasa ostatni raz opuszcza FIR EPWW (do EXIT_NM od niego); bez takiego punktu (długi odcinek DCT
-przez granicę, trasa nierozpisana, łuk do lotniska docelowego) MAP pokazuje lotnisko docelowe."""
+Punkt wyjścia z FIR-u (etykieta tranzytu i odlotu z EP** za granicę na MAP, trzecia linijka jak w PEGASUS_21;
+przylot i lot krajowy pokazują lotnisko docelowe): nazwany punkt trasy najbliżej miejsca, w którym trasa ostatni raz
+opuszcza FIR EPWW (do EXIT_NM od niego); bez takiego punktu (długi odcinek DCT przez granicę, trasa nierozpisana,
+łuk do lotniska docelowego) MAP pokazuje lotnisko docelowe."""
 
 import json
 import logging
@@ -226,8 +227,9 @@ class EpTraffic:
         return [rel for rel, _ in self.classify(pilots, resolver)]
 
     def classify(self, pilots: list[dict], resolver) -> list[tuple[str | None, str | None]]:
-        """Jak relations, z punktem wyjścia z FIR-u tranzytu: [(relacja, punkt wyjścia albo None)]. Tranzyt w FIR-ze
-        z planem lotu też ma rozpisaną trasę (tylko po punkt wyjścia; relacja zostaje "trn")."""
+        """Jak relations, z punktem wyjścia z FIR-u tranzytu i odlotu z EP** za granicę: [(relacja, punkt wyjścia
+        albo None)]. Tranzyt w FIR-ze z planem lotu i odlot za granicę też mają rozpisaną trasę (tylko po punkt
+        wyjścia; relacja zostaje "trn" albo "dep"). Lot krajowy i przylot: bez punktu wyjścia."""
         outline = self._outline()
         with self._lock:
             out: list[tuple[str | None, str | None]] = []
@@ -261,7 +263,7 @@ class EpTraffic:
                 hit[1].seen = now
                 if rel is None:
                     rel = "trn" if hit[1].enters(pos, outline) else None
-                out[i] = (rel, hit[1].exit if rel == "trn" else None)
+                out[i] = (rel, hit[1].exit if rel in ("trn", "dep") else None)
             if now - self._pruned > 60:
                 self._pruned = now
                 self._plans = {cs: v for cs, v in self._plans.items() if now - v[1].seen < KEEP_S}
@@ -270,10 +272,13 @@ class EpTraffic:
     @staticmethod
     def _quick(p: dict, outline: Outline) -> tuple[str | None, tuple | None]:
         """Relacja bez trasy albo klucz planu (lotnisko odlotu, trasa, lotnisko docelowe), gdy decyduje trasa
-        (w FIR-ze: relacja "trn" i klucz planu do punktu wyjścia z FIR-u)."""
+        (w FIR-ze: relacja "trn" i klucz planu do punktu wyjścia z FIR-u; odlot z EP** za granicę: relacja "dep"
+        i klucz planu do punktu wyjścia)."""
         dep, arr = (p.get("departure") or "").upper(), (p.get("arrival") or "").upper()
         if EP_AD.match(dep):
-            return "dep", None
+            # odlot za granicę opuszcza FIR EPWW jak tranzyt: trasa tylko po punkt wyjścia (etykieta na MAP);
+            # lot krajowy (EP → EP) i bez lotniska docelowego: bez trasy
+            return "dep", ((dep, (p.get("route") or "").upper(), arr) if arr and not EP_AD.match(arr) else None)
         if EP_AD.match(arr):
             return "arr", None
         lat, lon = p.get("lat"), p.get("lon")

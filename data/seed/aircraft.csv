@@ -198,7 +198,7 @@ B214,,Bell,214,helicopter,turboshaft,1,L,,,,,6260,6260,,,
 B222,,Bell,222,helicopter,turboshaft,2,L,,,12.91,3.37,3742,3742,20000,,
 B23,,Douglas,B-23 Dragon,airplane,piston,2,M,,,,,12474,12474,,,
 B23,,Douglas,UC-67 Dragon,airplane,piston,2,M,,,,,12474,12474,,,
-B230,,Bell,230,helicopter,turboshaft,2,L,,,12.96,3.26,3810,3810,120,,
+B230,,Bell,230,helicopter,turboshaft,2,L,,,12.96,3.26,3810,3810,,,
 B25,,North American,B-25 Mitchell,airplane,piston,2,M,,,,,15422,14606,28000,,
 B26,,Douglas,A-26 Invader,airplane,piston,2,M,E,21.3,15.2,5.6,15876,14061,,,
 B29,,"Boeing Defense, Space & Security",B-29 Superfortress,airplane,piston,4,,,,,,,,,,
@@ -243,7 +243,7 @@ B721,,"Boeing Defense, Space & Security",C-22,airplane,turbofan,3,,,32.92,40.59,
 B722,,Boeing,727-200,airplane,turbofan,3,,,32.92,46.68,10.65,,,42000,390,0.9
 B722,,Boeing,727-200F,airplane,turbofan,3,,,32.92,46.68,10.65,,,42000,350,0.88
 B732,,Boeing,737-200,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,350,0.82
-B732,,Boeing,737-200C,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,0,350
+B732,,Boeing,737-200C,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,350,0.82
 B732,,"Boeing Defense, Space & Security",T-43,airplane,turbofan,2,,,23.35,30.48,11.28,,,,,
 B732,,"Boeing Defense, Space & Security",VC-96,airplane,turbofan,2,M,E,23.35,30.48,11.28,58105,48534,37000,350,0.82
 B733,,Boeing,737-300,airplane,turbofan,2,M,E,28.88,33.4,11.13,63276,52888,37000,340,0.82
@@ -425,7 +425,7 @@ C340,,Cessna,340,airplane,piston,2,L,,,,,2717,2717,,,
 C402,,Cessna,401,airplane,piston,2,L,,,,,2858,2812,,,
 C402,,Cessna,402,airplane,piston,2,L,,,,,3107,3107,,,
 C404,,Cessna,404 Titan,airplane,piston,2,L,,,,,3810,3674,30000,,
-C408,,Cessna,408 SkyCourier,airplane,turboprop,2,M,,,,,8618,8437,25000,210,240
+C408,,Cessna,408 SkyCourier,airplane,turboprop,2,M,,,,,8618,8437,25000,210,
 C411,,Cessna,411,airplane,piston,2,L,,,,,2948,2948,,,
 C414,,Cessna,414 Chancellor,airplane,piston,2,L,,,,,3062,3062,,,
 C42,,Comco Ikarus,Ikarus C42,airplane,piston,1,L,F,8.71,6.38,2.2,560,560,,,
@@ -724,7 +724,7 @@ GA4C,,Gulfstream Aerospace,Gulfstream GVII-G400,airplane,turbofan,2,,,,,,,,,,
 GA5C,,Gulfstream Aerospace,Gulfstream GVII-G500,airplane,turbofan,2,M,,,,,36106,29189,51000,340,0.925
 GA6C,,Gulfstream Aerospace,Gulfstream GVII-G600,airplane,turbofan,2,M,,,,,42910,34836,51000,340,0.925
 GA7,,Grumman American,GA-7 Cougar,airplane,piston,2,L,,,,,1724,1724,,,
-GA8,,GippsAero,GA8 Airvan,airplane,piston,1,L,F,12.41,8.95,3.89,1814,114,20000,,
+GA8,,GippsAero,GA8 Airvan,airplane,piston,1,L,F,12.41,8.95,3.89,1814,,20000,,
 GABR,,Blackshape,BS115 / BK160 Gabriél,airplane,piston,1,L,F,9,7.44,2.46,850,850,11500,,
 GALX,,Gulfstream Aerospace,Gulfstream G200,airplane,turbofan,2,M,E,,,,15808,12701,45000,310,0.85
 GALX,,Israel Aerospace Industries,1126 Galaxy,airplane,turbofan,2,M,E,,,,15808,12701,45000,310,0.85

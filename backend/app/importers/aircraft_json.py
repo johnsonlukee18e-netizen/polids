@@ -22,6 +22,11 @@ from .sct import read_text
 SOURCE = "ICAO_Aircraft.json"
 PERF_SOURCE = "aircraft-database.com"
 RANGES = ("mlw", "ceiling_ft", "vmo_kt", "mmo")  # liczby z aircraft.csv: najmniejsza i największa z wersji typu
+# granice wiarygodności tych liczb (runda 14, przegląd): aircraft-database.com ma pomyłki, np. 737-200C z Vmo 0
+# i Mmo 350 (zamienione kolumny; w zakresie typu B732 dawało "M0.82–350"), C408 z Mmo 240 (Vmo w węzłach), B230
+# z pułapem 120 ft, GA8 z MLW 114 kg. Wartość spoza granic pomijamy, zakres typu liczymy z pozostałych wersji.
+BOUNDS = {"mlw": (50, 700000), "ceiling_ft": (1000, 80000), "vmo_kt": (40, 700), "mmo": (0.1, 1.0)}
+MLW_MTOW = (0.3, 1.1)  # MLW wersji względem jej MTOW z tego samego wiersza (gdy jest)
 # opis ICAO (Doc 8643, np. L2J): rodzaj statku, liczba silników, rodzaj silników; pasujące aircraft_type / engine_type
 # z aircraft-database.com (znak spoza tabel, np. "-" w opisie "---": bez sprawdzania)
 KINDS = {"L": {"airplane", "glider"}, "S": {"airplane", "amphibious"}, "A": {"airplane", "amphibious"},
@@ -69,6 +74,15 @@ def parse_icao_aircraft(text: str) -> dict[str, dict]:
     return out
 
 
+def plausible(field: str, value: float, row: dict | None = None) -> bool:
+    """Liczba z aircraft.csv w granicach BOUNDS (MLW także względem MTOW wiersza)."""
+    lo, hi = BOUNDS[field]
+    if not lo <= value <= hi:
+        return False
+    mtow = _f((row or {}).get("mtow")) if field == "mlw" else None
+    return not mtow or MLW_MTOW[0] * mtow <= value <= MLW_MTOW[1] * mtow
+
+
 def _fits(desc: str | None, row: dict) -> bool:
     """Wersja z aircraft.csv pasuje do opisu ICAO typu (rodzaj statku i silników). Typ bez opisu to oznaczenie zbiorcze
     różnych statków (GLID, ULAC, BALL, ZZZZ…), więc bez osiągów z wersji."""
@@ -81,8 +95,9 @@ def _fits(desc: str | None, row: dict) -> bool:
 
 def performance(rows: list[dict], descriptions: dict[str, str | None]) -> dict[str, dict]:
     """Osiągi typów z pliku json z wierszy aircraft.csv (wersje produkcyjne, kilka na typ): liczby jako najmniejsza
-    wartość i *_max (tylko gdy wersje się różnią), rodzaje silników od najczęstszego ("turbojet/turbofan"), liczba
-    silników, gdy wszystkie wersje mają tę samą. Wiersze typów spoza pliku json pomijamy."""
+    wartość i *_max (tylko gdy wersje się różnią; wartości niewiarygodne, poza BOUNDS, pomijamy), rodzaje silników od
+    najczęstszego ("turbojet/turbofan"), liczba silników, gdy wszystkie wersje mają tę samą. Wiersze typów spoza pliku
+    json pomijamy."""
     by = defaultdict(list)
     for r in rows:
         icao = _s(r.get("icao")).upper()
@@ -92,7 +107,7 @@ def performance(rows: list[dict], descriptions: dict[str, str | None]) -> dict[s
     for icao, variants in by.items():
         p = {}
         for k in RANGES:
-            vals = [v for r in variants for v in (_f(r.get(k)), _f(r.get(f"{k}_max"))) if v is not None]
+            vals = [v for r in variants for v in (_f(r.get(k)), _f(r.get(f"{k}_max"))) if v is not None and plausible(k, v, r)]
             if vals:
                 p[k] = min(vals)
                 if max(vals) != p[k]:

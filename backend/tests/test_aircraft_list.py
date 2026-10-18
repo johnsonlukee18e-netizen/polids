@@ -20,7 +20,7 @@ from backend.app import main  # noqa: E402
 from backend.app.config import DATA_DIR, settings  # noqa: E402
 from backend.app.database import Base  # noqa: E402
 from backend.app.importers import seed  # noqa: E402
-from backend.app.importers.aircraft_json import parse_icao_aircraft, performance  # noqa: E402
+from backend.app.importers.aircraft_json import BOUNDS, parse_icao_aircraft, performance, plausible  # noqa: E402
 from backend.app.importers.sct import read_text  # noqa: E402
 from backend.app.models import AircraftType, ImportLog  # noqa: E402
 from backend.app.services.photos import photo_query  # noqa: E402
@@ -88,6 +88,49 @@ def test_performance_from_variants():
                          "mmo": 0.86, "engine_type": "turbofan", "engine_count": 2}
     assert p["EC35"] == {"ceiling_ft": 20000, "engine_type": "turboshaft", "engine_count": 1}
     assert set(p) == {"A30B", "EC35"}
+
+
+def test_performance_skips_implausible_values():
+    """Runda 14 (przegląd): 737-200C w aircraft.csv miał Vmo 0 i Mmo 350, więc B732 pokazywał "M0.82–350", a C408
+    "M240". Liczby spoza granic wiarygodności (BOUNDS; MLW także względem MTOW wiersza) pomijamy."""
+    desc = {"B732": "L2J", "C408": "L2T", "GA8": "L1P"}
+    jet = {"icao": "B732", "aircraft_type": "airplane", "engine_type": "turbofan", "engine_count": "2", "mtow": "58105"}
+    rows = [
+        jet | {"mlw": "48534", "ceiling_ft": "37000", "vmo_kt": "350", "mmo": "0.82"},
+        jet | {"mlw": "48534", "ceiling_ft": "37000", "vmo_kt": "0", "mmo": "350"},       # kolumny zamienione
+        jet | {"mlw": "48534", "ceiling_ft": "120", "vmo_kt": "800", "mmo": "0.05"},      # pułap, Vmo, Mmo bez sensu
+        {"icao": "C408", "aircraft_type": "airplane", "engine_type": "turboprop", "mtow": "8618", "mlw": "8437",
+         "vmo_kt": "210", "mmo": "240"},
+        {"icao": "GA8", "aircraft_type": "airplane", "engine_type": "piston", "mtow": "1814", "mlw": "114"},
+    ]
+    p = performance(rows, desc)
+    assert p["B732"] == {"mlw": 48534, "ceiling_ft": 37000, "vmo_kt": 350, "mmo": 0.82, "engine_type": "turbofan",
+                         "engine_count": 2}
+    assert p["C408"] == {"mlw": 8437, "vmo_kt": 210, "engine_type": "turboprop"}
+    assert "mlw" not in p["GA8"]
+    assert plausible("mmo", 0.82) and not plausible("mmo", 350) and not plausible("vmo_kt", 0.82)
+    assert plausible("mlw", 60781, {"mtow": "57153"}) and not plausible("mlw", 114, {"mtow": "1814"})
+
+
+def test_aircraft_csv_values_are_plausible():
+    """data/seed/aircraft.csv poprawiony (B732 737-200C, C408, B230, GA8): każda liczba osiągów w granicach."""
+    bad = [(r["icao"], r["model"], k, r[k]) for r in csv.DictReader(open(settings.seed_dir / "aircraft.csv", encoding="utf-8"))
+           for k in BOUNDS if r.get(k) and float(r[k]) > 0 and not plausible(k, float(r[k]), r)]
+    assert bad == []
+
+
+def test_no_merged_record_has_implausible_speeds(client):
+    """Lista AIRCRAFT z bazy (seed): żaden rekord nie ma Mmo poza 0,1–1,0 ani Vmo poza 40–700 kt (także *_max)."""
+    every = [a for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+             for a in client.get("/api/aircraft", params={"limit": 2000, "prefix": letter}).json()]
+    assert len(every) == len(DESIGNATORS)
+    bad = [(a["icao"], k, a[k]) for a in every for k in ("mmo", "mmo_max", "vmo_kt", "vmo_kt_max", "ceiling_ft",
+                                                        "ceiling_ft_max", "mlw", "mlw_max")
+           if a.get(k) is not None and not BOUNDS[k.removesuffix("_max")][0] <= a[k] <= BOUNDS[k.removesuffix("_max")][1]]
+    assert bad == []
+    rec = {a["icao"]: a for a in every}
+    assert (rec["B732"]["vmo_kt"], rec["B732"]["mmo"], rec["B732"]["mmo_max"]) == (350, 0.82, None)
+    assert rec["C408"]["mmo"] is None and rec["C408"]["vmo_kt"] == 210
 
 
 def test_parse_icao_aircraft_fields():

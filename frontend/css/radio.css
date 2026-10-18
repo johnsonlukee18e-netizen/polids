@@ -166,6 +166,12 @@
   cursor: pointer; white-space: nowrap; overflow: hidden; }
 .rb-btns button[data-ly="low"] { grid-column: 1; }
 .rb-btns button[data-ly="high"] { grid-column: 3; }
+/* kolumna APP / TWR / TWR/ATIS / FIS: szerokość jednej trzeciej rzędu LOW MID HIGH, ale nie węższa niż napis z odstępem
+   po bokach (runda 14, przegląd: "TWR/ATIS" przy 1280–1600 px nie mieścił się w jednej trzeciej i był ucięty). Jak na
+   zdjęciu PANDORY: TWR/A trochę szerszy od TWR, reszta równa; czcionka o stałej szerokości, więc pogrubienie (włączona
+   warstwa) szerokości nie zmienia */
+.rb-btns button:is([data-ly="app"], [data-ly="twr"], [data-ly="twra"], [data-ly="fis"]) { grid-column: 1 / -1; justify-self: center;
+  width: calc((100% - 8px) / 3); min-width: max-content; padding: 2px 5px; }
 .rb-btns button:hover { outline: 1px solid #fff; outline-offset: 0; }
 .rb-btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .rb-btns button.on { background: var(--rb-btn-on); color: #000; font-weight: 700; }

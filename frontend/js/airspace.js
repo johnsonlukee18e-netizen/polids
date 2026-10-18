@@ -141,7 +141,7 @@ export function drawSectors(layer, gj, online = null, { labels = true, tipPane =
     const vc = online?.vacs?.[pr.name];
     const color = online && !own ? "#555" : colorFor(vc?.key || cs || pr.name);
     const ch = chain && vc ? `<br><span class="muted">${esc(vc.layer)}:</span> ${vc.chain.map((x) => (x === vc.owner ? `<b>${esc(x)}</b>` : esc(x))).join(" › ")}` : "";
-    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">no controller</span>`)
+    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">unstaffed</span>`)
       : `${esc(cs || "")} ${esc(freq || "")}`;
     const poly = L.geoJSON(f, { style: { color, weight: 1.2, fillColor: color, fillOpacity: online && !own ? 0 : 0.16 } })
       .bindTooltip(`<b>${esc(pr.name)}</b> ${fl(pr.lower_ft)}–${fl(pr.upper_ft)}<br>${who}${ch}`, { sticky: true, pane: tipPane, opacity: 1 });
@@ -217,9 +217,10 @@ export function rflFeet(v) {
 // i tła. 1: znak wywoławczy i prędkość względem ziemi w węzłach (3 cyfry); 2: poziom z Mode C, poniżej poziomu
 // przejściowego "A" i wysokość w setkach stóp ("A 53" = 5300 ft), wyżej FL ("270"), ze strzałką ↑ / ↓, gdy wysokość
 // zmieniła się od poprzedniego odczytu (p.vs z climbRates); 3: typ z kategorią turbulencji ("DC10H") i lotnisko
-// docelowe, a tranzyt punkt wyjścia z FIR-u (exit, z serwera), gdy znany; 4: "h  s  r" (przydzielone kurs, prędkość
-// i prędkość pionowa: na VATSIM ich nie ma, pola puste) i poziom: VATSIM nie podaje poziomu z zezwolenia, więc RFL
-// z planu lotu w dziesiątkach FL ("24" = FL240; poziom niepodzielny przez 10 trzema cyframi, poniżej TL "A" i setki stóp).
+// docelowe, a tranzyt i odlot z EP** za granicę punkt wyjścia z FIR-u (exit, z serwera), gdy znany; 4: "h  s  r"
+// (przydzielone kurs, prędkość i prędkość pionowa: na VATSIM ich nie ma, pola puste) i poziom: VATSIM nie podaje
+// poziomu z zezwolenia, więc RFL z planu lotu w dziesiątkach FL dwiema cyframi ("24" = FL240, "08" = FL080; poziom
+// niepodzielny przez 10 trzema cyframi, poniżej TL jak linijka 2: "A 45" = 4500 ft).
 export function p21Lines(p, { exit = null } = {}) {
   const gs = p.groundspeed === null || p.groundspeed === undefined ? "" : String(Math.max(0, Math.round(p.groundspeed))).padStart(3, "0");
   const l1 = gs ? `${String(p.callsign || "").padEnd(8)} ${gs}` : String(p.callsign || "");
@@ -229,14 +230,17 @@ export function p21Lines(p, { exit = null } = {}) {
   const arrow = !lvl || p.vs === null || p.vs === undefined ? "" : p.vs >= VS_ARROW_FT ? "↑" : p.vs <= -VS_ARROW_FT ? "↓" : "";
   const l3 = [`${p.aircraft || ""}${p.aircraft ? p.wake || "" : ""}`, exit || p.arrival || ""].filter(Boolean).join(" ");
   const ft = rflFeet(p.rfl), f = ft === null ? null : Math.round(ft / 100);
-  const rfl = ft === null ? "" : ft < TL_FT ? `A${f}` : f % 10 ? String(f).padStart(3, "0") : String(f / 10);
+  // dziesiątki FL zawsze dwiema cyframi (FL080 → "08", jak "24" w P21: jedna cyfra wyglądałaby jak inne pole),
+  // poniżej TL jak linijka 2 ("A 45" = 4500 ft)
+  const rfl = ft === null ? "" : ft < TL_FT ? `A${String(f).padStart(3)}` : f % 10 ? String(f).padStart(3, "0") : String(f / 10).padStart(2, "0");
   return [l1, lvl + arrow, l3, `h  s  r${rfl ? " " + rfl : ""}`];
 }
 
 // Samolot: sylwetka obrócona wg kursu (14 px, mniejsza niż do 0.12.4) i etykieta: sam znak wywoławczy albo (detail)
 // pełna etykieta PEGASUS_21 (p21Lines; pusta trzecia linijka, np. bez planu lotu, odpada). Bez tła: znak na zielono,
 // reszta na biało (map.css). cls: dodatkowa klasa ikony (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW;
-// out = wybrany lot spoza ruchu EP); exit: punkt wyjścia z FIR-u tranzytu (trzecia linijka zamiast lotniska docelowego).
+// out = wybrany lot spoza ruchu EP); exit: punkt wyjścia z FIR-u tranzytu albo odlotu za granicę (trzecia linijka
+// zamiast lotniska docelowego).
 export function aircraftMarker(p, { label = true, detail = false, cls = "", exit = null } = {}) {
   const lines = detail ? p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2) : [[String(p.callsign || ""), 0]];
   const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
@@ -279,14 +283,44 @@ export const symbolHalf = (name) => {
   return sym.circle || Math.max(...sym.flat().map(([x]) => Math.abs(x)));
 };
 
-// Ikona SVG symbolu (legenda, przyciski warstw); zamknięta łamana jako <polygon>
+// Zasięg symbolu z obrysem grubości w (jednostki SYMBOLS): największe |x| albo |y| razem z ostrzem narożnika
+// (stroke-linejoin miter: wierzchołek o kącie θ wystaje o w/2 / sin(θ/2) wzdłuż dwusiecznej; powyżej miterlimit 4
+// SVG ścina narożnik, wtedy najwyżej w/2) i z połową obrysu przy końcach łamanej
+export function symbolReach(name, w) {
+  const sym = SYMBOLS[name] || SYMBOLS.fix;
+  if (sym.circle) return sym.circle + w / 2;
+  let r = 0;
+  sym.forEach((line) => {
+    const ring = closed(line), pts = ring ? line.slice(0, -1) : line, n = pts.length;
+    pts.forEach(([x, y], i) => {
+      r = Math.max(r, Math.abs(x) + w / 2, Math.abs(y) + w / 2);
+      if (!ring && (i === 0 || i === n - 1)) return;
+      const [ax, ay] = pts[(i + n - 1) % n], [bx, by] = pts[(i + 1) % n];
+      const la = Math.hypot(ax - x, ay - y), lb = Math.hypot(bx - x, by - y);
+      const ux = (ax - x) / la + (bx - x) / lb, uy = (ay - y) / la + (by - y) / lb, lu = Math.hypot(ux, uy);
+      const cos = ((ax - x) * (bx - x) + (ay - y) * (by - y)) / (la * lb), sinHalf = Math.sqrt((1 - cos) / 2);
+      if (lu < 1e-9 || sinHalf < 1e-9 || 1 / sinHalf > 4) return;
+      const d = w / 2 / sinHalf;  // ostrze po stronie przeciwnej do dwusiecznej (na zewnątrz kąta)
+      r = Math.max(r, Math.abs(x - (ux / lu) * d), Math.abs(y - (uy / lu) * d));
+    });
+  });
+  return r;
+}
+
+// Ikona SVG symbolu (legenda, przyciski warstw); zamknięta łamana jako <polygon>. Skala 1.2 px na jednostkę, gdy
+// symbol się mieści; większy (lotnisko: ±6 i ostrza narożników) dostaje szerszy viewBox, żeby cały wielokąt z obrysem
+// był w ikonie (do 0.12.5 lewy i prawy wierzchołek sześciokąta lotniska były ucięte). Obrys zawsze ok. 1.3 px.
 export function symbolSvg(name, color = "currentColor", size = 14, scale = 1.2) {
   const sym = SYMBOLS[name];
-  const v = size / 2 / scale;
+  let v = size / 2 / scale;
+  // obrys 1.3 px na ekranie zależy od viewBox, a viewBox od obrysu: dwa przybliżenia wystarczą (zasięg rośnie wolno)
+  for (let k = 0; k < 3; k++) v = Math.max(size / 2 / scale, symbolReach(name, 1.3 * 2 * v / size) + 0.15);
+  v = Math.round(v * 1000) / 1000;
+  const sw = Math.round(1.3 * 2 * v / size * 1000) / 1000;
   const pts = (line) => line.map(([x, y]) => `${x},${y}`).join(" ");
   const body = sym.circle ? `<circle cx="0" cy="0" r="${sym.circle}"/>`
     : sym.map((line) => (closed(line) ? `<polygon points="${pts(line.slice(0, -1))}"/>` : `<polyline points="${pts(line)}"/>`)).join("");
-  return `<svg class="sym" width="${size}" height="${size}" viewBox="${-v} ${-v} ${2 * v} ${2 * v}" fill="none" stroke="${color}" stroke-width="${1.3 / scale}" stroke-linejoin="miter">${body}</svg>`;
+  return `<svg class="sym" width="${size}" height="${size}" viewBox="${-v} ${-v} ${2 * v} ${2 * v}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linejoin="miter">${body}</svg>`;
 }
 
 // Marker rysowany na kanwie (mapa z preferCanvas): kształt z SYMBOLS, skalowany. Obsługuje dymki i kliknięcia
