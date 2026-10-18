@@ -1,6 +1,7 @@
 """COORDINATION we frontendzie (frontend/js/agreements.js, tabs/coordination.js, docs.js) w Node, bez DOM: adres,
 dokument z adresu, filtr słowami, wybór stanowiska (ta sama kolejność przejmowania co backend), HTML z esc()."""
 import json
+import re
 import shutil
 import subprocess
 
@@ -302,9 +303,10 @@ def test_tab_wiring():
     assert "sumHtml(v, { pos: st.pos" in src and "data.errors" in src
     # 0.12.5 (issue #18): podmenu "LoA" i "DOCUMENTS" zamiast POROZUMIENIA i DOKUMENTY, przycisk na karcie "LoA ›"
     assert '{ id: "agreements", label: "LoA", fill: true,' in src and '{ id: "docs", label: "DOCUMENTS", fill: true,' in src
-    assert "POROZUMIENIA" not in src and "DOKUMENTY" not in src
+    code = re.sub(r"//[^\n]*", "", src)   # komentarze zostają po polsku, w kodzie i tekstach już nie
+    assert "POROZUMIENIA" not in code and "DOKUMENTY" not in code
     agr = (FRONTEND / "js" / "agreements.js").read_text("utf-8")
-    assert ">LoA ›</button>" in agr and "POROZUMIENIA" not in agr
+    assert ">LoA ›</button>" in agr and "POROZUMIENIA" not in re.sub(r"//[^\n]*", "", agr)
 
 
 
