@@ -1,7 +1,15 @@
-"""Paski postępu lotu (AERODROME › RUCH): SID/STAR z .ese, kategoria turbulencji, przydzielony SSR, kolejność pasków."""
+"""Paski postępu lotu (STRIP): SID/STAR z .ese, kategoria turbulencji, przydzielony SSR, kolejność pasków;
+okno lotu po kliknięciu paska (układ "Extended Label", strips.js) uruchamiane w Node."""
 
+import json
+import re
+import shutil
+import subprocess
 from datetime import datetime, timezone
 
+import pytest
+
+from backend.app.config import ROOT_DIR
 from backend.app.services.procedures import (first_fix, match_sid, match_star, parse_procedures, route_points,
                                              strip_board)
 from backend.app.services.vatsim import airport_traffic, assigned_squawk, fp_wake, level_ft, pilot_info
@@ -144,3 +152,140 @@ def test_strip_board_ground_far_from_airport_goes_last():
     assert [(s["callsign"], s["away"]) for s in b["departures"]] == [("GATE", False), ("AIRB", False), ("LANDED", True)]
     assert [(s["callsign"], s["away"]) for s in b["arrivals"]] == [("TAXIIN", False), ("INBOUND", False), ("ATADEP", True)]
     assert b["arrivals"][2]["eta"] is None and b["arrivals"][2]["dist_nm"] > 300
+
+
+# --- 0.12.5: okno lotu po kliknięciu paska (układ "Extended Label"), angielskie napisy, ostre krawędzie ---------------
+
+STRIPS_JS = ROOT_DIR / "frontend" / "js" / "strips.js"
+STRIP_TAB_JS = ROOT_DIR / "frontend" / "js" / "tabs" / "strip.js"
+STRIPS_CSS = ROOT_DIR / "frontend" / "css" / "strips.css"
+PL = re.compile("[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+
+NODE_SCRIPT = r"""
+const m = await import(process.argv[2]);
+const d = { icao: "EPWA", atis: { letter: "K" }, network_error: null, states: {} };
+const dep = { kind: "dep", callsign: "LOT3827", aircraft: "B38M", wake: "M", rules: "I", registration: "SPLVA",
+  departure: "EPWA", arrival: "EPGD", rfl_ft: 22000, state: "ground", altitude: 362, groundspeed: 0, squawk: "2000",
+  assigned_squawk: "4613", runway: "29", runway_source: "CDM", eobt: "1023", eobt_source: "vIFF", route: "OLILA L621",
+  remarks: "/V/", proc: { name: "OLILA6G", fixes: ["WA901", "OLILA"], approaches: [] },
+  viff: { state: "SI", ctot: "1043", delay: 20, regulation: "EPWA29A", tobt: "1025", tsat: "1025", ttot: "1039" } };
+const arr = { kind: "arr", callsign: "DLH1612", aircraft: "A20N", wake: "M", rules: "I", departure: "EDDF", arrival: "EPWA",
+  rfl_ft: 37000, state: "air", altitude: 11000, groundspeed: 330, dist_nm: 38, eta: "1018", eldt: "1022", eta_min: 7,
+  runway: "33", runway_source: "ATIS", proc: { name: "BIMPA6U", fixes: ["BIMPA", "WA529"], approaches: ["RNP", "ILS Z"] },
+  entry_fix: { fix: "BIMPA" }, viff: null, route: "SOBRA Y180 BIMPA" };
+const loc = { kind: "local", callsign: "SPKAT", aircraft: "C172", wake: "L", rules: "V", departure: "EPWA", arrival: "EPWA",
+  state: "air", altitude: 1300, groundspeed: 85, squawk: "6201", viff: null, route: "VFR CIRCUITS" };
+const pln = { kind: "dep", planned: "viff", callsign: "SAS1748", departure: "EPWA", arrival: "ESSA", state: "offline",
+  eobt: "0941", viff: { state: "SU", suspension: "FLS-NRA" } };
+const out = {};
+for (const [k, s] of Object.entries({ dep, arr, loc, pln })) out[k] = m.extLabel(s, d);
+out.cols = m.XL_COLS;
+out.fields = m.XL_FIELDS.map((f) => ({ k: f.k, row: f.row, col: f.col, span: f.span || 1 }));
+// pasek 1000..1046 px, okno 432 x 400, ekran 1600 x 900
+out.place = {
+  below: m.placeWin({ x: 600, top: 200, bottom: 246 }, 432, 400, 1600, 900),
+  above: m.placeWin({ x: 600, top: 700, bottom: 746 }, 432, 400, 1600, 900),
+  right: m.placeWin({ x: 1500, top: 200, bottom: 246 }, 432, 400, 1600, 900),
+  left: m.placeWin({ x: -40, top: 200, bottom: 246 }, 432, 400, 1600, 900),
+  tall: m.placeWin({ x: 600, top: 300, bottom: 346 }, 432, 700, 1600, 768),
+};
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.fixture(scope="module")
+def xl(tmp_path_factory):
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    d = tmp_path_factory.mktemp("strips")
+    (d / "api.mjs").write_text('export const api = async () => ({});\n'
+                               'export const esc = (s) => String(s ?? "");\n', "utf-8")
+    (d / "strips.mjs").write_text(STRIPS_JS.read_text("utf-8").replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    script = d / "run.mjs"
+    script.write_text(NODE_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (d / "strips.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def _by_key(fields):
+    return {f["k"]: f for f in fields}
+
+
+def test_extended_label_layout_is_data_driven(xl):
+    # jedna tablica pól: każde pole ma wiersz i kolumnę w siatce XL_COLS, bez nakładania się pól tego samego rodzaju lotu
+    cols = xl["cols"]
+    assert cols == 4
+    for f in xl["fields"]:
+        assert 1 <= f["col"] and f["col"] + f["span"] - 1 <= cols, f
+    for kind in ("dep", "arr", "loc", "pln"):
+        cells = set()
+        rows = sorted({f["row"] for f in xl[kind]})
+        assert rows == list(range(1, len(rows) + 1)), kind   # wiersze bez pól znikają, numeracja ciągła
+        for f in xl[kind]:
+            for c in range(f["col"], f["col"] + f["span"]):
+                assert (f["row"], c) not in cells, (kind, f)
+                cells.add((f["row"], c))
+
+
+def test_extended_label_fields_per_flight_kind(xl):
+    dep, arr, loc, pln = (_by_key(xl[k]) for k in ("dep", "arr", "loc", "pln"))
+    assert (dep["ssr"]["t"], dep["ssr"]["sub"]) == ("4613", "XPDR 2000")
+    assert (dep["type"]["t"], dep["rules"]["t"], dep["reg"]["t"]) == ("B38M/M", "IFR", "SPLVA")
+    assert (dep["adep"]["t"], dep["ades"]["t"], dep["rfl"]["t"], dep["lvl"]["t"]) == ("EPWA", "EPGD", "F220", "GND")
+    assert (dep["proc"]["l"], dep["proc"]["t"], dep["rwy"]["t"], dep["rwy"]["sub"]) == ("SID", "OLILA6G", "29", "CDM")
+    assert (dep["eobt"]["t"], dep["tsat"]["t"], dep["ttot"]["t"]) == ("1023", "1025", "1039")
+    assert (dep["ctot"]["t"], dep["ctot"]["sub"]) == ("1043", "+20' EPWA29A") and "d30" in dep["ctot"]["cls"]
+    assert dep["fls"]["t"] == "SI" and dep["status"]["t"] == "PARKED" and dep["stand"]["t"] is None
+    assert dep["route"]["t"] == "OLILA L621" and dep["pts"]["l"] == "SID OLILA6G" and dep["rmk"]["t"] == "/V/"
+    # przylot: ETA, ELDT, odległość, minuty, punkt wejścia i podejścia zamiast czasów A-CDM
+    assert "tsat" not in arr and "ctot" not in arr and "rmk" not in arr
+    assert (arr["eta"]["t"], arr["eldt"]["t"], arr["dist"]["t"], arr["in"]["t"]) == ("1018", "1022", "38 NM", "7'")
+    assert (arr["proc"]["l"], arr["entry"]["t"], arr["apch"]["t"]) == ("STAR", "BIMPA", "RNP, ILS Z")
+    assert (arr["lvl"]["t"], arr["status"]["t"], arr["gs"]["t"]) == ("F110", "AIRBORNE 330 KT", "330 KT")
+    # lot lokalny VFR: bez wierszy pustych czasów vIFF; lot planowany: brak danych = None ("–")
+    assert "tobt" not in loc and "ctot" not in loc and loc["eobt"]["t"] is None and loc["lvl"]["t"] == "A013"
+    assert (pln["status"]["t"], pln["fls"]["t"], pln["ssr"]["t"], pln["lvl"]["t"]) == ("OFFLINE", "SU NRA", None, None)
+
+
+def test_extended_label_window_stays_in_viewport(xl):
+    p = xl["place"]
+    assert p["below"] == {"left": 600, "top": 249}            # pod paskiem, od miejsca kliknięcia
+    assert p["above"] == {"left": 600, "top": 297}            # brak miejsca pod paskiem: nad nim
+    assert p["right"] == {"left": 1600 - 432 - 6, "top": 249}
+    assert p["left"]["left"] == 6
+    assert p["tall"]["top"] == 768 - 700 - 6 and p["tall"]["top"] >= 6
+
+
+def _code(src):
+    """Kod bez komentarzy (komentarze w projekcie są po polsku)."""
+    out = []
+    for line in src.splitlines():
+        s = line.strip()
+        if s.startswith(("//", "/*", "*")):
+            continue
+        out.append(re.split(r"\s//\s", line)[0])
+    return "\n".join(out)
+
+
+def test_strips_click_window_not_hover_and_english():
+    js = STRIPS_JS.read_text("utf-8")
+    # 0.12.5: najechanie na pasek niczego nie otwiera; kliknięcie otwiera okno, Esc / × / klik obok zamyka
+    assert "mousemove" not in js and "sx-tip" not in js and "mouseleave" not in js
+    assert 'root.addEventListener("click"' in js and 'e.key === "Escape"' in js and 'class="xw-x"' in js
+    assert 'document.addEventListener("click", onDocClick)' in js and 'document.removeEventListener("click", onDocClick)' in js
+    assert "if (open) drawWin();" in js   # odświeżenie: nowe dane w oknie albo zamknięcie, gdy lotu już nie ma
+    for src in (js, STRIP_TAB_JS.read_text("utf-8")):
+        assert not PL.search(_code(src)), PL.findall(_code(src))
+    for word in ("Odloty", "Przyloty", "Planowane", "Lokalne", "KOŁUJE", "POSTÓJ", "W POW.", "NA ZIEMI", "najedź", "Aktualizacja"):
+        assert word not in _code(js) and word not in _code(STRIP_TAB_JS.read_text("utf-8")), word
+    for word in ("Departures", "Arrivals", "Planned", "Local", "TAXIING", "PARKED", "AIRBORNE", "ON GROUND", "Updated"):
+        assert word in js + STRIP_TAB_JS.read_text("utf-8"), word
+
+
+def test_strips_css_sharp_edges():
+    css = re.sub(r"/\*.*?\*/", "", STRIPS_CSS.read_text("utf-8"), flags=re.S)
+    radii = re.findall(r"border-radius:\s*([^;}]+)", css)
+    assert radii and all(r.strip() in ("0", "50%") for r in radii), radii
+    assert "text-shadow" not in css and "box-shadow" not in css
