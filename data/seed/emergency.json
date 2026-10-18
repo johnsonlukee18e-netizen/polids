@@ -4,7 +4,7 @@
   {
    "id": "ASSIST",
    "label": "ASSIST",
-   "title": "ASSIST – zasady postępowania w sytuacji awaryjnej",
+   "title": "ASSIST – emergency handling principles",
    "source": "EUROCONTROL HRS/TSP-004-GUI-05, Annex A (poster)",
    "sections": [
     {
@@ -53,39 +53,39 @@
   },
   {
    "id": "A06",
-   "title": "A06 Emergency Descent (Zniżanie awaryjne)",
+   "title": "A06 Emergency Descent",
    "sections": [
     {
      "title": "ACC / APP / TWR",
      "items": [
-      "Zapewnij separację i/lub informacje o ruchu",
-      "Uwzględnij granice przestrzeni / skoordynuj skrót",
-      "Po awaryjnym zniżaniu:",
-      "Potwierdź stan statku powietrznego / intencje załogi (zmiana lotniska docelowego, obrażenia, uszkodzenia statku powietrznego)",
-      "Przyjmij, że a/c jest nadal w niebezpieczeństwie",
-      "Jeśli konieczne, nadaj informację o zniżaniu na częstotliwości ATC i częstotliwości awaryjnej",
-      "Powiadom kierownika zmiany ATM",
-      "Powiadom następny organ / sektor"
+      "Provide separation and/or traffic information",
+      "Consider airspace boundaries / coordinate a short-cut",
+      "After the emergency descent:",
+      "Check aircraft status / crew intentions (diversion, injuries, aircraft damage)",
+      "Assume the a/c is still in distress",
+      "If necessary, broadcast the descent on the ATC frequency and the emergency frequency",
+      "Inform the ATM shift supervisor",
+      "Inform the next unit / sector"
      ]
     },
     {
-     "title": "Bądź przygotowany na:",
+     "title": "Be prepared for:",
      "items": [
-      "Zniżanie bez ostrzeżenia",
+      "Descent without warning",
       "Squawk 7700",
-      "Opuszczenie trasy lotu",
-      "Ostrzeżenie o ruchu",
-      "Nieczytelną transmisję"
+      "Leaving the route",
+      "Traffic warning",
+      "Unreadable transmission"
      ]
     },
     {
-     "title": "Informacje dodatkowe:",
+     "title": "Additional information:",
      "items": [
-      "Czas do rozpoczęcia zniżania to średnio 5 do 15 sekund (początkowa prędkość zniżania wynosi od 7000 ft/min do 14000 ft/min)",
-      "Squawk 7700 pojawia się z opóźnieniem lub wcale",
-      "ATC jest zazwyczaj poinformowane za późno z powodu ograniczonej zdolności załogi do działania; przy zakładaniu masek tlenowych następuje automatyczne przełączenie odbioru ze słuchawek na głośnik w kokpicie, więc mikrofon w kokpicie oraz korespondencja może być zakłócona odgłosami w tle",
-      "Z powodu gwałtownej utraty ciśnienia w kabinie ciśnienie gazów w ludzkim ciele wzrasta, powodując złe samopoczucie załogi",
-      "Czas do utraty przytomności przez załogę (pozbawioną tlenu) to od 4 do 30 sekund w zależności od poziomu lotu (tzw. czas użyteczny przytomności)"
+      "Time until the descent starts is 5 to 15 seconds on average (initial rate of descent 7000 ft/min to 14000 ft/min)",
+      "Squawk 7700 appears late or not at all",
+      "ATC is usually informed too late because of the crew's limited capacity to act; when oxygen masks are put on, reception switches automatically from the headsets to the cockpit loudspeaker, so the cockpit microphone and communication may be disturbed by background noise",
+      "Because of the rapid loss of cabin pressure, gas pressure in the human body rises and the crew feel unwell",
+      "Time until the crew (without oxygen) lose consciousness is 4 to 30 seconds depending on the flight level (time of useful consciousness)"
      ]
     }
    ],

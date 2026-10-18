@@ -118,3 +118,10 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .chl-act .btn { flex: 1; padding: 4px 8px; text-align: center; text-decoration: none; white-space: nowrap; }
 .chl-act .btn[hidden] { display: none; }   /* przycisk PDF dopiero po wczytaniu listy */
 .chl-src { flex: none; margin: 0; font-size: 11px; }
+
+/* 0.12.5: ostre krawędzie także w pozostałych zakładkach z tej części (AD MIL/VFR, INOP, OTHER, CHECKLIST, EMERGENCY,
+   AUP, ABOUT): przyciski, pola, karty, kafelki i podmenu bez zaokrągleń, jak w PANDORZE */
+.view:is([data-tab="adciv"], [data-tab="admil"], [data-tab="advfr"], [data-tab="inop"], [data-tab="other"],
+  [data-tab="checklist"], [data-tab="emergency"], [data-tab="aup"], [data-tab="about"])
+  :is(.btn, .gbtn, .field, .card, .card h3, .ms-card, .ms-card h4, .about-tile, .submenu button, .toolbar input,
+    .toolbar select, .assist span, .soon-note) { border-radius: 0; }

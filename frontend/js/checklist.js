@@ -24,7 +24,7 @@ export function renderChecklist(el, chk, key) {
       <span class="chk-body"><span class="chk-what">${markup(what)}</span>${action ? `<span class="chk-dots"></span>${right}` : ""}</span></label>`;
   }).join("");
   el.innerHTML = (chk.preDescription ? `<p class="chk-pre">${markup(chk.preDescription)}</p>` : "") + rows
-    + `<div class="chk-foot"><button class="btn reset">Wyczyść</button><span class="hint chk-count"></span></div>`;
+    + `<div class="chk-foot"><button class="btn reset" title="Untick all items and clear the notes">Clear</button><span class="hint chk-count"></span></div>`;
   const count = () => {
     const n = chk.items.filter((_, i) => st[i]).length;
     el.querySelector(".chk-count").textContent = `${n}/${chk.items.length}`;

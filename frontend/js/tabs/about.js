@@ -1,79 +1,79 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
-  ["17.10.2026", "0.12.4 – polids.pl znowu startuje: obraz Dockera nadaje plikom aplikacji prawo odczytu, więc zmienione pliki z serwera (zapisane bez odczytu dla innych) nie blokują już startu jak po wdrożeniu 0.12.3."],
-  ["15.10.2026", "0.12.3 – według issue #13: nowe zakładki COORDINATION, CONVERSION i SQUAWK; PHRASEOLOGY przeniesione do OTHER jako podzakładka po DOCS (stary adres #phraseology przekierowuje). Ukryty przycisk ADMIN nie zajmuje już miejsca w menu."],
-  ["15.10.2026", "HOME: rating zalogowanego kontrolera, stanowisko, na którym jest zalogowany w VATSIM, i jego rezerwacje na najbliższą dobę; wybór stanowiska wspólny z AERODROME › OVERVIEW i przycisk PRZYGOTUJ SESJĘ (OVERVIEW albo lotnisko dla TWR); na dole wersja i bieżący AIRAC z datami."],
-  ["15.10.2026", "METEO: kolejność METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN (WIND i RADAR na końcu). GAMET IMGW dla rejonów A1–A5 albo wszystkich, z ważnością i mapą rejonów; ICING: oblodzenie z Windy na FL050–FL300; SUN: mapa dnia i nocy na Ziemi oraz wschód, zachód, górowanie, BMCT i EECT dla dowolnego lotniska albo punktu na mapie (UTC i czas polski). Godziny słońca liczone poprawnie także daleko od Greenwich."],
-  ["15.10.2026", "AD CIV: przyciski 15 lotnisk AD 2, każdy otwiera stronę lotniska w eAIP (adres #adciv/EPWA). Linki eAIP same przechodzą na poprawkę bieżącego cyklu AIRAC. CALLSIGN i AIRCRAFT: przycisk ALL zamiast ∗ na całą szerokość, litery w dwóch równych kolumnach."],
-  ["15.10.2026", "COORDINATION: porozumienia z LOA jak w ATCISS – WYJŚCIE (COPX) i WEJŚCIE (COPN), filtr po punktach (kilka słów naraz), wybór stanowiska z sektorami, które obsługuje (kolejność przejmowania i kontrolerzy online), FIR-y i rodzaj LOA/LOP; DOKUMENTY z czytelnymi nazwami, tagami AIRAC, FIR i sektorów oraz PDF obok. LOA nie ma już w OTHER › DOCS, a w RADIO przycisk COORDINATION › otwiera dokument. W DOKUMENTY także 20 LOP-ów (ACC Warszawa, 4 APP, 15 TWR) z kodami ICAO lotnisk – na razie z samym tytułem, treść w przygotowaniu."],
-  ["15.10.2026", "CONVERSION: kalkulator jednostek – hPa/inHg/mmHg, ft/m/FL, wysokość a FL przy QNH, NM/km/SM, kt/km/h/m/s/mph, Mach/TAS/CAS w ISA, prędkość pionowa, gradient, °C/°F/K, kg/lb/t, UTC a czas w Polsce."],
-  ["15.10.2026", "MAP: tylko ruch związany z Polską – odloty z lotnisk EP, przyloty do nich i tranzyt przez FIR EPWW (samolot jest teraz w FIR albo dalsza trasa z planu lotu do niego wchodzi). Samolot bez planu lotu tylko wtedy, gdy jest w FIR EPWW. Wybrany lot zostaje na mapie, nawet spoza tego ruchu."],
-  ["15.10.2026", "SQUAWK: pule kodów SSR FIR EPWW z EUROCONTROL CAL v4.13 (obszar EUR-E, jednostka EP), a także CCAMS, NATO i wszystkie wpisy EUR-E; sprawdzanie kodu i kody specjalne (7500, 7600, 7700, 2000, 7000, 1000)."],
-  ["14.10.2026", "0.12.2 – sektory EPWW i sąsiadów z jednego pliku data/seed/sectors.geojson, generowanego z plików .ese (MAP i RADIO biorą je stamtąd); nowy plik .ese EDGG (Langen): sektory EDGG na MAP, a w AERODROME › ED i ET wszystkie lotniska z jego stanowiskami."],
-  ["14.10.2026", "MAP: przy obsadzie wg kontrolerów online sektory obsługiwane przez to samo stanowisko są jednym obszarem w jego kolorze z jedną etykietą (stanowisko i częstotliwość); granica tylko tam, gdzie zmienia się obsługujący, przestrzeni bez nikogo nie rysujemy (gdy w FIR-ze nikogo nie ma, zostają same granice FIR-ów)."],
-  ["14.10.2026", "MAP: nowa sekcja Pozycje – lista stanowisk FIR EPWW i sąsiadów (ACC, FIS i lotniska, np. EPGD: GD APP, GD TWR, GD GND), domyślnie zaznaczeni zalogowani. Kliknięcie włącza stanowisko offline jak po zalogowaniu (SYM, przerywany kontur) albo ukrywa zalogowane; sektoryzacja i plakietki lotnisk rysują się wg tego wyboru. „jak online” wraca do stanu z sieci, „wyczyść” wyłącza wszystkie. Na liście są stanowiska z pliku .ese EPWW, z vacs-data i obsługujące sektory sąsiadów; zalogowani na innych lotniskach zagranicznych (np. EDDS_TWR, LOWW_TWR) mają zawsze plakietkę i nie da się ich wyłączyć."],
-  ["14.10.2026", "RADIO: sektory ACC na podglądach LOW, MID i HIGH tak samo – jeden obszar i jedna etykieta na stanowisko, granice tylko tam, gdzie zmienia się obsługujący, sektorów bez nikogo nie rysujemy (zostaje granica FIR EPWW)."],
-  ["14.10.2026", "AERODROME: pasy, częstotliwości i elewacje lotnisk z AIP Polska i AIP MIL (eAIP PAŻP, AIRAC 10/26), lądowiska VFR spoza AIP z lotniska.dlapilota.pl; np. EPBK ma teraz 09R/27L 1350 m i trawiasty 09L/27R zamiast błędnych 01/19 i 08/26. Częstotliwości z godzinami pracy i uwagą (np. EPRA 118.430: TWR cywilna i wojskowa): przy stanowisku z pliku .ese w dymku, częstotliwości z AIP bez stanowiska w .ese pod listą (np. EPRA MIL GND 119.155, APP 128.680)."],
-  ["14.10.2026", "Pas preferowany wg AIP AD 2.21 dla EPWA, EPMO, EPWR, EPGD i EPPO: godziny (zimą i latem w UTC), limity wiatru z porywami, wyjątki (burza, LVP); w podpowiedzi powód, np. „ARR/DEP 08 wg AIP (2000-0400 UTC), bo 26: w plecy 8 kt > 5 kt”. W LVP pasy dopuszczone przez AD 2.22: EPWA lądowania 33 albo 11 (RWY 11 CAT II od RVR 300 m, RWY 33 CAT IIIA od 175 m), starty 29 albo 15; EPPO lądowania 28, starty 28 albo 10; starty nigdy pod prąd lądowań, para pasów w limicie wiatru (EPWA przy 070/10 lądowania 11, starty 15), przy RVR pasa startowego < 125 m ostrzeżenie „starty niedozwolone”. Gdy hałas nie decyduje (np. mgła), do startu dalej pas z listy AIP (EPWA ARR 33 z ILS, DEP 29)."],
-  ["14.10.2026", "LVP: progi każdego lotniska z AIP (przygotowanie, wprowadzenie, odwołanie) w dymku; stany PRZYGOTOWANIE LVP, LVP W MOCY i LVP ODWOŁANE (przez 30 min od odwołania) w AERODROME, AWOS i OVERVIEW; lotniska bez LVP w AIP: „LVP nie dotyczy”; lotniska wojskowe: LVP tylko dla odlotów."],
-  ["12.10.2026", "0.12.1 – ATIS: pasy do lądowania i do startu czytane osobno (np. EPWA „APPROACH RUNWAY 33 … DEPARTURES RUNWAY 29” daje ARR 33 i DEP 29); pomijane są pasy zamknięte, na żądanie, przewidywane później i wspomniane w uwagach; osobne ATIS przylotowy i odlotowy są łączone."],
-  ["12.10.2026", "Menu: INOP pod AD VFR; DOCS przeniesione do OTHER jako pierwsza podzakładka (stare adresy #docs przekierowują). AERODROME: listy lotnisk wszystkich FIR-ów w jednej kolumnie, z PgUp i PgDn. Panel częstotliwości: imię i nazwisko kontrolera zawsze widoczne obok stanowiska."],
-  ["12.10.2026", "AWOS: przełącznik 1 PAS / 2 PASY / AUTO pod wiatrem; w 2 PASY osobny pas w kolumnach DEP i ARR; ręczny wybór wraca do automatu po zmianie pasów w ATIS albo po 12 h. RUCH na lotniskach bez A-CDM: EOBT i ETOT zamiast TSAT i TTOT, lot ze slotem na CTOT, gdy CTOT jest później niż ETOT."],
-  ["12.10.2026", "RADIO: sektory EPWW, TMA, CTR i FIS bez nikogo online pokazują samo ID, bez częstotliwości; częstotliwość pojawia się, gdy ktoś je obsługuje (wieża przejmowana przez APP: częstotliwość APP z ↑APP)."],
-  ["12.10.2026", "RADIO: stosy sąsiadów jak w VACS (tylko sektory graniczące z EPWW, bez FMP), częstotliwość tylko, gdy ktoś obsługuje sektor, bez nikogo w stosie ADVISORY 122.800, każda granica FL raz; warstwa APP w częściach TMA (WA APP, WA N APP, WA S APP), TMA bez APP z częstotliwością wieży, TMA Rzeszów z KK RZ APP; etykiety APP i TWR obok obrysów TMA i CTR z linią do punktu; LOW z suwakiem wysokości."],
-  ["12.10.2026", "0.12.0 – menu jak w PANDORZE: strzałka ← na górze wraca do poprzedniego ekranu (także podzakładki i wybrane lotnisko, tak samo jak przycisk Wstecz przeglądarki); „?” to HOME z samym przywitaniem, a informacje o programie są w ABOUT; nowe zakładki SYT OP, AUP, STRIP i OTHER (AUP i OTHER będą dostępne w przyszłości)."],
-  ["12.10.2026", "RADIO na jednej stronie jak w PANDORZE: podgląd FIR EPWW LOW z sąsiadami EDWW, EDMM, EDUU, ESAA i LKAA, HIGH z UMKK, EYVL, UMMV, UKLV i LZBB oraz mały MID; w każdym sektorze jego ID i częstotliwość stanowiska, które go teraz obsługuje; częstotliwości sąsiadów z podziałem na poziomy; warstwy ATIS, LOW MID HIGH, APP, TWR, TWR/ATIS i FIS; kliknięcie nazwy FIR-u sąsiada otwiera wyciąg z LOA. Dawne podzakładki RADIO (lotniska, GEO z mapą zasięgu, SEKTORYZACJA, rezerwacje) zastąpiła ta jedna strona."],
-  ["12.10.2026", "AERODROME: podzakładki 0 (przegląd FIR EPWW), EPWW, ESAA, ED, ET, LKAA, LZBB, UMKK, EYVL, UMMV i UKLV z listami lotnisk (także VFR i MIL) i wyszukiwarką WYŚWIETL / WYCZYŚĆ; lotnisko zagraniczne pokazuje METAR, TAF, ATIS i stanowiska APP, TWR, GND, DEL, ATIS. RUCH jak DMAN/AMAN: drabiny TSAT, TTOT i ELDT oraz widok AMAN z punktami wejścia i odstępem FLOW. Paski EFES przeniesione do zakładki STRIP."],
-  ["12.10.2026", "METEO: SAT PL i SAT EUR, TURB (mapy turbulencji IMGW od +0 do +21 h) i SIGWX (IMGW). SYT OP: wszystkie aktywne NOTAM-y FIR EPWW i głównych lotnisk z filtrem i sortowaniem."],
-  ["11.10.2026", "0.11.1 – AERODROME › PRZEGLĄD: na polids.pl w przeglądarce z blokadą reklam (uBlock, AdBlock, Opera, Brave) pod paskiem METAR było pusto. Ogólne reguły EasyList chowały klasy „ad-grid” i „ad-col” (ad = aerodrome) jako reklamy; wszystkie nazwy z „ad” w interfejsie zmienione na „aero”. Karta wiatru bez METAR pokazuje „–” zamiast „undefined”."],
-  ["08.10.2026", "AERODROME › OVERVIEW: jeden ekran dla FIR EPWW z poziomem przejściowym (jeden dla kraju: FL080, a FL090, gdy na którymkolwiek lotnisku QNH ≤ 995 hPa), METAR wszystkich lotnisk ze stanem LVP, aktywnymi NOTAM-ami, restrykcjami ECFMP i vIFF oraz Airport Monitorem vIFF. Filtr stanowiska: APP lub ACC zawęża lotniska (np. EPWA_APP: EPWA, EPMO, EPLL, EPRA) i pokazuje checklistę otwarcia, TWR przenosi do PRZEGLĄDU lotniska."],
-  ["08.10.2026", "RADIO: nowa zakładka EDUU/EDYY; u sąsiadów prawdziwe callsigny radiowe z nazwami sektorów (VATSIM Germany Knowledgebase, LOA); pasek LOA z tabelami przekazań, zasadami i PDF-em; przyciski szybkiego skoku we wszystkich FIR-ach; lotniska VFR bez ID. DOCS: nowa kategoria LOA."],
-  ["08.10.2026", "METEO › QNH: nowy podkład jak mapa rejonów QNH z AIP Polska (PAŻP), rejony odrysowane na nowo, pasy awaryjne 15–17 na 53°N i 51°N, ramki TMA/MTMA i SEKTOR n z QNH jak w vAWOS, szare oznaczenia TMA/CTR z mapy AIP (przełącznik „oznaczenia TMA/CTR”). AWOS: wiatr co 5 s z płynną wskazówką, RVR z METAR, „>2000 M” albo symulacja przy słabej widzialności. MAP: ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska (także ESGG GND), lista sąsiednich FIR-ów domyślnie zwinięta."],
-  ["08.10.2026", "Nowa nazwa: PolIDS (Polish Integrated Display System), wcześniej vPANDORA / POLIDS. Nowe logo w menu, na tej stronie i na stronie logowania, nowe ikony aplikacji i favicon."],
-  ["07.10.2026", "Dania (EKDK) też z własnego pliku .ese: sektory Kopenhagi, Bornholmu i FIS na MAP i w RADIO › GEO, kolejność przejmowania z ich pliku. Z pliku EPWW zostaje już tylko Białoruś."],
-  ["07.10.2026", "Sektory sąsiadów (Niemcy, Szwecja, Litwa, Czechy, Słowacja, Lwów, Kaliningrad) z ich własnych plików .ese: MAP rysuje je dokładnie na wybranym poziomie i koloruje wg tego, kto je obsługuje (kolejność przejmowania z ich plików), a RADIO › GEO pokazuje dokładny zasięg ich stanowisk. Z pakietu ukraińskiego bierzemy tylko Lwów, bez jego starych polskich sektorów. Sektory zależne od pasa w konfiguracji zachodniej."],
-  ["07.10.2026", "MAP: poprawiony kształt sektora UKLV (Lwów) – bez fałszywego trójkąta w środku; szare nazwy FIR-ów nie zasłaniają już częstotliwości sąsiada."],
-  ["07.10.2026", "ADMIN: lista CID-ów z dostępem, odmowy logowania"],
-  ["07.10.2026", "0.9.0 - wersja serwerowa: Docker, logowanie przez VATSIM Connect, PWA"],
-  ["07.10.2026", "Poprawki pod wielu użytkowników naraz, walidacja parametrów API"],
-  ["06.10.2026", "RADIO › GEO: kafelki stanowisk jak strony GEO w VACS (bez FMP), z częstotliwościami i tym, kto jest online; obok mapa zasięgu: kliknij jedną lub kilka pozycji (także dowolne stanowiska FIR-ów sąsiednich), żeby zobaczyć, co obsługują. Sąsiedzi: wszystkie stanowiska z pliku .ese i vacs-data, zasięgi z VATSpy."],
-  ["06.10.2026", "RADIO › SEKTORYZACJA (przeniesiona z MAP): kolejność przejmowania sektorów ACC z om.plvacc.pl › ownerships zamiast VACS, lista stanowisk w jednej kolumnie, krótkie nazwy pozycji (PO N APP, EPWW DBF, EDMM MEI, WA TWR)."],
-  ["06.10.2026", "TMA i CTR z pełną kolejnością przejmowania: najpierw APP i TWR z pliku .ese, potem ACC wg om.plvacc.pl. RADIO › SEKTORYZACJA: karta TMA i CTR, stanowiska APP/TWR w symulacji. MAP: dymek TMA, CTA i CTR pokazuje wszystkie stanowiska po kolei z częstotliwością i tym, kto jest online; warstwa CTA (np. CTA 02 nad TMA Warszawa) domyślnie włączona. RADIO › GEO: kafelki sąsiadów w kolorach FIR-ów jak w VACS. Komunikaty po polsku, gdy serwer nie odpowiada."],
-  ["06.10.2026", "MAP: przestrzeń rysowana dla wybranego poziomu (FL) albo dla wszystkich poziomów, listy do wyboru pojedynczych sektorów ACC, TMA, CTR i FIR-ów sąsiednich, opis TMA/CTR po najechaniu, samoloty w kolorach odlot / przylot / tranzyt, ATIS z nazwiskiem kontrolera, bez UNICOM i bez hierarchii dziedziczenia. Naprawione podświetlanie TMA Warszawa przy EPWA APP online."],
-  ["06.10.2026", "METEO: WIND (dawniej WINDY) z przełącznikiem 0 ft / 3000 ft na podejściu (punkt FAF/IAF każdego pasa), METAR i TAF alfabetycznie. AERODROME: wiatr 0 ft i 3000 ft w punktach podejścia (Open-Meteo), pasy ARR/DEP w kolorach listy lotów."],
-  ["06.10.2026", "AIRCRAFT: przyciski AIRBUS, BOEING, EMBRAER, MCDONNELL, ATR, CESSNA. Cała aplikacja w czcionce Consolas."],
-  ["06.10.2026", "MAP: sektoryzacja LOW/MID/HIGH wg łańcuchów VACS"],
-  ["06.10.2026", "RADIO: stanowiska sąsiadów jak w profilu VACS ACC_EPWW"],
-  ["06.10.2026", "AERODROME: paski EFES w zakładce RUCH"],
-  ["06.10.2026", "Wygląd w stylu NM UI"],
-  ["06.10.2026", "AERODROME: widok AWOS, wschód i zachód słońca"],
-  ["06.10.2026", "METEO: mapa QNH regionalnego"],
-  ["06.10.2026", "MAP: scenariusze i TV z vIFF, szczegóły lotu"],
-  ["05.10.2026", "AERODROME: odloty z vIFF (EOBT, CTOT, CDM)"],
-  ["05.10.2026", "MAP: TMA/CTR, przepustowość sektorów, karta lotniska, plakietki ATC"],
+  ["17.10.2026", "0.12.4 – polids.pl starts again: the Docker image gives the application files read permission, so files changed on the server (saved without read access for others) no longer block startup as after the 0.12.3 deployment."],
+  ["15.10.2026", "0.12.3 – per issue #13: new tabs COORDINATION, CONVERSION and SQUAWK; PHRASEOLOGY moved to OTHER as a sub-tab after DOCS (the old #phraseology address redirects). The hidden ADMIN button no longer takes space in the menu."],
+  ["15.10.2026", "HOME: rating of the logged-in controller, the position they are logged in on in VATSIM and their bookings for the next 24 hours; position choice shared with AERODROME › OVERVIEW and a PREPARE SESSION button (OVERVIEW, or the aerodrome for TWR); version and current AIRAC with dates at the bottom."],
+  ["15.10.2026", "METEO: order METAR, TAF, GAMET, SIGWX, ICING, QNH, SAT EUR, SAT PL, TURB, SUN (WIND and RADAR at the end). IMGW GAMET for regions A1–A5 or all, with validity and a map of the regions; ICING: icing from Windy at FL050–FL300; SUN: day and night map of the Earth plus sunrise, sunset, transit, BMCT and EECT for any aerodrome or point on the map (UTC and Poland LT). Sun times computed correctly far from Greenwich too."],
+  ["15.10.2026", "AD CIV: buttons for the 15 AD 2 aerodromes, each opens the aerodrome page in eAIP (address #adciv/EPWA). eAIP links follow the amendment of the current AIRAC cycle by themselves. CALLSIGN and AIRCRAFT: ALL button instead of ∗ across the full width, letters in two equal columns."],
+  ["15.10.2026", "COORDINATION: LoA transfers as in ATCISS – EXIT (COPX) and ENTRY (COPN), filter by points (several words at once), choice of position with the sectors it covers (coverage order and controllers online), FIRs and LOA/LOP type; DOCUMENTS with readable names, AIRAC, FIR and sector tags and the PDF beside them. LOA is no longer in OTHER › DOCS, and in RADIO the COORDINATION › button opens the document. DOCUMENTS also holds 20 LOPs (Warszawa ACC, 4 APP, 15 TWR) with aerodrome ICAO codes – title only for now, content in preparation."],
+  ["15.10.2026", "CONVERSION: unit calculator – hPa/inHg/mmHg, ft/m/FL, altitude and FL at QNH, NM/km/SM, kt/km/h/m/s/mph, Mach/TAS/CAS in ISA, vertical speed, gradient, °C/°F/K, kg/lb/t, UTC and Poland LT."],
+  ["15.10.2026", "MAP: only traffic related to Poland – departures from EP aerodromes, arrivals to them and transits through FIR EPWW (the aircraft is in the FIR now or the rest of its flight plan route enters it). An aircraft without a flight plan only when it is in FIR EPWW. The selected flight stays on the map, even outside this traffic."],
+  ["15.10.2026", "SQUAWK: SSR code pools of FIR EPWW from EUROCONTROL CAL v4.13 (area EUR-E, unit EP), plus CCAMS, NATO and all EUR-E entries; code check and special codes (7500, 7600, 7700, 2000, 7000, 1000)."],
+  ["14.10.2026", "0.12.2 – EPWW and neighbour sectors from one file data/seed/sectors.geojson, generated from the .ese files (MAP and RADIO take them from there); new EDGG (Langen) .ese file: EDGG sectors on MAP, and in AERODROME › ED and ET all aerodromes with its positions."],
+  ["14.10.2026", "MAP: with staffing by controllers online, sectors covered by the same position are one area in its colour with one label (position and frequency); a border only where the covering position changes, unstaffed airspace is not drawn (when nobody is online in a FIR, only the FIR borders remain)."],
+  ["14.10.2026", "MAP: new Positions section – list of positions of FIR EPWW and neighbours (ACC, FIS and aerodromes, e.g. EPGD: GD APP, GD TWR, GD GND), logged-in positions ticked by default. A click turns an offline position on as if logged in (SYM, dashed outline) or hides a logged-in one; sectorisation and aerodrome labels follow this choice. “as online” returns to the network state, “clear” turns all off. The list has the positions from the EPWW .ese file, from vacs-data and those covering neighbour sectors; positions logged in at other foreign aerodromes (e.g. EDDS_TWR, LOWW_TWR) always have a label and cannot be turned off."],
+  ["14.10.2026", "RADIO: ACC sectors on the LOW, MID and HIGH previews alike – one area and one label per position, borders only where the covering position changes, unstaffed sectors are not drawn (the FIR EPWW border remains)."],
+  ["14.10.2026", "AERODROME: runways, frequencies and elevations of aerodromes from AIP Poland and AIP MIL (PANSA eAIP, AIRAC 10/26), VFR landing sites outside the AIP from lotniska.dlapilota.pl; e.g. EPBK now has 09R/27L 1350 m and grass 09L/27R instead of the wrong 01/19 and 08/26. Frequencies with operating hours and a remark (e.g. EPRA 118.430: civil and military TWR): for a position from the .ese file in the tooltip, AIP frequencies without a position in the .ese below the list (e.g. EPRA MIL GND 119.155, APP 128.680)."],
+  ["14.10.2026", "Preferred runway per AIP AD 2.21 for EPWA, EPMO, EPWR, EPGD and EPPO: hours (winter and summer in UTC), wind limits with gusts, exceptions (thunderstorm, LVP); the reason in the tooltip, e.g. “ARR/DEP 08 per AIP (2000-0400 UTC), because 26: tailwind 8 kt > 5 kt”. In LVP the runways allowed by AD 2.22: EPWA landings 33 or 11 (RWY 11 CAT II from RVR 300 m, RWY 33 CAT IIIA from 175 m), take-offs 29 or 15; EPPO landings 28, take-offs 28 or 10; take-offs never against the landing direction, runway pair within the wind limit (EPWA at 070/10 landings 11, take-offs 15), with take-off runway RVR < 125 m the warning “take-offs not allowed”. When noise does not decide (e.g. fog), the take-off runway still comes from the AIP list (EPWA ARR 33 with ILS, DEP 29)."],
+  ["14.10.2026", "LVP: thresholds of each aerodrome from the AIP (preparation, introduction, cancellation) in the tooltip; states LVP PREPARATION, LVP IN FORCE and LVP CANCELLED (for 30 min after cancellation) in AERODROME, AWOS and OVERVIEW; aerodromes without LVP in the AIP: “LVP not applicable”; military aerodromes: LVP for departures only."],
+  ["12.10.2026", "0.12.1 – ATIS: landing and take-off runways read separately (e.g. EPWA “APPROACH RUNWAY 33 … DEPARTURES RUNWAY 29” gives ARR 33 and DEP 29); closed runways, runways on request, expected later and mentioned in remarks are skipped; separate arrival and departure ATIS are merged."],
+  ["12.10.2026", "Menu: INOP under AD VFR; DOCS moved to OTHER as the first sub-tab (old #docs addresses redirect). AERODROME: aerodrome lists of all FIRs in one column, with PgUp and PgDn. Frequency panel: the controller's name always visible next to the position."],
+  ["12.10.2026", "AWOS: 1 RWY / 2 RWY / AUTO switch under the wind; in 2 RWY a separate runway in the DEP and ARR columns; a manual choice returns to automatic after a runway change in ATIS or after 12 h. TRAFFIC at aerodromes without A-CDM: EOBT and ETOT instead of TSAT and TTOT, a flight with a slot at CTOT when CTOT is later than ETOT."],
+  ["12.10.2026", "RADIO: EPWW, TMA, CTR and FIS sectors with nobody online show the ID only, without frequency; the frequency appears when someone covers them (a tower covered by APP: APP frequency with ↑APP)."],
+  ["12.10.2026", "RADIO: neighbour stacks as in VACS (only sectors bordering EPWW, no FMP), frequency only when someone covers the sector, ADVISORY 122.800 in a stack with nobody online, each FL boundary once; APP layer in TMA parts (WA APP, WA N APP, WA S APP), TMA without APP with the tower frequency, TMA Rzeszów with KK RZ APP; APP and TWR labels beside the TMA and CTR outlines with a leader line to the point; LOW with an altitude slider."],
+  ["12.10.2026", "0.12.0 – menu as in PANDORA: the ← arrow at the top returns to the previous screen (also sub-tabs and the selected aerodrome, just like the browser Back button); “?” is HOME with the welcome only, and the program information is in ABOUT; new tabs SYT OP, AUP, STRIP and OTHER (AUP and OTHER will be available in the future)."],
+  ["12.10.2026", "RADIO on one page as in PANDORA: FIR EPWW LOW preview with neighbours EDWW, EDMM, EDUU, ESAA and LKAA, HIGH with UMKK, EYVL, UMMV, UKLV and LZBB, and a small MID; each sector shows its ID and the frequency of the position covering it now; neighbour frequencies split by levels; layers ATIS, LOW MID HIGH, APP, TWR, TWR/ATIS and FIS; clicking a neighbour FIR name opens the LOA extract. This one page replaces the former RADIO sub-tabs (aerodromes, GEO with the coverage map, SECTORISATION, bookings)."],
+  ["12.10.2026", "AERODROME: sub-tabs 0 (FIR EPWW overview), EPWW, ESAA, ED, ET, LKAA, LZBB, UMKK, EYVL, UMMV and UKLV with aerodrome lists (also VFR and MIL) and a SHOW / CLEAR search; a foreign aerodrome shows METAR, TAF, ATIS and the APP, TWR, GND, DEL, ATIS positions. TRAFFIC like DMAN/AMAN: TSAT, TTOT and ELDT ladders and an AMAN view with entry points and FLOW spacing. EFES strips moved to the STRIP tab."],
+  ["12.10.2026", "METEO: SAT PL and SAT EUR, TURB (IMGW turbulence charts from +0 to +21 h) and SIGWX (IMGW). SYT OP: all active NOTAMs of FIR EPWW and the main aerodromes with filter and sorting."],
+  ["11.10.2026", "0.11.1 – AERODROME › OVERVIEW: on polids.pl in a browser with an ad blocker (uBlock, AdBlock, Opera, Brave) the area under the METAR bar was empty. Generic EasyList rules hid the classes “ad-grid” and “ad-col” (ad = aerodrome) as ads; all names with “ad” in the interface changed to “aero”. The wind card without METAR shows “–” instead of “undefined”."],
+  ["08.10.2026", "AERODROME › OVERVIEW: one screen for FIR EPWW with the transition level (one for the country: FL080, and FL090 when QNH ≤ 995 hPa at any aerodrome), METARs of all aerodromes with LVP state, active NOTAMs, ECFMP and vIFF restrictions and the vIFF Airport Monitor. Position filter: APP or ACC narrows the aerodromes (e.g. EPWA_APP: EPWA, EPMO, EPLL, EPRA) and shows the opening checklist, TWR goes to the aerodrome OVERVIEW."],
+  ["08.10.2026", "RADIO: new EDUU/EDYY tab; real radio callsigns of neighbours with sector names (VATSIM Germany Knowledgebase, LOA); LOA bar with transfer tables, rules and the PDF; quick jump buttons in all FIRs; VFR aerodromes without ID. DOCS: new LOA category."],
+  ["08.10.2026", "METEO › QNH: new base map like the QNH regions chart from AIP Poland (PANSA), regions redrawn, emergency bands 15–17 at 53°N and 51°N, TMA/MTMA and SECTOR n boxes with QNH as in vAWOS, grey TMA/CTR labels from the AIP chart (“TMA/CTR labels” switch). AWOS: wind every 5 s with a smooth pointer, RVR from METAR, “>2000 M” or a simulation in poor visibility. MAP: ATIS line by line, controller data on hovering a label or position description (also ESGG GND), list of neighbouring FIRs collapsed by default."],
+  ["08.10.2026", "New name: PolIDS (Polish Integrated Display System), formerly vPANDORA / POLIDS. New logo in the menu, on this page and on the login page, new app icons and favicon."],
+  ["07.10.2026", "Denmark (EKDK) from its own .ese file too: Copenhagen, Bornholm and FIS sectors on MAP and in RADIO › GEO, coverage order from their file. Only Belarus is still taken from the EPWW file."],
+  ["07.10.2026", "Neighbour sectors (Germany, Sweden, Lithuania, Czechia, Slovakia, Lviv, Kaliningrad) from their own .ese files: MAP draws them exactly at the selected level and colours them by who covers them (coverage order from their files), and RADIO › GEO shows the exact reach of their positions. From the Ukrainian package only Lviv is taken, without its old Polish sectors. Runway-dependent sectors in the western configuration."],
+  ["07.10.2026", "MAP: corrected shape of the UKLV (Lviv) sector – no false triangle in the middle; grey FIR names no longer cover the neighbour frequency."],
+  ["07.10.2026", "ADMIN: list of CIDs with access, login refusals"],
+  ["07.10.2026", "0.9.0 - server version: Docker, login via VATSIM Connect, PWA"],
+  ["07.10.2026", "Fixes for many simultaneous users, API parameter validation"],
+  ["06.10.2026", "RADIO › GEO: position tiles like the GEO pages in VACS (no FMP), with frequencies and who is online; beside them a coverage map: click one or more positions (also any position of the neighbouring FIRs) to see what they cover. Neighbours: all positions from the .ese file and vacs-data, coverage from VATSpy."],
+  ["06.10.2026", "RADIO › SECTORISATION (moved from MAP): coverage order of ACC sectors from om.plvacc.pl › ownerships instead of VACS, position list in one column, short position names (PO N APP, EPWW DBF, EDMM MEI, WA TWR)."],
+  ["06.10.2026", "TMA and CTR with the full coverage order: first APP and TWR from the .ese file, then ACC per om.plvacc.pl. RADIO › SECTORISATION: TMA and CTR card, APP/TWR positions in the simulation. MAP: the TMA, CTA and CTR tooltip shows all positions in order with frequency and who is online; CTA layer (e.g. CTA 02 above TMA Warszawa) on by default. RADIO › GEO: neighbour tiles in FIR colours as in VACS. Messages in Polish when the server does not respond."],
+  ["06.10.2026", "MAP: airspace drawn for the selected level (FL) or for all levels, lists to pick single ACC, TMA and CTR sectors and neighbouring FIRs, TMA/CTR description on hover, aircraft in departure / arrival / transit colours, ATIS with the controller's name, no UNICOM and no inheritance hierarchy. Fixed TMA Warszawa highlighting with EPWA APP online."],
+  ["06.10.2026", "METEO: WIND (formerly WINDY) with a 0 ft / 3000 ft switch on approach (FAF/IAF point of each runway), METAR and TAF in alphabetical order. AERODROME: 0 ft and 3000 ft wind at the approach points (Open-Meteo), ARR/DEP runways in the flight list colours."],
+  ["06.10.2026", "AIRCRAFT: AIRBUS, BOEING, EMBRAER, MCDONNELL, ATR, CESSNA buttons. The whole app in the Consolas font."],
+  ["06.10.2026", "MAP: LOW/MID/HIGH sectorisation per VACS chains"],
+  ["06.10.2026", "RADIO: neighbour positions as in the VACS ACC_EPWW profile"],
+  ["06.10.2026", "AERODROME: EFES strips in the TRAFFIC tab"],
+  ["06.10.2026", "NM UI look"],
+  ["06.10.2026", "AERODROME: AWOS view, sunrise and sunset"],
+  ["06.10.2026", "METEO: regional QNH map"],
+  ["06.10.2026", "MAP: vIFF scenarios and TV, flight details"],
+  ["05.10.2026", "AERODROME: departures from vIFF (EOBT, CTOT, CDM)"],
+  ["05.10.2026", "MAP: TMA/CTR, sector capacity, aerodrome card, ATC labels"],
   ["05.10.2026", "EMERGENCY, CHECKLIST, PHRASEOLOGY"],
-  ["05.10.2026", "AERODROME: pas w użyciu z ATIS / pas preferowany, NOTAM"],
-  ["05.10.2026", "RADIO: kto jest online, rezerwacje"],
-  ["05.10.2026", "MAP: ruch VATSIM, trasy, granice FIR"],
-  ["05.10.2026", "Import sektorówki EPWW, navdata, callsignów i typów samolotów"],
-  ["05.10.2026", "Pierwsza wersja"],
+  ["05.10.2026", "AERODROME: runway in use from ATIS / preferred runway, NOTAM"],
+  ["05.10.2026", "RADIO: who is online, bookings"],
+  ["05.10.2026", "MAP: VATSIM traffic, routes, FIR borders"],
+  ["05.10.2026", "Import of the EPWW sector file, navdata, callsigns and aircraft types"],
+  ["05.10.2026", "First version"],
 ];
 
 const TILES = [
-  ["aerodrome", "AERODROME", "Przegląd FIR EPWW, listy lotnisk EPWW i sąsiadów, lotnisko na jednym ekranie: METAR, wiatr, pasy, ATIS, NOTAM, AWOS, RUCH (DMAN/AMAN)."],
-  ["meteo", "METEO", "METAR i TAF lotnisk, GAMET, SIGWX, oblodzenie, mapa QNH regionalnego, satelita, turbulencje, słońce, wiatr przy ziemi i na podejściu."],
-  ["map", "MAP", "Ruch VATSIM, przestrzeń na wybranym poziomie, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
-  ["radio", "RADIO", "Jedna strona jak w PANDORZE: sektory ACC EPWW na podglądach LOW/MID/HIGH z częstotliwościami, warstwy APP/TWR/FIS, ATIS i stanowiska sąsiadów; nazwa FIR-u sąsiada otwiera wyciąg z LOA."],
-  ["coordination", "COORDINATION", "Porozumienia LOA i LOP: przekazania po punktach i stanowisku, dokumenty z tagami."],
-  ["sytop", "SYT OP", "Aktywne NOTAM-y FIR EPWW i głównych lotnisk."],
-  ["strip", "STRIP", "Paski postępu lotu EFES dla 15 głównych lotnisk."],
-  ["callsign", "CALLSIGN", "Znaki wywoławcze linii lotniczych."],
-  ["aircraft", "AIRCRAFT", "Typy samolotów wg producenta, kategorie turbulencji, zdjęcia."],
-  ["squawk", "SQUAWK", "Pule kodów SSR FIR EPWW z EUROCONTROL CAL i kody specjalne."],
-  ["conversion", "CONVERSION", "Przeliczanie jednostek: ciśnienie, wysokość, FL przy QNH, prędkość, Mach, czas."],
-  ["checklist", "CHECKLIST", "Otwarcie i zamknięcie stanowiska, przekazanie, zmiana pasa."],
-  ["emergency", "EMERGENCY", "ASSIST i checklisty sytuacji awaryjnych."],
+  ["aerodrome", "AERODROME", "FIR EPWW overview, aerodrome lists of EPWW and neighbours, the aerodrome on one screen: METAR, wind, runways, ATIS, NOTAM, AWOS, TRAFFIC (DMAN/AMAN)."],
+  ["meteo", "METEO", "METAR and TAF of aerodromes, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun, surface and approach wind."],
+  ["map", "MAP", "VATSIM traffic, airspace at the selected level, TMA/CTR, sector capacity and flight status from vIFF."],
+  ["radio", "RADIO", "One page as in PANDORA: EPWW ACC sectors on LOW/MID/HIGH previews with frequencies, APP/TWR/FIS layers, ATIS and neighbour positions; a neighbour FIR name opens the LOA extract."],
+  ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents with tags."],
+  ["sytop", "SYT OP", "Active NOTAMs of FIR EPWW and the main aerodromes."],
+  ["strip", "STRIP", "EFES flight progress strips for the 15 main aerodromes."],
+  ["callsign", "CALLSIGN", "Airline radiotelephony callsigns."],
+  ["aircraft", "AIRCRAFT", "Aircraft types by manufacturer, wake turbulence categories, photos."],
+  ["squawk", "SQUAWK", "SSR code pools of FIR EPWW from EUROCONTROL CAL and special codes."],
+  ["conversion", "CONVERSION", "Unit conversion: pressure, height, FL at QNH, speed, Mach; UTC and Poland LT clocks."],
+  ["checklist", "CHECKLIST", "Position opening and closing, handover, runway change."],
+  ["emergency", "EMERGENCY", "ASSIST and emergency checklists."],
 ];
 
 export default {
@@ -84,7 +84,7 @@ export default {
         <div class="card about-info"><h3>System</h3><dl class="props info"></dl></div>
       </div>
       <div class="about-tiles">${TILES.map(([tab, name, txt]) => `<button class="about-tile${tab === "emergency" ? " red" : ""}" data-open="${tab}"><b>${name}</b><span>${esc(txt)}</span></button>`).join("")}</div>
-      <div class="card about-changes"><h3>Ostatnie zmiany</h3>
+      <div class="card about-changes"><h3>Recent changes</h3>
         <table class="data"><tbody>${CHANGES.map(([d, t]) => `<tr><td class="mono">${esc(d)}</td><td>${esc(t)}</td></tr>`).join("")}</tbody></table></div>
     </div>`);
     root.append(pane);
@@ -96,13 +96,13 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-      pane.querySelector(".info").innerHTML = row("Wersja", esc(ctx.config.version || "–"))
-        + row("Cykl AIRAC", `${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})`)
-        + row("Dane", `${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów`)
-        + row("Nawigacja", `${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC`)
-        + row("Klucz CARTO", ctx.config.carto_api_key ? "wczytany" : "brak (mapa używa zastępczego podkładu Esri)")
-        + row("Klucz OpenAIP", ctx.config.openaip_api_key ? "wczytany" : "brak")
-        + row("Logowanie", ctx.me?.user ? `${esc(ctx.me.user.name || "")} (CID ${esc(ctx.me.user.cid)})${ctx.me.admin ? ", administrator" : ""}` : "wyłączone (tryb lokalny)")
+      pane.querySelector(".info").innerHTML = row("Version", esc(ctx.config.version || "–"))
+        + row("AIRAC cycle", `${esc(ctx.config.airac.ident)} (from ${esc(ctx.config.airac.effective)})`)
+        + row("Data", `${c.aerodromes ?? "–"} aerodromes, ${c.aircraft_types ?? "–"} aircraft types, ${c.callsigns ?? "–"} callsigns`)
+        + row("Navigation", `${c.nav_points ?? "–"} points, ${c.airway_segments ?? "–"} airway segments, ${c.sectors ?? "–"} sectors, ${c.atc_positions ?? "–"} ATC positions`)
+        + row("CARTO key", ctx.config.carto_api_key ? "loaded" : "none (the map uses the Esri fallback base map)")
+        + row("OpenAIP key", ctx.config.openaip_api_key ? "loaded" : "none")
+        + row("Login", ctx.me?.user ? `${esc(ctx.me.user.name || "")} (CID ${esc(ctx.me.user.cid)})${ctx.me.admin ? ", administrator" : ""}` : "off (local mode)")
         + row("API", `<a href="/docs" target="_blank">/docs</a>`);
     };
     return { activate: load };
