@@ -308,7 +308,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
         + R("FROM", s.departure) + R("TO", s.arrival) + R("AC TYPE", acType(s))
         + R("STAR/IAF", [s.proc?.name, s.entry_fix?.fix].filter(Boolean).join(" / "), "", s.entry_fix ? `Punkt wejścia ${s.entry_fix.fix}: ${{ STAR: "z procedury STAR", IAF: "punkt wejścia lotniska w trasie", route: "ostatni punkt trasy" }[s.entry_fix.source] || ""}` : "")
         + R("STAND ARR", STAND, "", "Stanowiska nie ma w danych VATSIM.")
-        + R("STATUS ARR", s.planned ? (s.planned === "prefile" ? "PREFILE" : "OFFLINE") : s.state === "air" ? "AIRB" : s.away ? "NA ZIEMI (ADEP)" : "NA ZIEMI")
+        + R("STATUS ARR", s.planned ? "PREFILE" : s.state === "air" ? "AIRB" : s.away ? "NA ZIEMI (ADEP)" : "NA ZIEMI")
         + R("ELDT", s.eldt ? `${hm(s.eldt)} ${s.eldt_source === "vIFF" ? "vIFF" : "POZ."}` : "", "hl", SRC_TXT[s.eldt_source] || "")
         + R("ETA (POZ.)", s.eta_s !== null && s.eta_s !== undefined ? hmAt(nowMs(), data.now_ts + s.eta_s - now / 1000) : "", "", SRC_TXT.POS)
         + R("ELDT vIFF", hm(s.viff_eta), "", "Pole eta z vIFF (/ifps/callsign)")
@@ -335,7 +335,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
       const taxiSrc = v.taxi ? "Czas kołowania lotu z vIFF" : data.cad?.taxi ? `Domyślny czas kołowania lotniska z vIFF${c ? " (A-CDM)" : ""}`
         : "Brak czasu kołowania w vIFF: przyjęte 10 min";
       const vtt = v.ttot && v.tsat ? Math.round((r(v.ttot) - r(v.tsat)) / 60) : null;
-      const status = s.planned ? (s.planned === "prefile" ? "PREFILE" : "OFFLINE") : s.state === "air" ? "AIRB"
+      const status = s.planned ? "PREFILE" : s.state === "air" ? "AIRB"
         : (s.groundspeed || 0) >= 3 ? "TAXI" : v.aobt ? "OFFBLK" : v.ready ? "RDY" : v.state || "–";
       rows = R("CALLSIGN", s.callsign, "hd") + R("REGISTRATION", s.registration, "", "REG/ z uwag planu lotu")
         + R("FROM", s.departure) + R("TO", s.arrival) + R("AC TYPE", acType(s))
@@ -442,6 +442,9 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
     try {
       const d = await api(`/api/aerodromes/${encodeURIComponent(icao)}/strips?dman=1`);
       if (dead || my !== seq) return;
+      // RUCH bez lotów OFFLINE (planowane znane tylko z vIFF, pilot niepołączony): serwer pomija je przy dman=1,
+      // filtr tutaj chroni widok przed odpowiedzią bez tego pominięcia
+      d.planned = (d.planned || []).filter((s) => s.planned !== "viff");
       // zegar serwera: drabiny liczymy od jego czasu, gdy zegar przeglądarki różni się o więcej niż 30 s
       const off = d.now_ts ? d.now_ts * 1000 - Date.now() : 0;
       offset = Math.abs(off) > 30000 ? off : 0;

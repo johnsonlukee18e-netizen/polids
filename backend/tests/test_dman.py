@@ -324,6 +324,35 @@ def test_strips_dman_not_slower_when_viff_down(client, monkeypatch):
     assert "/etfms/getCadAirports" not in calls
 
 
+def test_strips_dman_without_offline_flights(client, monkeypatch):
+    """RUCH (DMAN/AMAN, ?dman=1) bez lotów OFFLINE: planowany odlot znany tylko z vIFF (pilot niepołączony, bez planu
+    w sieci VATSIM) zostaje w STRIP (zwykłe /strips), prefile (plan złożony w sieci) RUCH pokazuje dalej."""
+    async def feed():
+        return {**FEED, "prefiles": [{"callsign": "PRE1", "name": "Jan", "cid": 1, "flight_plan": {
+            "aircraft_short": "B738", "departure": "EPWA", "arrival": "EGLL", "deptime": "1300", "altitude": "36000",
+            "flight_rules": "I", "route": "SOXER"}}]}
+
+    async def fake_get(path, params=None, ttl=None):
+        if path == "/ifps/depAirport":
+            return [{"callsign": "GATE1", "arrival": "EDDF", "eobt": "1210", "taxi": 12, "cdmData": {"tsat": "121500"}},
+                    {"callsign": "OFF1", "arrival": "LOWW", "eobt": "1240", "cdmData": {"tsat": "124500"}}]
+        if path == "/etfms/getCadAirport":
+            return {"isCdm": True}
+        if path == "/etfms/getCadAirports":
+            return [{"icao": "EPWA", "rate": 34, "taxiTime": 15, "isCdm": True}]
+        if path == "/ifps/callsign":
+            return None
+        raise AssertionError(path)
+
+    monkeypatch.setattr(aerodromes, "get_feed", feed)
+    monkeypatch.setattr(viff, "_get", fake_get)
+    strip = {s["callsign"]: s["planned"] for s in client.get("/api/aerodromes/EPWA/strips").json()["planned"]}
+    assert strip == {"PRE1": "prefile", "OFF1": "viff"}
+    ruch = client.get("/api/aerodromes/EPWA/strips?dman=1").json()
+    assert {s["callsign"]: s["planned"] for s in ruch["planned"]} == {"PRE1": "prefile"}
+    assert "OFF1" not in {s["callsign"] for k in ("departures", "arrivals", "local", "planned") for s in ruch[k]}
+
+
 # --- frontend -----------------------------------------------------------------------------------------------------
 
 NODE_SCRIPT = r"""
@@ -470,6 +499,8 @@ def test_strip_tab_and_ruch_wiring():
     # STRIP i AERODROME › RUCH: paski EFES tylko w zakładce STRIP; PASKI tylko dla lotnisk z podzakładką w STRIP
     assert "import { mountStrips" not in dm and "mountStrips(" not in dm
     assert "STRIP_AIRPORTS.includes(icao)" in dm and "Paski tylko dla 15 głównych lotnisk" in dm
+    # RUCH bez lotów OFFLINE (planowane tylko z vIFF): filtr także w przeglądarce, bez statusu OFFLINE w szczegółach
+    assert 'd.planned = (d.planned || []).filter((s) => s.planned !== "viff");' in dm and '"OFFLINE"' not in dm
     # widok DMAN/AMAN ↔ AMAN w adresie AERODROME (#aerodrome/EPWA/aman): kliknięcie = krok do cofnięcia
     ad = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
     assert "onView?.(v, {})" in dm and "onView?.(st.view, { replace: true })" in dm and "setView(v) {" in dm

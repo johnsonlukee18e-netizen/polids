@@ -207,7 +207,8 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
     vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese i kategoria turbulencji z bazy typów.
 
     Każdy pasek ma też pola DMAN/AMAN (services/dman.py): registration, a przylot entry_fix, eta_s, eldt_s, eldt.
-    ?dman=1 (widok DMAN/AMAN) dodatkowo pyta vIFF o ELDT przylotów (/ifps/callsign) i ustawienia A-CDM lotniska."""
+    ?dman=1 (widok DMAN/AMAN) dodatkowo pyta vIFF o ELDT przylotów (/ifps/callsign) i ustawienia A-CDM lotniska
+    i pomija loty OFFLINE (planned "viff": znane tylko z vIFF, bez połączenia z siecią VATSIM)."""
     ad = _ad(db, icao)
 
     async def from_viff():
@@ -246,6 +247,10 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
         asked = sorted((s for s in board["arrivals"] if s["state"] == "air" or s["away"]),
                        key=lambda s: (s["dist_nm"] is None, s["dist_nm"] or 0))
         viff_etas = await viff_service.arrival_etas(ad.icao, [s["callsign"] for s in asked])
+    if dman:
+        # RUCH (DMAN/AMAN) bez lotów OFFLINE: planowane znane tylko z vIFF (pilot niepołączony, bez planu w sieci
+        # VATSIM) zostają w STRIP; prefile (plan złożony w sieci przed połączeniem) RUCH pokazuje dalej
+        board["planned"] = [s for s in board["planned"] if s.get("planned") != "viff"]
     dman_service.annotate(board, ad.icao, now, viff_etas)
     return {
         "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft, "now": now.strftime("%H%M"),
