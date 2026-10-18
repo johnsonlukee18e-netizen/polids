@@ -8,13 +8,13 @@ import { embedBar } from "./tabs/aip.js";
 export function mountPhraseology(pane, ctx) {
   iframeWithFallback(pane, ctx.config.links.phraseology, "EUROCONTROL Learning Zone");
   embedBar(pane);
-  const note = h(`<div class="embed-note hint">Sprawdzam, czy Learning Zone pozwala wyświetlić się w ramce…</div>`);
+  const note = h(`<div class="embed-note hint">Checking whether Learning Zone allows display in a frame…</div>`);
   pane.insertBefore(note, pane.querySelector("iframe"));
   api("/api/embed-check/phraseology").then((r) => {
     if (r.embeddable && !r.reason) note.remove();
     else if (r.embeddable === false) {
       note.classList.add("warn");
-      note.textContent = `Learning Zone może nie wyświetlić się w ramce (${r.reason}). Jeśli poniżej jest pusto albo widać komunikat o blokadzie, użyj przycisku „Otwórz w nowej karcie ↗”.`;
-    } else note.textContent = `Nie udało się sprawdzić strony (${r.reason}). Jeśli ramka jest pusta, użyj przycisku „Otwórz w nowej karcie ↗”.`;
-  }).catch((e) => { note.textContent = `Nie udało się sprawdzić strony (${e.message}). Jeśli ramka jest pusta, użyj przycisku „Otwórz w nowej karcie ↗”.`; });
+      note.textContent = `Learning Zone may not show in the frame (${r.reason}). If the frame below is empty or shows a blocking message, open the page in a new tab with the ↗ button above.`;
+    } else note.textContent = `Could not check the page (${r.reason}). If the frame is empty, open the page in a new tab with the ↗ button above.`;
+  }).catch((e) => { note.textContent = `Could not check the page (${e.message}). If the frame is empty, open the page in a new tab with the ↗ button above.`; });
 }

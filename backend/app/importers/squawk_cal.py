@@ -280,7 +280,7 @@ def extract_cal(sheets: dict[str, list[list[str]]], layouts: dict[str, tuple[int
     latest = latest if latest and ver_key(latest) >= (0, 0) else None
     named = f"{m.group(1)}.{m.group(2)}" if (m := EDITION_FILE.search(source)) else None
     edition = named or latest
-    edition_from = " i ".join(w for w, v in (("nazwa pliku", named), ("kolumna Ver", latest)) if v == edition and v)
+    edition_from = " and ".join(w for w, v in (("file name", named), ("Ver column", latest)) if v == edition and v)
     if named and latest and named != latest:
         report(f"   UWAGA: wydanie z nazwy pliku {named}, a najnowsza zmiana wiersza (Ver) {latest}")
     if areas and HOME_UNIT not in areas.get(HOME_PA, []):
@@ -404,9 +404,9 @@ def find_edition(sheets: dict[str, list[list[str]]], heads: dict[str, int | None
         top = grid[:heads[name]] if heads.get(name) is not None else grid[:15]
         for text in [name] + [c for row in top for c in row if c]:
             if m := EDITION.search(text):
-                return m.group(1), "arkusz"
+                return m.group(1), "sheet"
     if m := EDITION_FILE.search(source):
-        return f"{m.group(1)}.{m.group(2)}", "nazwa pliku"
+        return f"{m.group(1)}.{m.group(2)}", "file name"
     return None, None
 
 
@@ -482,7 +482,7 @@ def extract_generic(sheets: dict[str, list[list[str]]], source: str, units: list
                               "match": why, "sheet": name, "row": rn, "raw": raw})
     pools.sort(key=lambda p: (code_value(p["from"]), code_value(p["to"]), p["unit"], p["sheet"], p["row"]))
     edition, edition_from = find_edition(sheets, heads, source)
-    meta = {"source": source, "layout": "ogólny", "edition": edition, "edition_from": edition_from,
+    meta = {"source": source, "layout": "generic", "edition": edition, "edition_from": edition_from,
             "generated": date.today().isoformat(), "filter": {"unit": units, "mention": mentions}, "sheets": info,
             "counts": {c: sum(p["category"] == c for p in pools) for c in CATEGORIES},
             "pools": len(pools), "skipped": len(skipped)}

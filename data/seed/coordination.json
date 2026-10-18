@@ -20,7 +20,7 @@
     {
       "id": "loa-edww-eduu",
       "type": "LOA",
-      "name": "Warszawa ACC i TWR Szczecin – Bremen ACC i Karlsruhe UAC",
+      "name": "Warszawa ACC and TWR Szczecin – Bremen ACC and Karlsruhe UAC",
       "file": "LOA/LOA EPWW EDWW Bremen, EDUU Karlsruhe (AIRAC 2602).pdf",
       "firs": ["EPWW", "EDWW", "EDUU"],
       "positions": ["B LOW", "B MID", "B HIGH", "D LOW", "D MID", "D HIGH", "EPSC TMA", "EDWW MRZ", "EDWW MAR", "EDWW FLG", "EDDB DBAN", "EDDB DBAS", "EDDB DBDS", "EDUU OSE", "EDUU HVL"],
@@ -29,7 +29,7 @@
       "version": "rev. 4.0",
       "loa": ["EDWW", "EDUU"],
       "agreements": [],
-      "note": "Jeden dokument dla Bremen ACC (EDWW) i Karlsruhe UAC (EDUU); zastępuje wersję z 22.01.2026."
+      "note": "One document for Bremen ACC (EDWW) and Karlsruhe UAC (EDUU); supersedes the version of 22.01.2026."
     },
     {
       "id": "loa-edmm",
@@ -43,7 +43,7 @@
       "version": "rev. 2.3",
       "loa": ["EDMM"],
       "agreements": [],
-      "note": "Zastępuje wersję z 25.01.2024."
+      "note": "Supersedes the version of 25.01.2024."
     },
     {
       "id": "loa-lkaa",
@@ -57,7 +57,7 @@
       "version": "",
       "loa": ["LKAA"],
       "agreements": [],
-      "note": "LOA nie podaje AIRAC ani numeru wersji; 03.09.2026 to pierwszy dzień cyklu 2609."
+      "note": "The LOA gives no AIRAC or version number; 03.09.2026 is the first day of cycle 2609."
     },
     {
       "id": "loa-lzbb",
@@ -71,7 +71,7 @@
       "version": "",
       "loa": ["LZBB"],
       "agreements": [],
-      "note": "LOA nie podaje numeru wersji."
+      "note": "The LOA gives no version number."
     },
     {
       "id": "loa-uklv",
@@ -85,7 +85,7 @@
       "version": "v1.1",
       "loa": ["UKLV"],
       "agreements": [],
-      "note": "LOA z 2022 r. ze starą sektoryzacją EPWW (RWW, ZWW, SWW, UWW); w COORDINATION przypisane do dzisiejszego sektora R (COP-y DIBED, GOTIX, LUGOL, ROLKA, TEPNA, TOLPA, USTIL leżą w R)."
+      "note": "LOA of 2022 with the old EPWW sectorisation (RWW, ZWW, SWW, UWW); in COORDINATION mapped to today's sector R (COPs DIBED, GOTIX, LUGOL, ROLKA, TEPNA, TOLPA, USTIL lie in R)."
     },
     {
       "id": "loa-eyvl",
@@ -99,7 +99,7 @@
       "version": "rev. 2.0",
       "loa": ["EYVL"],
       "agreements": [],
-      "note": "Zastępuje wersję z 02.11.2023."
+      "note": "Supersedes the version of 02.11.2023."
     },
     {
       "id": "loa-esaa",
@@ -113,7 +113,7 @@
       "version": "v2.3",
       "loa": ["ESAA"],
       "agreements": [],
-      "note": "LOA nie podaje AIRAC; 19.02.2026 to pierwszy dzień cyklu 2602. Zastępuje wersję z 17.04.2025."
+      "note": "The LOA gives no AIRAC; 19.02.2026 is the first day of cycle 2602. Supersedes the version of 17.04.2025."
     },
     {
       "id": "lop-acc-epww",
@@ -127,7 +127,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-app-epgd",
@@ -141,7 +141,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-app-epkk",
@@ -155,7 +155,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-app-eppo",
@@ -169,7 +169,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-app-epwa",
@@ -183,7 +183,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epby",
@@ -197,7 +197,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epgd",
@@ -211,7 +211,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epkt",
@@ -225,7 +225,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epkk",
@@ -239,7 +239,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-eplb",
@@ -253,7 +253,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epll",
@@ -267,7 +267,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epsy",
@@ -281,7 +281,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epmo",
@@ -295,7 +295,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-eppo",
@@ -309,7 +309,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epra",
@@ -323,7 +323,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-eprz",
@@ -337,7 +337,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epsc",
@@ -351,7 +351,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epwa",
@@ -365,7 +365,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epwr",
@@ -379,7 +379,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     },
     {
       "id": "lop-twr-epzg",
@@ -393,7 +393,7 @@
       "version": "",
       "loa": [],
       "agreements": [],
-      "note": "PDF ma na razie tylko tytuł – treść w przygotowaniu."
+      "note": "The PDF has only a title so far – content in preparation."
     }
   ],
   "ep_sectors": {

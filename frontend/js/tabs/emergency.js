@@ -12,7 +12,7 @@ function items(list) {
 
 export default {
   mount(root) {
-    const holder = h(`<div class="pane"><p class="hint">Ładowanie…</p></div>`);
+    const holder = h(`<div class="pane"><p class="hint">Loading…</p></div>`);
     root.append(holder);
     api("/api/emergency").then((data) => {
       holder.remove();
@@ -22,7 +22,7 @@ export default {
           pane.innerHTML = `<h2>${esc(p.title)}</h2>${p.subtitle ? `<div class="em-sub">${esc(p.subtitle)}</div>` : ""}
             ${p.assist ? assistBar() : ""}
             <div class="em-sections">${p.sections.map((s) => `<section><h3>${esc(s.title)}</h3>${items(s.items)}</section>`).join("")}</div>
-            ${p.source ? `<p class="hint" style="margin-top:20px">Źródło: ${esc(p.source)}</p>` : ""}`;
+            ${p.source ? `<p class="hint" style="margin-top:20px">Source: ${esc(p.source)}</p>` : ""}`;
         },
       })));
     }).catch((e) => { holder.innerHTML = `<p class="error">${esc(e.message)}</p>`; });

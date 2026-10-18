@@ -27,17 +27,17 @@ export default {
     // --- POROZUMIENIA
     function mountAgreements(pane) {
       const el = h(`<div class="cr-wrap">
-        <div class="cr-main"><div class="cr-sum"></div><div class="cr-blocks"><p class="hint">Wczytywanie porozumień…</p></div>
-          <details class="cr-notes"><summary>Zasady z LOA</summary><div class="cr-notes-b"></div></details></div>
+        <div class="cr-main"><div class="cr-sum"></div><div class="cr-blocks"><p class="hint">Loading LoA…</p></div>
+          <details class="cr-notes"><summary>LOA rules</summary><div class="cr-notes-b"></div></details></div>
         <div class="cr-side">
-          <div class="ms-card"><h4>Punkty / filtr</h4>
-            <input type="search" class="field cr-q" list="cr-cops" placeholder="np. ALUKA EPKS" autocomplete="off" spellcheck="false" aria-label="Punkty i filtr">
+          <div class="ms-card"><h4>Points / filter</h4>
+            <input type="search" class="field cr-q" list="cr-cops" placeholder="e.g. ALUKA EPKS" autocomplete="off" spellcheck="false" aria-label="Points and filter">
             <datalist id="cr-cops"></datalist>
-            <p class="hint">Kilka pełnych nazw COP: którykolwiek z nich (ALUKA BODLA). Pozostałe słowa muszą pasować wszystkie (lotnisko, sektor, FIR, FL, warunki). Pełna nazwa COP – te wiersze na górze.</p></div>
-          <div class="ms-card"><h4>Stanowisko</h4><select class="field cr-pos" aria-label="Stanowisko"><option value="">Wszystkie</option></select>
+            <p class="hint">Several full COP names: any of them (ALUKA BODLA). All other words must match (aerodrome, sector, FIR, FL, conditions). Rows with a full COP name go to the top.</p></div>
+          <div class="ms-card"><h4>Position</h4><select class="field cr-pos" aria-label="Position"><option value="">All</option></select>
             <p class="hint cr-own"></p></div>
           <div class="ms-card"><h4>FIR</h4><div class="cr-tgs cr-firs"></div></div>
-          <div class="ms-card"><h4>Rodzaj</h4><div class="cr-tgs cr-types"></div></div>
+          <div class="ms-card"><h4>Type</h4><div class="cr-tgs cr-types"></div></div>
         </div></div>`);
       pane.append(el);
       const $ = (s) => el.querySelector(s);
@@ -49,7 +49,7 @@ export default {
       const refresh = () => {
         if (q.value !== st.q) q.value = st.q;   // bez przestawiania kursora w trakcie pisania
         if (!data) {
-          $(".cr-blocks").innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Wczytywanie porozumień…</p>`;
+          $(".cr-blocks").innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Loading LoA…</p>`;
           return;
         }
         if (built !== data) {
@@ -62,7 +62,7 @@ export default {
         data.agreements.forEach((r) => { counts[r.fir] = (counts[r.fir] || 0) + 1; counts[r.type] = (counts[r.type] || 0) + 1; });
         $(".cr-firs").innerHTML = data.firs.map((f) => `<button type="button" class="gbtn cr-tg${st.off.has(f) ? "" : " on"}" data-fir="${esc(f)}"`
           + ` title="${esc(data.notes[f]?.title || f)}">${esc(f)} <small>${counts[f] || 0}</small></button>`).join("")
-          + `<button type="button" class="btn cr-all" title="Włącz wszystkie FIR-y">wszystkie</button>`;
+          + `<button type="button" class="btn cr-all" title="Show all FIRs">all</button>`;
         $(".cr-types").innerHTML = ["LOA", "LOP"].map((t) => `<button type="button" class="gbtn cr-tg${st.typesOff.has(t) ? "" : " on"}" data-kind="${t}">`
           + `${t} <small>${counts[t] || 0}</small></button>`).join("");
         const v = view(data, { pos: st.pos || "", q: st.q, off: st.off, typesOff: st.typesOff, online });
@@ -74,13 +74,13 @@ export default {
         if (st.pos) {
           const keys = ownedKeys(data.chains, st.pos, online);
           const ons = data.positions.filter((p) => online.has(p.callsign) && p.callsign !== st.pos).map((p) => shortCs(p.callsign));
-          own.innerHTML = (keys.length ? `Obsługuje: <b>${esc(keys.join(", "))}</b>.` : "Teraz nie obsługuje żadnego sektora z LOA (przejmuje ktoś wyżej w kolejności).")
-            + (net === false ? " Brak danych VATSIM: liczymy tak, jakby nikt nie był online."
-              : net ? ` Online: ${ons.length ? esc(ons.join(", ")) : "nikt z tych stanowisk"}.` : "");
-        } else own.textContent = "Wszystkie przekazania, bez podziału na sektory.";
+          own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LOA sector now (covered by a position higher in the order).")
+            + (net === false ? " No VATSIM data: computed as if nobody were online."
+              : net ? ` Online: ${ons.length ? esc(ons.join(", ")) : "none of these positions"}.` : "");
+        } else own.textContent = "All transfers, not split by sector.";
         const firs = [...new Set([...v.out, ...v.in].map((r) => r.fir))];
-        $(".cr-notes summary").textContent = `Zasady z LOA: przekazanie kontroli, VFR, inne${firs.length ? " – " + firs.join(", ") : ""}`;
-        $(".cr-notes-b").innerHTML = notesHtml(data, firs) || `<p class="hint">Brak zasad dla wybranych FIR-ów.</p>`;
+        $(".cr-notes summary").textContent = `LOA rules: transfer of control, VFR, other${firs.length ? " – " + firs.join(", ") : ""}`;
+        $(".cr-notes-b").innerHTML = notesHtml(data, firs) || `<p class="hint">No rules for the selected FIRs.</p>`;
         if (wantTop !== null) { main.scrollTop = wantTop; wantTop = null; }
       };
       const saveQ = debounce(() => remember("coordination", argOf(), { replace: true }), 400);
@@ -120,15 +120,15 @@ export default {
     function mountDocuments(pane) {
       const el = h(`<div class="mapwrap cd-wrap">
         <div class="mapside">
-          <div class="ms-card"><h4>Dokumenty LOA i LOP</h4>
-            <div class="ms-row"><select class="field cd-fir" aria-label="FIR"><option value="">Wszystkie FIR-y</option></select>
-              <select class="field cd-type" aria-label="Rodzaj"><option value="">LOA i LOP</option><option>LOA</option><option>LOP</option></select></div>
-            <div class="cd-list"><p class="hint">Wczytywanie…</p></div></div>
-          <p class="hint">Nazwy, tagi i AIRAC: <span class="mono">data/seed/coordination.json</span>; PDF-y w
-            <span class="mono">data/docs/LOA</span> i <span class="mono">data/docs/LOP</span>.</p>
+          <div class="ms-card"><h4>LOA and LOP documents</h4>
+            <div class="ms-row"><select class="field cd-fir" aria-label="FIR"><option value="">All FIRs</option></select>
+              <select class="field cd-type" aria-label="Type"><option value="">LOA and LOP</option><option>LOA</option><option>LOP</option></select></div>
+            <div class="cd-list"><p class="hint">Loading…</p></div></div>
+          <p class="hint">Names, tags and AIRAC: <span class="mono">data/seed/coordination.json</span>; PDFs in
+            <span class="mono">data/docs/LOA</span> and <span class="mono">data/docs/LOP</span>.</p>
           <div class="cd-errs" hidden></div>
         </div>
-        <iframe class="embed viewer" style="background:#333" title="Dokument"></iframe>
+        <iframe class="embed viewer" style="background:#333" title="Document"></iframe>
       </div>`);
       pane.append(el);
       const list = el.querySelector(".cd-list"), fir = el.querySelector(".cd-fir"), type = el.querySelector(".cd-type");
@@ -153,23 +153,23 @@ export default {
       let reveal = true;
       const refresh = () => {
         if (!data) {
-          list.innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Wczytywanie…</p>`;
+          list.innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Loading…</p>`;
           return;
         }
         // uwagi do danych (PDF bez wpisu, nieznany sektor): dla tego, kto utrzymuje coordination.json
         errs.hidden = !data.errors?.length;
-        errs.innerHTML = data.errors?.length ? `<h4>Do poprawienia w danych</h4><ul>${data.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : "";
+        errs.innerHTML = data.errors?.length ? `<h4>To fix in the data</h4><ul>${data.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : "";
         const was = docRef(data.documents, st.doc);
         const sel = docSelect(data.documents, st.doc, { fir: st.dfir, type: st.dtype }, { reveal });
         reveal = false;
         st.dfir = sel.fir;
         st.dtype = sel.type;
         const firs = [...new Set(data.documents.flatMap((d) => d.firs))].sort();
-        fir.innerHTML = `<option value="">Wszystkie FIR-y</option>` + firs.map((f) => `<option${f === st.dfir ? " selected" : ""}>${esc(f)}</option>`).join("");
+        fir.innerHTML = `<option value="">All FIRs</option>` + firs.map((f) => `<option${f === st.dfir ? " selected" : ""}>${esc(f)}</option>`).join("");
         type.value = st.dtype;
         const ds = docFilter(data.documents, { fir: st.dfir, type: st.dtype });
         list.innerHTML = ds.length ? ds.map((d) => docCardHtml(d, { selected: d.id === sel.doc?.id, airac: data.current_airac })).join("")
-          : `<p class="hint">Brak dokumentów dla tego filtra.</p>`;
+          : `<p class="hint">No documents for this filter.</p>`;
         show(sel.doc);
         if (was && sel.doc && was.id !== sel.doc.id) remember("coordination", argOf(), { replace: true });
       };
@@ -216,8 +216,8 @@ export default {
 
     const refreshAll = () => { agr?.refresh(); docs?.refresh(); };
     sub = subtabs(root, [
-      { id: "agreements", label: "POROZUMIENIA", fill: true, render: (pane) => (agr = mountAgreements(pane)) },
-      { id: "docs", label: "DOKUMENTY", fill: true, render: (pane) => (docs = mountDocuments(pane)) },
+      { id: "agreements", label: "LoA", fill: true, render: (pane) => (agr = mountAgreements(pane)) },
+      { id: "docs", label: "DOCUMENTS", fill: true, render: (pane) => (docs = mountDocuments(pane)) },
     ], { arg: argOf });
 
     // dane raz na otwarcie zakładki (pliki zmieniają się z wersją PolIDS); błąd: ponowna próba przy następnym activate

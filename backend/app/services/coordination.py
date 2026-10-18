@@ -21,8 +21,8 @@ COP = re.compile(r"^[A-Z]{2,5}$")            # punkt koordynacyjny (ALUKA, BODLA
 FL = re.compile(r"FL\s?(\d{2,3})")
 ACC_SECTOR = re.compile(r"^([A-Z]) (LOW|MID|HIGH)$")
 ACC_CS = re.compile(r"^EPWW_[A-Z0-9]+_CTR$")
-UNKNOWN = "sektor nieokreślony w LOA"
-GROUPS = (("ACC", "ACC / FIR"), ("APP", "APP / zbliżanie"), ("TWR", "TWR / lotnisko"))
+UNKNOWN = "sector not specified in LOA"
+GROUPS = (("ACC", "ACC / FIR"), ("APP", "APP / approach"), ("TWR", "TWR / aerodrome"))
 
 
 # --- parsowanie pól z loa.json
@@ -208,7 +208,7 @@ def unregistered_doc(file: str, taken: set[str]) -> dict:
     name = stem[:-4] if stem.lower().endswith(".pdf") else stem
     return {"id": doc_id, "type": typ if typ in TYPES else "LOA", "name": name, "file": file, "firs": ["EPWW"],
             "positions": [], "airac": "", "effective": "", "version": "", "loa": [],
-            "note":"brak wpisu w data/seed/coordination.json", "url": f"/files/docs/{file}", "current": False,
+            "note": "no entry in data/seed/coordination.json", "url": f"/files/docs/{file}", "current": False,
             "exists": True, "count": 0, "registered": False}
 
 
@@ -249,7 +249,7 @@ def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
         n = 0
         for key in doc["loa"]:
             if key not in loa_firs:
-                errors.append(f"{doc['id']}: brak FIR {key} w loa.json")
+                errors.append(f"{doc['id']}: FIR {key} missing in loa.json")
                 continue
             doc_of_fir.setdefault(key, doc)
         own_fir = next((f for f in doc["firs"] if f != "EPWW"), "EPWW")
@@ -267,7 +267,7 @@ def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
         if f not in known:
             known.add(f)
             documents.append(unregistered_doc(f, {d["id"] for d in documents}))
-            errors.append(f"{f}: PDF bez wpisu w data/seed/coordination.json (dopisz nazwę, FIR-y i AIRAC)")
+            errors.append(f"{f}: PDF without an entry in data/seed/coordination.json (add its name, FIRs and AIRAC)")
     notes = {}
     for key, f in loa_firs.items():
         if not isinstance(f, dict):
@@ -289,7 +289,7 @@ def build(coord: dict, loa: dict, own: dict, *, airac: str | None = None,
         if r["fir"] not in firs:
             firs.append(r["fir"])
         if r["ep_unmapped"]:
-            errors.append(f"{r['id']}: nieznany sektor EPWW „{r['ep']}” (dopisz go do ep_sectors w coordination.json)")
+            errors.append(f"{r['id']}: unknown EPWW sector \"{r['ep']}\" (add it to ep_sectors in coordination.json)")
     return {"current_airac": airac, "documents": documents, "agreements": rows, "chains": chains,
             "positions": positions(chains, own, names or {}, loa_firs), "firs": firs, "notes": notes,
             "cops": sorted({r["cop_key"] for r in rows if r["cop_key"]}), "unknown_label": UNKNOWN, "errors": errors}

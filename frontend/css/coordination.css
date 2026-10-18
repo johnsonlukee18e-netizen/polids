@@ -1,6 +1,9 @@
 /* COORDINATION (0.12.3): porozumienia LOA/LOP jak „Agreements” w ATCISS, tabele jak w NM UI, panel sterowania po prawej */
-/* "POROZUMIENIA" mieści się w podmenu (130 px) bez wielokropka dopiero bez odstępów między literami */
+/* "DOCUMENTS" w podmenu (130 px) bez odstępów między literami, jak dawniej "POROZUMIENIA" */
 .view[data-tab="coordination"] > .submenu button { letter-spacing: 0; }
+/* 0.12.5: ostre krawędzie jak w PANDORZE (przyciski, pola, panele i karty bez zaokrągleń) */
+.view[data-tab="coordination"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .cd-card, .cd-tag),
+.view[data-tab="adciv"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .chl-row, .chl-kd) { border-radius: 0; }
 .cr-wrap { flex: 1; display: flex; min-height: 0; }
 .cr-main { flex: 1; min-width: 0; overflow: auto; padding: 10px 14px; }
 .cr-side { width: 280px; flex: none; background: #050705; border-left: 1px solid var(--line); padding: 8px; overflow: auto;
@@ -22,8 +25,8 @@
 .cr-sum b { color: #fff; }
 /* wyłączone przełączniki FIR / LOA-LOP: widać, czemu tabela jest krótsza */
 .cr-off b { color: var(--yellow); }
-.cr-block { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
-.cr-bh { margin: 0; padding: 5px 10px; background: var(--head); border-bottom: 1px solid var(--head-line); border-radius: 3px 3px 0 0;
+.cr-block { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 0; background: var(--panel); }
+.cr-bh { margin: 0; padding: 5px 10px; background: var(--head); border-bottom: 1px solid var(--head-line); border-radius: 0;
   font: 700 12px/1.3 var(--sans); letter-spacing: .8px; color: var(--green-text); }
 .cr-bh small { margin-left: 8px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
 table.cr-tab td { vertical-align: top; }
@@ -50,10 +53,10 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .cr-nb { white-space: nowrap; }
 .cr-by { display: block; color: var(--green-hi); font-size: 11px; }
 .cr-unk { color: var(--muted); font-size: 11px; border-bottom: 1px dotted var(--muted); cursor: help; }
-.cr-doc { background: none; border: 1px solid #2f3a2f; border-radius: 2px; color: var(--green-text); font: 700 11px var(--mono);
+.cr-doc { background: none; border: 1px solid #2f3a2f; border-radius: 0; color: var(--green-text); font: 700 11px var(--mono);
   padding: 1px 6px; cursor: pointer; white-space: nowrap; }
 .cr-doc:hover { border-color: var(--green-hi); color: #fff; }
-.cr-notes { border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
+.cr-notes { border: 1px solid var(--line); border-radius: 0; background: var(--panel); }
 .cr-notes summary { padding: 5px 10px; background: var(--head); cursor: pointer; font: 700 12px/1.3 var(--sans); color: var(--green-text);
   letter-spacing: .5px; }
 .cr-notes-b { padding: 4px 12px 8px; columns: 2 420px; column-gap: 24px; }
@@ -89,3 +92,36 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .cd-errs { padding: 6px 8px; border: 1px solid #5a4c12; border-left: 3px solid var(--yellow); background: #0d0b04; font-size: 12px; }
 .cd-errs h4 { margin: 0 0 4px; font: 700 11px var(--sans); color: var(--yellow); letter-spacing: .8px; text-transform: uppercase; }
 .cd-errs ul { margin: 0; padding-left: 16px; overflow-wrap: anywhere; }
+
+/* AD CIV (0.12.5, issue #18): przycisk lotniska otwiera listę map z AD 2.24 eAIP (jak „Charts” w PANDORZE), PDF obok;
+   lista przewijana w karcie, przyciski PDF / AD 2 TEXT zawsze widoczne pod nią */
+.chl-wrap .mapside { width: 390px; overflow: hidden; }
+.chl-wrap .mapside > .ms-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chl-name { margin-bottom: 6px; font: 700 13px/1.3 var(--sans); color: #fff; }
+.chl-kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; margin-bottom: 6px; }
+.chl-kinds:empty { display: none; }
+.chl-kinds .gbtn { margin: 0; padding: 3px 3px; font-size: 13px; }
+.chl-kinds .gbtn small { font-weight: 400; font-size: 11px; }
+.chl-kinds .gbtn:not(.on) { background: linear-gradient(#262a26, #181b18); border-color: #2a2f2a; color: var(--muted); }
+.chl-kinds .gbtn:not(.on):hover { color: var(--text); }
+.chl-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.chl-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 6px; align-items: start; padding: 3px 6px;
+  background: #0a0c0a; border: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer; font-size: 12px; line-height: 1.35; }
+.chl-row:hover { background: var(--row-hover); }
+.chl-row:focus { outline: 1px solid var(--green-hi); }
+.chl-row.on { background: var(--sel); border-left-color: var(--green-hi); color: #fff; }
+.chl-kd { justify-self: start; padding: 0 4px; border: 1px solid #24606b; color: var(--cyan); font: 700 10px/1.5 var(--mono); }
+.chl-tt { overflow-wrap: anywhere; }
+.chl-pdf { font: 11px/1.6 var(--mono); white-space: nowrap; text-decoration: none; }
+.chl-pdf:hover { text-decoration: underline; }
+.chl-act { flex: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.chl-act .btn { flex: 1; padding: 4px 8px; text-align: center; text-decoration: none; white-space: nowrap; }
+.chl-act .btn[hidden] { display: none; }   /* przycisk PDF dopiero po wczytaniu listy */
+.chl-src { flex: none; margin: 0; font-size: 11px; }
+
+/* 0.12.5: ostre krawędzie także w pozostałych zakładkach z tej części (AD MIL/VFR, INOP, OTHER, CHECKLIST, EMERGENCY,
+   AUP, ABOUT): przyciski, pola, karty, kafelki i podmenu bez zaokrągleń, jak w PANDORZE */
+.view:is([data-tab="adciv"], [data-tab="admil"], [data-tab="advfr"], [data-tab="inop"], [data-tab="other"],
+  [data-tab="checklist"], [data-tab="emergency"], [data-tab="aup"], [data-tab="about"])
+  :is(.btn, .gbtn, .field, .card, .card h3, .ms-card, .ms-card h4, .about-tile, .submenu button, .toolbar input,
+    .toolbar select, .assist span, .soon-note) { border-radius: 0; }

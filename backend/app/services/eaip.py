@@ -16,8 +16,11 @@ tego cyklu, sprawdzenie ponownie w tle. Pierwsze sprawdzenie startuje razem z se
 
 import asyncio
 import logging
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
+from html.parser import HTMLParser
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import httpx
 
@@ -182,3 +185,186 @@ async def resolved_links(today: date | None = None, links=tuple(PACKAGES)) -> di
 
 async def resolved_url(link: str, today: date | None = None) -> str:
     return (await resolved_links(today, (link,)))[link]
+
+
+# --- AD CIV (0.12.5, issue #18): przycisk lotniska prowadzi do listy map, a nie do opisu tekstowego. eAIP PAŻP nie ma
+# osobnej strony z listą map lotniska: mapy są w tabeli AD 2.24 ("AERONAUTICAL CHARTS RELATED TO AN AERODROME") na
+# końcu strony AD 2 lotniska (eAIP/AD 2 EPWA 1-en-GB.html, ta sama poprawka co index-v2.html), wiersz = tytuł mapy
+# i ikona z odnośnikiem do PDF-u .../documents/Root_WePub/AIP IFR/AD/EPZG/02/AD_2_EPZG_2-1.pdf. Serwer pobiera tę stronę
+# (kilka MB przy EPWA), wyciąga wiersze z PDF-ami map lotniska i trzyma wynik w pamięci (strona zmienia się z AIRAC).
+CHARTS_TTL = 6 * 3600        # s: lista map z poprawki (adres strony zawiera katalog poprawki)
+CHARTS_FAIL_TTL = 120        # s: po błędzie pobrania ponowna próba najwcześniej po 2 min (bez zapytań co kliknięcie)
+CHARTS_MAX_BYTES = 25 * 1024 * 1024
+CHART_FILE = re.compile(r"AD_2_([A-Z]{4})_(\d+)-(\d+)\.pdf$", re.I)
+PAGE_LABEL = re.compile(r"(?:AD\s*2\s+[A-Z]{4}\s+)?\d+\s*-\s*\d+", re.I)   # kolumna "Pages": "AD 2 EPZG 2-1" albo "2-1"
+# rodzaj mapy z tytułu (kolejność ma znaczenie: "PRECISION APPROACH TERRAIN CHART" to mapa terenu, nie podejścia,
+# a "VISUAL APPROACH CHART" to mapa VFR, nie podejście według przyrządów)
+CHART_KINDS = (("OBST", ("OBSTACLE", "TERRAIN")),
+               ("SID", ("STANDARD DEPARTURE", "INSTRUMENT DEPARTURE", "DEPARTURE CHART", "(SID)")),
+               ("STAR", ("STANDARD ARRIVAL", "INSTRUMENT ARRIVAL", "ARRIVAL CHART", "(STAR)")),
+               ("VFR", ("VISUAL", "VFR")), ("IAC", ("INSTRUMENT APPROACH", "APPROACH CHART")),
+               ("AD", ("AERODROME CHART", "PARKING", "DOCKING", "GROUND MOVEMENT")))
+
+_charts: dict[str, tuple[float, dict]] = {}          # adres strony AD 2 -> (ważny do, wynik)
+_charts_inflight: dict[str, asyncio.Task] = {}
+
+
+def aerodrome_page_url(base: str, icao: str) -> str:
+    """Strona AD 2 lotniska z tej samej poprawki co index-v2.html (jak aeroPageUrl w tabs/aip.js); adres katalogu
+    bez "/" na końcu traktujemy jak katalog; ?query i #fragment odpadają."""
+    parts = urlsplit(base)
+    path = parts.path
+    if not path.endswith("/") and not re.search(r"\.[a-z0-9]+$", path, re.I):
+        path += "/"
+    root = urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+    return urljoin(root, quote(f"eAIP/AD 2 {icao} 1-en-GB.html"))
+
+
+def chart_kind(title: str) -> str:
+    t = title.upper()
+    return next((kind for kind, words in CHART_KINDS if any(w in t for w in words)), "OTHER")
+
+
+class _Rows(HTMLParser):
+    """Wiersze tabel (teksty komórek i odnośniki) oraz odnośniki poza tabelami (adres, tekst)."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.rows: list[tuple[list[str], list[str]]] = []
+        self.loose: list[tuple[str, str]] = []
+        self._row: tuple[list[str], list[str]] | None = None
+        self._cell: list[str] | None = None
+        self._a: tuple[str, list[str]] | None = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._row, self._cell = ([], []), None
+        elif tag in ("td", "th") and self._row is not None:
+            self._cell = []
+        elif tag == "a" and (href := dict(attrs).get("href")):
+            self._a = (href, [])
+            if self._row is not None:
+                self._row[1].append(href)
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._row is not None and self._cell is not None:
+            self._row[0].append(" ".join("".join(self._cell).split()))
+            self._cell = None
+        elif tag == "tr" and self._row is not None:
+            self.rows.append(self._row)
+            self._row = self._cell = None
+        elif tag == "a" and self._a is not None:
+            if self._row is None:
+                self.loose.append((self._a[0], " ".join("".join(self._a[1]).split())))
+            self._a = None
+
+    def handle_data(self, data):
+        if self._cell is not None:
+            self._cell.append(data)
+        if self._a is not None:
+            self._a[1].append(data)
+
+
+def _chart_url(page_url: str, href: str) -> str | None:
+    url = urljoin(page_url, href.strip())
+    if urlsplit(url).scheme not in ("http", "https"):
+        return None
+    return quote(url, safe=":/?#[]@!$&'()*+,;=%~")   # spacje ("AIP IFR") → %20, istniejące %XX bez zmian
+
+
+def _clean_title(text: str, icao: str) -> str:
+    t = " ".join(text.split()).strip(" \"'“”„")
+    return re.sub(rf"^{icao}\s*[-–]\s*", "", t, flags=re.I)
+
+
+def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
+    """Mapy lotniska ze strony AD 2: wiersze tabeli z odnośnikiem do PDF-u AD_2_<ICAO>_<n>-<m>.pdf (tabela AD 2.24;
+    tytuł = pierwsza niepusta komórka poza numerem strony, bez przedrostka "<ICAO> - "), w kolejności strony,
+    bez powtórzeń adresu.
+    Odnośnik do mapy poza tabelą: tytuł z tekstu odnośnika. id "2-1" (numer z nazwy pliku, bez zer z przodu,
+    08-1 → 8-1), page "AD 2 EPWA 2-1", kind: AD, OBST, SID, STAR, IAC, VFR albo OTHER."""
+    icao = icao.upper()
+    p = _Rows()
+    p.feed(html)
+    p.close()
+    found = [(href, next((c for c in cells if c and not PAGE_LABEL.fullmatch(c)), "")) for cells, hrefs in p.rows
+             for href in hrefs]
+    found += p.loose
+    out, seen = [], set()
+    for href, text in found:
+        m = CHART_FILE.search(urlsplit(href.strip()).path)
+        if not m or m.group(1).upper() != icao:
+            continue
+        url = _chart_url(page_url, href)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        cid = f"{int(m.group(2))}-{int(m.group(3))}"
+        title = _clean_title(text, icao) or f"AD 2 {icao} {cid}"
+        out.append({"id": cid, "page": f"AD 2 {icao} {cid}", "title": title, "kind": chart_kind(title), "url": url})
+    return out
+
+
+def _page_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True,
+                             headers={"User-Agent": f"Mozilla/5.0 {settings.user_agent}"})
+
+
+def _fetch_error(exc: BaseException) -> str:
+    if isinstance(exc, ValueError):
+        return f"eAIP page could not be read ({exc})"
+    if isinstance(exc, httpx.TimeoutException):
+        return "no response from the eAIP server (timeout)"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"eAIP server: HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.TransportError):   # brak sieci, odmowa proxy, zerwane połączenie
+        return "cannot connect to the eAIP server"
+    return f"eAIP page could not be read ({type(exc).__name__})"
+
+
+async def _load_charts(page_url: str, icao: str) -> dict:
+    out = {"icao": icao, "page": page_url, "charts": [], "error": None}
+    try:
+        async with _page_client() as client:
+            async with client.stream("GET", page_url) as resp:
+                resp.raise_for_status()
+                chunks, size = [], 0
+                async for chunk in resp.aiter_bytes():
+                    size += len(chunk)
+                    if size > CHARTS_MAX_BYTES:
+                        raise ValueError(f"page larger than {CHARTS_MAX_BYTES // 1048576} MB")
+                    chunks.append(chunk)
+                html = b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace")
+        out["charts"] = parse_charts(html, page_url, icao)
+        if not out["charts"]:
+            out["error"] = "no charts found in AD 2.24 of the eAIP page"
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("eAIP %s: lista map z %s: %s", icao, page_url, exc)
+        out["error"] = _fetch_error(exc)
+    except Exception:   # nieprzewidziany błąd: komunikat zamiast 500, szczegóły w logu
+        log.exception("eAIP %s: lista map z %s", icao, page_url)
+        out["error"] = "eAIP page could not be read"
+    _charts[page_url] = (time.monotonic() + (CHARTS_FAIL_TTL if out["error"] else CHARTS_TTL), out)
+    return out
+
+
+def reset_charts() -> None:
+    _charts.clear()
+    _charts_inflight.clear()
+
+
+async def aerodrome_charts(icao: str, today: date | None = None) -> dict:
+    """AD CIV: lista map lotniska z AD 2.24 eAIP IFR bieżącej poprawki (resolved_url, adres z .env wygrywa):
+    {icao, page (strona AD 2), charts: [{id, page, title, kind, url}], error}. Jedno pobranie strony naraz
+    (single-flight), wynik w pamięci CHARTS_TTL, po błędzie CHARTS_FAIL_TTL."""
+    icao = icao.upper()
+    page_url = aerodrome_page_url(await resolved_url("aip_ifr", today), icao)
+    hit = _charts.get(page_url)
+    if hit and hit[0] > time.monotonic():
+        return hit[1]
+    task = _charts_inflight.get(page_url)
+    if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
+        task = asyncio.get_running_loop().create_task(_load_charts(page_url, icao))
+        _charts_inflight[page_url] = task
+        task.add_done_callback(lambda t: _charts_inflight.pop(page_url) if _charts_inflight.get(page_url) is t else None)
+    return await asyncio.shield(task)
