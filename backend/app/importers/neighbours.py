@@ -166,7 +166,7 @@ def import_nb_ese(db: Session, path: Path) -> dict:
     """Stanowiska pakietu sąsiada (tabela nb_positions). Sektory sąsiadów są w data/seed/sectors.geojson."""
     key = source_key(path)
     if not key:
-        return {"skipped": f"nieznany pakiet (nazwa pliku powinna zawierać jeden z: {', '.join(NB_SOURCES)})"}
+        return {"skipped": f"unknown package (the file name should contain one of: {', '.join(NB_SOURCES)})"}
     secs = ese_sections(read_text(path))
     _, sectors = read_airspace(secs.get("[AIRSPACE]", []))
     positions = pack_positions({"positions": parse_positions(secs.get("[POSITIONS]", [])), "sectors": sectors}, key)

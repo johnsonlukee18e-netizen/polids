@@ -450,14 +450,109 @@ def stack_tiles(items: list[dict], ese: dict[str, list[str]] | None = None, know
     return out
 
 
+# --- sąsiedzi na podglądach (0.12.5, Marek): sektory ACC FIR-ów sąsiednich (podgląd pokazuje te na swoim poziomie,
+# jak sektory EPWW) oraz TMA i CTR lotnisk sąsiadów przy granicy FIR EPWW (warstwy APP i TWR, jak TMA/CTR EPWW)
+NB_NEAR_KM = 15  # wycinek APP/TWR sąsiada „przy granicy”: dotyka granicy FIR EPWW albo leży najwyżej tyle od niej
+NB_FAR_KM = 50   # reszta wycinków tego samego stanowiska (cała TMA Ostrawa), ale nie w głąb kraju (TMA Praga)
+NB_INFO = re.compile(r"_(?:I|IE|IW|IS|IN|FIS|FIC|INFO)_[A-Z]+$")  # informacja (EYKA_I_APP): to nie APP ani ACC
+NB_LOCAL = ("APP", "DEP", "TWR")
+_KM_LAT = 111.2
+
+
+def nb_kind(name: str, owners: list[str]) -> str | None:
+    """Rodzaj wycinka sąsiada wg pierwszego stanowiska z listy OWNER: acc (CTR/FSS), app (TMA: APP/DEP, TMA wieży
+    jak LZTT_TMA), twr (CTR lotniska: nazwa z CTR albo wieża bez TMA, np. EDAH); None = informacja (FIS), ziemia
+    (GND/DEL) albo wycinek bez stanowisk – nie rysujemy."""
+    first = owners[0] if owners else ""
+    if not first or NB_INFO.search(first):
+        return None
+    fac = facility(first)
+    if fac in RADAR:
+        return "acc"
+    if fac not in NB_LOCAL:
+        return None
+    n = name.upper()
+    return "twr" if "CTR" in n or (fac == "TWR" and "TMA" not in n) else "app"
+
+
+def _km(lon: float, lat: float) -> tuple[float, float]:
+    """Punkt w kilometrach (rzut lokalny: długość × cos szerokości) – do odległości rzędu kilkudziesięciu km."""
+    return lon * _KM_LAT * math.cos(math.radians(lat)), lat * _KM_LAT
+
+
+class _Border:
+    """Odcinki granicy FIR EPWW w km w siatce (komórka CELL km) do szybkiego szukania najbliższego odcinka."""
+    CELL = 20.0
+
+    def __init__(self, geom: dict):
+        self.grid: dict[tuple[int, int], list[tuple[float, float, float, float]]] = {}
+        for ring in rings(geom):
+            pts = [_km(x, y) for x, y in ring]
+            for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
+                c = self.CELL
+                for i in range(math.floor(min(ax, bx) / c), math.floor(max(ax, bx) / c) + 1):
+                    for j in range(math.floor(min(ay, by) / c), math.floor(max(ay, by) / c) + 1):
+                        self.grid.setdefault((i, j), []).append((ax, ay, bx, by))
+
+    def dist(self, x: float, y: float, cap: float) -> float:
+        """Odległość punktu (km) od granicy; dalej niż cap → inf."""
+        c, n, best = self.CELL, math.ceil(cap / self.CELL), math.inf
+        ci, cj = math.floor(x / c), math.floor(y / c)
+        for i in range(ci - n, ci + n + 1):
+            for j in range(cj - n, cj + n + 1):
+                for ax, ay, bx, by in self.grid.get((i, j), ()):
+                    dx, dy = bx - ax, by - ay
+                    l2 = dx * dx + dy * dy
+                    t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / l2)) if l2 else 0.0
+                    best = min(best, math.hypot(x - ax - t * dx, y - ay - t * dy))
+        return best if best <= cap else math.inf
+
+    def to_geom(self, geom: dict, cap: float, step: float = 4.0) -> float:
+        """Najmniejsza odległość obrysu wielokąta od granicy (km, do cap): wierzchołki i punkty co `step` km na
+        bokach – bok przecinający granicę daje punkt najwyżej step/2 od niej."""
+        best = math.inf
+        for ring in rings(geom):
+            pts = [_km(x, y) for x, y in ring]
+            for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
+                k = max(1, math.ceil(math.hypot(bx - ax, by - ay) / step))
+                for t in range(k):
+                    best = min(best, self.dist(ax + (bx - ax) * t / k, ay + (by - ay) * t / k, cap))
+                    if best < step / 2:
+                        return best
+        return best
+
+
+def nb_areas(slices: list[dict], border_geom: dict) -> list[dict]:
+    """Wycinki sąsiadów na podglądy: wszystkie sektory ACC (wycinki z plików .ese sąsiadów są już tylko z rejonu
+    Polski) oraz TMA/CTR stanowisk APP/TWR, które mają wycinek przy granicy FIR EPWW (NB_NEAR_KM), z ich wycinkami
+    do NB_FAR_KM od granicy. slices: [{fir, name, lo, hi, owners (znaki), geom}]. Wynik:
+    [{id, fir, name, kind (acc/app/twr), lo, hi, chain, geom}] (id: n0, n1… w kolejności wejścia)."""
+    border = _Border(border_geom)
+    out, local = [], []
+    for s in slices:
+        kind = nb_kind(s["name"], s["owners"])
+        if not kind or s["lo"] >= TOP_FT:
+            continue
+        a = {"fir": s["fir"], "name": s["name"], "kind": kind, "lo": s["lo"], "hi": min(s["hi"], TOP_FT),
+             "chain": list(s["owners"]), "geom": s["geom"]}
+        if kind == "acc":
+            out.append(a)
+        else:
+            local.append((a, border.to_geom(s["geom"], NB_FAR_KM)))
+    near = {a["chain"][0] for a, d in local if d <= NB_NEAR_KM}
+    out += [a for a, d in local if a["chain"][0] in near and d <= NB_FAR_KM]
+    return [{"id": f"n{i}", **a} for i, a in enumerate(out)]
+
+
 def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], positions: dict, coords: dict,
-                 border_geom: dict, firs_geo: list[dict], nb_chains=()) -> dict:
+                 border_geom: dict, firs_geo: list[dict], nb_chains=(), nb_slices=()) -> dict:
     """Wszystko, co nie zależy od tego, kto jest online.
 
     epww_slices: wycinki z pliku EPWW ({fir, name, lo, hi, owners (znaki), geom}); vacs_tiles: kafelki sąsiadów
     z profilu VACS (vacs_epww.json, neighbours); positions: znak → {frequency, name, ...}; coords: ICAO → (lat, lon);
     border_geom: granica FIR EPWW (VATSpy); firs_geo: [{id, geometry}] do tła; nb_chains: listy OWNER (znaki)
-    wycinków sąsiadów z plików .ese – do kolejności kafelków bez CTR w controlled_by (tile_chain)."""
+    wycinków sąsiadów z plików .ese – do kolejności kafelków bez CTR w controlled_by (tile_chain); nb_slices: wycinki
+    sąsiadów ({fir, name, lo, hi, owners, geom}: pliki .ese sąsiadów i Białoruś z pliku EPWW) – nb_areas."""
     kinds: dict[str, list[dict]] = {"acc": [], "tma": [], "ctr": [], "fis": []}
     for s in epww_slices:
         k = sector_kind(s["fir"], s["name"])
@@ -483,16 +578,25 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
         return out
 
     fis_sl = [s for s in kinds["fis"] if FIS_NAME.match(s["name"])]
+    # sąsiedzi: ten sam kształt na tej samej wysokości (kopie z dwóch plików) raz
+    nb, nb_seen = [], set()
+    for a in nb_areas(list(nb_slices), border_geom):
+        g = simplify(a["geom"], 0.008, 2)  # tło podglądu: ok. 1 km wystarczy (0,01° to niecały piksel)
+        key = (a["kind"], a["lo"], a["hi"], json.dumps(g["coordinates"]))
+        if g["coordinates"] and key not in nb_seen:
+            nb_seen.add(key)
+            nb.append({**{k: v for k, v in a.items() if k != "geom"}, "geometry": g})
     geo = {"border": simplify(border_geom, 0.002), "firs": [{"id": f["id"], "geometry": simplify(f["geometry"], 0.02, 2)}
                                                            for f in firs_geo],
            "acc": acc_geo, "tma": outlines(kinds["tma"]), "ctr": outlines(kinds["ctr"]),
-           "fis": outlines(fis_sl, owner=lambda s: s["owners"][0] if s["owners"] else None)}
+           "fis": outlines(fis_sl, owner=lambda s: s["owners"][0] if s["owners"] else None),
+           "nb": [{k: a[k] for k in ("id", "fir", "name", "kind", "lo", "hi", "geometry")} for a in nb]}
     atis = sorted(cs for cs in positions if cs.startswith("EP") and facility(cs) == "ATIS")
     return {"layers": own.get("layers") or {}, "source": own.get("source_label") or own.get("source") or "",
             "acc_positions": sorted(own.get("acc_positions") or {}),
             "sectors": acc_sectors(own), "tma": tma_groups(kinds["tma"], own),
             "twr": ctr_groups(kinds["ctr"], own, coords, positions), "fis": fis_groups(fis_sl, own),
-            "atis": atis, "stacks": stacks, "geo": geo}
+            "atis": atis, "stacks": stacks, "nb": [{"id": a["id"], "chain": a["chain"]} for a in nb], "geo": geo}
 
 
 # --- część zmienna: kto jest online
@@ -550,6 +654,8 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
         online = {**online, cs: {"callsign": cs, "frequency": info.get("frequency"), "name": info.get("name"),
                                  "cid": info.get("cid"), "logon_time": info.get("logon_time"),
                                  "atis_code": info.get("atis_code"), "text_atis": info.get("text_atis")}}
+    # wycinki sąsiadów na podglądach: obsadzone (id → pierwsze stanowisko online z listy OWNER); reszta nieobsadzona
+    nb = {a["id"]: o for a in static.get("nb") or () if (o := first_online(a["chain"], online))}
     return {"layers": static["layers"], "source": static["source"], "sectors": sectors, "tma": tma, "twr": twr,
-            "fis": fis, "atis": atis, "stacks": stacks, "pos": pos,
+            "fis": fis, "atis": atis, "stacks": stacks, "nb": nb, "pos": pos,
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra}}

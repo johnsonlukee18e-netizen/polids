@@ -77,12 +77,12 @@ def loa():
     try:
         data = seed_json(settings.seed_dir / "loa.json")
     except FileNotFoundError as exc:
-        raise HTTPException(404, "LOA: brak pliku data/seed/loa.json") from exc
+        raise HTTPException(404, "LOA: file data/seed/loa.json not found") from exc
     except (OSError, ValueError) as exc:
-        raise HTTPException(500, f"LOA: nie da się odczytać pliku data/seed/loa.json ({exc})") from exc
+        raise HTTPException(500, f"LOA: cannot read file data/seed/loa.json ({exc})") from exc
     firs = data.get("firs") if isinstance(data, dict) else None
     if not isinstance(firs, dict):
-        raise HTTPException(500, "LOA: plik data/seed/loa.json nie ma sekcji firs")
+        raise HTTPException(500, "LOA: file data/seed/loa.json has no firs section")
     return {"firs": {k: v for k, v in firs.items() if isinstance(v, dict)}, "source": data.get("_zrodlo", "")}
 
 
@@ -90,7 +90,7 @@ async def _feed() -> dict:
     try:
         return await vatsim_api.get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed niedostępny: {exc}") from exc
+        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
 
 
 @router.get("/online")
@@ -115,7 +115,7 @@ async def bookings(db: Session = Depends(get_db)):
     try:
         data = await vatsim_api.get_bookings()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM ATC bookings niedostępne: {exc}") from exc
+        raise HTTPException(502, f"VATSIM ATC bookings unavailable: {exc}") from exc
     known = {p["callsign"] for p in all_positions(db)}
     result = {cs: b for cs, b in bookings_by_callsign(data).items() if cs in known or cs.startswith("EP")}
     try:
@@ -227,15 +227,21 @@ def _build_static(db: Session, positions: dict) -> dict:
     vacs = _seed_or_empty("vacs_epww.json").get("neighbours")
     by_id = {p.position_id: p.callsign for p in db.scalars(select(AtcPosition))}
     covered = covered_firs(db)
-    # listy OWNER sektorów sąsiadów z ich plików .ese (bez geometrii)
-    epww, nb_chains = [], [[o for o in (x or "").split(":") if o]
-                           for x in db.scalars(select(NbSector.owners).order_by(NbSector.id))]
+    # wycinki sąsiadów z ich plików .ese: listy OWNER (kolejność kafelków) i geometria (podglądy: nb_areas)
+    epww, nb_chains, nb_slices = [], [], []
+    for s in nb_sectors(db):
+        nb_chains.append(owners_of(s))
+        nb_slices.append(radioboard.make_slice(s.fir.upper(), s.name, s.lower_ft, s.upper_ft, owners_of(s),
+                                               json.loads(s.geometry)))
     for s in db.scalars(select(Sector).order_by(Sector.id)):
         owners = [by_id[o] for o in s.owners.split(":") if o in by_id]
         if s.fir.upper() == "EPWW":
             epww.append(radioboard.make_slice(s.fir, s.name, s.lower_ft, s.upper_ft, owners, json.loads(s.geometry)))
-        elif s.fir.upper() not in covered:  # FIR bez własnego pliku .ese (Białoruś): listy OWNER z pliku EPWW
+        elif s.fir.upper() not in covered and sector_kind(s.fir, s.name):
+            # FIR bez własnego pliku .ese (Białoruś): listy OWNER i geometria z pliku EPWW
             nb_chains.append(owners)
+            nb_slices.append(radioboard.make_slice(s.fir.upper(), s.name, s.lower_ft, s.upper_ft, owners,
+                                                   json.loads(s.geometry)))
     coords = {a.icao: (a.lat, a.lon) for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.like("EP%")))}
     firs = fir_boundaries()
     border = next((f["geometry"] for f in firs.get("features", []) if f["properties"]["id"] == "EPWW"), None) or {}
@@ -244,7 +250,7 @@ def _build_static(db: Session, positions: dict) -> dict:
              if "-" not in f["properties"]["id"] and f["properties"]["id"] != "EPWW" and _in_frame(f["geometry"])]
     return radioboard.build_static(own=own, epww_slices=epww, vacs_tiles=vacs if isinstance(vacs, list) else [],
                                    positions=positions, coords=coords, border_geom=border, firs_geo=frame,
-                                   nb_chains=nb_chains)
+                                   nb_chains=nb_chains, nb_slices=nb_slices)
 
 
 def _board_data(db: Session) -> tuple[list[dict], dict, dict, set]:
@@ -278,7 +284,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
         feed_atis = data.get("atis", [])
         net["updated"] = data.get("general", {}).get("update_timestamp")
     except (UpstreamError, ValueError) as exc:
-        net.update(ok=False, error=f"VATSIM data feed niedostępny: {exc}")
+        net.update(ok=False, error=f"VATSIM data feed unavailable: {exc}")
     out = radioboard.board(static, online, positions, feed_atis)
     out["net"] = net
     out["ver"] = static["ver"]

@@ -85,7 +85,7 @@ def test_position_range():
 
 
 def test_sector_kind_and_group():
-    cases = {("EPWW", "EPWWB"): ("acc", "Sektor B"), ("EPWW", "EPWWR-N"): ("acc", "Sektor R"),
+    cases = {("EPWW", "EPWWB"): ("acc", "Sector B"), ("EPWW", "EPWWR-N"): ("acc", "Sector R"),
              ("EPWW", "EPWA_APP_N_A"): ("tma", "TMA Warszawa"), ("EPWW", "EPWA_DIR11_A"): ("tma", "TMA Warszawa"),
              ("EPWW", "EPKK_DEP07"): ("tma", "TMA Kraków"), ("EPWW", "CTA01_N"): ("tma", "CTA 01"),
              ("EPWW", "EPPO_TMA_N_A"): ("tma", "TMA Poznań N"), ("EPWW", "EPPO_TMA_S_G"): ("tma", "TMA Poznań S"),

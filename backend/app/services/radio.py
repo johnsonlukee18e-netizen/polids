@@ -164,7 +164,7 @@ def sector_group(fir: str, name: str, kind: str | None = None) -> str:
         # krótkie nazwy bez kodu ICAO (LZBB "CTR", LKAA "NL") z kodem FIR-u
         return g if g[:2] == fir[:2] or re.match(r"^[ELU][A-Z]{3}[ _]", g) or len(g) > 12 else f"{fir} {g}"
     if kind == "acc":
-        return f"Sektor {_ACC.match(n).group(1)}"
+        return f"Sector {_ACC.match(n).group(1)}"
     if m := re.match(r"^CTA(\d+)", n):
         return f"CTA {m.group(1)}"
     if n == "EPWW-MIDSEA":
