@@ -160,7 +160,7 @@ MIL_TMA = {
     "EPPW": [("EPPO", 1628.8, 1049.3), ("EPPO", 1570.9, 1124.1), ("EPPO", 1594.7, 1140.7), (1575.0, 1233.3),
              (1600.0, 1239.3), (1623.3, 1243.3), (1755.0, 1229.3), (1803.3, 1211.0), (1817.3, 1140.0),
              (1791.7, 1102.7)],
-    "EPLK": [("EPLL", 1861.8, 1344.0), ("EPLL", 1995.2, 1363.3), (2010.0, 1407.3), (1991.7, 1468.3),
+    "EPLK": [("EPLL", 1861.8, 1344.0), ("EPLL", 1995.2, 1363.3), ("EPLL", 2010.0, 1407.3), (1991.7, 1468.3),
              (1948.3, 1516.7), (1930.0, 1532.7), (1851.7, 1517.3), (1800.7, 1389.0), (1833.3, 1356.0)],
     "EPMM": [(2340.7, 1132.7), ("EPWA", 2373.3, 1110.7), ("EPWA", 2426.0, 1110.3), (2470.0, 1107.3),
              (2488.3, 1085.0), (2560.0, 1091.7), (2581.7, 1094.0), (2575.0, 1136.7), (2586.7, 1183.3),
@@ -385,6 +385,7 @@ def tma_areas(cfg: dict, secs: list[dict], ads: dict):
     CTR/MCTR i części wspólne obszarów. Zwraca (areas, parts, ctrs, overlaps, snapper)."""
     from shapely.geometry import LineString, MultiLineString, Point, Polygon
     from shapely.ops import linemerge, polygonize, unary_union
+    from shapely.ops import snap as shapely_snap
 
     snap = Snapper()
     areas, parts, low = {}, {}, {}
@@ -396,16 +397,22 @@ def tma_areas(cfg: dict, secs: list[dict], ads: dict):
             sys.exit(f"{t['icao']}: brak sektorów {t['ese']} w pliku .ese")
         low[t["icao"]] = [(_poly(s["geometry"]), s["lower_ft"]) for s in layers]
         if t["icao"] in SCT_FILL:
-            # część obrysu z pliku .sct, której nie ma w żadnej warstwie TMA z pliku .ese; dolna granica jak
-            # w warstwie, z którą ma najdłuższą wspólną granicę (cienka linia tylko tam, gdzie granica się zmienia)
+            # część obrysu z pliku .sct, której nie ma w żadnej warstwie TMA z pliku .ese; dolna granica = najniższa
+            # dolna granica CTA z pliku .ese nad tą częścią (TMA Łódź C: CTA03 od 5500 ft, pod nią FIS, więc cienka
+            # linia między C a częściami A i B jak na mapie PAŻP), bez CTA jak w warstwie o najdłuższej wspólnej granicy
             every = unary_union([_poly(s["geometry"]) for s in secs
                                  if s["fir"] == "EPWW" and s["name"].startswith(tuple(t["ese"]))])
-            gap = sct_outline(SCT_FILL[t["icao"]]).difference(every)
+            # wspólne wierzchołki .sct i .ese różnią się w 5.-6. miejscu po przecinku: bez przyciągnięcia różnica ma
+            # drzazgi przyklejone do części C, które po zaokrągleniu w JSON-ie dają pierścień z kolcem (niepoprawny)
+            gap = shapely_snap(sct_outline(SCT_FILL[t["icao"]]), every, 1e-4).difference(every)
             for q in getattr(gap, "geoms", [gap]):
                 if q.geom_type != "Polygon" or q.buffer(-0.002).is_empty:   # pomijamy drzazgi wzdłuż granic
                     continue
+                inside = q.representative_point()
+                cta = [s["lower_ft"] for s in secs if s["fir"] == "EPWW" and s["name"].startswith("CTA")
+                       and _poly(s["geometry"]).contains(inside)]
                 edge = q.boundary.buffer(1e-4)
-                ft = max(low[t["icao"]], key=lambda pf: pf[0].boundary.intersection(edge).length)[1]
+                ft = min(cta) if cta else max(low[t["icao"]], key=lambda pf: pf[0].boundary.intersection(edge).length)[1]
                 low[t["icao"]].append((Polygon(q.exterior), ft))
         areas[t["icao"]] = unary_union([p for p, _ in low[t["icao"]]])
         areas[t["icao"]] = unary_union([Polygon(p.exterior) for p in getattr(areas[t["icao"]], "geoms", [areas[t["icao"]]])])

@@ -252,6 +252,18 @@ def test_tma_areas_from_sector_file():
         assert sum(_in_area(p, t["area"]) for t in CFG["tmas"]) >= 2, p
 
 
+def test_geometry_valid():
+    """Wielokąty pliku rejonów są poprawne po zaokrągleniu współrzędnych (bez kolców i samoprzecięć), a części wspólne
+    obszarów TMA/MTMA to zakładki z mapy PAŻP, nie drzazgi wzdłuż wspólnej granicy (np. MTMA Łask przy TMA Łódź C)."""
+    pytest.importorskip("shapely")
+    from shapely.geometry import shape
+
+    geoms = {**{t["icao"]: t["area"] for t in CFG["tmas"]}, **{c["name"]: c["geometry"] for c in CFG["ctrs"]},
+             **{f"region {r['id']}": r["geometry"] for r in CFG["regions"]}, "fir": CFG["fir"]}
+    assert [k for k, g in geoms.items() if not shape(g).is_valid] == []
+    assert all(not p.buffer(-0.002).is_empty for p in shape(CFG["overlaps"]).geoms)
+
+
 # obrysy TMA z pliku .sct ([ARTCC] "… OUT") -> obszary BELOW TMA z pliku rejonów
 SCT_OUT = {"EPBY TMA OUT": ("EPBY",), "EPDE MTMA OUT": ("EPDE",), "EPGD TMA OUT": ("EPGD",),
            "EPKK TMA OUT": ("EPKT", "EPKK"), "EPLB TMA OUT": ("EPLB",), "EPLL TMA OUT": ("EPLL",),
