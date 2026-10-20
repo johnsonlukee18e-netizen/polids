@@ -248,7 +248,7 @@ FIR_FAIL_SECONDS = 90       # lokalizacja bez odpowiedzi: tyle sekund bez ponown
 _fir_failed: dict[str, tuple[float, str]] = {}      # ICAO → (time.monotonic() błędu, opis)
 
 
-def _error_text(exc: BaseException) -> str:
+def error_text(exc: BaseException) -> str:
     cause = exc.__cause__ if isinstance(exc, UpstreamError) and exc.__cause__ is not None else exc
     if isinstance(cause, httpx.TimeoutException):
         return TIMEOUT_TEXT
@@ -325,7 +325,7 @@ async def fir_notams(now: datetime | None = None, include_inactive: bool = False
         except _StillDown as exc:
             return icao, None, 0.0, str(exc)
         except (UpstreamError, ValueError) as exc:
-            error = _error_text(exc)
+            error = error_text(exc)
             _fir_failed[icao] = (time.monotonic(), error)
             return icao, None, 0.0, error
 
