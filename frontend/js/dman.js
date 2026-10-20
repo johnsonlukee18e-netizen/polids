@@ -342,7 +342,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
         + R("STAND DEP", STAND, "", "No stand data.") + R("DEICING PAD", "") + R("DEICING REQ", "") + R("DEICING TIME", "")
         + R("MIN TURNARND", "")
         + R("STATUS DEP", status, "hl", v.state ? data.states?.[v.state] || v.state : "No CDM data for this flight")
-        + R("SCHED DEP", hm(s.deptime), "", "Flight plan departure time") + R("SOBT", hm(s.deptime), "", "Flight plan departure time")
+        + R("SCHED DEP", hm(s.deptime), "", "Scheduled departure time") + R("SOBT", hm(s.deptime), "", "Scheduled off-block time")
         + R("EOBT", hm(s.eobt), c ? "" : "hl")
         + opt(v.tobt, "TOBT", hm(v.tobt)) + R("ACT RDY TIME", v.ready ? "REA" : "", "", "REA (ready) flag only, without a time")
         + opt(v.tsat, "TSAT", hm(v.tsat), c ? "hl" : "") + R("AOBT", hm(v.aobt))
