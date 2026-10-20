@@ -25,7 +25,11 @@ PHASES = (("prep", "Preparation"), ("lvp", "LVP"), ("cancel", "Cancellation"))
 NO_LVP = "No LVP at this aerodrome"
 # fragmenty uwag z lvp.json o pochodzeniu i odczytaniu progów (paragrafy, poprawki AIRAC, "taken as"): zostają
 # w pliku dla opiekunów danych, w dymku tylko uwagi operacyjne (ILS, starty, tendencja)
-_NOTE_SKIP = re.compile(r"\bAIP\b|\bAMDT\b|\bpara\b|taken as|reconstructed", re.I)
+_NOTE_SKIP = re.compile(r"\bAIP\b|\bAMDT\b|\bpara\b|taken as|reconstructed|\bAD \d", re.I)
+# części, w których odczytanie AIP stoi obok warunku operacyjnego: najpierw przeredagowanie (warunek zostaje),
+# dopiero potem odrzucenie części o pochodzeniu (_NOTE_SKIP)
+_NOTE_FIX = ((re.compile(r"\s*'and/or' taken as 'and',?"), ""),                      # EPWA, EPMO, EPGD: tendencja
+             (re.compile(r"^AIP links preparation to\b"), "preparation also on"))   # EPPO: wyzwalacze przygotowania
 
 # icao -> {"obs": czas METAR, "prev": (stan, od kiedy) przed tym METAR, "cur": (stan, od kiedy) po nim, "reasons": [...]}
 _memory: dict[str, dict] = {}
@@ -155,10 +159,23 @@ def transition(cfg: dict, m: Metar, prev: tuple[str | None, datetime | None], ob
 
 
 def _note(text: str | None) -> str | None:
-    """Uwaga z lvp.json do dymka: części rozdzielone ';' bez tych o pochodzeniu progów (_NOTE_SKIP), None, gdy nic
-    nie zostaje ('ILS CAT IIIA RWY 33, …; no take-offs with RVR < 125 m')."""
-    parts = [x.strip() for x in (text or "").split(";")]
+    """Uwaga z lvp.json do dymka: części rozdzielone ';' po przeredagowaniu (_NOTE_FIX), bez tych o pochodzeniu progów
+    (_NOTE_SKIP), None, gdy nic nie zostaje ('cancellation with a trend to further improvement; ILS CAT IIIA …')."""
+    parts = []
+    for x in (text or "").split(";"):
+        x = x.strip()
+        for rx, repl in _NOTE_FIX:
+            x = rx.sub(repl, x)
+        parts.append(x)
     return "; ".join(x for x in parts if x and not _NOTE_SKIP.search(x)) or None
+
+
+def _no_lvp(text: str | None) -> str:
+    """Powód braku LVP: stały tekst, z dopiskiem operacyjnym z nawiasu w lvp.json (EPOK: tylko minima startu
+    śmigłowców IFR z drogi kołowania); nawiasy o pochodzeniu ('no AIP data', 'AD 2.20 …') pomijamy."""
+    m = re.search(r"\(([^()]*)\)\s*$", text or "")
+    extra = m.group(1).strip() if m and not _NOTE_SKIP.search(m.group(1)) else ""
+    return f"{NO_LVP} ({extra})" if extra else NO_LVP
 
 
 def _hhmm(t: datetime | None) -> str | None:
@@ -174,7 +191,7 @@ def evaluate(m: Metar | None, icao: str, now: datetime | None = None) -> dict:
     cfg = thresholds(code)
     base = {"state": None, "applies": cfg.get("applies", True), "reasons": [], "since": None, "until": None,
             "scope": cfg.get("scope"), "verified": cfg.get("verified", True), "note": _note(cfg.get("note")),
-            "reason": None if cfg.get("applies", True) else NO_LVP}
+            "reason": None if cfg.get("applies", True) else _no_lvp(cfg.get("reason"))}
     if not base["applies"]:
         return {**base, "rules": [], "thresholds": None}
     base["rules"] = rules(cfg)

@@ -42,6 +42,10 @@ def test_neutral_messages():
     assert 'const SYM = "simulated instantaneous wind";' in awos and "<b>SYM</b> simulated" in awos
     for name in ("dman.js", "aman.js"):
         assert '"Network data unavailable"' in (FRONTEND / name).read_text("utf-8"), name
+    # wiatr w punktach podejścia (INFO): błędy prognozy i METAR bez treści z serwera (tam bywa nazwa dostawcy)
+    aero = _code((FRONTEND / "tabs/aerodrome.js").read_text("utf-8"))
+    assert 'aw.model_error && "Forecast unavailable"' in aero and 'aw.metar_error && "METAR unavailable"' in aero
+    assert "[aw.model_error, aw.metar_error]" not in aero
 
 
 def test_lvp_without_source_and_neutral_notes():
@@ -52,11 +56,19 @@ def test_lvp_without_source_and_neutral_notes():
         for text in [e["reason"] or "", e["note"] or "", *e.get("rules", [])]:
             assert not re.search(r"\bAIP\b|\bAMDT\b|\bpara\b|taken as|reconstructed", text), (icao, text)
         if not e["applies"]:
-            assert e["reason"] == "No LVP at this aerodrome"
-    # uwagi operacyjne zostają, o odczytaniu AIP nie
-    assert lvp.evaluate(None, "EPWA")["note"] == ("ILS CAT IIIA RWY 33, CAT II RWY 11, take-offs from RWY 29 or 15; "
-                                                  "no take-offs with RVR < 125 m")
-    assert lvp.evaluate(None, "EPMO")["note"] is None
+            assert e["reason"].startswith("No LVP at this aerodrome"), icao
+    # dopisek operacyjny w nawiasie zostaje, nawias o pochodzeniu nie
+    assert lvp.evaluate(None, "EPOK")["reason"] == "No LVP at this aerodrome (only IFR helicopter take-off minima from a taxiway)"
+    assert lvp.evaluate(None, "EPRA")["reason"] == lvp.evaluate(None, "EPZG")["reason"] == "No LVP at this aerodrome"
+    # uwagi operacyjne zostają (także warunki stojące obok odczytania AIP), o odczytaniu AIP nie
+    assert lvp.evaluate(None, "EPWA")["note"] == ("cancellation with a trend to further improvement; ILS CAT IIIA RWY 33, "
+                                                  "CAT II RWY 11, take-offs from RWY 29 or 15; no take-offs with RVR < 125 m")
+    assert lvp.evaluate(None, "EPMO")["note"] == lvp.evaluate(None, "EPGD")["note"] == \
+        "cancellation with further improvement expected"
+    assert lvp.evaluate(None, "EPPO")["note"].startswith("preparation also on a decreasing RVR trend, TAF forecast or "
+                                                         "aerodrome warning")
+    assert "cancellation with a sustained improving trend" in lvp.evaluate(None, "EPPO")["note"]
+    assert lvp.evaluate(None, "EPSY")["note"] is None and lvp.evaluate(None, "EPWR")["note"] is None
     assert lvp.rules(lvp.thresholds("EPKK"))[0] == "Preparation: none"
     # brak wartości w METAR: "not reported", bez nazwy źródła
     m = parse_metar("EPKT 140700Z 26004KT 0400 FG 08/08 Q1012")

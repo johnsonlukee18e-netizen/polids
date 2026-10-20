@@ -103,11 +103,12 @@ def directors(slices: list[tuple[str, str, list[str]]]) -> set[str]:
     return {cs for cs, k in first.items() if k == {True} and cs.split("_")[-1] in ("APP", "DEP")}
 
 
-def coverage_orders(db: Session) -> dict[str, list[list[str]]]:
+def coverage_orders(db: Session, sl: list[tuple[str, str, list[str]]] | None = None) -> dict[str, list[list[str]]]:
     """Kolejność przejmowania każdego lotniska od poziomu APP w górę: {ICAO: [[znaki], ...]}, po jednej na każdą różną
     listę OWNER wycinków CTR lotniska (lotnisko bez CTR: wszystkich jego wycinków). Bez wieży, GND i DEL samego
-    lotniska, stanowisk informacji i dyrektorów: EPWA_CTR = EPWA_APP › EPWA_N_APP › EPWA_S_APP › EPWW_C_CTR › …"""
-    sl = _slices(db)
+    lotniska, stanowisk informacji i dyrektorów: EPWA_CTR = EPWA_APP › EPWA_N_APP › EPWA_S_APP › EPWW_C_CTR › …
+    `sl`: wycinki z _slices(db), gdy już są pod ręką."""
+    sl = _slices(db) if sl is None else sl
     dirs = directors(sl)
     ctr = {icao for icao, name, _ in sl if _CTR.match(name)}
     out: dict[str, list[list[str]]] = {}
@@ -409,7 +410,12 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     stations = feed["feed"].get("controllers", []) + feed["feed"].get("atis", [])
     # kto obsługuje lotnisko przede mną: tylko przy stanowisku ACC / APP (wieża przeskakuje do PRZEGLĄDU lotniska)
     mine = pos["callsign"] if pos and pos["kind"] in ("ACC", "APP") else None
-    orders = coverage_orders(db) if mine else {}
+    sl = _slices(db) if mine else []
+    # dyrektor (EPWA_F_APP) pracuje przy pasie razem z APP, nie zamiast niego: jego lotniska nikt mu nie zabiera
+    # (inaczej przy APP online MINE byłoby u dyrektora zawsze puste); MINE = ALL
+    if mine in directors(sl):
+        mine = None
+    orders = coverage_orders(db, sl) if mine else {}
     others = online_others(feed["feed"], list(db.scalars(select(AtcPosition))), mine, cid) if mine else set()
     aerodromes = []
     for icao in shown:

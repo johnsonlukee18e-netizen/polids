@@ -56,15 +56,17 @@ function lvpChip(lvp) {
 }
 
 // Pas w użyciu (a.runway z serwera, te same wartości co AERODROME › INFO): z ATIS pełna ramka z literą ATIS, pas
-// preferowany ramka kreskowana i PREF, jak "preferred" w AERODROME. Jeden pas do lądowań i startów: RWY 29, różne:
-// ARR 33 DEP 29 (kolory ról jak na paskach: ARR żółty, DEP niebieski). Dymek: ATIS albo powód wyboru pasa.
+// preferowany ramka kreskowana i PREF, jak "preferred" w AERODROME. Zwięźle, żeby wiersz lotniska mieścił się w jednej
+// linii przy 1366 px: jeden pas do lądowań i startów "29", różne "33/29" (ARR, potem DEP, w kolorach ról jak na
+// paskach: ARR żółty, DEP niebieski). Dymek: role pasów słownie i ATIS albo powód wyboru pasa.
 export function runwayChip(rw, atis = null) {
   if (!rw || !rw.arr) return "";
   const fromAtis = rw.source === "ATIS";
   const dep = rw.dep || rw.arr;
-  const body = dep === rw.arr ? `<i>RWY</i><b>${esc(rw.arr)}</b>`
-    : `<i>ARR</i><b class="arr">${esc(rw.arr)}</b><i>DEP</i><b class="dep">${esc(dep)}</b>`;
-  const tip = fromAtis ? [`Runway in use · ATIS ${rw.letter || ""}`.trim(), atis?.callsign] : ["Preferred runway", rw.reason];
+  const same = dep === rw.arr;
+  const body = same ? `<b>${esc(rw.arr)}</b>` : `<b><span class="arr">${esc(rw.arr)}</span>/<span class="dep">${esc(dep)}</span></b>`;
+  const roles = same ? `ARR/DEP ${rw.arr}` : `ARR ${rw.arr} · DEP ${dep}`;
+  const tip = fromAtis ? [`Runway in use · ATIS ${rw.letter || ""}`.trim(), roles, atis?.callsign] : ["Preferred runway", roles, rw.reason];
   return `<span class="ov-rwy ${fromAtis ? "atis" : "pref"}" data-tip="${esc(tip.filter(Boolean).join("\n"))}"><i class="src">${
     fromAtis ? esc(`ATIS ${rw.letter || ""}`.trim()) : "PREF"}</i>${body}</span>`;
 }
@@ -86,7 +88,7 @@ function wxRow(a, open) {
       ${a.covered_by ? `<span class="ov-by" data-tip="Covered now by ${esc(a.covered_by)}">${esc(a.covered_by)}</span>` : ""}
       <span class="ov-traffic" data-tip="Flights with a flight plan from/to this aerodrome: ↑ departures, ↓ arrivals, ✎ prefiled">↑${t.departures ?? 0} ↓${t.arrivals ?? 0}${t.prefiles ? ` ✎${t.prefiles}` : ""}</span>
       <span class="ov-obs">${obs}</span>
-      <span class="ov-more">${open ? "▾" : "▸"} TAF</span>
+      <span class="ov-more">${open ? "▾" : "▸"}<span class="w"> TAF</span></span>
     </div>
     <div class="wx ov-metar">${colorize(a.metar)}</div>
     ${open ? `<div class="wx ov-taf">${a.taf ? wxLines("taf", a.taf) : colorize(null)}</div>` : ""}
@@ -209,6 +211,17 @@ export const hiddenNote = (hidden) => ({
   text: hidden.length ? `${hidden.length} hidden` : "",
   tip: hidden.map((x) => `${x.icao}: ${x.by}`).join("\n"),
 });
+// MINE ukrył wszystkie lotniska stanowiska (np. EPWW_C_CTR przy EPWA_APP online): zamiast pustych paneli krótka
+// informacja, kto je obsługuje i że ALL je pokaże; "" gdy coś zostało albo nic nie ukryto
+export function emptyNote(shown, hidden) {
+  if (shown || !hidden.length) return "";
+  const by = [...new Set(hidden.map((x) => x.by))].join(", ");
+  return hidden.length === 1 ? `${hidden[0].icao} is covered now by ${by}. ALL shows it.`
+    : `All ${hidden.length} aerodromes of this position are covered now by ${by}. ALL shows them.`;
+}
+// dymek data-tip otwiera się w dół; w dolnej połowie przewijanego panelu w górę, inaczej dolna krawędź panelu go ucina
+// (r: prostokąt elementu z dymkiem, box: prostokąt panelu)
+export const tipUp = (r, box) => r.top + r.bottom > box.top + box.bottom;
 
 // --- widok -----------------------------------------------------------------------------------------------------
 export function mountOverview(el, { onGoto } = {}) {
@@ -300,23 +313,27 @@ export function mountOverview(el, { onGoto } = {}) {
     hid.textContent = sw ? note.text : "";
     if (sw && note.tip) hid.dataset.tip = note.tip; else hid.removeAttribute("data-tip");
     $(".ov-pos-note").innerHTML = pos
-      ? `${esc(pos.name || "")}${pos.frequency ? ` · ${esc(pos.frequency)}` : ""} · aerodromes: <b>${d.airports.map(esc).join(", ")}</b>`
+      ? `${esc(pos.name || "")}${pos.frequency ? ` · ${esc(pos.frequency)}` : ""} · aerodromes: <b>${d.airports.map(esc).join(", ") || "–"}</b>`
       : `all controlled aerodromes of FIR EPWW (${d.airports.length})`;
+    // wszystkie lotniska ukryte (MINE): ta sama informacja w panelach lotnisk zamiast pustej listy i pustej tabeli
+    const none = sw ? emptyNote(d.aerodromes.length, d.hidden) : "";
+    const noneHint = none ? `<div class="hint ov-none">${esc(none)}</div>` : "";
     $(".ov-net").textContent = [d.network_error, d.wx_error].filter(Boolean).join(" · ");
     $(".ov-upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
     $(".ov-tl-body").innerHTML = tlPanel(d);
     // z filtrem (mało lotnisk) TAF od razu widoczny, bez filtra dopiero po kliknięciu wiersza;
     // kliknięcie odwraca stan domyślny, więc przy rozwiniętych TAF-ach zwija TAF danego lotniska
     const all = Boolean(position) && d.aerodromes.length <= 6;
-    $(".ov-h-note").textContent = all ? "TAF expanded · click = collapse" : "click an aerodrome = TAF";
+    $(".ov-h-note").textContent = none ? "" : all ? "TAF expanded · click = collapse" : "click an aerodrome = TAF";
     $(".ov-wx-body").innerHTML = (d.wx_error ? `<div class="error ov-err">${esc(d.wx_error)}</div>` : "")
-      + d.aerodromes.map((a) => wxRow(a, all !== open.has(a.icao))).join("");
-    $(".ov-nt-n").textContent = d.notam_error && !d.notams.length ? "–" : `${d.notams.length}`;   // "0" po awarii by kłamało
+      + (noneHint || d.aerodromes.map((a) => wxRow(a, all !== open.has(a.icao))).join(""));
+    // "0" po awarii by kłamało, a bez pokazanych lotnisk nie ma czego liczyć
+    $(".ov-nt-n").textContent = (d.notam_error || none) && !d.notams.length ? "–" : `${d.notams.length}`;
     $(".ov-notam-body").innerHTML = (d.notam_error ? `<div class="error ov-err">${esc(d.notam_error)}</div>` : "")
-      + notamPanel(d);
+      + (noneHint || notamPanel(d));
     $(".ov-flow-body").innerHTML = flowPanel(d);
     $(".ov-mon-body").innerHTML = (d.monitor_error ? `<div class="error ov-err">${esc(d.monitor_error)}</div>` : "")
-      + monitorPanel(d);
+      + (noneHint || monitorPanel(d));
     drawChecklist(d);
   };
 
@@ -358,6 +375,11 @@ export function mountOverview(el, { onGoto } = {}) {
     scope = scopeOf(b.dataset.scope);
     lsSet(SCOPE_KEY, scope);
     if (last) draw(last);
+  });
+  // dymki w dolnej połowie panelu METAR otwierają się w górę (tipUp)
+  $(".ov-wx-body").addEventListener("mouseover", (e) => {
+    const t = e.target.closest("[data-tip]");
+    if (t) t.classList.toggle("tip-up", tipUp(t.getBoundingClientRect(), e.currentTarget.getBoundingClientRect()));
   });
   // kliknięcie wiersza lotniska rozwija / zwija TAF
   $(".ov-wx-body").addEventListener("click", (e) => {

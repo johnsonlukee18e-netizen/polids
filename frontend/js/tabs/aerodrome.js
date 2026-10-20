@@ -202,7 +202,8 @@ function approachWind(aw, st, err) {
       <td class="num w">${windVec(r.w3000)}</td><td class="num">${pair(r.c3000)}</td>
       <td class="pt ${r.method}">${esc(r.fix || "CL 3°")}</td></tr>`;
   }).join("");
-  const errs = [aw.model_error, aw.metar_error].filter(Boolean);
+  // komunikaty błędów neutralne, bez nazwy dostawcy i treści wyjątku z serwera
+  const errs = [aw.model_error && "Forecast unavailable", aw.metar_error && "METAR unavailable"].filter(Boolean);
   return `<div class="apw-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
     <table class="data apw-tab"><thead><tr><th rowspan="2">RWY</th><th colspan="2">0 ft · H/T XW</th><th colspan="2">3000 ft</th><th rowspan="2">Point</th></tr>
       <tr><th>METAR</th><th>10 m</th><th>wind</th><th>H/T XW</th></tr></thead><tbody>${rows}</tbody></table>

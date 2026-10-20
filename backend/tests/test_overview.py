@@ -416,7 +416,9 @@ def test_coverage_orders_z_pliku_ese(client):
     from backend.app.database import SessionLocal
     with SessionLocal() as db:
         orders = overview.coverage_orders(db)
+        dirs = overview.directors(overview._slices(db))
     assert set(orders) == set(overview.AERODROMES)
+    assert {"EPWA_F_APP", "EPKK_KK_APP"} <= dirs and not dirs & {"EPWA_APP", "EPKK_APP", "EPKK_E_APP", "EPGD_APP"}
     # od poziomu APP w górę: bez wieży, GND i DEL lotniska i bez dyrektora (EPWA_F_APP, EPKK_KK_APP)
     assert orders["EPWA"][0][:4] == ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP", "EPWW_C_CTR"]
     assert all(not cs.startswith(("EPWA_TWR", "EPWA_GND", "EPWA_DEL", "EPWA_F_")) for o in orders["EPWA"] for cs in o)
@@ -463,6 +465,9 @@ def test_overview_mine_all(client, monkeypatch):
     # EPWA_APP widzi swoje lotniska (EPWW_S_CTR jest dalej w kolejności)
     app = client.get("/api/overview?position=EPWA_APP").json()
     assert [a["covered_by"] for a in app["aerodromes"]] == [None] * 4
+    # dyrektor pracuje przy pasie razem z APP: EPWA_APP online nie zabiera mu EPWA (MINE nie jest puste)
+    f = client.get("/api/overview?position=EPWA_F_APP").json()
+    assert [(a["icao"], a["covered_by"]) for a in f["aerodromes"]] == [("EPWA", None)]
     # bez stanowiska i przy wieży nie liczymy
     assert all(a["covered_by"] is None for a in client.get("/api/overview").json()["aerodromes"])
     assert client.get("/api/overview?position=EPKK_TWR").json()["aerodromes"][0]["covered_by"] is None
