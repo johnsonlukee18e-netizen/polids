@@ -84,7 +84,8 @@ out.sum = {
 };
 const unreg = { ...data.documents[0], id: "plik-loa-x", registered: false, count: 0, note: "no entry in data/seed/coordination.json",
   name: "LOA EPWW UMMV Minsk" };
-out.cards = { unreg: A.docCardHtml(unreg, {}), reg: A.docCardHtml(data.documents[0], {}) };
+out.cards = { unreg: A.docCardHtml(unreg, {}), reg: A.docCardHtml(data.documents[0], {}),
+  all: data.documents.map((d) => [d.id, d.name, d.count, A.docCardHtml(d, { selected: d.id === "loa-edmm" })]) };
 out.coordFile = ["LOA/x.pdf", "lop/a/b.pdf", "LOA", "LOA/", "ICAO/doc.pdf", "", null, "LOAX/x.pdf"].map(docsMod.isCoordFile);
 const row = data.agreements.find((r) => r.fir === "LKAA");
 const evil = { ...data.agreements[0], cop: "<b>X", cop_key: "", traffic: "<i>t</i>", adep: [], ades: [], conditions: "<script>",
@@ -100,7 +101,7 @@ out.html = {
   block: A.blockHtml("in", [], data, {}),
   notes: A.notesHtml(data, ["EDWW", "XXXX"]),
   options: A.positionOptions(data.positions, "EPWW_DBT_CTR"),
-  card: A.docCardHtml(data.documents[0], { selected: true, airac: data.current_airac }),
+  card: A.docCardHtml(data.documents[0], { selected: true }),
   cardCur: A.docCardHtml({ ...data.documents[0], current: true }, {}),
   cardEvil: A.docCardHtml({ ...data.documents[0], name: "<img src=x>", url: "javascript:alert(1)", positions: ["<b>"] }, {}),
   cardMissing: A.docCardHtml({ ...data.documents[0], exists: false }, {}),
@@ -123,7 +124,7 @@ out.select = {
 const lopFile = "LOP/LOP TWR/LOP TWR Okęcie.pdf";
 const lop = data.documents.find((d) => d.file === lopFile);
 out.lop = {
-  card: A.docCardHtml(lop, { airac: data.current_airac }), acc: A.docCardHtml(data.documents.find((d) => d.id === "lop-acc-epww"), {}),
+  card: A.docCardHtml(lop, {}), acc: A.docCardHtml(data.documents.find((d) => d.id === "lop-acc-epww"), {}),
   refFile: ref(lopFile), refId: ref("lop-app-epkk"), arg: A.parseArg("docs/" + lopFile), docsArg: A.docsArg(lop.id),
   coordFile: [lopFile, "LOP/LOP APP/LOP APP Kraków.pdf", "lop/lop twr/x.pdf"].map(docsMod.isCoordFile),
   cards: data.documents.filter((d) => d.type === "LOP").map((d) => A.docCardHtml(d, {})),
@@ -240,6 +241,8 @@ def test_document_card_to_agreements(out, data):
 def test_summary_says_what_is_hidden(out, data):
     s = out["sum"]
     assert "hidden" not in s["none"] and "only FIR" not in s["none"] and "all positions" in s["none"]
+    # 0.12.6 (issue #21): bez dopisku, skąd są dane („PDF extract (data/seed/loa.json), the PDF prevails”)
+    assert all("PDF" not in x and "loa.json" not in x and "hint" not in x for x in s.values())
     assert "hidden FIRs <b>EDWW</b>" in s["one"]
     assert "only FIR <b>UKLV</b>" in s["only"] and "position <b>EPWW_DBT_CTR</b>" in s["only"]
     assert "all FIRs off" in s["allOff"]
@@ -249,29 +252,55 @@ def test_summary_says_what_is_hidden(out, data):
 
 def test_unregistered_card_and_old_doc_addresses(out):
     c = out["cards"]
-    assert 'class="cd-new"' in c["unreg"] and "no entry in data/seed/coordination.json" in c["unreg"]
-    assert "cd-agr" not in c["unreg"] and "cd-agr" in c["reg"] and "cd-new" not in c["reg"]
+    # 0.12.6: PDF bez wpisu w rejestrze ma zwykłą kartę (nazwa z pliku, PDF ↗), bez uwagi dla utrzymującego dane
+    assert ">LOA EPWW UMMV Minsk<" in c["unreg"] and "PDF ↗" in c["unreg"]
+    assert "cd-new" not in c["unreg"] and "coordination.json" not in c["unreg"] and "no entry" not in c["unreg"]
+    assert "cd-agr" not in c["unreg"] and "cd-agr" in c["reg"]
     # stary adres OTHER › DOCS z plikiem LOA/LOP → COORDINATION
     assert out["coordFile"] == [True, True, False, False, False, False, False, False]
+
+
+def test_document_cards_only_name_and_buttons(out):
+    """Issue #21 (COORDINATION): karta dokumentu bez dopisków pod tytułem (typ i FIR-y, AIRAC, data, wersja, liczba
+    przekazań, sektory, uwagi): tekst karty to sama nazwa, PDF ↗ i – gdy dokument ma przekazania – LoA ›."""
+    def text(html):
+        return " ".join(re.sub(r"<[^>]+>", " ", html).split())
+
+    def esc(v):   # jak esc() z api.js
+        return re.sub(r"[&<>\"']", lambda m: {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[m[0]], v)
+
+    assert out["cards"]["all"]
+    for doc_id, name, count, html in out["cards"]["all"]:
+        want = esc(name) + " PDF ↗" + (" LoA ›" if count else "")
+        assert text(html) == want, doc_id
+        assert ("cd-card on" in html) is (doc_id == "loa-edmm")
+        assert re.search(r'<div class="cd-card[^"]*" data-doc="[^"]+" tabindex="0">', html), doc_id   # bez dymka z uwagą
 
 
 def test_html(out):
     h = out["html"]
     assert 'class="cr-cop hit">ALUKA</b>' in h["hit"] and 'data-doc="loa-edww-eduu"' in h["hit"]
-    assert "sector not specified in LOA" in h["unk"] and 'class="unk"' in h["unk"] and "J LOW" in h["unk"]
+    assert ">sector not specified</span>" in h["unk"] and 'class="unk"' in h["unk"] and "J LOW" in h["unk"]
+    assert 'title="sector not specified. For positions covering: J LOW' in h["unk"] and "listed in the LOA" not in h["unk"]
     ev = h["evil"]
     for bad in ("<b>X", "<i>t", "<script>", "<u>FL1", "<s>", "<q>"):
         assert bad not in ev, bad
     assert "cr-doc" not in ev   # nieznany dokument: bez przycisku
     assert "No transfers for these settings." in h["block"] and "COPN" in h["block"]
     assert "Transfer of control and communication" in h["notes"] and "XXXX" not in h["notes"]
+    # zasady z LOA: tytuł bez wersji, daty i AIRAC dokumentu
+    assert "<h4>LOA EPWW – EDWW (Bremen)</h4>" in h["notes"] and "rev. 4.0" not in h["notes"] and "AIRAC" not in h["notes"]
     assert h["options"].startswith('<option value="">All</option>') and 'value="EPWW_DBT_CTR" selected' in h["options"]
     assert '<optgroup label="ACC / FIR">' in h["options"] and '<optgroup label="TWR / aerodrome">' in h["options"]
-    assert 'class="cd-card on"' in h["card"] and "AIRAC 2602" in h["card"] and "PDF ↗" in h["card"]
+    assert 'class="cd-card on"' in h["card"] and "PDF ↗" in h["card"] and ">LoA ›</button>" in h["card"]
     assert 'href="/files/docs/LOA/LOA%20EPWW%20EDWW%20Bremen,%20EDUU%20Karlsruhe%20(AIRAC%202602).pdf"' in h["card"]
-    assert 'class="cd-tag airac cur"' in h["cardCur"] and 'class="cd-tag airac cur"' not in h["card"]
-    assert "<img" not in h["cardEvil"] and "javascript:" not in h["cardEvil"] and "<b>" not in h["cardEvil"]
-    assert "missing file" in h["cardMissing"] and "href=" not in h["cardMissing"]
+    # 0.12.6: bez tagów (typ, FIR-y, AIRAC), daty, wersji, liczby przekazań i sektorów, także dla bieżącego cyklu
+    for card in (h["card"], h["cardCur"]):
+        assert "cd-tag" not in card and "cd-meta" not in card and "cd-pos" not in card
+        assert ">AIRAC" not in card and "19.02.2026" not in card and "rev. 4.0" not in card and "transfers<" not in card
+    assert "<img" not in h["cardEvil"] and "javascript:" not in h["cardEvil"]
+    assert '<span class="error">PDF unavailable</span>' in h["cardMissing"] and "href=" not in h["cardMissing"]
+    assert ".pdf" not in h["cardMissing"]   # bez ścieżki pliku na ekranie
     up, indiv = out["level"]
     assert 'class="cr-c"' in up and "<b>FL230-FL270</b>" in up and "↑ FL" not in up
     assert 'class="cr-indiv"' in indiv and "uzgodniony z EPWW" in indiv
@@ -290,6 +319,9 @@ def test_documents_and_other_docs(out, data):
     assert out["tab"] == "function"
     # OTHER › DOCS: bez LOA i LOP (są w COORDINATION)
     assert out["other"] == ["ICAO", "INNE"]
+    # 0.12.6: OTHER › DOCS bez dopisków, skąd są dokumenty (folder data/docs/)
+    docs_code = re.sub(r"//[^\n]*", "", (FRONTEND / "js" / "docs.js").read_text("utf-8"))
+    assert "data/docs" not in docs_code and "Put new PDFs" not in docs_code and "No documents.</p>" in docs_code
 
 
 def test_tab_wiring():
@@ -300,7 +332,12 @@ def test_tab_wiring():
     assert "docFocus(data, d.id," in fn and "lsSet(" not in fn
     assert 'stash("coordination", { top: main.scrollTop })' in src and 'const s = stashed("coordination");' in src
     assert "main.scrollTop = wantTop" in src
-    assert "sumHtml(v, { pos: st.pos" in src and "data.errors" in src
+    assert "sumHtml(v, { pos: st.pos" in src
+    # 0.12.6: uwagi do danych (data.errors) w logu serwera, nie w panelu DOCUMENTS; bez dopisków, skąd są dane
+    code_src = re.sub(r"//[^\n]*", "", src)
+    assert "data.errors" not in code_src and "cd-errs" not in code_src
+    for bad in ("data/seed", "data/docs", "coordination.json", "AIRAC", "VATSIM data", "higher in the order"):
+        assert bad not in code_src, bad
     # 0.12.5 (issue #18): podmenu "LoA" i "DOCUMENTS" zamiast POROZUMIENIA i DOKUMENTY, przycisk na karcie "LoA ›"
     assert '{ id: "agreements", label: "LoA", fill: true,' in src and '{ id: "docs", label: "DOCUMENTS", fill: true,' in src
     code = re.sub(r"//[^\n]*", "", src)   # komentarze zostają po polsku, w kodzie i tekstach już nie
@@ -317,12 +354,12 @@ def test_lop_cards_and_addresses(out, api_docs):
     lop = out["lop"]
     c = lop["card"]
     assert 'data-doc="lop-twr-epwa"' in c and ">LOP TWR Warszawa Chopin (EPWA)<" in c
-    assert '<span class="cd-tag ty">LOP</span><span class="cd-tag fir">EPWW</span>' in c and "AIRAC" not in c
-    assert '<div class="cd-pos"><span>EPWA TWR</span></div>' in c and "0 transfers" in c and "content in preparation" in c
     assert 'href="/files/docs/LOP/LOP%20TWR/LOP%20TWR%20Ok%C4%99cie.pdf"' in c and 'title="Open the PDF: LOP TWR Warszawa Chopin (EPWA)"' in c
-    assert "missing file" not in c and "cd-new" not in c
-    # 30 sektorów ACC: każda etykieta bez łamania w środku („B LOW”), łamanie tylko na „ · ”
-    assert "<span>B LOW</span> · <span>B MID</span> · <span>B HIGH</span>" in lop["acc"] and "<span>T HIGH</span></div>" in lop["acc"]
+    # 0.12.6: bez tagów LOP / EPWW, stanowiska, liczby przekazań i uwagi z rejestru („content in preparation”)
+    assert "cd-tag" not in c and "EPWA TWR" not in c and "transfers" not in c and "content in preparation" not in c
+    assert "PDF unavailable" not in c and "cd-new" not in c
+    # LOP ACC: bez listy 30 sektorów ACC
+    assert "B LOW" not in lop["acc"] and "cd-pos" not in lop["acc"]
     assert len(lop["cards"]) == 20 and not any("cd-agr" in x or "LoA ›" in x for x in lop["cards"])
     assert all('href="/files/docs/LOP/LOP%20' in x for x in lop["cards"])
     assert lop["refFile"] == "lop-twr-epwa" and lop["refId"] == "lop-app-epkk" and lop["docsArg"] == "docs/lop-twr-epwa"

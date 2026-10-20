@@ -21,7 +21,7 @@ COP = re.compile(r"^[A-Z]{2,5}$")            # punkt koordynacyjny (ALUKA, BODLA
 FL = re.compile(r"FL\s?(\d{2,3})")
 ACC_SECTOR = re.compile(r"^([A-Z]) (LOW|MID|HIGH)$")
 ACC_CS = re.compile(r"^EPWW_[A-Z0-9]+_CTR$")
-UNKNOWN = "sector not specified in LOA"
+UNKNOWN = "sector not specified"
 GROUPS = (("ACC", "ACC / FIR"), ("APP", "APP / approach"), ("TWR", "TWR / aerodrome"))
 
 

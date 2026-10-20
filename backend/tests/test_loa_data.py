@@ -1,5 +1,6 @@
 """Dane LOA z sąsiadami (data/seed/loa.json) i ich PDF-y w data/docs/LOA."""
 import json
+import re
 
 import pytest
 
@@ -82,3 +83,31 @@ def test_both_directions_where_loa_has_them(firs):
     assert ("out", "ARR EDDB", "GOVEN", "FL120", "DBAS") in edww
     lkaa = {(t["dir"], t["traffic"], t["cop"], t["level"]) for t in firs["LKAA"]["transfers"]}
     assert ("in", "ARR EPKK", "NETIR", "↓ FL150, FL190B") in lkaa
+
+
+def test_no_document_references(firs):
+    """0.12.6 (issue #21): zasady i uwagi o stanowiskach (COORDINATION › LoA rules, panel LOA w RADIO) bez odwołań do
+    stron, załączników i rozdziałów PDF-u ani dopisków, skąd jest wartość – same dane."""
+    bad = re.compile(r"\bannex\b|\bpage\b|\bp\. ?\d|section \d|in the PDF|PDF annex|LOA table|as in the LOA|"
+                     r"in the LOA\)|underlined in the LOA|LOA parties", re.I)
+    for key, fir in firs.items():
+        texts = [s for f in ("silent", "vfr", "other") for s in fir[f]]
+        texts += [p["note"] for p in fir["positions"]] + [t["conditions"] for t in fir["transfers"]]
+        for s in texts:
+            assert not bad.search(s), f"{key}: {s}"
+
+
+def test_positions_without_coverage_order(firs):
+    """0.12.6 (issue #21): uwagi o stanowiskach (kolumna Remarks w panelu LOA w RADIO) bez hierarchii przejmowania
+    („order: A → B → C”) – same zakresy pionowe i obszary."""
+    for key, fir in firs.items():
+        for p in fir["positions"]:
+            assert not re.search(r"\border\b|→|\bafter [A-Z]{4}_", p["note"]), f"{key}: {p}"
+
+
+def test_esaa_ep_sectors(firs):
+    """ESAA: sektory polskie bez dwóch „F MID” – FL365–FL660 to F HIGH, B LOW kończy się tam, gdzie zaczyna B MID."""
+    ep = {p["sector"]: p["note"] for p in firs["ESAA"]["positions"] if p["side"] == "EP" and not p["callsign"]}
+    assert len(ep) == len([p for p in firs["ESAA"]["positions"] if p["side"] == "EP" and not p["callsign"]])
+    assert ep["B LOW (BWW)"] == "FL95 – FL335" and ep["B MID (BWW)"] == "FL335 – FL365"
+    assert ep["F MID (FWW)"] == "FL335 – FL365" and ep["F HIGH (FWW)"] == "FL365 – FL660"

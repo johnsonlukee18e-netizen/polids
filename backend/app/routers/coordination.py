@@ -15,6 +15,8 @@ from ..services.radio import seed_json
 router = APIRouter(prefix="/api/coordination", tags=["coordination"])
 log = logging.getLogger("polids.coordination")
 CALLSIGN = re.compile(r"[A-Za-z0-9_]{3,20}")
+UNAVAILABLE = "Data unavailable"   # na ekranie (COORDINATION: …) bez nazw plików; szczegóły w logu serwera
+_logged: list[tuple[str, ...]] = [()]   # ostatnio zalogowane uwagi do danych (każdy zestaw raz, nie przy każdym zapytaniu)
 
 
 def _seed(name: str, required: bool = False) -> dict:
@@ -23,20 +25,31 @@ def _seed(name: str, required: bool = False) -> dict:
     try:
         data = seed_json(path)
     except FileNotFoundError as exc:
-        if required:
-            raise HTTPException(404, f"COORDINATION: file data/seed/{name} missing") from exc
         log.warning("COORDINATION: brak pliku data/seed/%s", name)
+        if required:
+            raise HTTPException(404, UNAVAILABLE) from exc
         return {}
     except (OSError, ValueError) as exc:
+        log.warning("COORDINATION: nie da się odczytać data/seed/%s (%s)", name, exc)
         if required:
-            raise HTTPException(500, f"COORDINATION: cannot read file data/seed/{name} ({exc})") from exc
-        log.warning("COORDINATION: pomijam data/seed/%s (%s)", name, exc)
+            raise HTTPException(500, UNAVAILABLE) from exc
         return {}
     if not isinstance(data, dict):
+        log.warning("COORDINATION: data/seed/%s to nie obiekt JSON", name)
         if required:
-            raise HTTPException(500, f"COORDINATION: file data/seed/{name} is not a JSON object")
+            raise HTTPException(500, UNAVAILABLE)
         return {}
     return data
+
+
+def _log_errors(errors: list[str]) -> None:
+    """Uwagi do danych (PDF bez wpisu, nieznany sektor) dla utrzymującego coordination.json: do logu serwera, nie na
+    ekran (0.12.6); ten sam zestaw tylko raz."""
+    if tuple(errors) == _logged[0]:
+        return
+    _logged[0] = tuple(errors)
+    for e in errors:
+        log.warning("COORDINATION: %s", e)
 
 
 def _exists(rel: str) -> bool:
@@ -77,4 +90,5 @@ def coordination(position: str = Query("", description="EPWW position callsign, 
     names = {p.callsign: {"name": p.name, "frequency": p.frequency} for p in db.scalars(select(AtcPosition))}
     data = coord_service.build(coord, _seed("loa.json"), _seed("ownership.json"), names=names, file_exists=_exists,
                                files=_files())
+    _log_errors(data["errors"])
     return coord_service.for_position(data, position.upper(), on) if position else data

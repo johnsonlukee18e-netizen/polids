@@ -7,7 +7,7 @@ import {
 // COORDINATION (0.12.3): wszystkie LOA i LOP, jak „Agreements” w ATCISS (VATSIM Germany). Podmenu:
 // POROZUMIENIA – tabela przekazań WYJŚCIE (COPX) / WEJŚCIE (COPN) z filtrem punktów, wyborem stanowiska (pokazuje tylko
 //   sektory, które ono teraz obsługuje wg kolejności przejmowania i zalogowanych w VATSIM), FIR-ami i rodzajem dokumentu;
-// DOKUMENTY – karty dokumentów (nazwa, FIR-y, AIRAC, wersja, sektory) i PDF obok.
+// DOKUMENTY – karty dokumentów (nazwa, przyciski PDF i LoA) i PDF obok.
 // Adresy: "#coordination/agreements[/<stanowisko|ALL>[/<filtr>]]" i "#coordination/docs/<id>" (także FIR z loa.json albo
 // plik w data/docs – tak otwiera RADIO i stare odnośniki). Dane: GET /api/coordination (data/seed/coordination.json
 // i loa.json).
@@ -74,8 +74,8 @@ export default {
         if (st.pos) {
           const keys = ownedKeys(data.chains, st.pos, online);
           const ons = data.positions.filter((p) => online.has(p.callsign) && p.callsign !== st.pos).map((p) => shortCs(p.callsign));
-          own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LoA sector now (covered by a position higher in the order).")
-            + (net === false ? " No VATSIM data: computed as if nobody were online."
+          own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LoA sector now.")
+            + (net === false ? " Online data unavailable."
               : net ? ` Online: ${ons.length ? esc(ons.join(", ")) : "none of these positions"}.` : "");
         } else own.textContent = "All transfers, not split by sector.";
         const firs = [...new Set([...v.out, ...v.in].map((r) => r.fir))];
@@ -124,15 +124,11 @@ export default {
             <div class="ms-row"><select class="field cd-fir" aria-label="FIR"><option value="">All FIRs</option></select>
               <select class="field cd-type" aria-label="Type"><option value="">LOA and LOP</option><option>LOA</option><option>LOP</option></select></div>
             <div class="cd-list"><p class="hint">Loading…</p></div></div>
-          <p class="hint">Names, tags and AIRAC: <span class="mono">data/seed/coordination.json</span>; PDFs in
-            <span class="mono">data/docs/LOA</span> and <span class="mono">data/docs/LOP</span>.</p>
-          <div class="cd-errs" hidden></div>
         </div>
         <iframe class="embed viewer" style="background:#333" title="Document"></iframe>
       </div>`);
       pane.append(el);
       const list = el.querySelector(".cd-list"), fir = el.querySelector(".cd-fir"), type = el.querySelector(".cd-type");
-      const errs = el.querySelector(".cd-errs");
       let viewer = el.querySelector(".viewer");
       const show = (d) => {
         if (!d) return;
@@ -156,9 +152,6 @@ export default {
           list.innerHTML = err ? `<p class="error">${esc(err)}</p>` : `<p class="hint">Loading…</p>`;
           return;
         }
-        // uwagi do danych (PDF bez wpisu, nieznany sektor): dla tego, kto utrzymuje coordination.json
-        errs.hidden = !data.errors?.length;
-        errs.innerHTML = data.errors?.length ? `<h4>To fix in the data</h4><ul>${data.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : "";
         const was = docRef(data.documents, st.doc);
         const sel = docSelect(data.documents, st.doc, { fir: st.dfir, type: st.dtype }, { reveal });
         reveal = false;
@@ -168,7 +161,7 @@ export default {
         fir.innerHTML = `<option value="">All FIRs</option>` + firs.map((f) => `<option${f === st.dfir ? " selected" : ""}>${esc(f)}</option>`).join("");
         type.value = st.dtype;
         const ds = docFilter(data.documents, { fir: st.dfir, type: st.dtype });
-        list.innerHTML = ds.length ? ds.map((d) => docCardHtml(d, { selected: d.id === sel.doc?.id, airac: data.current_airac })).join("")
+        list.innerHTML = ds.length ? ds.map((d) => docCardHtml(d, { selected: d.id === sel.doc?.id })).join("")
           : `<p class="hint">No documents for this filter.</p>`;
         show(sel.doc);
         if (was && sel.doc && was.id !== sel.doc.id) remember("coordination", argOf(), { replace: true });
