@@ -192,9 +192,11 @@ export function frameGo(frame, url) {
   return f;
 }
 
-export function iframeWithFallback(pane, url, note = "") {
+// Ramka z paskiem nad nią: przycisk otwierający stronę w nowej karcie, opcjonalna uwaga (note) i adres strony.
+// showUrl: false = pasek bez adresu strony (0.12.6: adres zdradzał tylko, skąd jest strona).
+export function iframeWithFallback(pane, url, note = "", { showUrl = true } = {}) {
   pane.append(h(`<div class="toolbar" style="padding:6px 10px;margin:0;background:var(--panel)">
-      <span class="hint mono">${esc(url)}</span><span style="flex:1"></span>
+      ${showUrl ? `<span class="hint mono">${esc(url)}</span>` : ""}<span style="flex:1"></span>
       ${note ? `<span class="hint">${esc(note)}</span>` : ""}
       <a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Open in new tab ↗</a></div>`));
   pane.append(h(`<iframe class="embed" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>`));

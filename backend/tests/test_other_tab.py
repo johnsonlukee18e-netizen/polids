@@ -245,3 +245,39 @@ def test_other_subtab_switching(js):
     assert phr["log"] == [["remember", "other", "phraseology", False]]
     # LOA z dawnego adresu DOCS dalej do COORDINATION
     assert _step(js, "loa")["log"] == [["navigate", "coordination", "docs/LOA/x.pdf"]]
+
+
+FRAME_SCRIPT = r"""
+// atrapa document dla h() z api.js: <template> oddaje napis HTML zamiast węzła
+globalThis.document = { createElement: () => ({ set innerHTML(v) { this.html = v; },
+  get content() { return { firstElementChild: { html: this.html } }; } }) };
+const api = await import(process.argv[2]);
+const bar = (...args) => { const pane = { items: [], append(x) { this.items.push(x.html); } };
+  api.iframeWithFallback(pane, ...args); return pane.items; };
+console.log(JSON.stringify({ plain: bar("https://example.test/a?b=1&c=2", "Note"),
+  hidden: bar("https://example.test/a?b=1&c=2", "", { showUrl: false }) }));
+"""
+
+
+def test_frame_bar_without_url(tmp_path):
+    """OTHER › PHRASEOLOGY: pasek nad ramką bez adresu strony (adres mówi tylko, skąd jest strona), przycisk ↗ zostaje."""
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
+    script = tmp_path / "run.mjs"
+    script.write_text(FRAME_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (tmp_path / "api.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    url = "https://example.test/a?b=1&amp;c=2"
+    # domyślnie (INOP, AD CIV, AD MIL, AD VFR) pasek jak dotąd: adres, uwaga, przycisk
+    plain_bar, plain_frame = out["plain"]
+    assert f'<span class="hint mono">{url}</span>' in plain_bar and '<span class="hint">Note</span>' in plain_bar
+    hidden_bar, hidden_frame = out["hidden"]
+    assert "hint mono" not in hidden_bar and "example.test" not in hidden_bar.replace(f'href="{url}"', "")
+    assert f'<a class="btn" href="{url}" target="_blank" rel="noopener">Open in new tab ↗</a>' in hidden_bar
+    assert hidden_frame == plain_frame and f'src="{url}"' in hidden_frame
+    # frazeologia korzysta z paska bez adresu
+    assert 'iframeWithFallback(pane, ctx.config.links.phraseology, "", { showUrl: false });' in (
+        FRONTEND / "js" / "phraseology.js").read_text("utf-8")
