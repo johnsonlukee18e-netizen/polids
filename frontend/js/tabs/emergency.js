@@ -21,8 +21,7 @@ export default {
           pane.classList.add("emergency");
           pane.innerHTML = `<h2>${esc(p.title)}</h2>${p.subtitle ? `<div class="em-sub">${esc(p.subtitle)}</div>` : ""}
             ${p.assist ? assistBar() : ""}
-            <div class="em-sections">${p.sections.map((s) => `<section><h3>${esc(s.title)}</h3>${items(s.items)}</section>`).join("")}</div>
-            ${p.source ? `<p class="hint" style="margin-top:20px">Source: ${esc(p.source)}</p>` : ""}`;
+            <div class="em-sections">${p.sections.map((s) => `<section><h3>${esc(s.title)}</h3>${items(s.items)}</section>`).join("")}</div>`;
         },
       })));
     }).catch((e) => { holder.innerHTML = `<p class="error">${esc(e.message)}</p>`; });

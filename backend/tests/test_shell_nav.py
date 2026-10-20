@@ -14,11 +14,13 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 
 # INOP pod AD VFR, DOCS w OTHER (runda 11); 0.12.3 (issue #13): COORDINATION i CONVERSION po MAP, SQUAWK po STRIP,
-# PHRASEOLOGY w OTHER
+# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER
 MENU = ["home", "radio", "meteo", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
-        "coordination", "conversion", "checklist", "sytop", "aup", "strip", "squawk", "other", "about", "emergency", "admin"]
+        "coordination", "conversion", "sytop", "aup", "strip", "squawk", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
-          "COORDINATION", "CONVERSION", "CHECKLIST", "SYT OP", "AUP", "STRIP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+          "COORDINATION", "CONVERSION", "SYT OP", "AUP", "STRIP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+# stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
+MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
 
 
 def _menu_buttons():
@@ -55,13 +57,13 @@ def test_docs_moved_to_other():
     app.js przekierowuje na OTHER › DOCS (link #docs bez arg zostawia otwarty dokument), a przycisk COORDINATION ›
     w panelu LOA w RADIO otwiera LOA w COORDINATION › DOKUMENTY."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
-    assert ('const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"], '
-            'phraseology: () => ["other", "phraseology"] };') in APP
+    assert '  docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],' in MOVED_SRC
+    assert '  phraseology: () => ["other", "phraseology"],' in MOVED_SRC
     assert "if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);" in APP
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { isCoordFile, mountDocs } from "../docs.js";' in other and "soon(" not in other
     subs = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', other)
-    assert subs == [("docs", "DOCS"), ("phraseology", "PHRASEOLOGY")]
+    assert subs == [("docs", "DOCS"), ("phraseology", "PHRASEOLOGY"), ("checklist", "CHECKLIST")]
     assert 'remember("other", argOf())' in other and "activate(arg)" in other and "SUBS" not in other
     docs = (FRONTEND / "js" / "docs.js").read_text("utf-8")
     assert "export function mountDocs(" in docs and "remember(" not in docs and "frameGo(" in docs
@@ -85,6 +87,27 @@ def test_phraseology_moved_to_other():
     assert "export function mountPhraseology(pane, ctx)" in phr and "/api/embed-check/phraseology" in phr
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { mountPhraseology } from "../phraseology.js";' in other
+
+
+def test_checklist_moved_to_other():
+    """0.12.6 (issue #21): CHECKLIST nie jest już w menu, tylko podzakładką OTHER po PHRASEOLOGY (#other/checklist/<id>,
+    checklisty w drugim podmenu). Stare adresy #checklist i #checklist/<id> przekierowuje app.js, kafelek w ABOUT
+    (ctx.open("checklist")) też. Zaznaczenia pod tym samym kluczem co w dawnej zakładce (zapisany postęp zostaje),
+    a AERODROME › OVERVIEW dalej bierze renderChecklist z checklist.js."""
+    assert "checklist" not in MENU and not (FRONTEND / "js" / "tabs" / "checklist.js").exists()
+    assert 'data-tab="checklist"' not in INDEX and "checklist" not in re.search(r"const TABS = \{([^}]+)\}", APP).group(1)
+    assert '  checklist: (arg) => ["other", arg ? "checklist/" + arg : "checklist"],' in MOVED_SRC
+    chk = (FRONTEND / "js" / "checklist.js").read_text("utf-8")
+    assert "export function renderChecklist(el, chk, key)" in chk and "export function mountChecklists(pane, " in chk
+    assert "`checklist.tab.${c.id}`" in chk and "{ remember: false }" in chk
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert 'import { mountChecklists } from "../checklist.js";' in other
+    overview = (FRONTEND / "js" / "overview.js").read_text("utf-8")
+    assert 'import { renderChecklist } from "./checklist.js";' in overview
+    # żaden odnośnik w aplikacji nie prowadzi już wprost do zakładki checklist (poza przekierowaniem)
+    for path in (FRONTEND / "js").rglob("*.js"):
+        src = path.read_text("utf-8")
+        assert not re.search(r"""navigate\(\s*["']checklist["']|href=["']#checklist""", src), path.name
 
 
 def test_hidden_menu_button_takes_no_space():
@@ -121,6 +144,8 @@ console.log(JSON.stringify({
   // stare adresy #docs: przycisk/link bez arg, "#docs", "#docs/<plik>" (undefined w JSON = null)
   moved: [undefined, "", "LOA/LOA EPWW EDMM (AIRAC 2602).pdf"].map((a) => moved.MOVED.docs(a)),
   phraseology: moved.MOVED.phraseology(),
+  // kafelek ABOUT / link #checklist bez arg, "#checklist", "#checklist/<id>"
+  checklist: [undefined, "", "close-position"].map((a) => moved.MOVED.checklist(a)),
 }));
 """
 
@@ -134,8 +159,7 @@ def js(tmp_path_factory):
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
     (d / "home.mjs").write_text((FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8").replace('"../api.js"', '"./api.mjs"'), "utf-8")
     # MOVED z app.js (całego app.js Node nie wczyta: DOM)
-    moved = re.search(r"^const MOVED = .*;$", APP, re.M).group(0)
-    (d / "moved.mjs").write_text("export " + moved + "\n", "utf-8")
+    (d / "moved.mjs").write_text("export " + MOVED_SRC + "\n", "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "api.mjs").as_uri(), (d / "home.mjs").as_uri(), (d / "moved.mjs").as_uri()],
@@ -165,6 +189,8 @@ def test_moved_docs(js):
     # bez arg OTHER zostaje w swoim stanie (otwarty dokument), "" = pierwszy dokument, plik = ten PDF
     assert js["moved"] == [["other", None], ["other", "docs"], ["other", "docs/LOA/LOA EPWW EDMM (AIRAC 2602).pdf"]]
     assert js["phraseology"] == ["other", "phraseology"]
+    # CHECKLIST: bez arg i "" = pierwsza checklista w OTHER › CHECKLIST, id = ta checklista
+    assert js["checklist"] == [["other", "checklist"], ["other", "checklist"], ["other", "checklist/close-position"]]
 
 
 def test_home_greeting(js):
@@ -262,7 +288,7 @@ def test_menu_fits_low_windows():
     zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
     przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
     zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
-    bez zmian (reguły bez @media nietknięte)."""
+    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej."""
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
     low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")
     assert ".menu nav { display: flex; flex-direction: column; }" in low
@@ -280,8 +306,10 @@ def test_menu_fits_low_windows():
     assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
     assert ".menu nav { flex: 1; overflow-y: auto; }" in css
     # budżet 600 px (pomiary Playwright przy 1366x600): logo z paddingiem menu 45,5 px, zegar z AIRAC 49,8 px,
-    # użytkownik z wylogowaniem 66 px; 23 przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie
-    n, margins = 23, 23 * 1 + 5 + 5
+    # użytkownik z wylogowaniem 66 px; 22 przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie
+    n = len(_menu_buttons())
+    assert n == 22
+    margins = n * 1 + 5 + 5
     for user in (0, 66):
         nav = 600 - 45.5 - 49.8 - user - 6
         assert n * min_h + margins <= nav, (user, nav)

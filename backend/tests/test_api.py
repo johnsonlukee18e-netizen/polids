@@ -120,7 +120,7 @@ def test_route_without_navdata(client):
 
 def test_checklists_and_emergency(client):
     ids = [c["id"] for c in client.get("/api/checklists").json()["checklists"]]
-    assert ids == ["open-position", "close-position", "handover-takeover", "rwy-change"]
+    assert ids == ["open-position", "close-position", "handover-takeover", "rwy-change", "controller-tips"]
     procs = client.get("/api/emergency").json()["procedures"]
     assert len(procs) == 18 and procs[1]["id"] == "A06" and any(p["id"] == "RCF" for p in procs)
 

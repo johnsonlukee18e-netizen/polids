@@ -1,11 +1,10 @@
 {
- "_uwaga": "Procedury awaryjne wyświetlane w zakładce EMERGENCY (kolejność = kolejność w menu). Punkt to tekst albo {\"text\": ..., \"items\": [...]} (podpunkty) albo {\"note\": ...} (akapit). \"assist\": true pokazuje nad procedurą przypomnienie ASSIST. Checklisty 16 scenariuszy pochodzą z EUROCONTROL HRS/TSP-004-GUI-05 (Annex B) – tekst oryginalny, po angielsku.",
+ "_uwaga": "Procedury awaryjne wyświetlane w zakładce EMERGENCY (kolejność = kolejność w menu). Punkt to tekst albo {\"text\": ..., \"items\": [...]} (podpunkty) albo {\"note\": ...} (akapit). \"assist\": true pokazuje nad procedurą przypomnienie ASSIST. Checklisty 16 scenariuszy pochodzą z EUROCONTROL HRS/TSP-004-GUI-05 (Guidelines for Controller Training in the Handling of Unusual/Emergency Situations, ed. 2.0, Annex B), ASSIST z plakatu w Annex A; tekst oryginalny, po angielsku. Źródła tylko tutaj (0.12.6: interfejs pokazuje same procedury).",
  "procedures": [
   {
    "id": "ASSIST",
    "label": "ASSIST",
    "title": "ASSIST – emergency handling principles",
-   "source": "EUROCONTROL HRS/TSP-004-GUI-05, Annex A (poster)",
    "sections": [
     {
      "title": "EMERGENCY",
@@ -96,7 +95,6 @@
    "label": "ACAS/TCAS",
    "title": "ACAS / TCAS",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -139,7 +137,6 @@
    "label": "BIRDSTRIKE",
    "title": "Birdstrike",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -185,7 +182,6 @@
    "label": "BOMB",
    "title": "Bomb Warning",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -222,7 +218,6 @@
    "label": "BRAKES",
    "title": "Brake Problems",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -249,9 +244,8 @@
    "id": "RCF",
    "label": "COM FAIL",
    "title": "Communication Failure",
-   "subtitle": "Radio Communication Failure (ICAO Doc 7030 – EUR Region)",
+   "subtitle": "Radio Communication Failure – EUR Region",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -302,7 +296,6 @@
    "title": "Electrical Problems",
    "subtitle": "Loss of all generators (alternators) / battery power only – power supply reduced to emergency level",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -340,7 +333,6 @@
    "label": "DESCENT",
    "title": "Emergency Descent",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -391,7 +383,6 @@
    "label": "ENGINE",
    "title": "Engine Failure",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -439,7 +430,6 @@
    "label": "FIRE / APU",
    "title": "Engine on Fire or APU on Fire",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -502,7 +492,6 @@
    "label": "FUEL",
    "title": "Fuel Problems – Critical Fuel Status",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -549,7 +538,6 @@
    "title": "Gear Problems",
    "subtitle": "Unsafe Indication / No Gear",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -589,7 +577,6 @@
    "title": "Hydraulic Problems",
    "subtitle": "Complete or partial failure of flight controls, gear extension, brakes, flaps, nose wheel steering",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -644,7 +631,6 @@
    "label": "ICING",
    "title": "Icing",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -685,7 +671,6 @@
    "label": "PRESSURE",
    "title": "Pressurisation Problems",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "May result in",
@@ -718,7 +703,6 @@
    "label": "SMOKE",
    "title": "Smoke or Fire in the Cockpit / Cabin",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
@@ -758,7 +742,6 @@
    "label": "UNLAWFUL",
    "title": "Unlawful Interference",
    "assist": true,
-   "source": "EUROCONTROL, Guidelines for Controller Training in the Handling of Unusual/Emergency Situations (HRS/TSP-004-GUI-05, ed. 2.0), Annex B",
    "sections": [
     {
      "title": "Expect",
