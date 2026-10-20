@@ -284,6 +284,9 @@ def test_endpoint_position(client):
     on = {(r["fir"], r["ep"]) for r in d["agreements"] if r["applies"]}
     assert ("EDWW", "B LOW") in on and ("EDWW", "EPSC TMA") in on and ("ESAA", "") in on
     assert not any(f in ("LKAA", "LZBB", "UKLV") for f, _ in on)   # Praha, Bratysława i Lwów: sektory J, R, T
+    # ESAA: wiersze bez sektora dotyczą wszystkich polskich sektorów z LOA, także F HIGH (jak B HIGH)
+    esaa = next(r for r in d["agreements"] if r["fir"] == "ESAA" and not r["ep"])
+    assert {"B HIGH", "F MID", "F HIGH"} <= set(esaa["scope"])
     # DBT sam przejmuje też T (jest w kolejności T LOW): widzi LOA z Pragą
     d = client.get("/api/coordination?position=EPWW_DBT_CTR").json()
     assert "T LOW" in d["selected"]["owned"] and any(r["applies"] and r["fir"] == "LKAA" for r in d["agreements"])

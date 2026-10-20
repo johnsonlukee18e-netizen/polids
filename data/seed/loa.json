@@ -186,8 +186,8 @@
     {"callsign": "", "radio": "", "sector": "Spree (EDUUSPE)", "frequency": "", "side": "NB", "note": "UIR Rhein, FL315–FL660"},
     {"callsign": "EDXX_MM_CTR", "radio": "Langen Information", "sector": "FIS (VFR)", "frequency": "120.650", "side": "NB", "note": "primary for uncontrolled VFR"},
     {"callsign": "EDXX_FIS_CTR", "radio": "Langen Information", "sector": "FIS (VFR)", "frequency": "128.950", "side": "NB", "note": "when EDXX_MM_CTR offline"},
-    {"callsign": "EPPO_S_APP", "radio": "Poznan Approach", "sector": "EPPO TMA SOUTH (EPPO-S)", "frequency": "123.040", "side": "EP", "note": "FL095–FL195; order: 1"},
-    {"callsign": "EPPO_N_APP", "radio": "Poznan Approach", "sector": "EPPO TMA SOUTH (EPPO-S)", "frequency": "128.925", "side": "EP", "note": "order: 2 (after EPPO_S_APP)"},
+    {"callsign": "EPPO_S_APP", "radio": "Poznan Approach", "sector": "EPPO TMA SOUTH (EPPO-S)", "frequency": "123.040", "side": "EP", "note": "FL095–FL195"},
+    {"callsign": "EPPO_N_APP", "radio": "Poznan Approach", "sector": "EPPO TMA SOUTH (EPPO-S)", "frequency": "128.925", "side": "EP", "note": ""},
     {"callsign": "", "radio": "", "sector": "D LOW (EPWWDL)", "frequency": "", "side": "EP", "note": "FL095–FL335"},
     {"callsign": "", "radio": "", "sector": "D MID (EPWWDM)", "frequency": "", "side": "EP", "note": "FL335–FL365"},
     {"callsign": "", "radio": "", "sector": "D HIGH (EPWWDH)", "frequency": "", "side": "EP", "note": "FL365–FL660"},
@@ -239,12 +239,12 @@
    "version": "from 03.09.2026",
    "pdf": "/files/docs/LOA/LOA EPWW LKAA Praha (od 03.09.2026).pdf",
    "positions": [
-    {"callsign": "LKMT_APP", "radio": "Praha Radar", "sector": "MT", "frequency": "", "side": "NB", "note": "GND–FL125 excluding TMA/CTR of civil aerodromes and military MTMA/MCTR; order: LKMT_APP → LKAA_R_CTR → LKAA_N_CTR → LKAA_NS_CTR → LKAA_L_CTR → LKAA_CTR"},
-    {"callsign": "LKAA_N_CTR", "radio": "Praha Radar", "sector": "NL", "frequency": "", "side": "NB", "note": "FL125–FL305 excluding TMA of civil aerodromes; FL125–FL245 in DESEN AREA, FL245–FL305 in KLODZKO AREA; order: LKAA_N_CTR → LKAA_NS_CTR → LKAA_L_CTR → LKAA_CTR"},
-    {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "NU", "frequency": "", "side": "NB", "note": "FL305–FL660; order: LKAA_U_CTR → LKAA_N_CTR → LKAA_NS_CTR → LKAA_CTR"},
-    {"callsign": "LKAA_S_CTR", "radio": "Praha Radar", "sector": "SL", "frequency": "", "side": "NB", "note": "FL125–FL305 excluding TMA of civil aerodromes; order: LKAA_S_CTR → LKAA_NS_CTR → LKAA_L_CTR → LKAA_CTR"},
-    {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "SU", "frequency": "", "side": "NB", "note": "FL305–FL660; order: LKAA_U_CTR → LKAA_S_CTR → LKAA_NS_CTR → LKAA_CTR"},
-    {"callsign": "LKPR_APP", "radio": "Praha Radar", "sector": "HDO BOX", "frequency": "", "side": "NB", "note": "FL95–FL125, internal area in sector MT permanently delegated to LKPR_APP; order: LKPR_APP → LKAA_L_CTR → LKAA_CTR"},
+    {"callsign": "LKMT_APP", "radio": "Praha Radar", "sector": "MT", "frequency": "", "side": "NB", "note": "GND–FL125 excluding TMA/CTR of civil aerodromes and military MTMA/MCTR"},
+    {"callsign": "LKAA_N_CTR", "radio": "Praha Radar", "sector": "NL", "frequency": "", "side": "NB", "note": "FL125–FL305 excluding TMA of civil aerodromes; FL125–FL245 in DESEN AREA, FL245–FL305 in KLODZKO AREA"},
+    {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "NU", "frequency": "", "side": "NB", "note": "FL305–FL660"},
+    {"callsign": "LKAA_S_CTR", "radio": "Praha Radar", "sector": "SL", "frequency": "", "side": "NB", "note": "FL125–FL305 excluding TMA of civil aerodromes"},
+    {"callsign": "LKAA_U_CTR", "radio": "Praha Radar", "sector": "SU", "frequency": "", "side": "NB", "note": "FL305–FL660"},
+    {"callsign": "LKPR_APP", "radio": "Praha Radar", "sector": "HDO BOX", "frequency": "", "side": "NB", "note": "FL95–FL125, internal area in sector MT permanently delegated to LKPR_APP"},
     {"callsign": "LKAA_I_CTR", "radio": "Praha Information", "sector": "FIS (VFR)", "frequency": "126.100", "side": "NB", "note": "primary for uncontrolled VFR"},
     {"callsign": "", "radio": "", "sector": "J LOW", "frequency": "", "side": "EP", "note": "FL095–FL335 excluding TMA Kraków"},
     {"callsign": "", "radio": "", "sector": "J MID", "frequency": "", "side": "EP", "note": "FL335–FL365"},
@@ -319,7 +319,7 @@
    "vfr": [
     "Controlled VFR and night VFR: coordination, transfer of control and transfer of communications as IFR; uncontrolled VFR to the appropriate sector if in radio contact.",
     "EPWW → LKAA: uncontrolled VFR – LKAA_I_CTR (Praha Information) 126.100.",
-    "LKAA → EPWW: uncontrolled VFR – EPKK_I_APP (Krakow Information) 119.275 / EPPO_I_APP (Poznan Information) 126.300 / EPWW_I_CTR (Warszawa Information) 134.875; FIS split in class G airspace."
+    "LKAA → EPWW: uncontrolled VFR – FIS of the class G area entered: EPKK_I_APP (Krakow Information) 119.275 / EPPO_I_APP (Poznan Information) 126.300 / EPWW_I_CTR (Warszawa Information) 134.875."
    ],
    "other": [
     "Release = approval for the accepting unit to climb, descend and/or turn (max. 45°) before the transfer of control point; the transferring unit remains responsible for separation in its AoR unless agreed otherwise.",
@@ -342,9 +342,9 @@
    "version": "from 19.02.2026 (AIRAC 2602)",
    "pdf": "/files/docs/LOA/LOA EPWW LZBB Bratislava (AIRAC 2602).pdf",
    "positions": [
-    {"callsign": "LZTT_TWR", "radio": "Tatry Tower", "sector": "Tatry", "frequency": "121.350", "side": "NB", "note": "GND–FL135; order: LZTT_TWR → LZBB_CTR 134.475"},
+    {"callsign": "LZTT_TWR", "radio": "Tatry Tower", "sector": "Tatry", "frequency": "121.350", "side": "NB", "note": "GND–FL135"},
     {"callsign": "LZBB_CTR", "radio": "Bratislava Radar", "sector": "BB", "frequency": "134.475", "side": "NB", "note": "8000 ft – FL305, except sector Tatry (8000 ft – FL135)"},
-    {"callsign": "LZBB_U_CTR", "radio": "Bratislava Radar", "sector": "U", "frequency": "127.425", "side": "NB", "note": "FL305–FL660; order: LZBB_U_CTR → LZBB_CTR 134.475"},
+    {"callsign": "LZBB_U_CTR", "radio": "Bratislava Radar", "sector": "U", "frequency": "127.425", "side": "NB", "note": "FL305–FL660"},
     {"callsign": "LZBB_I_CTR", "radio": "Bratislava Info", "sector": "FIS (VFR)", "frequency": "124.300", "side": "NB", "note": "primary for uncontrolled VFR"},
     {"callsign": "EPKK_APP", "radio": "Kraków Approach", "sector": "TMA Kraków West", "frequency": "121.075", "side": "EP", "note": "GND–FL285"},
     {"callsign": "EPKK_E_APP", "radio": "Kraków Approach", "sector": "TMA Kraków East", "frequency": "126.975", "side": "EP", "note": "GND–FL285"},
@@ -422,13 +422,13 @@
    "version": "v1.1 (February 2022), from 24.02.2022 (AIRAC 2202)",
    "pdf": "/files/docs/LOA/LOA EPWW UKLV Lviv (v1.1, AIRAC 2202).pdf",
    "positions": [
-    {"callsign": "UKLL_APP", "radio": "L'viv Radar", "sector": "L'viv Approach (ALL)", "frequency": "120.525", "side": "NB", "note": "GND–FL165; order: UKLL_APP → UKLV_CTR 134.050 → UKR_CTR (Ukraine Radar) 123.475"},
-    {"callsign": "UKLV_CTR", "radio": "L'viv Radar", "sector": "L'viv Radar (RLV)", "frequency": "134.050", "side": "NB", "note": "GND–FL660, above ALV FL165–FL660; order: UKLV_CTR → UKR_CTR (Ukraine Radar) 123.475"},
-    {"callsign": "EPRZ_TWR", "radio": "Rzeszów Tower", "sector": "Rzeszów Tower (TRZ)", "frequency": "126.800", "side": "EP", "note": "GND–FL145; order: EPRZ_TWR → EPWW_R_CTR 123.625 → EPWW_J_CTR 124.625 → EPWW_CTR 125.450 → EPWW_U_CTR 130.625"},
-    {"callsign": "EPWW_R_CTR", "radio": "Warszawa Radar", "sector": "Warszawa R (RWW)", "frequency": "123.625", "side": "EP", "note": "FL95–FL365, above TRZ FL145–FL335; order: EPWW_R_CTR → EPWW_J_CTR 124.625 → EPWW_CTR 125.450 → EPWW_U_CTR 130.625 → EURE_FSS (Eurocontrol East) 135.300 (Eurocontrol only sectors above FL245)"},
-    {"callsign": "EPWW_Z_CTR", "radio": "Warszawa Radar", "sector": "Warszawa Z (ZWW)", "frequency": "130.875", "side": "EP", "note": "FL95–FL365, above TRZ FL145–FL335; order: EPWW_Z_CTR → EPWW_R_CTR 123.625 → EPWW_J_CTR 124.625 → EPWW_CTR 125.450 → EPWW_U_CTR 130.625 → EURE_FSS (Eurocontrol East) 135.300 (Eurocontrol only sectors above FL245)"},
-    {"callsign": "EPWW_U_CTR", "radio": "Warszawa Radar", "sector": "Warszawa R High", "frequency": "130.625", "side": "EP", "note": "FL365–FL660; order: EPWW_U_CTR → EPWW_R_CTR 123.625 → EPWW_J_CTR 124.625 → EPWW_CTR 125.450 → EURE_FSS (Eurocontrol East) 135.300"},
-    {"callsign": "EPWW_U_CTR", "radio": "Warszawa Radar", "sector": "Warszawa Z High", "frequency": "130.625", "side": "EP", "note": "FL365–FL660; order: EPWW_U_CTR → EPWW_Z_CTR 130.875 → EPWW_R_CTR 123.625 → EPWW_J_CTR 124.625 → EPWW_CTR 125.450 → EURE_FSS (Eurocontrol East) 135.300"},
+    {"callsign": "UKLL_APP", "radio": "L'viv Radar", "sector": "L'viv Approach (ALL)", "frequency": "120.525", "side": "NB", "note": "GND–FL165"},
+    {"callsign": "UKLV_CTR", "radio": "L'viv Radar", "sector": "L'viv Radar (RLV)", "frequency": "134.050", "side": "NB", "note": "GND–FL660, above ALV FL165–FL660"},
+    {"callsign": "EPRZ_TWR", "radio": "Rzeszów Tower", "sector": "Rzeszów Tower (TRZ)", "frequency": "126.800", "side": "EP", "note": "GND–FL145"},
+    {"callsign": "EPWW_R_CTR", "radio": "Warszawa Radar", "sector": "Warszawa R (RWW)", "frequency": "123.625", "side": "EP", "note": "FL95–FL365, above TRZ FL145–FL335"},
+    {"callsign": "EPWW_Z_CTR", "radio": "Warszawa Radar", "sector": "Warszawa Z (ZWW)", "frequency": "130.875", "side": "EP", "note": "FL95–FL365, above TRZ FL145–FL335"},
+    {"callsign": "EPWW_U_CTR", "radio": "Warszawa Radar", "sector": "Warszawa R High", "frequency": "130.625", "side": "EP", "note": "FL365–FL660"},
+    {"callsign": "EPWW_U_CTR", "radio": "Warszawa Radar", "sector": "Warszawa Z High", "frequency": "130.625", "side": "EP", "note": "FL365–FL660"},
     {"callsign": "EPKK_I_APP", "radio": "Kraków Information", "sector": "FIS (VFR)", "frequency": "119.275", "side": "EP", "note": "VFR from Poland to Ukraine, if online"},
     {"callsign": "EPWW_V_CTR", "radio": "Warszawa Information", "sector": "FIS (VFR)", "frequency": "134.875", "side": "EP", "note": "when Kraków Information offline"}
    ],
@@ -484,8 +484,8 @@
    "version": "rev. 2.0, from 19.02.2026 (AIRAC 2602)",
    "pdf": "/files/docs/LOA/LOA EPWW EYVL Vilnius (AIRAC 2602).pdf",
    "positions": [
-    {"callsign": "EYVL_CTR", "radio": "Vilnius Control", "sector": "U, M, L, E (EYVE)", "frequency": "133.305", "side": "NB", "note": "FL095–FL195 (CTA), FL195–FL660 (UTA); order: EYVL_CTR → EYVL_E_CTR 135.380"},
-    {"callsign": "EYVL_E_CTR", "radio": "Vilnius Control", "sector": "U, M, L, E (EYVE)", "frequency": "135.380", "side": "NB", "note": "order: 2 (after EYVL_CTR)"},
+    {"callsign": "EYVL_CTR", "radio": "Vilnius Control", "sector": "U, M, L, E (EYVE)", "frequency": "133.305", "side": "NB", "note": "FL095–FL195 (CTA), FL195–FL660 (UTA)"},
+    {"callsign": "EYVL_E_CTR", "radio": "Vilnius Control", "sector": "U, M, L, E (EYVE)", "frequency": "135.380", "side": "NB", "note": ""},
     {"callsign": "EYVL_CTR", "radio": "Vilnius Control", "sector": "U, M, L (EYVC)", "frequency": "133.305", "side": "NB", "note": "FL095–FL195 (CTA), FL195–FL660 (UTA)"},
     {"callsign": "", "radio": "", "sector": "N LOW (EPWWNL)", "frequency": "", "side": "EP", "note": "FL095–FL335"},
     {"callsign": "", "radio": "", "sector": "N MID (EPWWNM)", "frequency": "", "side": "EP", "note": "FL335–FL365"},
@@ -538,12 +538,12 @@
     {"callsign": "ESMM_8_CTR", "radio": "Sweden Control", "sector": "ESMM 8", "frequency": "128.180", "side": "NB", "note": "west of E016.14.00, GND – FL365"},
     {"callsign": "ESMM_9_CTR", "radio": "Sweden Control", "sector": "ESMM 9", "frequency": "135.985", "side": "NB", "note": "west of E016.14.00, FL365 – UNL"},
     {"callsign": "EPGD_APP", "radio": "Gdańsk Approach", "sector": "Gdańsk Approach (AGD)", "frequency": "127.280", "side": "EP", "note": "UTMA and TMA EPGD, GND – FL285"},
-    {"callsign": "", "radio": "", "sector": "B LOW (BWW)", "frequency": "", "side": "EP", "note": "FL95 – FL365"},
+    {"callsign": "", "radio": "", "sector": "B LOW (BWW)", "frequency": "", "side": "EP", "note": "FL95 – FL335"},
     {"callsign": "", "radio": "", "sector": "B MID (BWW)", "frequency": "", "side": "EP", "note": "FL335 – FL365"},
     {"callsign": "", "radio": "", "sector": "B HIGH (BWW)", "frequency": "", "side": "EP", "note": "FL365 – FL660"},
     {"callsign": "", "radio": "", "sector": "F LOW (FWW)", "frequency": "", "side": "EP", "note": "FL95 – FL335, above AGD FL285 – FL335"},
     {"callsign": "", "radio": "", "sector": "F MID (FWW)", "frequency": "", "side": "EP", "note": "FL335 – FL365"},
-    {"callsign": "", "radio": "", "sector": "F MID (FWW)", "frequency": "", "side": "EP", "note": "FL365 – FL660 (F HIGH range)"}
+    {"callsign": "", "radio": "", "sector": "F HIGH (FWW)", "frequency": "", "side": "EP", "note": "FL365 – FL660"}
    ],
    "transfers": [
     {"dir": "in", "traffic": "ARR EPGD", "cop": "MOTAD", "level": "↓ FL270, crossing COP/abeam FL280B", "from": "", "to": "EPGD APP", "conditions": "or cruise level if lower; transfer of communications to EPGD APP; released to EPGD APP for descent and turns, taking known traffic and active D areas into account"},
