@@ -353,8 +353,7 @@ export default {
           const { ls, more } = parts.get(g.id);
           const id = nm(g.nominal), proc = /_TWR$/.test(g.nominal);
           const title = `${g.tma}${g.id !== g.tma ? ` – part ${id}` : ""} (${g.lo ? flText(g.lo) : "GND"}–${flText(g.hi)})`;
-          const extra = [...(proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : []),
-            ...(g.apps.length > 1 ? [`APP in this part: ${g.apps.map((c) => `${nm(c)} ${d.pos[c]?.frequency || ""}`).join(", ")}`] : [])];
+          const extra = proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : [];
           out.push({ at: g.at, box: g.box, kind: "app", dot: "app", lb: { cls: "app",
             state: g.owners.length ? "on" : "off", id, ls, more, rt: groupTip(g, title, tx(), extra) } });
         });

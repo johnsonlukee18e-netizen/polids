@@ -110,14 +110,18 @@ def test_board_tma_parts(board):
     assert sorted(parts["TMA Warszawa"]) == ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"]
     assert sorted(parts["TMA Kraków"]) == ["EPKK_APP", "EPKK_E_APP"]
     assert sorted(parts["TMA Gdańsk"]) == ["EPGD_APP", "EPGD_L_APP"]
-    # każde APP z pliku ma swoją część albo jest w dymku części (dyrektor)
+    # każde APP z pliku ma swoją część albo należy do części (dyrektor: w jej kolejnościach, online – w "Now:")
     noms = {g["nominal"] for g in board["tma"]}
     assert {"EPPO_N_APP", "EPPO_S_APP", "EPKK_RZ_APP", "EPDE_APP"} <= noms
     assert not noms & {"EPWA_F_APP", "EPKK_KK_APP", "EPKK_KT_APP"}
-    assert "EPWA_F_APP" in tma["TMA Warszawa · EPWA_APP"]["apps"] and "EPKK_KT_APP" in tma["TMA Katowice · EPKK_APP"]["apps"]
+    wa, kt = tma["TMA Warszawa · EPWA_APP"]["chains"], tma["TMA Katowice · EPKK_APP"]["chains"]
+    assert any("EPWA_F_APP" in ch for ch in wa) and any("EPKK_KT_APP" in ch for ch in kt)
+    # bez listy APP części do dymku (runda 15: bez kolejności przejmowania)
+    assert all("apps" not in g for g in board["tma"])
     # TMA proceduralne: wieża lotniska, bez APP
     for key, cs in (("TMA Szczecin", "EPSC_TWR"), ("TMA Lublin", "EPLB_TWR"), ("TMA Olsztyn-Mazury", "EPSY_TWR")):
-        assert tma[key]["nominal"] == cs and tma[key]["apps"] == [] and tma[key]["owners"] == [], key
+        assert tma[key]["nominal"] == cs and tma[key]["owners"] == [], key
+        assert not any(rb.facility(c) in rb.APP_TYPES for ch in tma[key]["chains"] for c in rb._local(ch)), key
     # EPRZ: KK RZ APP, a po APP Krakowa wieża Rzeszów (kolejność z .ese)
     rz = tma["TMA Rzeszów"]
     assert rz["nominal"] == "EPKK_RZ_APP" and rz["icao"] == "EPRZ"
@@ -154,6 +158,21 @@ def test_board_tma_parts_online(client, monkeypatch):
     # za UMMV_CTR w całym stosie to samo, co .ese stawia za nim w UMMV N (RU-WRC_FSS)
     tails = {tuple(t["chain"][t["chain"].index("UMMV_CTR") + 1:]) for t in ummv.values()}
     assert len(tails) == 1 and tails != {()}, tails
+
+
+def test_board_tma_director_online(client, monkeypatch):
+    """Dyrektor online (WA DIR = EPWA_F_APP) jest w "Now:" swojej części TMA (owners), choć nie ma własnej części."""
+    feed = {**FEED, "controllers": [
+        {"callsign": "EPWA_APP", "frequency": "128.805", "name": "WA", "cid": 31},
+        {"callsign": "EPWA_F_APP", "frequency": "129.380", "name": "DIR", "cid": 32}], "atis": []}
+
+    async def other():
+        return feed
+
+    monkeypatch.setattr(vatsim_api, "get_feed", other)
+    tma = {g["id"]: g for g in client.get("/api/radio/board").json()["tma"]}
+    assert set(tma["TMA Warszawa · EPWA_APP"]["owners"]) == {"EPWA_APP", "EPWA_F_APP"}
+    assert tma["TMA Warszawa · EPWA_N_APP"]["owners"] == ["EPWA_APP"]
 
 
 def test_board_atis(board):
@@ -1139,7 +1158,8 @@ const acc = { owner: "EPWW_N_CTR", sectors: [{ id: "LB", nominal: "EPWW_DBT_CTR"
 const tma = (owners, topdown = null) => ({ nominal: "EPWA_S_APP", owners, topdown, chains: [ch] });
 console.log(JSON.stringify({
   acc: radio.accTip(acc, "EPWW N · LOW FL095–FL335", x()),
-  app: radio.groupTip(tma(["EPWA_APP"]), "TMA Radom (FL035–FL095)", x(), ["APP in this part: WA S APP 135.930"]),
+  app: radio.groupTip(tma(["EPWA_APP"]), "TMA Radom (FL035–FL095)", x()),
+  proc: radio.groupTip(tma([]), "TMA Szczecin (GND–FL095)", x(), ["Procedural TMA (no APP): tower frequency SC TWR"]),
   top: radio.groupTip(tma([], "EPWW_N_CTR"), "TMA Radom (FL035–FL095)", x()),
   none: radio.groupTip(tma([]), "TMA Radom (FL035–FL095)", x()),
   nonet: radio.groupTip(tma([]), "TMA Radom (FL035–FL095)", x(false)),
@@ -1166,8 +1186,8 @@ def test_js_preview_tooltips(tmp_path):
     out = json.loads(r.stdout)
     assert out["acc"].split("\n") == ["EPWW N · LOW FL095–FL335", "Now: EPWW_N_CTR 130.675 – Tomasz (CID 11)", "Sectors: LB, LG"]
     pos = "Position: EPWA_S_APP · Warszawa Approach 128.805"
-    assert out["app"].split("\n") == ["TMA Radom (FL035–FL095)", pos, "Now: EPWA_APP 128.805 – Jan (CID 12)",
-                                      "APP in this part: WA S APP 135.930"]
+    assert out["app"].split("\n") == ["TMA Radom (FL035–FL095)", pos, "Now: EPWA_APP 128.805 – Jan (CID 12)"]
+    assert out["proc"].split("\n")[3:] == ["Procedural TMA (no APP): tower frequency SC TWR"]
     assert out["top"].split("\n")[2] == "Now top-down: EPWW_N_CTR 130.675 – Tomasz (CID 11)"
     assert out["none"].split("\n") == ["TMA Radom (FL035–FL095)", pos, "Now: unstaffed"]
     assert out["nonet"].split("\n")[2] == "Now: no data"
@@ -1186,7 +1206,7 @@ def test_radio_page_without_provenance_notes():
         lines = (FRONTEND / "js" / name).read_text("utf-8").splitlines()
         code = "\n".join(re.sub(r"\s//\s.*$", "", ln) for ln in lines if not ln.lstrip().startswith("//"))
         for bad in ("Coverage order", "coverage order", "sector position", "VACS", "VATSpy", ".ese", "sector file",
-                    "om.plvacc", "VATSIM", "PDF extract", "per LOA", "chainText"):
+                    "om.plvacc", "VATSIM", "PDF extract", "per LOA", "chainText", "in this part", "g.apps"):
             assert bad not in code, (name, bad)
 
 

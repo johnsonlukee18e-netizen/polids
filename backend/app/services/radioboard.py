@@ -305,12 +305,10 @@ def tma_groups(slices: list[dict], own: dict) -> list[dict]:
             if owner := part_owner(s["chain"], dirs):
                 parts.setdefault(owner, []).append(s)
         for nominal, psl in parts.items():
-            # wszystkie APP części (z dyrektorem, np. WA DIR w części WA APP), od najczęstszego – do dymku
-            apps = Counter(cs for s in psl for cs in _local(s["chain"]) if facility(cs) in APP_TYPES)
             other = [s for cs, p in parts.items() if cs != nominal for s in p]
             out.append({"id": key if len(parts) == 1 else f"{key} · {nominal}", "tma": key, "icao": icao,
                         "at": part_anchor(psl, other), "box": _box(psl), "nominal": nominal,
-                        "apps": [cs for cs, _ in apps.most_common()], "chains": _uniq_chains(psl),
+                        "chains": _uniq_chains(psl),
                         "lo": min(s["lo"] for s in psl), "hi": max(s["hi"] for s in psl)})
     return sorted(out, key=lambda g: g["id"])
 
