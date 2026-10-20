@@ -268,17 +268,16 @@ export function lvpState(lvp) {
   return { cls: "off", label: "LVP not in force" };
 }
 
-// dymek LVP: progi trzech faz (przygotowanie, wprowadzenie, odwołanie), zakres i źródło w AIP; długie uwagi łamane
-// do ok. 60 znaków (dymek ma white-space: pre)
+// dymek LVP: progi trzech faz (przygotowanie, wprowadzenie, odwołanie), zakres i uwagi; długie uwagi łamane
+// do ok. 60 znaków (dymek ma white-space: pre). 0.12.6: bez źródła progów (paragraf AIP) w dymku
 export function lvpTip(lvp) {
   if (!lvp) return "";
   const wrap = (t) => (t || "").split(" ").reduce((ls, w) => {
     if (ls.length && (ls[ls.length - 1] + " " + w).length <= 60) ls[ls.length - 1] += " " + w; else ls.push(w);
     return ls;
   }, []).join("\n");
-  const src = lvp.source ? `Source: ${lvp.source}` : "";
-  if (lvp.applies === false) return [lvp.reason || "AIP does not provide for LVP", src].filter(Boolean).map(wrap).join("\n");
-  return [...(lvp.rules || []), lvp.scope === "DEP" ? "LVP for departures only" : "", src, lvp.note || ""]
+  if (lvp.applies === false) return wrap(lvp.reason || "No LVP at this aerodrome");
+  return [...(lvp.rules || []), lvp.scope === "DEP" ? "LVP for departures only" : "", lvp.note || ""]
     .filter(Boolean).map(wrap).join("\n");
 }
 
