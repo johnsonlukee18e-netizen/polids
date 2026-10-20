@@ -250,7 +250,21 @@ def test_approach_wind_endpoint(client, fake_meteo):
         assert r29["fix"] == "WA728" and r29["c3000"]["hw"] > 0
 
 
-def test_approach_wind_degrades_without_open_meteo(client, monkeypatch):
+def test_metar_taf_errors_neutral_and_logged(client, monkeypatch, caplog):
+    """METEO › METAR/TAF: w odpowiedzi krótki opis bez adresu serwera, pełny komunikat w logu."""
+    async def down(icaos):
+        raise UpstreamError("https://metar.example.net/metar: [Errno -3] DNS")
+
+    monkeypatch.setattr(meteo, "get_metars", down)
+    monkeypatch.setattr(meteo, "get_tafs", down)
+    for kind in ("metar", "taf"):
+        r = client.get(f"/api/meteo/{kind}", params={"ids": "EPWA"})
+        assert r.status_code == 502 and r.json()["detail"] == f"{kind.upper()} unavailable: [Errno -3] DNS"
+        assert any(m.getMessage() == f"METEO, {kind.upper()}: https://metar.example.net/metar: [Errno -3] DNS"
+                   for m in caplog.records if m.name == "polids.meteo"), kind
+
+
+def test_approach_wind_degrades_without_open_meteo(client, monkeypatch, caplog):
     async def down(url, ttl, params=None, headers=None):
         raise UpstreamError(f"{url}: brak sieci")
 
@@ -263,6 +277,10 @@ def test_approach_wind_degrades_without_open_meteo(client, monkeypatch):
     # komunikaty bez adresu i nazwy serwera
     assert d["model_error"] == "Wind forecast unavailable: brak sieci"
     assert d["metar_error"] == "METAR unavailable: brak sieci"
+    # pełna przyczyna (z adresem) zostaje w logu serwera
+    logged = [r.getMessage() for r in caplog.records if r.name == "polids.meteo"]
+    assert any("metar.vatsim.net: brak sieci" in m for m in logged), logged
+    assert any(m.startswith("WIND EPKK, prognoza: brak sieci") and uw.OPEN_METEO_URL in m for m in logged), logged
     assert d["valid"] is None and d["model_surface"] is None and d["runways"]
     for r in d["runways"]:
         assert r["w3000"] is None and r["c3000"] == {"hw": None, "xw": None} and r["lat"] and r["method"]

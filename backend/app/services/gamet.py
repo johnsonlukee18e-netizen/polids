@@ -11,6 +11,7 @@ Rejony A1–A5 (sektory FIS z 2010 r., granice zmienione 14.04.2026 razem z rejo
 
 import html
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +19,7 @@ import httpx
 
 from .http_cache import UpstreamError, describe, fetch_text, peek
 
+log = logging.getLogger("polids.gamet")
 GAMET_URL = "https://aviation-api.imgw.pl/data/last"
 PARAMS = {"params": "gamet", "format": "json", "count": "1"}
 # zapas: inny projekt zgłaszał HTTP 400 dla parametru count (count=4); bez niego serwer zwraca ostatnie komunikaty
@@ -174,6 +176,7 @@ async def get_gamet(now: datetime | None = None) -> dict:
     try:
         text, params = await _fetch()
     except UpstreamError as exc:
+        log.warning("GAMET: %s", exc)
         return {**base, "areas": {a: area_info(None, now) for a in AREAS},
                 "error": f"GAMET unavailable: {describe(exc)}"}
     hit = peek(GAMET_URL, params)

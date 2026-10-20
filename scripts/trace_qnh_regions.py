@@ -201,9 +201,9 @@ MIL_CTR = {
     "MCTR EPTM": [(2071.3, 1331.3), (2172.5, 1407.5), (2138.8, 1446.3), (2027.5, 1366.3)],
 }
 
-NOTE = ("Region QNH: lowest current aerodrome QNH in the region; the official regional QNH may be lower. Regions 15–17 "
-        "(bands split at 53°N and 51°N): backup values, issued only when the regional QNH forecast fails. Below a TMA/MTMA "
-        "use the QNH of the aerodrome named in its BELOW … QNH FROM caption. For simulation use only.")
+NOTE = ("Regions 15–17 (bands split at 53°N and 51°N): backup values, used only when the QNH of regions 1–14 is not "
+        "available. Below a TMA/MTMA use the QNH of the aerodrome named in its BELOW … QNH FROM caption. For simulation "
+        "use only.")
 UWAGA = ("Plik generuje scripts/trace_qnh_regions.py (opis źródeł w skrypcie): granice rejonów, obszary TMA/MTMA, "
          "CTR/MCTR i FIR poprawiać w skrypcie i uruchomić go ponownie (także po podmianie plików sektorowych: "
          "'sources' = sha256 plików, test_qnh.py przypomni). Rejony: 'airports' = lotniska z METAR-em, QNH rejonu = "

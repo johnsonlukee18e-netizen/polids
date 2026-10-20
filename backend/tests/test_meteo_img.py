@@ -82,6 +82,9 @@ console.log(JSON.stringify({
     const u = "https://x/a.gif?t=1", a = new Date(T), b = new Date(T + 9 * 60000);
     return [m.fetchedAt(u, a).toISOString(), m.fetchedAt(u, b).toISOString(), m.fetchedAt(u + "0", b).toISOString()];
   })(),
+  note: [m.forecastNote({ valid: "2026-10-12T12:00Z", fetched: "12:04Z" }),
+         m.forecastNote({ valid: null, model_error: "Wind forecast unavailable: no connection" }),
+         m.forecastNote({ valid: null }), m.forecastNote(null)],
   tip: m.pointTip({ designator: "29", fix: "WA728", method_label: "FAF", dist_nm: 7, path_ft: 2590,
                     approaches: ["RNP"], rejected: ["XX702: 2.30 NM from THR (< 2.5 NM)"] }),
 }));
@@ -320,3 +323,8 @@ def test_no_provenance_text():
 def test_point_tip_without_rejected_fixes(js):
     """Podpowiedź punktu podejścia: dane punktu (fix, odległość, ścieżka, podejścia) bez opisu odrzuconych punktów."""
     assert js["tip"] == "RWY 29: WA728, FAF, 7.0 NM from THR, 3° path ≈ 2590 ft\nApproaches: RNP"
+
+
+def test_forecast_note_once(js):
+    """WIND: ważność prognozy pod tabelą; przy błędzie pobrania tylko czerwony komunikat, bez drugiego "unavailable"."""
+    assert js["note"] == ["Forecast for 12:00Z 12.10, fetched 12:04Z.", "", "Forecast unavailable.", "Forecast unavailable."]

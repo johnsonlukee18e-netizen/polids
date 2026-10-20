@@ -146,7 +146,7 @@ def test_get_gamet_retries_without_count(fresh, monkeypatch):
     assert [c[2] for c in calls[2:]] == [gamet.PARAMS_NO_COUNT]
 
 
-def test_get_gamet_upstream_down_and_stale(fresh, monkeypatch):
+def test_get_gamet_upstream_down_and_stale(fresh, monkeypatch, caplog):
     async def down(url, ttl, params=None, headers=None):
         raise _status_error(503)
 
@@ -154,6 +154,8 @@ def test_get_gamet_upstream_down_and_stale(fresh, monkeypatch):
     out = asyncio.run(gamet.get_gamet(NOW))
     # komunikat bez adresu i nazwy serwera
     assert out["error"] == "GAMET unavailable: HTTP 503" and out["areas"]["A1"]["text"] is None
+    # pełna przyczyna (z adresem) zostaje w logu serwera
+    assert any(r.name == "polids.gamet" and gamet.GAMET_URL in r.getMessage() for r in caplog.records)
     assert out["fetched_at"] is None and out["source_url"].startswith("https://awiacja.imgw.pl/")
 
     async def old(url, ttl, params=None, headers=None):

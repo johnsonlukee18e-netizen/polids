@@ -19,7 +19,7 @@ const stateTxt = (st, d) => STATE_TXT[st] || d?.states?.[st] || st;
 // kolor CTOT = opóźnienie jak w liście lotów NM: < 15 min, < 30, < 45, ≥ 45
 const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 const RULES = { I: "IFR", V: "VFR", Y: "IFR/V", Z: "VFR/I" };
-const RWY_SRC = { ATIS: "ATIS", SUGGESTED: "system suggestion (no ATIS)", CDM: "assigned (CDM)" };
+const RWY_SRC = { ATIS: "ATIS", SUGGESTED: "system suggestion, no ATIS", CDM: "CDM" };
 const WAKE = { L: "light", M: "medium", H: "heavy", J: "super (A388)" };
 
 const ph = (t) => `<span class="ph">${t}</span>`;

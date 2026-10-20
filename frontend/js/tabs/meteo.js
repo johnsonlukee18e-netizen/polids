@@ -335,6 +335,9 @@ export const hwTxt = (v) => (v === null || v === undefined ? "–" : v < 0 && kt
 export const xwTxt = (v) => (v === null || v === undefined ? "–" : kt(v) === 0 ? "0" : `${kt(v)}${v > 0 ? "R" : "L"}`);
 // "2026-10-06T18:00Z" -> "18:00Z 06.10"
 export const validTxt = (t) => (t ? `${t.slice(11, 16)}Z ${t.slice(8, 10)}.${t.slice(5, 7)}` : "–");
+// uwaga pod tabelą wiatru: ważność prognozy; przy błędzie pobrania tylko komunikat błędu (bez drugiego "unavailable")
+export const forecastNote = (aw) => (aw?.valid ? `Forecast for ${validTxt(aw.valid)}, fetched ${aw.fetched || "–"}.`
+  : aw?.model_error ? "" : "Forecast unavailable.");
 // punkt podejścia bez nazwy: na przedłużeniu osi pasa, w którym ścieżka 3° osiąga 3000 ft
 const CL3 = "CL 3°";
 // odległość od progu zawsze z jedną cyfrą po przecinku ("3.0 NM", nie "3 NM" obok "4.9 NM")
@@ -407,7 +410,7 @@ function windTab(pane) {
       <div class="wnd-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>0 ft model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
       <table class="data wnd-tab"><thead>${thead}</thead><tbody>${rows}</tbody></table>
       ${[aw.model_error, aw.metar_error].filter(Boolean).map((e) => `<p class="error">${esc(e)}</p>`).join("")}
-      <p class="wnd-note">${aw.valid ? `Forecast for ${validTxt(aw.valid)}, fetched ${esc(aw.fetched)}.` : "Forecast unavailable."}</p>
+      ${forecastNote(aw) ? `<p class="wnd-note">${esc(forecastNote(aw))}</p>` : ""}
       ${mode === "3000" ? `<p class="wnd-note">${CL3}: point on the extended centreline where a 3° path reaches 3000 ft.
         Click a RWY to move the map forecast point there.</p>`
         : `<p class="wnd-note">0 ft wind: METAR and 10 m model over the aerodrome reference point; components relative to each RWY heading.</p>`}

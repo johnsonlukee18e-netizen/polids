@@ -571,3 +571,6 @@ def test_strips_no_provenance_text():
     for txt in ("ATOT: actual take-off time.", "CTOT: ATFM slot", "TTOT: target take-off time (A-CDM), no slot.",
                 "CFL field: RFL (requested flight level).", "click: flight details · double-click: map · CFL = RFL<"):
         assert txt in js, txt
+    # źródło pasa w podpowiedzi pola A idzie w nawias ("runway 29 (CDM)"), więc same wartości bez nawiasów
+    rwy_src = re.search(r"const RWY_SRC = \{([^}]*)\}", js).group(1)
+    assert "(" not in rwy_src and ")" not in rwy_src, rwy_src
