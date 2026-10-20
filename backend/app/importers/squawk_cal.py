@@ -26,8 +26,8 @@ i treści, filtr UNIT EP / EP… i wzmianka EUR-E; --generic wymusza ten tryb, -
 
 Wynik: pools [{from, to, count, category, pa, unit, civ_mil, app, assigned_by, ar, destination, via, protection,
 remarks, ver, sheet, row}] posortowane po kategorii i kodzie, meta {source, layout, edition, generated,
-participating_areas, counts…}. Kody specjalne ("special") i opis pliku ("_uwaga") zostają z dotychczasowego
-pliku; notatka "_status" (stara: import oczekuje) znika."""
+participating_areas, counts…}. Kody specjalne ("special": [{code, label}], lista prowadzona ręcznie, np. 0001 LPR)
+i opis pliku ("_uwaga") zostają z dotychczasowego pliku; notatka "_status" (stara: import oczekuje) znika."""
 
 import argparse
 import json
@@ -524,7 +524,8 @@ def dumps(data: dict) -> str:
 
 
 def merge(base: dict, result: dict) -> dict:
-    """Nowa treść pliku: opis i kody specjalne z dotychczasowego pliku, meta i pule z arkusza, bez "_status"."""
+    """Nowa treść pliku: opis i kody specjalne z dotychczasowego pliku (bez zmian, także 0001 spoza arkusza), meta
+    i pule z arkusza, bez "_status"."""
     out = {k: v for k, v in base.items() if k not in ("_status", "meta", "special", "pools")}
     out["meta"] = result["meta"]
     out["special"] = base.get("special") or []
