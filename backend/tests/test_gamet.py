@@ -60,7 +60,7 @@ def test_parse_variants(doc):
 
 
 def test_parse_errors():
-    assert "not JSON" in gamet.parse("<html>502</html>", NOW)["error"]
+    assert gamet.parse("<html>502</html>", NOW)["error"] == "GAMET unavailable: unreadable response"
     assert "no areas" in gamet.parse(json.dumps({"metar": {}}), NOW)["error"]
     out = gamet.parse(json.dumps({"EPWW": {"A1": {"gamets": []}}}), NOW)
     assert out["error"] and set(out["areas"]) == {"A1", "A2", "A3", "A4", "A5"}
@@ -146,13 +146,16 @@ def test_get_gamet_retries_without_count(fresh, monkeypatch):
     assert [c[2] for c in calls[2:]] == [gamet.PARAMS_NO_COUNT]
 
 
-def test_get_gamet_upstream_down_and_stale(fresh, monkeypatch):
+def test_get_gamet_upstream_down_and_stale(fresh, monkeypatch, caplog):
     async def down(url, ttl, params=None, headers=None):
         raise _status_error(503)
 
     monkeypatch.setattr(gamet, "fetch_text", down)
     out = asyncio.run(gamet.get_gamet(NOW))
-    assert out["error"].startswith("IMGW server not responding") and out["areas"]["A1"]["text"] is None
+    # komunikat bez adresu i nazwy serwera
+    assert out["error"] == "GAMET unavailable: HTTP 503" and out["areas"]["A1"]["text"] is None
+    # pełna przyczyna (z adresem) zostaje w logu serwera
+    assert any(r.name == "polids.gamet" and gamet.GAMET_URL in r.getMessage() for r in caplog.records)
     assert out["fetched_at"] is None and out["source_url"].startswith("https://awiacja.imgw.pl/")
 
     async def old(url, ttl, params=None, headers=None):
@@ -176,7 +179,7 @@ def test_gamet_endpoint_never_500(monkeypatch):
     clear_cache()
     with TestClient(main.app) as c:
         r = c.get("/api/meteo/gamet")
-    assert r.status_code == 200 and "not responding" in r.json()["error"]
+    assert r.status_code == 200 and r.json()["error"] == "GAMET unavailable: CONNECT 403"
     assert set(r.json()["areas"]) == {"A1", "A2", "A3", "A4", "A5"}
 
 

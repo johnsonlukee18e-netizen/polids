@@ -557,3 +557,20 @@ def test_strips_css_sharp_edges():
     radii = re.findall(r"border-radius:\s*([^;}]+)", css)
     assert radii and all(r.strip() in ("0", "50%") for r in radii), radii
     assert "text-shadow" not in css and "box-shadow" not in css
+
+
+def test_strips_no_provenance_text():
+    """Issue #21: opisy pól paska i belki bez dopisków, skąd pochodzi wartość (vIFF, VATSIM, plik .ese, EuroScope,
+    baza typów, plan lotu VATSIM, IFPS); same dane, czasy i stany zostają."""
+    for src in (STRIPS_JS.read_text("utf-8"), STRIP_TAB_JS.read_text("utf-8")):
+        code = _code(src)
+        for word in ("vIFF", "VATSIM", ".ese", "EuroScope", "type database", "IFPS)", "deptime", "from the network",
+                     "Flight not in", "not in VATSIM"):
+            assert word not in code, word
+    js = STRIPS_JS.read_text("utf-8")
+    for txt in ("ATOT: actual take-off time.", "CTOT: ATFM slot", "TTOT: target take-off time (A-CDM), no slot.",
+                "CFL field: RFL (requested flight level).", "click: flight details · double-click: map · CFL = RFL<"):
+        assert txt in js, txt
+    # źródło pasa w podpowiedzi pola A idzie w nawias ("runway 29 (CDM)"), więc same wartości bez nawiasów
+    rwy_src = re.search(r"const RWY_SRC = \{([^}]*)\}", js).group(1)
+    assert "(" not in rwy_src and ")" not in rwy_src, rwy_src

@@ -193,6 +193,11 @@ def test_json_valid():
     assert all(len(k) == 4 and k.startswith("EP") and v in qnh.SIDES for k, v in CFG["aero_labels"].items())
     # objaśnienie dla użytkownika po angielsku, bez nazw kluczy JSON (te są w "_uwaga")
     assert CFG["note"] and not re.search(r"'\w+'", CFG["note"]) and not POLISH & set(CFG["note"])
+    # issue #21: bez dopisków, skąd pochodzą wartości i granice (serwis meteo, mapa AIP, pliki sektorowe)
+    assert not re.search(r"IMGW|PANSA|PAŻP|sector file|traced|computed|METAR\)|AIP|lowest|official", CFG["note"]), CFG["note"]
+    code = "\n".join(re.sub(r"(^|\s)//.*$", "", ln) for ln in (FRONT / "js" / "qnhmap.js").read_text("utf-8").splitlines())
+    # ani opisu, jak liczone jest QNH rejonu (najniższe z lotnisk)
+    assert "IMGW" not in code and "lowest" not in code and "band aerodromes" not in code
 
 
 def test_sources_current():
@@ -667,11 +672,12 @@ def test_endpoint_regions_and_tmas(client, monkeypatch):
     assert q["coast"] is None or q["coast"]["type"] == "MultiLineString"
 
 
-def test_endpoint_without_metar(client, monkeypatch):
+def test_endpoint_without_metar(client, monkeypatch, caplog):
     async def down(icaos):
         raise UpstreamError("no network")
 
     monkeypatch.setattr(meteo, "get_metars", down)
     q = client.get("/api/meteo/qnh-regions").json()
-    assert q["error"] == "METAR source unavailable: no network"
+    assert q["error"] == "METAR unavailable: no network"
+    assert any(r.name == "polids.qnh" and "no network" in r.getMessage() for r in caplog.records)
     assert all(r["qnh"] is None for r in q["regions"]) and all(t["qnh"] is None for t in q["tmas"])

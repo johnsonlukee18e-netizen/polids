@@ -19,7 +19,7 @@ const stateTxt = (st, d) => STATE_TXT[st] || d?.states?.[st] || st;
 // kolor CTOT = opóźnienie jak w liście lotów NM: < 15 min, < 30, < 45, ≥ 45
 const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 const RULES = { I: "IFR", V: "VFR", Y: "IFR/V", Z: "VFR/I" };
-const RWY_SRC = { ATIS: "from ATIS", SUGGESTED: "system suggestion (no ATIS)", CDM: "assigned in EuroScope (CDM)" };
+const RWY_SRC = { ATIS: "ATIS", SUGGESTED: "system suggestion, no ATIS", CDM: "CDM" };
 const WAKE = { L: "light", M: "medium", H: "heavy", J: "super (A388)" };
 
 const ph = (t) => `<span class="ph">${t}</span>`;
@@ -32,7 +32,7 @@ const minsTxt = (m) => (!has(m) ? "" : m < 60 ? `${m}'` : `${Math.floor(m / 60)}
 
 function movement(s, d) {
   // lot tylko z vIFF: bez danych VATSIM nie wiadomo, czy pilot jest połączony
-  if (s.planned) return s.planned === "viff" ? (d?.network_error ? "VATSIM ?" : "OFFLINE") : "PREFILE";
+  if (s.planned) return s.planned === "viff" ? (d?.network_error ? "UNKNOWN" : "OFFLINE") : "PREFILE";
   // na ziemi daleko od lotniska: przylot jeszcze na lotnisku odlotu, odlot np. już po przylocie do ADES
   if (s.away) return s.kind === "arr" ? "ON GROUND" : `ON GROUND ${s.dist_nm} NM`; // przylot: odległość jest w 1. komórce
   // w powietrzu: dla przylotu poziom jest w swojej komórce, więc tu prędkość względem ziemi
@@ -59,14 +59,14 @@ function procHint(s, icao) {
   const p = s.proc;
   if (s.rules === "V") return `${kind}: VFR flight, no procedure.`;
   if (!s.runway) return `${kind}: runway in use unknown.`;
-  if (p?.source === "CDM") return `SID assigned in EuroScope (CDM plugin, vIFF: ${s.runway}/${p.name}).`;
-  if (p?.source === "route") return `${kind} ${p.name} filed in the flight plan route; exists for RWY ${s.runway} in the .ese file.`;
-  if (p) return kind === "SID" ? `SID from the .ese file for RWY ${s.runway}: last SID point = first route point (${p.fix}).`
-    : `STAR from the .ese file for RWY ${s.runway}: first STAR point = last route point (${p.fix}).`;
+  if (p?.source === "CDM") return `SID assigned (CDM): ${s.runway}/${p.name}.`;
+  if (p?.source === "route") return `${kind} ${p.name} filed in the flight plan route, RWY ${s.runway}.`;
+  if (p) return kind === "SID" ? `SID for RWY ${s.runway} ending at the first route point (${p.fix}).`
+    : `STAR for RWY ${s.runway} starting at the last route point (${p.fix}).`;
   if (!s.route) return `No ${kind}: no route in the flight plan.`;
   if (!s.proc_fix) return `No ${kind}: the route does not ${kind === "SID" ? "start" : "end"} with a navigation fix.`;
-  return kind === "SID" ? `No SID: no SID for RWY ${s.runway} (${icao}) in the .ese file ends at ${s.proc_fix}.`
-    : `No STAR: no STAR for RWY ${s.runway} (${icao}) in the .ese file starts at ${s.proc_fix}.`;
+  return kind === "SID" ? `No SID: no SID for RWY ${s.runway} (${icao}) ends at ${s.proc_fix}.`
+    : `No STAR: no STAR for RWY ${s.runway} (${icao}) starts at ${s.proc_fix}.`;
 }
 
 // prawe pole (w EFES przycisk SU): najważniejszy czas z vIFF albo minuty do przylotu
@@ -75,18 +75,18 @@ function box(s) {
   const b = (k, val, cls = "", h = "") => `<div data-f="box" class="c-box ${cls}" data-h="${esc(h)}"><span class="k">${k}</span><b>${esc(val)}</b></div>`;
   if (s.kind === "arr") {
     return has(s.eta_min) && s.state === "air"
-      ? b("IN", minsTxt(s.eta_min), "", "Minutes to arrival (distance / ground speed).")
+      ? b("IN", minsTxt(s.eta_min), "", "Minutes to arrival.")
       : `<div data-f="box" class="c-box empty" data-h="Minutes to arrival: aircraft not airborne.">${ph("IN")}</div>`;
   }
   if (s.kind === "local") return `<div data-f="box" class="c-box empty" data-h="Local VFR flight: no slot and no A-CDM."></div>`;
-  if (v.atot) return b("ATOT", v.atot, "", "ATOT: actual take-off time (vIFF).");
+  if (v.atot) return b("ATOT", v.atot, "", "ATOT: actual take-off time.");
   if (v.ctot) {
-    const h = ["CTOT: ATFM slot from vIFF", has(v.delay) && `delay ${v.delay} min`,
+    const h = ["CTOT: ATFM slot", has(v.delay) && `delay ${v.delay} min`,
       v.regulation && `regulation ${v.regulation}`, v.airspace && `airspace ${v.airspace}`].filter(Boolean).join(" · ");
     return b("CTOT", v.ctot, "ctot " + delayClass(v.delay), h);
   }
-  if (v.ttot) return b("TTOT", v.ttot, "", "TTOT: target take-off time from A-CDM (vIFF), no slot.");
-  return `<div data-f="box" class="c-box empty" data-h="No CTOT / TTOT in vIFF.">${ph("CTOT")}</div>`;
+  if (v.ttot) return b("TTOT", v.ttot, "", "TTOT: target take-off time (A-CDM), no slot.");
+  return `<div data-f="box" class="c-box empty" data-h="No CTOT / TTOT.">${ph("CTOT")}</div>`;
 }
 
 function stripHtml(s, d, sel) {
@@ -98,17 +98,17 @@ function stripHtml(s, d, sel) {
   // 1: EOBT / SU-PB (odlot), ETA / CONT (przylot)
   let c1;
   if (s.kind === "arr") {
-    c1 = `<div class="c c-time" data-f="time" data-h="ETA (UTC) = now + distance / ground speed. Below: distance from ${esc(d.icao)}.">
+    c1 = `<div class="c c-time" data-f="time" data-h="ETA (UTC). Below: distance from ${esc(d.icao)}.">
       ${s.eta ? `<b class="t">${esc(s.eta)}</b>` : ph("ETA")}${has(s.dist_nm) ? `<span class="s">${s.dist_nm} NM</span>` : ph("CONT")}</div>`;
   } else {
     const [k2, t2] = v.aobt ? ["AOBT", v.aobt] : v.tsat ? ["TSAT", v.tsat] : v.tobt ? ["TOBT", v.tobt] : [null, null];
-    const h = `EOBT ${s.eobt_source === "vIFF" ? "from vIFF (IFPS)" : s.eobt_source === "FPL" ? "from the VATSIM flight plan (deptime)" : "unknown"}.`
-      + ` SU/PB field: ${k2 ? { AOBT: "AOBT (off-block, vIFF)", TSAT: "TSAT (start-up from A-CDM, vIFF)", TOBT: "TOBT (target off-block, A-CDM)" }[k2] : "no TSAT/AOBT"}.`;
+    const h = `${s.eobt ? "EOBT: estimated off-block time" : "EOBT unknown"}.`
+      + ` SU/PB field: ${k2 ? { AOBT: "AOBT (actual off-block)", TSAT: "TSAT (target start-up approval, A-CDM)", TOBT: "TOBT (target off-block, A-CDM)" }[k2] : "no TSAT/AOBT"}.`;
     c1 = `<div class="c c-time" data-f="time" data-h="${esc(h)}">${s.eobt ? `<b class="t">${esc(s.eobt)}</b>` : ph("EOBT")}
       ${k2 ? `<span class="s"><i>${k2}</i>${esc(t2)}</span>` : ph(local ? "TSTMP" : "SU/PB")}</div>`;
   }
   // 2: TYP + W / ADES (odlot) albo ADEP (przylot); lokalny: ADEP i ADES
-  const wh = s.wake ? `Wake turbulence category ${s.wake} (${WAKE[s.wake] || "?"}) ${s.wake_source === "db" ? "from the type database" : "from the flight plan"}.` : "Wake turbulence category unknown.";
+  const wh = s.wake ? `Wake turbulence category ${s.wake} (${WAKE[s.wake] || "?"}).` : "Wake turbulence category unknown.";
   const type = `<span class="ty">${s.aircraft ? esc(s.aircraft) : ph("TYPE")}${s.wake ? `<i class="w w-${esc(s.wake)}">${esc(s.wake)}</i>` : ""}</span>`;
   const c2 = local
     ? `<div class="c c-type three" data-f="type" data-h="${esc(`ICAO type. ${wh} ADEP = ADES: local flight (circuits).`)}">${type}<span class="s">${t4(s.departure)}</span><span class="s">${t4(s.arrival)}</span></div>`
@@ -119,39 +119,39 @@ function stripHtml(s, d, sel) {
   const c3 = `<div class="c c-cs" data-f="cs" data-h="${esc(statusHint(s, d))}"><span class="cs ${cs.length > 7 ? "long" : ""}">${esc(cs)}</span>
     <span class="st">${chip(s, d)}<span class="mv">${esc(movement(s, d))}</span></span></div>`;
   // 4: A (litera ATIS) / reguły + pas
-  const aH = `A = ATIS letter ${d.icao}${atis ? "" : " (ATIS not on air)"}. Below: flight rules and ${s.kind === "arr" ? "landing" : "departure"} runway${s.runway ? ` ${s.runway}: ${RWY_SRC[s.runway_source] || ""}` : ": unknown"}.`;
+  const aH = `A = ATIS letter ${d.icao}${atis ? "" : " (ATIS not on air)"}. Below: flight rules and ${s.kind === "arr" ? "landing" : "departure"} runway${s.runway ? ` ${s.runway}${RWY_SRC[s.runway_source] ? ` (${RWY_SRC[s.runway_source]})` : ""}` : ": unknown"}.`;
   const c4 = `<div class="c c-a" data-f="a" data-h="${esc(aH)}">${atis ? `<b class="atis">${esc(atis)}</b>` : ph("A")}
     <span class="s">${s.rules ? `<span class="ru ${s.rules === "V" ? "vfr" : ""}">${RULES[s.rules] || esc(s.rules)}</span>` : ""}${s.runway ? `<b class="rw">${esc(s.runway)}</b>` : ph("RWY")}</span></div>`;
   // 5: SID/STAR / CFL + SSR; lokalny: CUR / CFL + SSR
   const air = s.state === "air";
   const cflH = s.kind === "arr"
-    ? `CFL: VATSIM data has no CFL. ${air ? "Showing the current level from the network" : "Aircraft not airborne"}; RFL from the flight plan ${s.rfl_ft ? lvl(s.rfl_ft) : "unknown"}.`
-    : "CFL: VATSIM data has no CFL; showing RFL (cruising level from the flight plan).";
+    ? `CFL field: ${air ? "current level (CUR)" : "aircraft not airborne"}; RFL ${s.rfl_ft ? lvl(s.rfl_ft) : "unknown"}.`
+    : "CFL field: RFL (requested flight level).";
   const ssrH = `SSR: ${s.assigned_squawk ? `assigned code ${s.assigned_squawk}` : "no assigned code, grey = current transponder"}${s.squawk && s.squawk !== s.assigned_squawk ? ` (transponder ${s.squawk})` : ""}.`;
   const level = s.kind === "arr"
     ? (air ? `<span class="cur"><i>CUR</i>${lvl(s.altitude)}</span>` : ph("CFL"))
     : (s.rfl_ft ? lvl(s.rfl_ft) : ph("CFL"));
   const low = `<span class="s"><span class="cfl" data-f="cfl" data-h="${esc(cflH)}">${level}</span><span data-f="ssr" data-h="${esc(ssrH)}">${ssr(s)}</span></span>`;
   const top = local
-    ? `<span class="pr" data-f="prv" data-h="Current altitude / level from the VATSIM network (previous level not tracked).">${ph("PRV")}${air ? `<span class="cur"><i>CUR</i>${lvl(s.altitude)}</span>` : ph("CUR")}</span>`
+    ? `<span class="pr" data-f="prv" data-h="CUR: current altitude / level.">${ph("PRV")}${air ? `<span class="cur"><i>CUR</i>${lvl(s.altitude)}</span>` : ph("CUR")}</span>`
     : s.proc ? `<b class="proc" data-f="proc" data-h="${esc(procHint(s, d.icao))}">${esc(s.proc.name)}</b>` : `<span data-f="proc" data-h="${esc(procHint(s, d.icao))}">${ph(s.kind === "arr" ? "STAR" : "SID")}</span>`;
   const c5 = `<div class="c c-proc">${top}${low}</div>`;
-  const c6 = `<div class="c c-taxi" data-f="taxi" data-h="TAXI / GATE: taxi route and stand are not in VATSIM network data.">${ph("TAXI")}${ph("GATE")}</div>`;
+  const c6 = `<div class="c c-taxi" data-f="taxi" data-h="TAXI / GATE: taxi route and stand (not available).">${ph("TAXI")}${ph("GATE")}</div>`;
   // FREETEXT: trasa (i krótkie uwagi)
   const rmk = s.remarks && s.remarks.length <= 32 ? s.remarks : "";
   const free = [s.route, rmk].filter(Boolean).map(esc).join(" · ") || ph("FREETEXT");
-  const lp = local ? `<span class="lp" data-f="lp" data-h="Low pass (LP) and touch-and-go (TG) counters: not in VATSIM data.">LP:__ | TG:__ |</span>` : "";
+  const lp = local ? `<span class="lp" data-f="lp" data-h="Low pass (LP) and touch-and-go (TG) counters (not available).">LP:__ | TG:__ |</span>` : "";
   return `<div class="${cls}" data-k="${esc(s.kind + ":" + cs)}" tabindex="0" role="button" aria-expanded="${sel}">
     <div class="s-top">${c1}${c2}${c3}${c4}${c5}${c6}${box(s)}</div>
-    <div class="s-free" data-f="free" data-h="Route from the flight plan${rmk ? " and remarks" : ""}.">${lp}<span class="ft">${free}</span></div></div>`;
+    <div class="s-free" data-f="free" data-h="Flight plan route${rmk ? " and remarks" : ""}.">${lp}<span class="ft">${free}</span></div></div>`;
 }
 
 // opis pola CALLSIGN / STATUS (także wiersz STATUS w oknie lotu)
 function statusHint(s, d) {
   const v = s.viff || {};
   const away = s.away ? ` Aircraft on ground ${s.dist_nm} NM from ${d.icao}: ${s.kind === "arr" ? "still at the departure aerodrome" : "away from the departure aerodrome (e.g. already arrived)"}.` : "";
-  const net = s.planned === "viff" && d.network_error ? " No VATSIM data: unknown whether the pilot is connected." : "";
-  return `${s.viff ? stateTxt(v.state, d) + ". " : "Flight not in vIFF. "}Movement: ${movement(s, d)}${s.groundspeed ? `, GS ${s.groundspeed} kt` : ""}.${away}${net}`;
+  const net = s.planned === "viff" && d.network_error ? " No network data: unknown whether the pilot is connected." : "";
+  return `${s.viff ? stateTxt(v.state, d) + ". " : ""}Movement: ${movement(s, d)}${s.groundspeed ? `, GS ${s.groundspeed} kt` : ""}.${away}${net}`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -414,7 +414,7 @@ export function restoreFocus(spot, root) {
 
 const BAYS = [
   { key: "departures", cls: "dep main", title: "Departures", sub: "on ground by TSAT / CTOT / EOBT, then airborne", empty: "No departures" },
-  { key: "planned", cls: "plan side", title: "Planned", sub: "prefiles and vIFF flights not connected", empty: "No planned flights" },
+  { key: "planned", cls: "plan side", title: "Planned", sub: "prefiles and filed flights not connected", empty: "No planned flights" },
   { key: "arrivals", cls: "arr main", title: "Arrivals", sub: "by ETA", empty: "No arrivals" },
   { key: "local", cls: "loc side", title: "Local", sub: "ADEP = ADES (circuits)", empty: "No local flights" },
 ];
@@ -471,11 +471,11 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
       <span class="kv" title="Landing runway in use (${esc(src)})"><i>ARR</i><b class="arr">${esc(u.arr || "–")}</b></span>
       ${u.source === "ATIS" ? "" : `<span class="kv sugg">system suggestion, no runway from ATIS</span>`}
       <span class="kv"><i>ATIS</i><b>${esc(d.atis?.letter || "–")}</b></span>
-      <span class="kv" title="A-CDM: TOBT, TSAT, TTOT from vIFF${d.viff_error ? " (vIFF unavailable: unknown)" : ""}"><i>A-CDM</i>${d.viff_error ? "?" : d.cdm ? "yes" : "no"}</span>
-      ${noProc ? `<span class="kv sugg">no SID/STAR for ${esc(d.icao)} in the .ese file</span>` : ""}
+      <span class="kv" title="A-CDM: TOBT, TSAT, TTOT${d.viff_error ? " (no data: unknown)" : ""}"><i>A-CDM</i>${d.viff_error ? "?" : d.cdm ? "yes" : "no"}</span>
+      ${noProc ? `<span class="kv sugg">no SID/STAR for ${esc(d.icao)}</span>` : ""}
       <span class="sx-legend"><span><s class="lg dep"></s>departure ${n("departures")}</span><span><s class="lg arr"></s>arrival ${n("arrivals")}</span>
         <span><s class="lg loc"></s>local ${n("local")}</span><span><s class="lg plan"></s>planned ${n("planned")}</span></span>
-      <span class="hint sx-note">click: flight details · double-click: map · CFL = RFL · SID/STAR from .ese</span>
+      <span class="hint sx-note">click: flight details · double-click: map · CFL = RFL</span>
       ${errs.length ? `<span class="error">${errs.map(esc).join(" · ")}</span>` : ""}`;
   };
 
@@ -553,7 +553,7 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
       sec.classList.toggle("empty", !list.length);
       sec.querySelector(".n").textContent = list.length;
       // bez danych VATSIM pusta zatoka nie znaczy "brak ruchu" (PLANOWANE mają jeszcze loty z vIFF)
-      const empty = d.network_error && b.key !== "planned" ? "No VATSIM network data (see the error above)" : b.empty;
+      const empty = d.network_error && b.key !== "planned" ? "No network data (see the error above)" : b.empty;
       sec.querySelector(".sx-list").innerHTML = bayList(b.key, list, d, open?.key) || `<div class="hint sx-empty">${empty}</div>`;
     });
     // okno lotu: nowe dane tego samego lotu albo zamknięcie, gdy lotu już nie ma

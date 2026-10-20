@@ -2,6 +2,7 @@
 na jedno pobranie (lock per klucz)."""
 
 import asyncio
+import re
 import time
 
 import httpx
@@ -15,6 +16,25 @@ MAX_ENTRIES = 1000
 
 class UpstreamError(Exception):
     pass
+
+
+def describe(exc: BaseException) -> str:
+    """Krótki opis błędu pobierania do interfejsu, bez adresu i nazwy serwera (komunikat UpstreamError z fetch_text
+    zaczyna się od adresu): brak odpowiedzi, kod HTTP, brak połączenia albo pierwsza linia komunikatu bez adresów."""
+    cause = exc.__cause__ if isinstance(exc, UpstreamError) and exc.__cause__ is not None else exc
+    if isinstance(cause, httpx.TimeoutException):
+        return "no response (timeout)"
+    if isinstance(cause, httpx.HTTPStatusError):
+        return f"HTTP {cause.response.status_code}"
+    if isinstance(cause, httpx.ConnectError):
+        return "no connection"
+    if isinstance(cause, (httpx.NetworkError, httpx.ProtocolError)):
+        return "connection interrupted"
+    msg = str(exc).strip().split("\n")[0]
+    # "<adres albo host>: <komunikat>" -> sam komunikat
+    msg = re.sub(r"^(?:[a-z][a-z0-9+.-]*://)?[^\s:/]*\.[^\s:]*:\s*", "", msg, flags=re.I)
+    msg = re.sub(r"\s+", " ", re.sub(r"'?https?://\S+", "", msg)).strip(" :")
+    return (msg[:79].rstrip() + "…" if len(msg) > 80 else msg) or "error"
 
 
 def _prune():
