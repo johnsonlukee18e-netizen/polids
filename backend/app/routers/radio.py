@@ -19,7 +19,7 @@ from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
 from ..services.positions import all_positions
 from ..services.radio import (Station, neighbour_tab, position_range, radio_names, sector_group, sector_kind,
                               seed_json)
-from ..services.vatsim import bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
+from ..services.vatsim import BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
@@ -123,7 +123,7 @@ async def bookings(db: Session = Depends(get_db)):
         data = await vatsim_api.get_bookings()
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: rezerwacje niedostępne (%s)", exc)
-        raise HTTPException(502, "Bookings unavailable") from exc
+        raise HTTPException(502, BOOKINGS_DOWN) from exc
     known = {p["callsign"] for p in all_positions(db)}
     result = {cs: b for cs, b in bookings_by_callsign(data).items() if cs in known or cs.startswith("EP")}
     try:

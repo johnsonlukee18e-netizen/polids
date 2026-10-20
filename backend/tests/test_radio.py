@@ -141,7 +141,7 @@ def test_radio_online_upstream_error(client, monkeypatch):
 
     monkeypatch.setattr(vatsim_api, "get_bookings", no_bookings)
     r = client.get("/api/radio/bookings")
-    assert r.status_code == 502 and r.json()["detail"] == "Bookings unavailable"
+    assert r.status_code == 502 and r.json()["detail"] == "ATC bookings unavailable"
 
 
 def test_radio_bookings_only_known_positions(client):
