@@ -74,7 +74,7 @@ export default {
     const pane = h(`<div class="pane fill sytop-pane">
       <div class="sytop-head">
         <h2 class="title">SYT OP – active NOTAMs FIR EPWW</h2>
-        <span class="hint sytop-src" title="PL vACC NOTAM server (cv.plvacc.pl): FIR EPWW and the main aerodromes">source: PL vACC · refresh every 10 min</span>
+        <span class="hint sytop-note" title="FIR EPWW and the main aerodromes">refresh every 10 min</span>
         <span class="sytop-gap"></span>
         <span class="hint sytop-upd"></span>
         <button class="btn sytop-refresh" title="Fetch the list again">REFRESH</button>
@@ -159,7 +159,7 @@ export default {
       const scroll = list.scrollTop;
       if (!all.length) {
         list.innerHTML = down
-          ? `<div class="error sytop-empty">The PL vACC NOTAM server does not respond – no data from any location.
+          ? `<div class="error sytop-empty">No NOTAM data – no location responded.
               <div class="sytop-why">${failedHtml(data.failed)}</div><div class="hint">Next attempt in 2 min, or press REFRESH.</div></div>`
           : `<div class="hint sytop-empty">No NOTAMs in force now in FIR EPWW${data.failed.length ? " (excluding the locations that did not respond)" : ""}.</div>`;
         return;
@@ -199,12 +199,12 @@ export default {
       upd.textContent = !data ? "" : down ? `attempt ${hm(data.now)} · no data`
         : `Updated ${at}${error ? " · refresh failed" : ""}`;
       upd.title = !data ? "" : error ? `Last refresh attempt: ${error}`
-        : down ? "UTC time of the last attempt – the PL vACC NOTAM server did not respond"
-          : `UTC time the NOTAMs were fetched from the PL vACC server (oldest data on the list); checked ${hm(data.now)}`;
+        : down ? "UTC time of the last attempt – no data received"
+          : `UTC time of the NOTAM data (oldest on the list); checked ${hm(data.now)}`;
       const parts = [];
       if (data && error) parts.push(`List from ${at} – could not refresh it: ${esc(error)}`);
       if (data?.failed.length && !down) parts.push(`No data from: ${failedHtml(data.failed)}. The list is without these locations.`);
-      if (stale.length && !down) parts.push(`NOTAM server does not respond – older data on the list: ${staleHtml(stale)}.`);
+      if (stale.length && !down) parts.push(`Not refreshed – older data on the list: ${staleHtml(stale)}.`);
       msg.innerHTML = parts.map((p) => `<div>${p}</div>`).join("");
     };
 
@@ -219,7 +219,7 @@ export default {
         const d = await api("/api/notam/fir/EPWW");
         if (my !== seq) return;
         // nic nie odpowiedziało, a mamy wcześniejszą listę: zostaje ona, z ostrzeżeniem (lepsze starsze dane niż nic)
-        if (allDown(d) && data && !allDown(data)) error = d.error || "NOTAM server does not respond";
+        if (allDown(d) && data && !allDown(data)) error = d.error || "no data";
         else { data = d; error = ""; }
         nextAt = Date.now() + (d.failed.length || d.stale?.length ? RETRY_MS : REFRESH_MS);
       } catch (e) {

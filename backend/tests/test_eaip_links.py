@@ -364,9 +364,13 @@ def test_aerodrome_page_url_matches_frontend():
 
 
 def test_chart_kind():
+    # 0.12.6: mapa lotniska (ADC) i mapy postojowe (APDC) osobno
     kinds = {
-        "AERODROME CHART - ICAO": "AD", "AERODROME CHART AREAS OF RESPONSIBILITY": "AD",
-        "AIRCRAFT PARKING/DOCKING CHART - ICAO": "AD", "AERODROME GROUND MOVEMENT CHART - ICAO": "AD",
+        "AERODROME CHART - ICAO": "ADC", "AERODROME CHART AREAS OF RESPONSIBILITY": "ADC",
+        "AIRCRAFT PARKING/DOCKING CHART - ICAO": "APDC", "AERODROME GROUND MOVEMENT CHART - ICAO": "ADC",
+        "AIRCRAFT PARKING, DOCKING CHART - ICAO (APN 10)": "APDC", "AIRCRAFT PARKING CHART - ICAO (TWY E2)": "APDC",
+        "VFR ARRIVAL AND DEPARTURE ROUTES": "VFR", "BIRD CONCENTRATIONS": "OTHER",
+        "AREA CHART ICAO - ARRIVAL AND TRANSIT ROUTES (TMA ŁÓDŹ)": "OTHER",
         "AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 06, RWY 24)": "OBST",
         "PRECISION APPROACH TERRAIN CHART - ICAO RWY 33": "OBST",
         "STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO RWY 29": "SID",
@@ -374,7 +378,7 @@ def test_chart_kind():
         "STANDARD ARRIVAL CHART INSTRUMENT (STAR) - ICAO (RWY 06, RWY 24)": "STAR",
         "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24 (CAT A/B/C/D)": "IAC",
         "VISUAL APPROACH CHART - ICAO": "VFR", "VISUAL OPERATION CHART": "VFR",
-        "ATC SURVEILLANCE MINIMUM ALTITUDE CHART - ICAO": "OTHER", "BIRD CONCENTRATION": "OTHER",
+        "ATC SURVEILLANCE MINIMUM ALTITUDE CHART - ICAO": "OTHER", "BIRD CONCENTRATION": "OTHER", "HOT SPOT": "ADC",
     }
     assert {t: eaip.chart_kind(t) for t in kinds} == kinds
     assert eaip.chart_kind("instrument approach chart") == "IAC"
@@ -384,15 +388,18 @@ def test_parse_charts():
     charts = eaip.parse_charts(ZG_HTML, ZG_PAGE, "epzg")
     # tylko PDF-y map tego lotniska (http/https), w kolejności strony, bez powtórzeń adresu (spacja i %20 to ten sam)
     assert [c["id"] for c in charts] == ["2-1", "6-1", "13-1", "12-1"]
-    assert charts[0] == {"id": "2-1", "page": "AD 2 EPZG 2-1", "title": "AERODROME CHART - ICAO", "kind": "AD",
-                         "url": DOCS + "02/AD_2_EPZG_2-1.pdf"}
+    # 0.12.6: title = krótka nazwa, full = pełny tytuł (bez przedrostka "EPZG - ")
+    assert charts[0] == {"id": "2-1", "page": "AD 2 EPZG 2-1", "title": "AERODROME", "full": "AERODROME CHART - ICAO",
+                         "kind": "ADC", "url": DOCS + "02/AD_2_EPZG_2-1.pdf"}
     # cudzysłów i encje HTML z tytułu, 06-1 → 6-1 (adres pliku bez zmian)
-    assert charts[1]["title"] == "AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 06, RWY 24) & more"
+    assert charts[1]["full"] == "AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 06, RWY 24) & more"
     assert charts[1]["kind"] == "OBST" and charts[1]["url"] == DOCS + "06/AD_2_EPZG_06-1.pdf"
     # pusta komórka tytułu: numer strony; adres bezwzględny z ?v zostaje
-    assert charts[2]["title"] == "AD 2 EPZG 13-1" and charts[2]["url"] == "https://docs.pansa.pl/x/AD_2_EPZG_13-1.pdf?v=2"
+    assert charts[2]["title"] == charts[2]["full"] == "AD 2 EPZG 13-1"
+    assert charts[2]["url"] == "https://docs.pansa.pl/x/AD_2_EPZG_13-1.pdf?v=2"
     # odnośnik poza tabelą: tytuł z tekstu odnośnika
-    assert charts[3]["title"] == "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24" and charts[3]["kind"] == "IAC"
+    assert charts[3]["full"] == "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24" and charts[3]["kind"] == "IAC"
+    assert charts[3]["title"] == "RWY 24 ILS Z"
     assert all(" " not in c["url"] for c in charts)
     assert eaip.parse_charts("<html><p>AD 2.24 Nil</p></html>", ZG_PAGE, "EPZG") == []
 
@@ -438,9 +445,9 @@ def test_aerodrome_charts_single_flight(ad2):
     assert a == b and len(a["charts"]) == 4 and len(ad2["seen"]) == 1
 
 
+# 0.12.6: komunikaty bez nazwy serwera (lista map pokazuje "Chart list unavailable: <opis>.")
 @pytest.mark.parametrize("status, error", [
-    (404, "eAIP server: HTTP 404"), ("down", "cannot connect to the eAIP server"),
-    ("slow", "no response from the eAIP server (timeout)"),
+    (404, "HTTP 404"), ("down", "no connection"), ("slow", "no response (timeout)"),
 ])
 def test_aerodrome_charts_errors(ad2, status, error):
     ad2["status"] = status
@@ -453,12 +460,12 @@ def test_aerodrome_charts_errors(ad2, status, error):
 
 def test_aerodrome_charts_no_charts_and_size_cap(ad2, monkeypatch):
     ad2["html"] = "<html><h3>EPZG AD 2.24</h3><p>Nil</p></html>"
-    assert asyncio.run(eaip.aerodrome_charts("EPZG"))["error"] == "no charts found in AD 2.24 of the eAIP page"
+    assert asyncio.run(eaip.aerodrome_charts("EPZG"))["error"] == "no charts found"
     eaip.reset_charts()
     ad2["html"] = ZG_HTML
     monkeypatch.setattr(eaip, "CHARTS_MAX_BYTES", 100)
     out = asyncio.run(eaip.aerodrome_charts("EPZG"))
-    assert out["charts"] == [] and out["error"] == "eAIP page could not be read (page larger than 0 MB)"
+    assert out["charts"] == [] and out["error"] == "page could not be read (page larger than 0 MB)"
 
 
 def test_charts_endpoint(monkeypatch):
@@ -497,7 +504,7 @@ VARIANT_HTML = """<html><body><table>
 <tr><td><a href="AD_2_EPWA_12-2.pdf"></a></td></tr>
 <tr><td>VISUAL APPROACH CHART - ICAO</td><td><table><tr><td><a href="AD_2_EPWA_13-1.pdf"></a></td></tr></table></td></tr>
 <tr><td>AIRCRAFT PARKING/DOCKING CHART - ICAO<td><a href="AD_2_EPWA_5-1.pdf"></a>
-<tr><td></td><td><a href="AD_2_EPWA_6-1.pdf" title="BIRD CONCENTRATION CHART"></a></td></tr>
+<tr><td></td><td><a href="AD_2_EPWA_14-1.pdf" title="BIRD CONCENTRATION CHART"></a></td></tr>
 <tr><td></td><td><a href="AD_2_EPWA_7-1.pdf"><img src="p.gif" alt="AERODROME OBSTACLE CHART - ICAO TYPE A"></a></td></tr>
 </table></body></html>"""
 
@@ -506,17 +513,18 @@ def test_parse_charts_real_eaip_variants():
     # <br>/<p> rozdzielają słowa, <del> (skreślone w poprawce) pomijamy, rowspan i tabela w komórce, brak </td>/</tr>,
     # tytuł z title odnośnika albo alt obrazka
     page = "https://docs.pansa.pl/ais/eaipifr/X/eAIP/AD%202%20EPWA%201-en-GB.html"
-    got = {c["id"]: (c["title"], c["kind"]) for c in eaip.parse_charts(VARIANT_HTML, page, "EPWA")}
+    got = {c["id"]: (c["full"], c["title"], c["kind"]) for c in eaip.parse_charts(VARIANT_HTML, page, "EPWA")}
     assert got == {
-        "3-1": ("AERODROME GROUND MOVEMENT CHART - ICAO", "AD"),
-        "4-1": ("STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO RWY 29", "SID"),
-        "2-1": ("AERODROME CHART - ICAO", "AD"),
-        "12-1": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "IAC"),
-        "12-2": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "IAC"),
-        "13-1": ("VISUAL APPROACH CHART - ICAO", "VFR"),
-        "5-1": ("AIRCRAFT PARKING/DOCKING CHART - ICAO", "AD"),
-        "6-1": ("BIRD CONCENTRATION CHART", "OTHER"),
-        "7-1": ("AERODROME OBSTACLE CHART - ICAO TYPE A", "OBST"),
+        "3-1": ("AERODROME GROUND MOVEMENT CHART - ICAO", "GROUND MOVEMENT", "ADC"),
+        "4-1": ("STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO RWY 29", "RWY 29 SID", "SID"),
+        "2-1": ("AERODROME CHART - ICAO", "AERODROME", "ADC"),
+        # wspólny tytuł (rowspan) dwóch PDF-ów: krótkie nazwy rozróżnione numerem
+        "12-1": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "RWY 33 IAC (1/2)", "IAC"),
+        "12-2": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "RWY 33 IAC (2/2)", "IAC"),
+        "13-1": ("VISUAL APPROACH CHART - ICAO", "VISUAL APPROACH", "VFR"),
+        "5-1": ("AIRCRAFT PARKING/DOCKING CHART - ICAO", "PARKING", "APDC"),
+        "14-1": ("BIRD CONCENTRATION CHART", "BIRD CONCENTRATION", "OTHER"),
+        "7-1": ("AERODROME OBSTACLE CHART - ICAO TYPE A", "OBSTACLE TYPE A", "OBST"),
     }
 
 
@@ -526,7 +534,7 @@ ZG = "../documents/Root_WePub/AIP IFR/AD/EPZG/{n:02d}/AD_2_EPZG_{n:02d}-1.pdf"
 
 
 def _ids(html, icao="EPZG"):
-    return [(c["id"], c["title"]) for c in eaip.parse_charts(html, ZG_PAGE, icao)]
+    return [(c["id"], c["full"]) for c in eaip.parse_charts(html, ZG_PAGE, icao)]
 
 
 def test_parse_charts_unclosed_link_then_img_alt_in_later_row():
@@ -597,6 +605,10 @@ def _soup(rnd, n):
     return "".join(out)
 
 
+def _no_short(c):
+    return {k: v for k, v in c.items() if k != "title"}
+
+
 def test_parse_charts_fuzz_never_raises():
     """Losowe zbitki znaczników (wiele ziaren): parse_charts nie rzuca wyjątku i daje poprawne wpisy; dobrze zbudowane
     strony z dopisaną na końcu zbitką mają te same mapy co bez niej (zbitka używa innych numerów stron)."""
@@ -612,10 +624,11 @@ def test_parse_charts_fuzz_never_raises():
         urls = [c["url"] for c in charts]
         assert len(urls) == len(set(urls)), (seed, soup)
         for c in charts:
-            assert set(c) == {"id", "page", "title", "kind", "url"} and re.fullmatch(r"\d+-\d+", c["id"]), (seed, soup)
-            assert c["title"] and c["url"].startswith("https://") and " " not in c["url"], (seed, soup)
+            assert set(c) == {"id", "page", "title", "full", "kind", "url"} and re.fullmatch(r"\d+-\d+", c["id"]), (seed, soup)
+            assert c["title"] and c["full"] and c["url"].startswith("https://") and " " not in c["url"], (seed, soup)
         # dobrze zbudowana strona + zbitka (z numerami stron 90+): mapy strony bez zmian, w tej samej kolejności
+        # (krótka nazwa zależy od całej listy: mapa ze zbitki o tej samej nazwie dodaje "(1/2)", więc bez "title")
         for name, (html, icao, want) in good.items():
             tail = soup.replace("AD_2_EPZG_", f"AD_2_{icao}_9").replace("AD_2_EPWA_", f"AD_2_{icao}_9")
-            got = [c for c in eaip.parse_charts(html + tail, page, icao) if not c["id"].startswith("9")]
-            assert got == [c for c in want if not c["id"].startswith("9")], (name, seed, soup)
+            got = [_no_short(c) for c in eaip.parse_charts(html + tail, page, icao) if not c["id"].startswith("9")]
+            assert got == [_no_short(c) for c in want if not c["id"].startswith("9")], (name, seed, soup)
