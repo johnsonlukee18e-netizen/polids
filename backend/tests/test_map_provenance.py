@@ -40,6 +40,11 @@ def test_airspace_tooltip_without_takeover_order():
     assert "since ${hhmm(x.logon_time)}" in who and "top-down:" in who and "unstaffed" in who
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "map.css").read_text("utf-8"), flags=re.S)
     assert ".as-ch" not in css and ".asc" not in css and "as-chr" not in css
+    # przegląd: stałe max-width 640 px (dla dawnego wiersza kolejności) ucinało "since HH:MMZ" za ramką dymka;
+    # teraz najwyżej szerokość mapy, a na wąskiej mapie zawija się ostatnia kolumna
+    tip = re.search(r"\.leaflet-tooltip\.atc-tip\.as-tip \{([^}]*)\}", css).group(1)
+    assert "max-width: calc(100% - 8px)" in tip and "640px" not in tip
+    assert ".as-tip td:last-child { white-space: normal; }" in css
     # dawny rysunek sektorów z dopisywaną kolejnością (drawSectors, sectorOwners) usunięty z airspace.js
     air = _code("js/airspace.js")
     for gone in ("drawSectors", "sectorOwners", "vacsShort", "chain = false"):

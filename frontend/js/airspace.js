@@ -193,14 +193,39 @@ export function aircraftMarker(p, { cls = "" } = {}) {
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [14, 14], iconAnchor: [7, 7] }) });
 }
 
+// Odstęp okienka etykiety od środka samolotu (px). Cały odstęp daje przesunięcie dymka: map.css zeruje margines,
+// który Leaflet dodaje dymkom z boku (6 px), inaczej okienko przy brzegu mapy wystawało poza nią.
+export const AC_LABEL_GAP = 16;
+
 // Miejsce okienka etykiety obok samolotu, w pikselach kontenera mapy: (x, y) samolot, w × h okienko, W × H mapa.
 // Z prawej, a gdy tam się nie mieści, z lewej (gdy z żadnej strony, tam, gdzie więcej miejsca); w pionie środkiem na
-// wysokości samolotu, przesunięte w granice mapy (m = margines). Wynik dla dymka Leafleta: kierunek i przesunięcie.
-export function acLabelSpot(x, y, w, h, W, H, { gap = 10, m = 4 } = {}) {
-  const fitR = x + gap + w <= W - m, fitL = x - gap - w >= m;
-  const right = fitR || (!fitL && W - x >= x);
-  const top = Math.max(m, Math.min(y - h / 2, H - m - h));
-  return { dir: right ? "right" : "left", off: [right ? gap : -gap, Math.round(top - (y - h / 2))] };
+// wysokości samolotu, przesunięte w granice mapy (m = margines). obst: nakładki na mapie [lewo, góra, prawo, dół]
+// (panel lotu, wykres TV, przyciski): strona z nakładką na wysokości samolotu odpada, a nakładka nad albo pod
+// samolotem przesuwa okienko w pionie; gdy obie strony zasłonięte, jak bez nakładek. Wynik dla dymka Leafleta:
+// kierunek i przesunięcie.
+export function acLabelSpot(x, y, w, h, W, H, { gap = AC_LABEL_GAP, m = 4, obst = [] } = {}) {
+  const want = y - h / 2;
+  // góra okienka z danej strony albo null, gdy tam się nie mieści
+  const side = (right, os) => {
+    const l = right ? x + gap : x - gap - w, r = l + w;
+    if (l < m || r > W - m) return null;
+    let lo = m, hi = H - m - h;
+    for (const [ol, ot, or, ob] of os) {
+      if (or <= l || ol >= r) continue;
+      if (ot >= y) hi = Math.min(hi, ot - m - h);
+      else if (ob <= y) lo = Math.max(lo, ob + m);
+      else return null;
+    }
+    return lo <= hi ? Math.max(lo, Math.min(want, hi)) : null;
+  };
+  const pick = (os) => {
+    const r = side(true, os);
+    if (r !== null) return [true, r];
+    const l = side(false, os);
+    return l === null ? null : [false, l];
+  };
+  const [right, top] = pick(obst) || pick([]) || [W - x >= x, Math.max(m, Math.min(want, H - m - h))];
+  return { dir: right ? "right" : "left", off: [right ? gap : -gap, Math.round(top - want)] };
 }
 
 // Wznoszenie / zniżanie (MAP, loty krajowe): p.vs = zmiana wysokości od odczytu sprzed co najmniej minAge ms.

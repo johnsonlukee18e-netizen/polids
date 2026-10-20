@@ -1,6 +1,6 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, loadRatio, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
-import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, acLabelSpot, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates,
+import { AC_LABEL_GAP, FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, acLabelSpot, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates,
   colorFor, controllerRows, drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
@@ -622,7 +622,8 @@ function mainMap(ctx) {
   // nakładki zmienione bez ruchu mapy (wykres TV, panel lotu, nazwy lotnisk): etykiety od nowa przed następną klatką,
   // raz na klatkę (inaczej zostają pod nakładką do najbliższego odświeżenia plakietek i wtedy same skaczą)
   let relabelAt = 0;
-  const relabel = () => { relabelAt ||= requestAnimationFrame(() => { relabelAt = 0; declutter(); }); };
+  // okienka etykiet samolotów też (placeLabels niżej; mainMap jest synchroniczne, więc przed klatką już istnieje)
+  const relabel = () => { relabelAt ||= requestAnimationFrame(() => { relabelAt = 0; declutter(); placeLabels(); }); };
   const area = (bb) => (bb[2] - bb[0]) * (bb[3] - bb[1]);
   const center = (f) => L.latLngBounds([f.bb[1], f.bb[0]], [f.bb[3], f.bb[2]]).getCenter();
   // sąsiedzi: etykieta stanowiska na wycinku z największą częścią w pobliżu Polski (sektory ESMM sięgają daleko na północ)
@@ -1458,18 +1459,24 @@ function mainMap(ctx) {
   };
   // Etykieta samolotu (0.12.6, Marek): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
   // w nieprzezroczystym okienku po najechaniu na samolot, u wybranego lotu cały czas. Własna warstwa nad plakietkami
-  // lotnisk i etykietami stanowisk (pod kartami lotnisk, atcTip = 700); okienko w granicach mapy (acLabelSpot), przy
-  // otwarciu i po każdym przerysowaniu ruchu (moveend).
+  // lotnisk i etykietami stanowisk (pod kartami lotnisk, atcTip = 700); okienko w granicach mapy i obok nakładek
+  // Leafleta (panel lotu, wykres TV, przyciski; acLabelSpot), przy otwarciu, po każdym przerysowaniu ruchu (moveend)
+  // i po zmianie nakładek (relabel).
   map.createPane("acLbl").style.zIndex = 690;
   const placeLabel = (m) => {
     const tt = m.getTooltip(), el = tt?.getElement();
     if (!el || !m.isTooltipOpen()) return;
+    const mc = map.getContainer(), mb = mc.getBoundingClientRect();
+    const obst = [...mc.querySelectorAll(".leaflet-control")].map((c) => c.getBoundingClientRect()).filter((r) => r.width && r.height)
+      .map((r) => [r.left - mb.left, r.top - mb.top, r.right - mb.left, r.bottom - mb.top]);
     const p = map.latLngToContainerPoint(m.getLatLng()), { x: W, y: H } = map.getSize();
-    const { dir, off } = acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H);
+    const { dir, off } = acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H, { obst });
     if (tt.options.direction === dir && String(tt.options.offset) === String(off)) return;
     Object.assign(tt.options, { direction: dir, offset: off });
     tt.update();
   };
+  // mapa ukryta (inna zakładka): bez wymiarów, ustawi drawTraffic po pokazaniu
+  const placeLabels = () => { if (mapEl.offsetWidth) layers.traffic.eachLayer(placeLabel); };
   const drawTraffic = () => {
     layers.traffic.clearLayers();
     if (!$(".traffic").checked || map.getSize().x < 40) return;
@@ -1482,7 +1489,7 @@ function mainMap(ctx) {
       const exit = rel === "trn" || rel === "dep" ? p.exit || null : null;
       // tooltipopen: e.target to marker (stały dymek wybranego lotu otwiera się już w addTo)
       aircraftMarker(p, { cls: rel + (sel ? " sel" : "") })
-        .bindTooltip(p21Html(p, { exit }), { pane: "acLbl", className: "ac-lbl" + (sel ? " sel" : ""), direction: "right", offset: [10, 0],
+        .bindTooltip(p21Html(p, { exit }), { pane: "acLbl", className: "ac-lbl" + (sel ? " sel" : ""), direction: "right", offset: [AC_LABEL_GAP, 0],
           opacity: 1, permanent: sel })
         .on("tooltipopen", (e) => placeLabel(e.target))
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);

@@ -101,10 +101,12 @@
 .swatch.atz { background: rgba(224,138,214,.2); border: 1px solid #e08ad6; }
 .swatch.nb { border: 1px dashed #8d99a6; }
 
-/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu */
-.leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: 640px; pointer-events: none; }
+/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu. Szerokość wg wierszy (każdy w jednej
+   linijce, z godziną "since"), najwyżej szerokość mapy; dopiero na wąskiej mapie zawija się ostatnia kolumna (kto) */
+.leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: calc(100% - 8px); pointer-events: none; }
 .leaflet-tooltip.as-tip::before { display: none; }
 .as-tip td { padding: 1px 5px; }
+.as-tip td:last-child { white-space: normal; }
 .as-tip td.lv { color: var(--yellow); }
 .as-tip .fq { color: #9dff6e; font-weight: 700; }
 .as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 0; font: 700 10px/14px var(--mono); text-align: center; }
@@ -167,8 +169,9 @@
    (wybrany lot: cały czas): nieprzezroczyste czarne tło z cienką ramką, czytelne na każdym podkładzie, bez cienia
    i poświaty. Linijki czcionką o stałej szerokości (spacje w linijce to kolumny); sam znak wywoławczy (b.cs) na
    zielono, prędkość (b.gs) i linijki 2-3 na biało jak na etykiecie DOM004 z P21; wybrany lot: znak i ramka na
-   pomarańczowo */
-.leaflet-tooltip.ac-lbl { padding: 2px 4px; background: #000; border: 1px solid #4a584a; border-radius: 0; box-shadow: none;
+   pomarańczowo. Bez marginesu, który Leaflet dodaje dymkom z boku: odstęp od samolotu to samo przesunięcie dymka
+   (AC_LABEL_GAP w airspace.js) */
+.leaflet-tooltip.ac-lbl { margin: 0; padding: 2px 4px; background: #000; border: 1px solid #4a584a; border-radius: 0; box-shadow: none;
   color: #f4f6f8; font: 11px/12px var(--mono); }
 .leaflet-tooltip.ac-lbl::before { display: none; }
 .leaflet-tooltip.ac-lbl.sel { border-color: #ff9f1a; }

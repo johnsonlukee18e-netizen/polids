@@ -44,6 +44,14 @@ const out = {
   spot: [[400, 300], [760, 300], [400, 5], [400, 598], [30, 10], [790, 590], [20, 300], [60, 300]]
     .map(([x, y]) => as.acLabelSpot(x, y, 90, 40, 800, 600)),
   spotWide: [as.acLabelSpot(50, 300, 760, 40, 800, 600), as.acLabelSpot(750, 300, 760, 40, 800, 600)],
+  spotEdge: [690, 691].map((x) => as.acLabelSpot(x, 300, 90, 40, 800, 600).dir),
+  gap: as.AC_LABEL_GAP,
+  // nakładki Leafleta [lewo, góra, prawo, dół]: panel lotu z prawej na wysokości samolotu, wykres TV tuż pod samolotem,
+  // przyciski zoomu nad samolotem, nakładka z boku bez wpływu, obie strony zasłonięte (jak bez nakładek)
+  spotObst: [
+    [440, 150, [[500, 10, 790, 276]]], [300, 463, [[10, 471, 560, 590]]], [20, 75, [[10, 10, 44, 70]]],
+    [300, 300, [[600, 0, 800, 600]]], [400, 300, [[100, 200, 700, 400]]], [760, 150, [[500, 10, 790, 276]]],
+  ].map(([x, y, obst]) => ({ x, y, obst, s: as.acLabelSpot(x, y, 90, 40, 800, 600, { obst }) })),
   exports: Object.keys(as).sort(),
   ad: as.SYMBOLS.aerodrome, half: ["aerodrome", "vor", "ndb", "vfr", "fix"].map(as.symbolHalf),
   svg: as.symbolSvg("aerodrome", "#fff"), svgFix: as.symbolSvg("fix", "#fff"),
@@ -118,23 +126,52 @@ def test_p21_html(js):
     assert js["htmlEsc"].startswith('<i class="l1"><b class="cs">&lt;X&amp;&gt;</b>     <b class="gs">005</b></i>')
 
 
-def test_label_spot_inside_map(js):
-    """Okienko etykiety (90 × 40) obok samolotu w granicach mapy 800 × 600 (margines 4 px, odstęp 10 px od środka)."""
-    def box(x, y, spot, w=90, h=40):
-        left = x + spot["off"][0] if spot["dir"] == "right" else x - w + spot["off"][0]
-        top = y - h / 2 + spot["off"][1]
-        return left, top, left + w, top + h
+def _box(x, y, spot, w=90, h=40):
+    """Okienko na stronie: przesunięcie dymka to cały odstęp (map.css zeruje margines Leafleta, .ac-lbl margin: 0)."""
+    left = x + spot["off"][0] if spot["dir"] == "right" else x - w + spot["off"][0]
+    top = y - h / 2 + spot["off"][1]
+    return left, top, left + w, top + h
 
+
+def test_label_spot_inside_map(js):
+    """Okienko etykiety (90 × 40) obok samolotu w granicach mapy 800 × 600 (margines 4 px, odstęp 16 px od środka)."""
+    g = js["gap"]
+    assert g == 16
     pts = [[400, 300], [760, 300], [400, 5], [400, 598], [30, 10], [790, 590], [20, 300], [60, 300]]
     assert [s["dir"] for s in js["spot"]] == ["right", "left", "right", "right", "right", "left", "right", "right"]
-    assert js["spot"][0] == {"dir": "right", "off": [10, 0]} and js["spot"][1] == {"dir": "left", "off": [-10, 0]}
+    assert js["spot"][0] == {"dir": "right", "off": [g, 0]} and js["spot"][1] == {"dir": "left", "off": [-g, 0]}
     for (x, y), s in zip(pts, js["spot"]):
-        x0, y0, x1, y1 = box(x, y, s)
+        x0, y0, x1, y1 = _box(x, y, s)
         assert x0 >= 4 and y0 >= 4 and x1 <= 796 and y1 <= 596, ((x, y), s)
-        # okienko nie zasłania samolotu: cała szerokość po jednej stronie, co najmniej 10 px od środka
-        assert x0 >= x + 10 or x1 <= x - 10, ((x, y), s)
+        # okienko nie zasłania samolotu: cała szerokość po jednej stronie, co najmniej odstęp od środka
+        assert x0 >= x + g or x1 <= x - g, ((x, y), s)
+    # przy prawym brzegu: z prawej tylko, gdy mieści się z marginesem 4 px (796 - 16 - 90 = 690)
+    assert js["spotEdge"] == ["right", "left"]
     # za szerokie na obie strony: tam, gdzie więcej miejsca
     assert js["spotWide"][0]["dir"] == "right" and js["spotWide"][1]["dir"] == "left"
+
+
+def test_label_spot_beside_overlays(js):
+    """Przegląd 0.12.6: okienko wybranego lotu wchodziło pod panel szczegółów lotu, a okienko nad wykresem TV pod jego
+    tytuł. Nakładki Leafleta to przeszkody: strona z nakładką na wysokości samolotu odpada, nakładka pod albo nad
+    samolotem przesuwa okienko w pionie; gdy obie strony zasłonięte, jak bez nakładek (w granicach mapy)."""
+    g = js["gap"]
+    res = {(c["x"], c["y"]): c["s"] for c in js["spotObst"]}
+    assert res[(440, 150)] == {"dir": "left", "off": [-g, 0]}  # panel lotu z prawej
+    assert res[(300, 463)] == {"dir": "right", "off": [g, -16]}  # nad wykresem: dół okienka 4 px nad wykresem
+    assert res[(20, 75)] == {"dir": "right", "off": [g, 19]}  # pod przyciskami zoomu: góra okienka 4 px pod nimi
+    assert res[(300, 300)] == {"dir": "right", "off": [g, 0]}  # nakładka daleko z boku: bez zmian
+    assert res[(400, 300)] == {"dir": "right", "off": [g, 0]}  # obie strony zasłonięte: jak bez nakładek
+    assert res[(760, 150)] == {"dir": "left", "off": [-g, 0]}  # samolot pod panelem: jak bez nakładek (z lewej)
+    for c in js["spotObst"]:
+        if (c["x"], c["y"]) == (400, 300):
+            continue
+        x0, y0, x1, y1 = _box(c["x"], c["y"], c["s"])
+        assert x0 >= 4 and y0 >= 4 and x1 <= 796 and y1 <= 596, c
+        for ol, ot, orr, ob in c["obst"]:
+            if (c["x"], c["y"]) == (760, 150):
+                continue  # samolot pod panelem: okienko z lewej też na panelu (od x = 500)
+            assert x1 <= ol or x0 >= orr or y1 <= ot - 4 or y0 >= ob + 4, c
 
 
 def test_p21_label_css_and_legend():
@@ -146,6 +183,9 @@ def test_p21_label_css_and_legend():
     box = re.search(r"\.leaflet-tooltip\.ac-lbl \{([^}]*)\}", rules).group(1)
     assert "background: #000" in box and "border: 1px solid" in box and "border-radius: 0" in box and "box-shadow: none" in box
     assert "var(--mono)" in box
+    # bez marginesu, który Leaflet dodaje dymkom z boku (6 px): odstęp od samolotu to samo przesunięcie z acLabelSpot,
+    # inaczej okienko przy prawym brzegu wystawało do 2 px poza mapę
+    assert box.lstrip().startswith("margin: 0;")
     assert ".leaflet-tooltip.ac-lbl::before { display: none; }" in rules  # bez strzałki dymka
     assert ".ac-lbl b.cs, .p21-sample b.cs { color: #00ff00; }" in rules
     assert ".ac-lbl.sel b.cs { color: #ff9f1a; }" in rules and ".leaflet-tooltip.ac-lbl.sel { border-color: #ff9f1a; }" in rules
@@ -170,6 +210,7 @@ def test_map_hover_label_wiring():
     draw = code.split("const drawTraffic = () => {")[1].split("\n  };")[0]
     assert "aircraftMarker(p, { cls: rel + (sel ? \" sel\" : \"\") })" in draw
     assert "bindTooltip(p21Html(p, { exit })" in draw and 'pane: "acLbl"' in draw and "permanent: sel" in draw
+    assert "offset: [AC_LABEL_GAP, 0]" in draw
     assert '"ac-lbl" + (sel ? " sel" : "")' in draw and "opacity: 1" in draw
     assert 'on("tooltipopen", (e) => placeLabel(e.target))' in draw
     assert "getZoom" not in draw and "detail" not in draw and "label:" not in draw
@@ -179,7 +220,12 @@ def test_map_hover_label_wiring():
     # warstwa okienka: nad plakietkami lotnisk (atcAd 660) i FIR (655), pod kartami lotnisk (atcTip 700)
     air = (JS / "airspace.js").read_text("utf-8")
     assert '["atcFirName", 585], ["atcFir", 655], ["atcAd", 660], ["atcTip", 700]' in air
-    assert "acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H)" in code
+    # okienko obok nakładek Leafleta (panel lotu, wykres TV, przyciski), także po ich zmianie bez ruchu mapy (relabel)
+    place = code.split("const placeLabel = (m) => {")[1].split("\n  };")[0]
+    assert 'querySelectorAll(".leaflet-control")' in place
+    assert "acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H, { obst })" in place
+    assert "declutter(); placeLabels(); });" in code
+    assert "const placeLabels = () => { if (mapEl.offsetWidth) layers.traffic.eachLayer(placeLabel); };" in code
 
 
 def test_aerodrome_symbol_is_closed_polygon(js):
