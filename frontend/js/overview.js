@@ -1,17 +1,20 @@
 // AERODROME › OVERVIEW: jeden ekran dla całego FIR EPWW, coś jak self-checkin przed otwarciem stanowiska.
 // Panele (dane z /api/overview, każdy z własnym komunikatem błędu):
 //   1. poziom przejściowy (TL): jeden dla całego kraju, FL080, a FL090, gdy gdziekolwiek QNH ≤ 995 hPa,
-//   2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP, kolory jak w METEO,
+//   2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP i pasem w użyciu (z ATIS albo preferowany,
+//      jak w AERODROME › INFO), kolory jak w METEO,
 //   3. NOTAM-y obowiązujące teraz,
 //   4. restrykcje ECFMP dla FIR EPWW i regulacje vIFF na sektorach EP,
 //   5. Airport Monitor vIFF (przepustowość, ruch, loty z CTOT) + liczby lotów z sieci VATSIM.
 // Filtr stanowiska u góry: ACC / APP / TWR. APP i ACC zawężają panele do swoich lotnisk i pokazują checklistę
-// otwarcia stanowiska, TWR przeskakuje od razu do PRZEGLĄDU danego lotniska (onGoto).
-import { api, choiceGet, choiceSet, esc, h, lvpState, lvpTip, ONLINE_EVENT, POS_KEY } from "./api.js";
+// otwarcia stanowiska, TWR przeskakuje od razu do PRZEGLĄDU danego lotniska (onGoto). Przy ACC / APP przełącznik
+// MINE / ALL: MINE ukrywa lotniska, które przed wybranym stanowiskiem obsługuje teraz ktoś inny (covered_by z serwera).
+import { api, choiceGet, choiceSet, esc, h, lsGet, lsSet, lvpState, lvpTip, ONLINE_EVENT, POS_KEY } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 import { renderChecklist } from "./checklist.js";
 
 const CHK_KEY = "checklist.overview.open-position";
+const SCOPE_KEY = "overview.scope";
 const REFRESH_MS = 60000;
 
 const hm = (iso) => (iso ? new Date(iso).toISOString().slice(11, 16) + "Z" : "–");
@@ -35,15 +38,14 @@ function tlPanel(d) {
     <div class="hint ov-tl-rule">${esc(t.rule || "")}</div>
     ${t.qnh_icao ? `<div class="ov-tl-min">lowest QNH: <b class="ic">${esc(t.qnh_icao)}</b> ${n0(t.qnh_min)} hPa</div>` : ""}
     ${low.length ? `<div class="ov-note warn">${thr}: ${low.map(esc).join(", ")}</div>` : ""}
-    ${miss.length ? `<div class="${t.uncertain ? "ov-note warn" : "hint"}">no QNH from METAR (not taken into account): ${miss.map(esc).join(", ")}${
+    ${miss.length ? `<div class="${t.uncertain ? "ov-note warn" : "hint"}">no QNH (not taken into account): ${miss.map(esc).join(", ")}${
       t.uncertain ? ` – if ${thr} there, TL is ${esc(t.raised)}` : ""}</div>` : ""}
     <div class="hint ov-src">${esc(t.normal || "")}, and when ${thr} at any of the ${n0((t.stations || 0) + miss.length)} controlled aerodromes,
-      ${esc(t.raised || "")} nationwide. TA ${n0(t.ta_ft)} ft.
-      <a href="${esc(t.source_url || "")}" target="_blank" rel="noopener">${esc(t.source || "")}</a></div>`;
+      ${esc(t.raised || "")} nationwide. TA ${n0(t.ta_ft)} ft.</div>`;
 }
 
-// --- 2. METAR / TAF / LVP --------------------------------------------------------------------------------------
-// stan LVP z progami z AIP; dymek: progi trzech faz i źródło (lvpTip), przy stanie też powody
+// --- 2. METAR / TAF / LVP / pas w użyciu ---------------------------------------------------------------------
+// stan LVP z progami z AIP; dymek: progi trzech faz (lvpTip), przy stanie też powody
 function lvpChip(lvp) {
   if (!lvp) return "";
   const s = lvpState(lvp), tip = lvpTip(lvp);
@@ -53,20 +55,40 @@ function lvpChip(lvp) {
   return `<span class="ov-chip ${cls}" data-tip="${esc([s.label, ...(lvp.reasons || []), tip].filter(Boolean).join("\n"))}">${esc(short[s.cls] + scope)}</span>`;
 }
 
+// Pas w użyciu (a.runway z serwera, te same wartości co AERODROME › INFO): z ATIS pełna ramka z literą ATIS, pas
+// preferowany ramka kreskowana i PREF, jak "preferred" w AERODROME. Zwięźle, żeby wiersz lotniska mieścił się w jednej
+// linii przy 1366 px: jeden pas do lądowań i startów "29", różne "33/29" (ARR, potem DEP, w kolorach ról jak na
+// paskach: ARR żółty, DEP niebieski). Dymek: role pasów słownie i ATIS albo powód wyboru pasa.
+export function runwayChip(rw, atis = null) {
+  if (!rw || !rw.arr) return "";
+  const fromAtis = rw.source === "ATIS";
+  const dep = rw.dep || rw.arr;
+  const same = dep === rw.arr;
+  const body = same ? `<b>${esc(rw.arr)}</b>` : `<b><span class="arr">${esc(rw.arr)}</span>/<span class="dep">${esc(dep)}</span></b>`;
+  const roles = same ? `ARR/DEP ${rw.arr}` : `ARR ${rw.arr} · DEP ${dep}`;
+  const tip = fromAtis ? [`Runway in use · ATIS ${rw.letter || ""}`.trim(), roles, atis?.callsign] : ["Preferred runway", roles, rw.reason];
+  return `<span class="ov-rwy ${fromAtis ? "atis" : "pref"}" data-tip="${esc(tip.filter(Boolean).join("\n"))}"><i class="src">${
+    fromAtis ? esc(`ATIS ${rw.letter || ""}`.trim()) : "PREF"}</i>${body}</span>`;
+}
+
 function wxRow(a, open) {
   const p = a.parsed || {};
   const t = a.traffic || {};
   const obs = p.time ? `${esc(p.time.slice(2, 4))}:${esc(p.time.slice(4, 6))}Z` : "";
-  return `<div class="ov-aero${open ? " open" : ""}" data-icao="${esc(a.icao)}">
+  // litera ATIS jest w ramce pasa, gdy pas jest z ATIS; ATIS bez czytelnego pasa ma osobną ramkę
+  const atisChip = a.atis && a.runway?.source !== "ATIS";
+  return `<div class="ov-aero${open ? " open" : ""}${a.covered_by ? " other" : ""}" data-icao="${esc(a.icao)}">
     <div class="ov-aero-head">
       <b class="ic">${esc(a.icao)}</b>
       <span class="cat cat-${esc(p.flight_category || "")}">${esc(p.flight_category || "–")}</span>
       ${lvpChip(a.lvp)}
-      ${a.atis ? `<span class="ov-chip on" data-tip="${esc(a.atis.callsign)}">ATIS ${esc(a.atis.letter || "")}</span>` : ""}
+      ${runwayChip(a.runway, a.atis)}
+      ${atisChip ? `<span class="ov-chip on" data-tip="${esc(a.atis.callsign)}">ATIS ${esc(a.atis.letter || "")}</span>` : ""}
       ${(a.atc || []).length ? `<span class="ov-chip on" data-tip="${esc(a.atc.map((c) => `${c.callsign} ${c.frequency} ${c.name || ""}`).join("\n"))}">ATC ${a.atc.length}</span>` : ""}
-      <span class="ov-traffic" data-tip="Flights on the VATSIM network with a flight plan from/to this aerodrome">↑${t.departures ?? 0} ↓${t.arrivals ?? 0}${t.prefiles ? ` ✎${t.prefiles}` : ""}</span>
+      ${a.covered_by ? `<span class="ov-by" data-tip="Covered now by ${esc(a.covered_by)}">${esc(a.covered_by)}</span>` : ""}
+      <span class="ov-traffic" data-tip="Flights with a flight plan from/to this aerodrome: ↑ departures, ↓ arrivals, ✎ prefiled">↑${t.departures ?? 0} ↓${t.arrivals ?? 0}${t.prefiles ? ` ✎${t.prefiles}` : ""}</span>
       <span class="ov-obs">${obs}</span>
-      <span class="ov-more">${open ? "▾" : "▸"} TAF</span>
+      <span class="ov-more">${open ? "▾" : "▸"}<span class="w"> TAF</span></span>
     </div>
     <div class="wx ov-metar">${colorize(a.metar)}</div>
     ${open ? `<div class="wx ov-taf">${a.taf ? wxLines("taf", a.taf) : colorize(null)}</div>` : ""}
@@ -109,15 +131,15 @@ function flowPanel(d) {
     <td class="mono">${esc(r.tv)}</td><td>${esc((r.type || "").replace(/^ENR-/, ""))}</td>
     <td class="num">${n0(r.value)}</td><td class="num mono">${esc(r.start || "")}–${esc(r.end || "")}</td></tr>`).join("");
   // "brak restrykcji" tylko wtedy, gdy źródło odpowiedziało; po awarii zostaje sam komunikat błędu
-  return `<div class="ov-sub">ECFMP · FIR EPWW${f.source ? ` <span class="hint">(${esc(f.source)})</span>` : ""}</div>
+  return `<div class="ov-sub">Flow measures · FIR EPWW</div>
     ${f.error ? `<div class="error ov-err">${esc(f.error)}</div>` : ""}
-    ${ms || (f.source ? `<div class="hint">No ECFMP restrictions for FIR EPWW and Polish aerodromes.</div>` : "")}
-    <div class="ov-sub">vIFF · EP sector regulations</div>
+    ${ms || (f.source ? `<div class="hint">No flow measures for FIR EPWW and Polish aerodromes.</div>` : "")}
+    <div class="ov-sub">EP sector regulations</div>
     ${f.viff_error ? `<div class="error ov-err">${esc(f.viff_error)}</div>` : ""}
     ${rs ? `<table class="data ov-tab"><thead><tr><th>Sector</th><th>Type</th><th>Value</th><th>Hours</th></tr></thead>
       <tbody>${rs}</tbody></table><div class="hint">ENTRIES = entry limit per hour, OCCUPANCY = occupancy limit (hover: sector description).
       Highlighted = in force now.</div>`
-      : f.viff_error ? "" : `<div class="hint">No restrictions on EP sectors in vIFF.</div>`}`;
+      : f.viff_error ? "" : `<div class="hint">No restrictions on EP sectors.</div>`}`;
 }
 
 // --- 5. Airport Monitor vIFF ----------------------------------------------------------------------------------
@@ -148,11 +170,11 @@ function monitorPanel(d) {
   // vIFF liczy przepustowość lotniska dla przylotów (Base Rate = Default Arrival Rate w dokumentacji vIFF),
   // a godzinowe entriesCount z /etfms/airports to przyloty w tej godzinie
   return `<table class="data ov-tab ov-mon-tab"><thead>
-      <tr><th rowspan="2">AD</th><th colspan="2">vIFF arrivals</th><th rowspan="2" title="Aerodrome capacity in vIFF (arrivals/h)">Cap.</th>
-        <th rowspan="2">A-CDM</th><th colspan="2">Flights with CTOT</th><th rowspan="2" title="Flights on the VATSIM network: departures/arrivals">VATSIM</th></tr>
+      <tr><th rowspan="2">AD</th><th colspan="2">Arrivals</th><th rowspan="2" title="Aerodrome capacity (arrivals/h)">Cap.</th>
+        <th rowspan="2">A-CDM</th><th colspan="2">Flights with CTOT</th><th rowspan="2" title="Flights with a flight plan: departures/arrivals">DEP/ARR</th></tr>
       <tr><th title="Current UTC hour">now</th><th>+1 h</th><th title="Number of flights with CTOT (hover: list)">no.</th><th title="Average ATFM delay (CTOT − ETOT)">delay</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="hint">vIFF: arrivals planned in the hour vs aerodrome capacity (green &lt; 90&nbsp;%, orange 90–100&nbsp;%, red above).</div>`;
+    <div class="hint">Arrivals planned in the hour vs aerodrome capacity (green &lt; 90&nbsp;%, orange 90–100&nbsp;%, red above).</div>`;
 }
 
 // --- stanowisko wspólne z HOME (czyste funkcje, testy w Node) ---------------------------------------------------
@@ -170,12 +192,45 @@ export function syncPosition({ seen = "", position = "", loaded = false } = {}, 
   return { seen: shared, position: !shared || isFilter(shared) ? shared : position };
 }
 
+// --- MINE / ALL (czyste funkcje, testy w Node) -------------------------------------------------------------------
+// Zakres listy lotnisk: "mine" (domyślny) albo "all"; inna wartość (stary zapis, brak localStorage) = "mine".
+export const scopeOf = (v) => (v === "all" ? "all" : "mine");
+// Przełącznik ma sens tylko przy stanowisku ACC / APP (wieża przeskakuje do lotniska, bez stanowiska cały FIR).
+export const hasScope = (pos) => Boolean(pos && (pos.kind === "ACC" || pos.kind === "APP"));
+// Dane widoku w zakresie: MINE bez lotnisk, które przed wybranym stanowiskiem obsługuje teraz ktoś inny (covered_by),
+// także bez ich NOTAM-ów i wierszy Airport Monitor; hidden = ukryte lotniska z tym, kto je obsługuje. ALL bez zmian.
+export function scoped(d, scope) {
+  const hidden = scopeOf(scope) === "mine" ? (d.aerodromes || []).filter((a) => a.covered_by) : [];
+  const out = new Set(hidden.map((a) => a.icao));
+  const keep = (icao) => !out.has(icao);
+  return { ...d, aerodromes: (d.aerodromes || []).filter((a) => keep(a.icao)), notams: (d.notams || []).filter((n) => keep(n.icao)),
+    airports: (d.airports || []).filter(keep), hidden: hidden.map((a) => ({ icao: a.icao, by: a.covered_by })) };
+}
+// "3 hidden" przy przełączniku; dymek: lotnisko i kto je obsługuje
+export const hiddenNote = (hidden) => ({
+  text: hidden.length ? `${hidden.length} hidden` : "",
+  tip: hidden.map((x) => `${x.icao}: ${x.by}`).join("\n"),
+});
+// MINE ukrył wszystkie lotniska stanowiska (np. EPWW_C_CTR przy EPWA_APP online): zamiast pustych paneli krótka
+// informacja, kto je obsługuje i że ALL je pokaże; "" gdy coś zostało albo nic nie ukryto
+export function emptyNote(shown, hidden) {
+  if (shown || !hidden.length) return "";
+  const by = [...new Set(hidden.map((x) => x.by))].join(", ");
+  return hidden.length === 1 ? `${hidden[0].icao} is covered now by ${by}. ALL shows it.`
+    : `All ${hidden.length} aerodromes of this position are covered now by ${by}. ALL shows them.`;
+}
+// dymek data-tip otwiera się w dół; w dolnej połowie przewijanego panelu w górę, inaczej dolna krawędź panelu go ucina
+// (r: prostokąt elementu z dymkiem, box: prostokąt panelu)
+export const tipUp = (r, box) => r.top + r.bottom > box.top + box.bottom;
+
 // --- widok -----------------------------------------------------------------------------------------------------
 export function mountOverview(el, { onGoto } = {}) {
   el.innerHTML = `<div class="ov">
     <div class="toolbar ov-bar">
       <label class="sc">Position
         <select class="field ov-pos"><option value="">All aerodromes of FIR EPWW</option></select></label>
+      <span class="ov-scope" hidden><button type="button" data-scope="mine" title="Only aerodromes not covered now by other controllers">MINE</button><button type="button" data-scope="all" title="All aerodromes of the position">ALL</button></span>
+      <span class="hint ov-hidden"></span>
       <span class="hint ov-pos-note"></span>
       <span style="flex:1"></span>
       <span class="error ov-net"></span>
@@ -188,17 +243,19 @@ export function mountOverview(el, { onGoto } = {}) {
       </div>
       <div class="ov-col">
         <div class="card grow ov-wx"><h3>METAR · TAF · LVP<span class="ov-h-note"></span></h3><div class="scroll ov-wx-body"><span class="hint">Loading…</span></div></div>
-        <div class="card part ov-mon"><h3>Airport Monitor vIFF</h3><div class="scroll ov-mon-body"></div></div>
+        <div class="card part ov-mon"><h3>Airport monitor</h3><div class="scroll ov-mon-body"></div></div>
       </div>
       <div class="ov-col">
         <div class="card grow ov-notam"><h3>NOTAMs in force now<span class="ov-h-note ov-nt-n"></span></h3><div class="scroll ov-notam-body"><span class="hint">Loading…</span></div></div>
-        <div class="card grow ov-flow"><h3>ECFMP · vIFF restrictions</h3><div class="scroll ov-flow-body"></div></div>
+        <div class="card grow ov-flow"><h3>Flow restrictions</h3><div class="scroll ov-flow-body"></div></div>
       </div>
     </div></div>`;
   const $ = (s) => el.querySelector(s);
   let seen = choiceGet(POS_KEY);  // wybór stanowiska (HOME albo tutaj), jaki PRZEGLĄD ostatnio widział
   let position = "";             // filtr: dopiero z listą stanowisk (listPosition), bez niej cały FIR
   let open = new Set();          // lotniska kliknięte: TAF w stanie odwrotnym do domyślnego (rozwinięty / zwinięty)
+  // MINE / ALL, zapamiętane w tej przeglądarce
+  let scope = scopeOf(lsGet(SCOPE_KEY));
   let timer = null, chk = null, destroyed = false, last = null, posLoaded = false;
 
   // lista stanowisk do filtra (ACC / APP / TWR); bez niej zostaje sam widok całego FIR-u
@@ -238,33 +295,45 @@ export function mountOverview(el, { onGoto } = {}) {
     api("/api/checklists").then((d) => {
       if (destroyed || want !== position) return;   // w międzyczasie wybrano inne stanowisko
       const item = d.checklists.find((c) => c.id === (d.aerodrome || "open-position"));
-      if (!item) { body.innerHTML = `<div class="hint">No checklist in data/seed/checklists.json.</div>`; return; }
+      if (!item) { body.innerHTML = `<div class="hint">No checklist.</div>`; return; }
       body.innerHTML = `<div class="ov-chk-pos">${esc(position)}</div><div class="checklist"></div>`;
       renderChecklist(body.querySelector(".checklist"), item, CHK_KEY);
       chk = { position };
     }).catch((e) => { if (!destroyed && want === position) body.innerHTML = `<div class="error">${esc(e.message)}</div>`; });
   };
 
-  const draw = (d) => {
-    const pos = d.position;
+  const draw = (raw) => {
+    const pos = raw.position;
+    const sw = hasScope(pos);
+    const d = scoped(raw, sw ? scope : "all");
+    const note = hiddenNote(d.hidden);
+    $(".ov-scope").hidden = !sw;
+    el.querySelectorAll(".ov-scope button").forEach((b) => b.classList.toggle("on", b.dataset.scope === scope));
+    const hid = $(".ov-hidden");
+    hid.textContent = sw ? note.text : "";
+    if (sw && note.tip) hid.dataset.tip = note.tip; else hid.removeAttribute("data-tip");
     $(".ov-pos-note").innerHTML = pos
-      ? `${esc(pos.name || "")}${pos.frequency ? ` · ${esc(pos.frequency)}` : ""} · aerodromes: <b>${d.airports.map(esc).join(", ")}</b>`
+      ? `${esc(pos.name || "")}${pos.frequency ? ` · ${esc(pos.frequency)}` : ""} · aerodromes: <b>${d.airports.map(esc).join(", ") || "–"}</b>`
       : `all controlled aerodromes of FIR EPWW (${d.airports.length})`;
+    // wszystkie lotniska ukryte (MINE): ta sama informacja w panelach lotnisk zamiast pustej listy i pustej tabeli
+    const none = sw ? emptyNote(d.aerodromes.length, d.hidden) : "";
+    const noneHint = none ? `<div class="hint ov-none">${esc(none)}</div>` : "";
     $(".ov-net").textContent = [d.network_error, d.wx_error].filter(Boolean).join(" · ");
     $(".ov-upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
     $(".ov-tl-body").innerHTML = tlPanel(d);
     // z filtrem (mało lotnisk) TAF od razu widoczny, bez filtra dopiero po kliknięciu wiersza;
     // kliknięcie odwraca stan domyślny, więc przy rozwiniętych TAF-ach zwija TAF danego lotniska
     const all = Boolean(position) && d.aerodromes.length <= 6;
-    $(".ov-h-note").textContent = all ? "TAF expanded · click = collapse" : "click an aerodrome = TAF";
+    $(".ov-h-note").textContent = none ? "" : all ? "TAF expanded · click = collapse" : "click an aerodrome = TAF";
     $(".ov-wx-body").innerHTML = (d.wx_error ? `<div class="error ov-err">${esc(d.wx_error)}</div>` : "")
-      + d.aerodromes.map((a) => wxRow(a, all !== open.has(a.icao))).join("");
-    $(".ov-nt-n").textContent = d.notam_error && !d.notams.length ? "–" : `${d.notams.length}`;   // "0" po awarii by kłamało
+      + (noneHint || d.aerodromes.map((a) => wxRow(a, all !== open.has(a.icao))).join(""));
+    // "0" po awarii by kłamało, a bez pokazanych lotnisk nie ma czego liczyć
+    $(".ov-nt-n").textContent = (d.notam_error || none) && !d.notams.length ? "–" : `${d.notams.length}`;
     $(".ov-notam-body").innerHTML = (d.notam_error ? `<div class="error ov-err">${esc(d.notam_error)}</div>` : "")
-      + notamPanel(d);
+      + (noneHint || notamPanel(d));
     $(".ov-flow-body").innerHTML = flowPanel(d);
     $(".ov-mon-body").innerHTML = (d.monitor_error ? `<div class="error ov-err">${esc(d.monitor_error)}</div>` : "")
-      + monitorPanel(d);
+      + (noneHint || monitorPanel(d));
     drawChecklist(d);
   };
 
@@ -298,6 +367,19 @@ export function mountOverview(el, { onGoto } = {}) {
     open = new Set();
     chk = null;
     load();
+  });
+  // MINE / ALL: tylko inny widok tych samych danych (bez nowego zapytania), wybór zapamiętany w przeglądarce
+  $(".ov-scope").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-scope]");
+    if (!b || b.dataset.scope === scope) return;
+    scope = scopeOf(b.dataset.scope);
+    lsSet(SCOPE_KEY, scope);
+    if (last) draw(last);
+  });
+  // dymki w dolnej połowie panelu METAR otwierają się w górę (tipUp)
+  $(".ov-wx-body").addEventListener("mouseover", (e) => {
+    const t = e.target.closest("[data-tip]");
+    if (t) t.classList.toggle("tip-up", tipUp(t.getBoundingClientRect(), e.currentTarget.getBoundingClientRect()));
   });
   // kliknięcie wiersza lotniska rozwija / zwija TAF
   $(".ov-wx-body").addEventListener("click", (e) => {

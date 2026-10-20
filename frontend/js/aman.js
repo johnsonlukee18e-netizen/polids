@@ -7,7 +7,7 @@ import { esc, lsGet, lsSet } from "./api.js";
 import { APPROACH_KT, DEFAULT_FLOW, OTHER_COLOR, clock, fixColor, fixColors, fixOrder, hm, lndSep, overflow, sequence, stack } from "./dmancore.js";
 
 const OTHER = "OTHER";
-const SEQ_HINT = "Sequence (approximation): ETA = ELDT from vIFF or from position (great-circle distance / GS, last 10 NM 140 kt); "
+const SEQ_HINT = "Sequence (approximation): ETA = CDM ELDT or from position (great-circle distance / GS, last 10 NM 140 kt); "
   + "on each runway in ETA order: STA = max(ETA, previous STA + FLOW / 140 kt). Bar under the distance: green = on time, "
   + "red = the aircraft has to lose that much time (length ∝ STA − ETA).";
 const num = (v) => Math.round(v * 2) / 2;
@@ -95,7 +95,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
     const q = seq.get(st.sel);
     const L = (k, v) => `<div><i>${k}</i><b>${esc(v ?? "–")}</b></div>`;
     return `<div class="am-info">${L("CALLSIGN", s.callsign)}${L("TYPE", s.aircraft)}${L("FROM", s.departure)}
-      ${L("IAF", s.entry_fix?.fix)}${L("STAR", s.proc?.name)}${L("ELDT", s.eldt ? hm(s.eldt) + (s.eldt_source === "vIFF" ? " vIFF" : " POS") : null)}
+      ${L("IAF", s.entry_fix?.fix)}${L("STAR", s.proc?.name)}${L("ELDT", s.eldt ? hm(s.eldt) + (s.eldt_source === "vIFF" ? " CDM" : " POS") : null)}
       ${L("STA", q ? clock(q.sta * 1000, false) : null)}${L("DELAY", q ? `${Math.round(q.delay / 6) / 10} min` : null)}
       ${L("DIST", s.dist_nm !== null && s.dist_nm !== undefined ? s.dist_nm + " NM" : null)}${L("GS", s.groundspeed ? s.groundspeed + " kt" : null)}
       ${L("ALT", s.state === "air" && s.altitude ? s.altitude + " ft" : null)}${L("RWY", s.runway)}</div>`;
@@ -104,7 +104,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
   const restHtml = (d) => {
     const rest = [...d.arrivals.filter((x) => x.away), ...d.planned.filter((x) => x.kind === "arr")];
     return `<div class="h">NOT SEQUENCED · ${rest.length}</div>${rest.map((x) => `<div class="r${st.sel === x.kind + ":" + x.callsign ? " sel" : ""}" data-k="${esc(x.kind + ":" + x.callsign)}"
-      title="${esc(`${x.callsign} from ${x.departure || "?"}: ${x.planned ? "planned flight (prefile)" : "on ground at the departure aerodrome"}${x.eldt ? `, ELDT ${hm(x.eldt)} (vIFF)` : ""}`)}">
+      title="${esc(`${x.callsign} from ${x.departure || "?"}: ${x.planned ? "planned flight (prefile)" : "on ground at the departure aerodrome"}${x.eldt ? `, ELDT ${hm(x.eldt)}` : ""}`)}">
       <span>${esc(x.callsign)}</span><span>${esc(x.departure || "")}</span><span>${x.eldt ? hm(x.eldt) : "–"}</span></div>`).join("")
       || `<div class="r none">None</div>`}`;
   };
@@ -123,7 +123,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
       const f = b.dataset.fix, off = thin.has(f);
       b.className = off ? "thin" : "full";
       const what = f === OTHER ? (strict ? "Other entries (outside the six points of the ACC window) and unknown" : "Arrivals without an entry point on the route")
-        : b.dataset.src ? `Entry ${f} (last route point or a STAR outside the .ese file)` : `Stream ${f}`;
+        : b.dataset.src ? `Entry ${f} (last route point or STAR)` : `Stream ${f}`;
       b.title = `${what}: ${off ? "only a thin line with the callsign" : "full labels"}. Click to toggle.`;
     });
   };
@@ -209,7 +209,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
       const sel = st.sel === k;
       const delayMin = t.q.delay / 60;
       const title = `${t.f.s.callsign} ${t.f.s.aircraft || ""} from ${t.f.s.departure || "?"} · entry ${t.fix === OTHER ? t.f.s.entry_fix?.fix || "?" : t.fix}
-STA ${clock(t.q.sta * 1000, false)} · ETA ${clock(t.f.eta * 1000, false)} (${t.f.s.eldt_source === "vIFF" ? "ELDT vIFF" : "from position"}) · ${delayMin >= 0.5 ? `lose ${delayMin.toFixed(1)} min` : "on time"}
+STA ${clock(t.q.sta * 1000, false)} · ETA ${clock(t.f.eta * 1000, false)} (${t.f.s.eldt_source === "vIFF" ? "CDM ELDT" : "from position"}) · ${delayMin >= 0.5 ? `lose ${delayMin.toFixed(1)} min` : "on time"}
 ${t.f.s.dist_nm ?? "?"} NM · GS ${t.f.s.groundspeed ?? "?"} kt · RWY ${t.f.runway || "?"} · no. ${t.q.order}
 Click: details · double-click: map`;
       if (t.thin) {
@@ -234,7 +234,7 @@ Click: details · double-click: map`;
       const why = [beyond ? `${beyond} later than ${hor}' (change the HORIZON)` : "", drop.size ? `${drop.size} do not fit in the window (latest ones)` : ""].filter(Boolean);
       s += `<text class="more" x="${LW + 46 + (cmp ? 20 : 26) + 6}" y="${top + 8}"><title>${esc(why.join("; "))}</title>▲ ${later} ${beyond && !drop.size ? `later than ${hor}'` : "more"}</text>`;
     }
-    if (!list.length) s += `<text class="empty" x="${LW + (W - LW) / 2}" y="${(top + bot) / 2}" text-anchor="middle">${d.network_error ? "No data from the VATSIM network" : "No airborne arrivals"}</text>`;
+    if (!list.length) s += `<text class="empty" x="${LW + (W - LW) / 2}" y="${(top + bot) / 2}" text-anchor="middle">${d.network_error ? "Network data unavailable" : "No airborne arrivals"}</text>`;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.innerHTML = s;
   };

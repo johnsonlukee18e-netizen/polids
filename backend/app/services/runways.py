@@ -19,6 +19,7 @@ from functools import lru_cache
 
 from ..config import DATA_DIR, settings
 from .lvp import rvr_value
+from .vatsim import atis_in_use, parse_atis
 
 # najniższy RVR podejścia ILS danej kategorii (ICAO Annex 6: CAT II nie mniej niż 300 m, CAT IIIA 175 m); kategoria pasa
 # z AIP AD 2.22 w runway_config.json (lvp.cat)
@@ -264,16 +265,16 @@ def _aip_choice(cfg: dict, by: dict, wind_dir, wind_speed, gust, metar, t: datet
             skipped = arr_skipped
         if d:
             hrs = now["hours"][phase]
-            out[phase] = (d, f"{d} per AIP ({'H24' if hrs == 'H24' else hrs + ' UTC'})"
+            out[phase] = (d, f"{d} preferred ({'H24' if hrs == 'H24' else hrs + ' UTC'})"
                              + (f", because {_skipped(skipped)}" if skipped else ""))
             continue
-        out[phase] = (None, f"no AIP preference: {block or _skipped(skipped)}")
+        out[phase] = (None, f"no preferred runway: {block or _skipped(skipped)}")
         if phase == "dep":
             # hałas nie decyduje, ale ILS liczy się tylko przy lądowaniu: do startu pierwszy pas z listy AIP w limicie
             # wiatru (EPWA w mgle 29, nie 33 z ILS; przy wietrze zmiennym kierunku nie znamy, więc bez limitu)
             d, skipped = _first_ok(prefs, (lambda d: None) if wind_dir is None else check, arr)
             if d and not _same_runway(d, arr):
-                out["alt"] = (d, f"DEP {d} from AIP list" + (f", because {_skipped(skipped)}" if skipped else ""))
+                out["alt"] = (d, f"DEP {d} from preferred list" + (f", because {_skipped(skipped)}" if skipped else ""))
     return out
 
 
@@ -412,7 +413,7 @@ def _lvp_choice(cfg: dict, by: dict, base: dict, wind_dir, wind_speed, gust, met
     if not notes:
         return base
     plain = all(n.count(" ") == 1 for n in notes)   # same pasy: "ARR 33, DEP 29"
-    reason = f"LVP in force (AIP AD 2.22): {(', ' if plain else '; ').join(notes)}"
+    reason = f"LVP in force: {(', ' if plain else '; ').join(notes)}"
     if missing:   # faza bez listy z AIP: wybór jak bez niej (kierunek z ILS)
         reason += f"; {missing[0]}: {_lc(base['reason'].removeprefix('LVP in force: '))}"
     if wind_dir is None and speed != 0:   # wiatru w plecy nie sprawdzaliśmy
@@ -463,6 +464,62 @@ def _wind_choice(rows: list[dict], by: dict, wind_dir, wind_speed, cfg: dict, li
         return pick(rows[0]["designator"], None, "No wind data: first runway in list")
     best = max(rows, key=lambda r: (head(r), -abs(r["crosswind"] or 0), r["ils"], -rank(r)))["designator"]
     return pick(best, best, "Largest headwind")
+
+
+# --- pas w użyciu lotniska: wspólne dla AERODROME › INFO (/api/aerodromes/{icao}/status) i OVERVIEW -----------------
+
+def runway_state(ad, parsed, lvp: dict | None, now: datetime | None = None) -> dict:
+    """Pasy lotniska `ad` (model Aerodrome) ze składowymi wiatru z METAR (`parsed`) i pas preferowany (select_runways):
+    {"config": runway_config, "runways": [...], "preferred": {"arr", "dep", "reason"}}. `lvp` = evaluate() z lvp.py:
+    LVP i przygotowanie LVP wymagają podejścia precyzyjnego; odwołane LVP już nie, zostaje IMC z kategorii METAR."""
+    wd = parsed.wind_dir if parsed else None
+    ws = parsed.wind_speed if parsed else None
+    cfg = runway_config(ad.icao)
+    equipment = equipment_for(ad.icao, cfg)
+    rwys = [{"designator": r.designator, "heading": runway_heading(r.designator, r.heading_true),
+             "preferred": r.preferred, "length_m": r.length_m, "width_m": r.width_m, "surface": r.surface,
+             "equipment": equipment.get(r.designator, [])} for r in ad.runways]
+    for r in rwys:
+        r["headwind"], r["crosswind"] = wind_components(wd, ws, r["heading"])
+    state = (lvp or {}).get("state")
+    low_vis = state if state in ("LVP", "PREP") else (
+        "IMC" if parsed and parsed.flight_category in ("IFR", "LIFR") else None)
+    pref = select_runways(rwys, wd, ws, equipment=equipment, low_vis=low_vis, config=cfg,
+                          gust=parsed.wind_gust if parsed else None, metar=parsed,
+                          now=now or datetime.now(timezone.utc))
+    return {"config": cfg, "runways": rwys, "preferred": pref}
+
+
+def atis_state(stations: list[dict], icao: str, designators: list[str] | None = None) -> dict | None:
+    """ATIS lotniska z listy stanowisk data feedu (controllers + atis): EPWA_ATIS albo osobno EPWA_A_ATIS i EPWA_D_ATIS
+    (znaki i litery sklejone " / ", tekst kolejno). arr / dep = pas do lądowania i startu odczytany z tekstu (pas musi
+    istnieć na lotnisku, gdy podano `designators`); None = ATIS nie podaje pasu tej roli. Bez ATIS: None."""
+    atis, parsed = None, []
+    own = sorted((c for c in stations if str(c.get("callsign") or "").upper().startswith(icao.upper() + "_")
+                  and str(c.get("callsign")).upper().endswith("_ATIS")), key=lambda c: c["callsign"])
+    for c in own:
+        info = parse_atis(c.get("text_atis"), designators, c.get("atis_code"))
+        kind = "dep" if "_D_ATIS" in c["callsign"] else "arr" if "_A_ATIS" in c["callsign"] else "both"
+        parsed.append((kind, info))
+        if atis is None:
+            atis = {"callsign": c["callsign"], "letter": info["letter"], "arr": None, "dep": None,
+                    "frequency": c.get("frequency"), "lines": list(c.get("text_atis") or [])}
+        else:
+            atis["callsign"] += " / " + c["callsign"]
+            atis["letter"] = " / ".join(x for x in (atis["letter"], info["letter"]) if x)
+            atis["lines"] = atis["lines"] + list(c.get("text_atis") or [])
+    if atis:
+        atis.update(atis_in_use(parsed))
+    return atis
+
+
+def runway_in_use(atis: dict | None, preferred: dict) -> dict:
+    """Pas w użyciu: z ATIS, gdy podaje pas (brakującą rolę uzupełnia druga), inaczej pas preferowany
+    (source "SUGGESTED", z powodem wyboru)."""
+    if atis and (atis.get("arr") or atis.get("dep")):
+        return {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
+                "reason": f"From ATIS {atis.get('letter') or ''}".strip()}
+    return {**preferred, "source": "SUGGESTED"}
 
 
 def suggest_runway(runways: list[dict], wind_dir: int | None, wind_speed: int | None,
