@@ -14,7 +14,7 @@ const ENGINE = { J: "jet", T: "turboprop/turboshaft", P: "piston", E: "electric"
 const MAKERS = [["airbus", "AIRBUS", "airbus"], ["boeing", "BOEING", "boeing"], ["embraer", "EMBRAER", "embraer"],
   ["mcdonnell", "MCDONNELL", "mcdonnell douglas"], ["atr", "ATR", "atr"], ["cessna", "CESSNA", "cessna"]];
 const types = (n) => `${n} ${n === 1 ? "type" : "types"}`;
-const norm = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 // Widok producenta: grupy wg nazwy producenta w bazie (np. Airbus, Airbus Helicopters), główna nazwa pierwsza,
 // dalej od największej grupy; w grupie kolejność z serwera (wg kodu ICAO)
@@ -39,8 +39,13 @@ const num = (v) => String(+Number(v).toFixed(2));
 const tons = (kg) => String(Math.round(kg / 100) / 10);
 const flevel = (ft) => String(Math.round(ft / 100)).padStart(3, "0");
 const mach = (m) => String(+Number(m).toFixed(3));
-// osiągi z wersji produkcyjnych typu: od–do, gdy wersje się różnią (*_max z serwera), inaczej jedna wartość
-const span = (lo, hi, f) => (lo == null ? "" : hi == null || hi === lo ? f(lo) : `${f(lo)}–${f(hi)}`);
+// osiągi z wersji produkcyjnych typu: od–do, gdy wersje się różnią (*_max z serwera), inaczej jedna wartość;
+// porównanie po zaokrągleniu, żeby nie było "2–2 t" (MLW 1970 i 2047 kg)
+const span = (lo, hi, f) => {
+  if (lo == null) return "";
+  const a = f(lo), b = hi == null ? a : f(hi);
+  return a === b ? a : `${a}–${b}`;
+};
 const unit = (v, u) => (v ? `${v}${u}` : "");
 const pre = (p, v) => (v ? `${p}${v}` : "");
 
@@ -49,10 +54,11 @@ export function describe(d) {
   if (!d || d.length < 3) return "";
   return `${KIND[d[0]] || "?"}, ${d[1] === "C" ? "coupled" : `${d[1]} ×`} ${ENGINE[d[2]] || "?"}`;
 }
-// silniki do kratki ENG: liczba (z bazy albo z opisu typu) i rodzaj; T w opisie śmigłowca to turbina wałowa
+// silniki do kratki ENG: liczba (z bazy albo z opisu typu) i rodzaj; T w opisie śmigłowca i tiltrotora (H2T, T2T)
+// to turbina wałowa
 export function engines(a) {
   const d = a.description || "";
-  const kind = a.engine_type || (d[2] === "T" ? (d[0] === "H" ? "turboshaft" : "turboprop") : ENGINE[d[2]]);
+  const kind = a.engine_type || (d[2] === "T" ? (/^[HT]/.test(d) ? "turboshaft" : "turboprop") : ENGINE[d[2]]);
   const count = a.engine_count ?? (d[1] === "C" ? "coupled" : /^\d$/.test(d[1] || "") ? d[1] : null);
   return [count, kind].filter((x) => x != null && x !== "").join(" ");
 }
@@ -108,6 +114,7 @@ export function record(a, i) {
 }
 
 // Rozwinięty rekord (klik): zdjęcie, opis typu i kategorii RECAT-EU słownie, odnośniki do kolejnych zdjęć
+// i do wyszukiwarki bazy osiągów (dla typów, których strony osiągów nie ma)
 export function detail(a) {
   const q = encodeURIComponent(searchName(a));
   const lines = [a.description && `${a.description} – ${describe(a.description)}`,
@@ -116,8 +123,16 @@ export function detail(a) {
     <div class="photo-box"><span class="hint">Loading photo…</span></div>
     <div class="ac-info">${lines.map((l) => `<div>${esc(l)}</div>`).join("")}
       <div class="ac-links"><a href="https://www.jetphotos.com/photo/keyword/${q}" target="_blank" rel="noopener">More photos ↗</a>
-        <a href="https://www.google.com/search?tbm=isch&q=${q}" target="_blank" rel="noopener">Image search ↗</a></div></div>
+        <a href="https://www.google.com/search?tbm=isch&q=${q}" target="_blank" rel="noopener">Image search ↗</a>
+        <a href="${esc(PERF)}" target="_blank" rel="noopener">Performance search ↗</a></div></div>
   </div>`;
+}
+
+// Podpis pod zdjęciem: odnośnik do strony zdjęcia (autor i licencja) nazwany wg funkcji, bez nazwy serwisu;
+// sam tekst podpisu tylko przy własnym zdjęciu bez strony (np. autor)
+export function photoCredit(p) {
+  if (p.page) return `<a href="${esc(p.page)}" target="_blank" rel="noopener">Photo page ↗</a>`;
+  return p.credit ? esc(p.credit) : "";
 }
 
 export default {
@@ -177,13 +192,17 @@ export default {
             ${list.map((a) => record(a, i++)).join("")}</div>`).join("");
     };
 
+    // rozwinięty rekord przy dolnej krawędzi listy przewijany do widoku (najmniejszy ruch)
+    const reveal = (rec) => rec.scrollIntoView({ block: "nearest" });
     // zdjęcie w rozwiniętym rekordzie; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana
     const photo = (rec, a) => {
       const pb = rec.querySelector(".photo-box");
       api(`/api/aircraft/${a.id}/photo`).then((p) => {
         if (current !== a) return;
-        const credit = !p.credit ? "" : p.page ? `<a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.credit)}</a>` : esc(p.credit);
+        const credit = photoCredit(p);
         pb.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">${credit ? `<div class="hint">${credit}</div>` : ""}`;
+        // zdjęcie wydłuża rekord dopiero po wczytaniu
+        pb.querySelector("img").addEventListener("load", () => { if (current === a) reveal(rec); }, { once: true });
       }).catch((e) => {
         if (current !== a) return;
         pb.classList.add("none");
@@ -203,6 +222,7 @@ export default {
       rec.classList.add("selected");
       current = rows[rec.dataset.i];
       rec.insertAdjacentHTML("beforeend", detail(current));
+      reveal(rec);
       photo(rec, current);
     });
     pane.querySelector(".ac-makers").addEventListener("click", (e) => {

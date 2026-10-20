@@ -59,7 +59,11 @@ console.log(JSON.stringify({
   arc: spans.map((s) => ac.arcCode({ wingspan: s, description: "L2J" })),
   arcHeli: ac.arcCode({ wingspan: 10.2, description: "H2T" }),
   engines: [{ description: "LCT" }, { description: "L4J", engine_count: 4, engine_type: "turbofan" },
-    { description: "L2J" }, { engine_type: "piston" }, { description: "H1T" }, {}].map(ac.engines),
+    { description: "L2J" }, { engine_type: "piston" }, { description: "H1T" }, {}, { description: "T2T" }].map(ac.engines),
+  mlw: [[1970, 2047], [1202, 1247], [490, 522], [122000, 136000], [21850, null], [21850, 21850]]
+    .map(([lo, hi]) => ac.boxes({ icao: "X", mlw: lo, mlw_max: hi }).find((b) => b.label === "MLW").value),
+  credit: [{ credit: "Wikipedia: ATR 72", page: "https://en.wikipedia.org/wiki/ATR_72" },
+    { credit: "J. Kowalski <own>", page: null }, { credit: "", page: null }].map(ac.photoCredit),
   describe: ["L2J", "LCT", "H2T", null].map(ac.describe),
 }));
 """
@@ -106,6 +110,8 @@ def test_boxes_ranges_of_production_variants(js):
     assert by["VMO"] == "345–360 kt" and by["MMO"] == "M0.82–0.86" and by["MLW"] == "122–136 t"
     assert by["CEILING"] == "FL370–410" and by["MTOW"] == "165 t" and by["RECAT"] == "C|H↓" and by["ARC"] == "D"
     assert by["WINGSPAN"] == "44.84 m" and by["LENGTH"] == "53.62 m"
+    # zakres tylko, gdy wartości różnią się po zaokrągleniu (lekkie typy: MLW 1970 i 2047 kg to "2 t", nie "2–2 t")
+    assert js["mlw"] == ["2 t", "1.2 t", "0.5 t", "122–136 t", "21.9 t", "21.9 t"]
 
 
 def test_empty_values_have_no_boxes(js):
@@ -122,7 +128,8 @@ def test_arc_code_letters(js):
 
 
 def test_engines_and_description(js):
-    assert js["engines"] == ["coupled turboprop", "4 turbofan", "2 jet", "piston", "1 turboshaft", ""]
+    # tiltrotor (T2T) ma turbiny wałowe jak śmigłowiec
+    assert js["engines"] == ["coupled turboprop", "4 turbofan", "2 jet", "piston", "1 turboshaft", "", "2 turboshaft"]
     assert js["describe"] == ["landplane, 2 × jet", "landplane, coupled turboprop/turboshaft",
                               "helicopter, 2 × turboprop/turboshaft", ""]
 
@@ -154,9 +161,29 @@ def test_detail_markup(js):
     assert "L2T – landplane, 2 × turboprop/turboshaft" in html and "RECAT-EU E – Lower Medium" in html
     assert ">More photos ↗</a>" in html and ">Image search ↗</a>" in html and "Loading photo…" in html
     assert "keyword/ATR%20ATR-72-600" in html
+    # wyszukiwarka bazy osiągów (typy bez własnej strony osiągów), nazwana wg funkcji
+    assert re.search(r'<a href="[^"]*/default\.aspx"[^>]*>Performance search ↗</a>', html)
     for k in ("AT76", "A30B", "EC35"):
         assert not PROVENANCE.search(_visible(js["detail"][k])), k
     assert "RECAT-EU" not in js["detail"]["EC35"]
+
+
+def test_photo_credit_names_no_source(js):
+    # strona zdjęcia (autor, licencja) jako odnośnik nazwany wg funkcji; własny podpis bez strony jako tekst
+    page, own, empty = js["credit"]
+    assert page == '<a href="https://en.wikipedia.org/wiki/ATR_72" target="_blank" rel="noopener">Photo page ↗</a>'
+    assert not PROVENANCE.search(_visible(page))
+    assert own == "J. Kowalski &lt;own&gt;" and empty == ""
+
+
+def test_code_lines_ascii_except_symbols():
+    """Poza samodzielnymi komentarzami tylko ASCII i typograficzne symbole napisów (bez znaków łączących w regexach)."""
+    allowed = set("–↗×…↑↓·›")
+    for n, line in enumerate(SRC.splitlines(), 1):
+        if line.strip().startswith("//"):
+            continue
+        bad = {c for c in line if ord(c) > 127} - allowed
+        assert not bad, (n, sorted(hex(ord(c)) for c in bad))
 
 
 def test_no_provenance_strings_in_code():
@@ -180,6 +207,10 @@ def test_css_boxes_flat_and_linked():
     value = int(re.search(r"\.acb > b \{[^}]*font: 700 (\d+)px", text).group(1))
     assert value >= label + 6
     assert re.search(r"\.ac-boxes \{[^}]*flex-wrap: wrap", text)
+    # kolor kategorii RECAT-EU na wartości: selektor silniejszy od białej wartości (.acb > b)
+    for k, color in (("A", "#ff6a5a"), ("B", "#ff6a5a"), ("C", "var(--yellow)"), ("D", "var(--yellow)"),
+                     ("E", "var(--ok)"), ("F", "var(--ok)")):
+        assert re.search(rf"\.acb > b\.recat-{k}[^{{]*\{{ color: {re.escape(color)}; \}}", text), k
     # cztery kategorie w różnych kolorach
     bgs = {c: re.search(rf"\.acb\.{c} \{{[^}}]*background: (#[0-9a-f]{{6}})", text).group(1)
            for c in ("id", "perf", "wake", "dim")}
