@@ -75,7 +75,7 @@ def test_board_sectors_and_owners(board):
     assert all(cs in board["pos"] for s in board["sectors"] for cs in s["chain"])
     assert board["pos"]["EPWW_N_CTR"]["frequency"] == "130.675"
     assert board["net"] == {"ok": True, "error": None, "updated": "2026-10-12T12:00:00Z"}
-    assert "geo" not in board
+    assert "geo" not in board and "source" not in board  # bez opisu źródła kolejności (runda 15)
 
 
 def test_board_overlays(board):
@@ -110,14 +110,18 @@ def test_board_tma_parts(board):
     assert sorted(parts["TMA Warszawa"]) == ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"]
     assert sorted(parts["TMA Kraków"]) == ["EPKK_APP", "EPKK_E_APP"]
     assert sorted(parts["TMA Gdańsk"]) == ["EPGD_APP", "EPGD_L_APP"]
-    # każde APP z pliku ma swoją część albo jest w dymku części (dyrektor)
+    # każde APP z pliku ma swoją część albo należy do części (dyrektor: w jej kolejnościach, online – w "Now:")
     noms = {g["nominal"] for g in board["tma"]}
     assert {"EPPO_N_APP", "EPPO_S_APP", "EPKK_RZ_APP", "EPDE_APP"} <= noms
     assert not noms & {"EPWA_F_APP", "EPKK_KK_APP", "EPKK_KT_APP"}
-    assert "EPWA_F_APP" in tma["TMA Warszawa · EPWA_APP"]["apps"] and "EPKK_KT_APP" in tma["TMA Katowice · EPKK_APP"]["apps"]
+    wa, kt = tma["TMA Warszawa · EPWA_APP"]["chains"], tma["TMA Katowice · EPKK_APP"]["chains"]
+    assert any("EPWA_F_APP" in ch for ch in wa) and any("EPKK_KT_APP" in ch for ch in kt)
+    # bez listy APP części do dymku (runda 15: bez kolejności przejmowania)
+    assert all("apps" not in g for g in board["tma"])
     # TMA proceduralne: wieża lotniska, bez APP
     for key, cs in (("TMA Szczecin", "EPSC_TWR"), ("TMA Lublin", "EPLB_TWR"), ("TMA Olsztyn-Mazury", "EPSY_TWR")):
-        assert tma[key]["nominal"] == cs and tma[key]["apps"] == [] and tma[key]["owners"] == [], key
+        assert tma[key]["nominal"] == cs and tma[key]["owners"] == [], key
+        assert not any(rb.facility(c) in rb.APP_TYPES for ch in tma[key]["chains"] for c in rb._local(ch)), key
     # EPRZ: KK RZ APP, a po APP Krakowa wieża Rzeszów (kolejność z .ese)
     rz = tma["TMA Rzeszów"]
     assert rz["nominal"] == "EPKK_RZ_APP" and rz["icao"] == "EPRZ"
@@ -154,6 +158,21 @@ def test_board_tma_parts_online(client, monkeypatch):
     # za UMMV_CTR w całym stosie to samo, co .ese stawia za nim w UMMV N (RU-WRC_FSS)
     tails = {tuple(t["chain"][t["chain"].index("UMMV_CTR") + 1:]) for t in ummv.values()}
     assert len(tails) == 1 and tails != {()}, tails
+
+
+def test_board_tma_director_online(client, monkeypatch):
+    """Dyrektor online (WA DIR = EPWA_F_APP) jest w "Now:" swojej części TMA (owners), choć nie ma własnej części."""
+    feed = {**FEED, "controllers": [
+        {"callsign": "EPWA_APP", "frequency": "128.805", "name": "WA", "cid": 31},
+        {"callsign": "EPWA_F_APP", "frequency": "129.380", "name": "DIR", "cid": 32}], "atis": []}
+
+    async def other():
+        return feed
+
+    monkeypatch.setattr(vatsim_api, "get_feed", other)
+    tma = {g["id"]: g for g in client.get("/api/radio/board").json()["tma"]}
+    assert set(tma["TMA Warszawa · EPWA_APP"]["owners"]) == {"EPWA_APP", "EPWA_F_APP"}
+    assert tma["TMA Warszawa · EPWA_N_APP"]["owners"] == ["EPWA_APP"]
 
 
 def test_board_atis(board):
@@ -297,7 +316,8 @@ def test_board_upstream_error(client, monkeypatch):
     r = client.get("/api/radio/board")
     assert r.status_code == 200
     d = r.json()
-    assert d["net"]["ok"] is False and "VATSIM" in d["net"]["error"]
+    # komunikat bez nazwy dostawcy danych i bez szczegółów błędu (runda 15)
+    assert d["net"]["ok"] is False and d["net"]["error"] == "Online data unavailable"
     assert all(s["owner"] is None for s in d["sectors"]) and d["online"] == {}
     assert all(t["owner"] is None for s in d["stacks"] for t in s["tiles"])
     assert len(d["sectors"]) == 30 and all(a["online"] is False for a in d["atis"])
@@ -913,7 +933,9 @@ def test_js_loa_panel(tmp_path):
     e, f = out["edww"], firs["EDWW"]
     n_out = sum(t["dir"] == "out" for t in f["transfers"])
     assert f"transfers: {n_out} from EPWW · {len(f['transfers']) - n_out} to EPWW" in e
-    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Positions and sectors per LOA" in e
+    assert "EPWW → EDWW" in e and "EDWW → EPWW" in e and "Positions and sectors <small>" in e
+    # bez dopisków, skąd są dane (runda 15): ani "PDF extract", ani nazwy pliku
+    assert "PDF extract" not in e and "loa.json" not in e and "per LOA" not in e
     rows = len(f["transfers"]) + len(f["positions"]) + sum(len(f[k]) for k in ("silent", "vfr", "other"))
     assert e.count("data-f=") == rows
     assert 'data-coord="EDWW"' in e and "COORDINATION ›" in e
@@ -996,7 +1018,13 @@ def test_js_neighbour_stack(tmp_path):
     assert eduu.index("<i>285</i>") < eduu.index('class="rb-sep"') < eduu.index("<i>+315</i>") < eduu.index(">EDUU SPE<")
     assert "new band group" in eduu
     assert 'class="rb-nb flat"' in out["flat"] and "rb-bd" not in out["flat"] and 'class="rb-nbh"' in out["flat"]
-    assert "no VACS sectors" in out["empty"] and "ADVISORY" not in out["empty"]
+    assert "no sectors" in out["empty"] and "ADVISORY" not in out["empty"]
+    # dymki bez kolejności przejmowania i bez dopisków, skąd są dane (runda 15)
+    for key, h in out.items():
+        assert not re.search(r"Coverage order|coverage order|VACS|VATSIM|›", h), key
+    assert "EYVL U · from FL365\n" in out["off"] and "EYVL M · FL335–FL365\n" in out["off"]
+    assert "EYVL VILNIUS: sectors bordering FIR EPWW\n" in out["off"]
+    assert out["nonet"].count("Now: no data") == 4
     # błąd VATSIM: nie wiadomo, czy ktoś jest online – bez linii ADVISORY i bez częstotliwości
     assert "rb-unicom" not in out["nonet"] and 'class="rb-fq"' not in out["nonet"]
     ev = out["evil"]
@@ -1118,6 +1146,68 @@ def test_js_label_variants(tmp_path):
     assert t["on"]["tw"] == "EPWA_TWR" and t["on"]["ls"] == [{"fq": "118.305", "by": ""}]
     assert '<span class="rb-fq">120.455</span><b class="rb-code">K</b>' in t["on"]["atl"] and t["noTwra"]["atl"] == ""
     assert t["atisOnly"]["ls"] == [] and "120.455" in t["atisOnly"]["atl"]
+
+
+TIP_SCRIPT = r"""
+const radio = await import(process.argv[2]);
+const WHO = { EPWW_N_CTR: "EPWW_N_CTR 130.675 – Tomasz (CID 11)", EPWA_APP: "EPWA_APP 128.805 – Jan (CID 12)" };
+const x = (net = true) => ({ who: (cs) => WHO[cs] || "", pos: (cs) => `${cs} · Warszawa Approach 128.805`, net });
+const ch = ["EPRA_TWR", "EPWA_S_APP", "EPWA_APP", "EPWW_C_CTR", "EPWW_N_CTR"];
+const acc = { owner: "EPWW_N_CTR", sectors: [{ id: "LB", nominal: "EPWW_DBT_CTR", chain: ["EPWW_DBT_CTR", "EPWW_N_CTR"] },
+  { id: "LG", nominal: "EPWW_G_CTR", chain: ["EPWW_G_CTR", "EPWW_N_CTR"] }] };
+const tma = (owners, topdown = null) => ({ nominal: "EPWA_S_APP", owners, topdown, chains: [ch] });
+console.log(JSON.stringify({
+  acc: radio.accTip(acc, "EPWW N · LOW FL095–FL335", x()),
+  app: radio.groupTip(tma(["EPWA_APP"]), "TMA Radom (FL035–FL095)", x()),
+  proc: radio.groupTip(tma([]), "TMA Szczecin (GND–FL095)", x(), ["Procedural TMA (no APP): tower frequency SC TWR"]),
+  top: radio.groupTip(tma([], "EPWW_N_CTR"), "TMA Radom (FL035–FL095)", x()),
+  none: radio.groupTip(tma([]), "TMA Radom (FL035–FL095)", x()),
+  nonet: radio.groupTip(tma([]), "TMA Radom (FL035–FL095)", x(false)),
+  cov: radio.groupTip(tma(["EPWA_APP"]), "CTR Radom · EPRA", x(), ["Click: AERODROME"], "Tower offline – covered by EPWA_APP"),
+  now: [radio.nowText([], x()), radio.nowText([], x(false)), radio.nowText(["EPWA_APP", "EPWW_N_CTR"], x())],
+}));
+"""
+
+
+def test_js_preview_tooltips(tmp_path):
+    """Dymki podglądów (tabs/radio.js accTip, groupTip, nowText; runda 15, Marek: "wywal hierarchię dziedziczenia"):
+    przestrzeń, stanowisko i kto ją teraz obsługuje – bez kolejności przejmowania (Coverage order, ›) i bez stanowiska
+    sektora z kolejnością; bez danych o zalogowanych "Now: no data" bez nazwy dostawcy."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    d = tmp_path / "js"
+    shutil.copytree(FRONTEND / "js", d)
+    (d / "package.json").write_text('{"type": "module"}', "utf-8")
+    script = tmp_path / "tip.mjs"
+    script.write_text(TIP_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (d / "tabs" / "radio.js").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["acc"].split("\n") == ["EPWW N · LOW FL095–FL335", "Now: EPWW_N_CTR 130.675 – Tomasz (CID 11)", "Sectors: LB, LG"]
+    pos = "Position: EPWA_S_APP · Warszawa Approach 128.805"
+    assert out["app"].split("\n") == ["TMA Radom (FL035–FL095)", pos, "Now: EPWA_APP 128.805 – Jan (CID 12)"]
+    assert out["proc"].split("\n")[3:] == ["Procedural TMA (no APP): tower frequency SC TWR"]
+    assert out["top"].split("\n")[2] == "Now top-down: EPWW_N_CTR 130.675 – Tomasz (CID 11)"
+    assert out["none"].split("\n") == ["TMA Radom (FL035–FL095)", pos, "Now: unstaffed"]
+    assert out["nonet"].split("\n")[2] == "Now: no data"
+    assert out["cov"].split("\n") == ["CTR Radom · EPRA", pos, "Tower offline – covered by EPWA_APP", "Click: AERODROME"]
+    assert out["now"] == ["Now: unstaffed", "Now: no data",
+                          "Now: EPWA_APP 128.805 – Jan (CID 12)\nNow: EPWW_N_CTR 130.675 – Tomasz (CID 11)"]
+    for key, t in out.items():
+        assert not re.search(r"Coverage order|coverage order|sector position|›|VATSIM|VACS", json.dumps(t)), key
+        assert "EPRA_TWR" not in json.dumps(t) and "EPWW_C_CTR" not in json.dumps(t), key  # nic z kolejności
+
+
+def test_radio_page_without_provenance_notes():
+    """Runda 15 (Marek): na stronie RADIO bez kolejności przejmowania i bez dopisków, skąd jest wartość, opis albo układ
+    (VACS, VATSpy, plik .ese/sektora, om.plvacc.pl, VATSIM jako źródło) – w kodzie strony poza komentarzami."""
+    for name in ("tabs/radio.js", "radioboard.js"):
+        lines = (FRONTEND / "js" / name).read_text("utf-8").splitlines()
+        code = "\n".join(re.sub(r"\s//\s.*$", "", ln) for ln in lines if not ln.lstrip().startswith("//"))
+        for bad in ("Coverage order", "coverage order", "sector position", "VACS", "VATSpy", ".ese", "sector file",
+                    "om.plvacc", "VATSIM", "PDF extract", "per LOA", "chainText", "in this part", "g.apps"):
+            assert bad not in code, (name, bad)
 
 
 def test_frontend_imports_resolve():

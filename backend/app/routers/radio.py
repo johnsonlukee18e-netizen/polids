@@ -25,6 +25,9 @@ from . import vatsim as vatsim_api
 
 router = APIRouter(prefix="/api/radio", tags=["radio"])
 log = logging.getLogger("polids.radio")
+# komunikaty błędów widoczne na stronie: bez nazwy dostawcy danych i pliku (szczegóły w logu serwera)
+ONLINE_UNAVAILABLE = "Online data unavailable"
+LOA_UNAVAILABLE = "LOA data unavailable"
 
 
 def _seed_or_empty(name: str) -> dict:
@@ -77,20 +80,24 @@ def loa():
     try:
         data = seed_json(settings.seed_dir / "loa.json")
     except FileNotFoundError as exc:
-        raise HTTPException(404, "LOA: file data/seed/loa.json not found") from exc
+        log.warning("LOA: brak pliku data/seed/loa.json")
+        raise HTTPException(404, LOA_UNAVAILABLE) from exc
     except (OSError, ValueError) as exc:
-        raise HTTPException(500, f"LOA: cannot read file data/seed/loa.json ({exc})") from exc
+        log.warning("LOA: nie mogę odczytać data/seed/loa.json (%s)", exc)
+        raise HTTPException(500, LOA_UNAVAILABLE) from exc
     firs = data.get("firs") if isinstance(data, dict) else None
     if not isinstance(firs, dict):
-        raise HTTPException(500, "LOA: file data/seed/loa.json has no firs section")
-    return {"firs": {k: v for k, v in firs.items() if isinstance(v, dict)}, "source": data.get("_zrodlo", "")}
+        log.warning("LOA: data/seed/loa.json bez sekcji firs")
+        raise HTTPException(500, LOA_UNAVAILABLE)
+    return {"firs": {k: v for k, v in firs.items() if isinstance(v, dict)}}
 
 
 async def _feed() -> dict:
     try:
         return await vatsim_api.get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
+        log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
+        raise HTTPException(502, ONLINE_UNAVAILABLE) from exc
 
 
 @router.get("/online")
@@ -115,7 +122,8 @@ async def bookings(db: Session = Depends(get_db)):
     try:
         data = await vatsim_api.get_bookings()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM ATC bookings unavailable: {exc}") from exc
+        log.warning("RADIO: rezerwacje niedostępne (%s)", exc)
+        raise HTTPException(502, "Bookings unavailable") from exc
     known = {p["callsign"] for p in all_positions(db)}
     result = {cs: b for cs, b in bookings_by_callsign(data).items() if cs in known or cs.startswith("EP")}
     try:
@@ -284,7 +292,8 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
         feed_atis = data.get("atis", [])
         net["updated"] = data.get("general", {}).get("update_timestamp")
     except (UpstreamError, ValueError) as exc:
-        net.update(ok=False, error=f"VATSIM data feed unavailable: {exc}")
+        log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
+        net.update(ok=False, error=ONLINE_UNAVAILABLE)
     out = radioboard.board(static, online, positions, feed_atis)
     out["net"] = net
     out["ver"] = static["ver"]

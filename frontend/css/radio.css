@@ -213,7 +213,7 @@
 .rb-loa-tools { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; height: 32px; background: #050705; }
 .rb-loa-q { flex: 0 1 260px; min-width: 120px; padding: 2px 6px; background: #000; border: 1px solid #2f3a2f; border-radius: 0; color: var(--text); font: 12px var(--mono); }
 .rb-loa-q:focus { outline: none; border-color: var(--green-hi); }
-.rb-loa-tools .hint, .rb-loa-cnt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--muted); }
+.rb-loa-cnt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--muted); }
 .rb-loa-cnt:empty { display: none; }
 .rb-loa-sec[hidden], .rb-loa [data-f][hidden] { display: none; }
 .rb-loa h4 { margin: 8px 0 3px; font: 700 11px/1.3 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }

@@ -305,12 +305,10 @@ def tma_groups(slices: list[dict], own: dict) -> list[dict]:
             if owner := part_owner(s["chain"], dirs):
                 parts.setdefault(owner, []).append(s)
         for nominal, psl in parts.items():
-            # wszystkie APP części (z dyrektorem, np. WA DIR w części WA APP), od najczęstszego – do dymku
-            apps = Counter(cs for s in psl for cs in _local(s["chain"]) if facility(cs) in APP_TYPES)
             other = [s for cs, p in parts.items() if cs != nominal for s in p]
             out.append({"id": key if len(parts) == 1 else f"{key} · {nominal}", "tma": key, "icao": icao,
                         "at": part_anchor(psl, other), "box": _box(psl), "nominal": nominal,
-                        "apps": [cs for cs, _ in apps.most_common()], "chains": _uniq_chains(psl),
+                        "chains": _uniq_chains(psl),
                         "lo": min(s["lo"] for s in psl), "hi": max(s["hi"] for s in psl)})
     return sorted(out, key=lambda g: g["id"])
 
@@ -592,8 +590,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
            "fis": outlines(fis_sl, owner=lambda s: s["owners"][0] if s["owners"] else None),
            "nb": [{k: a[k] for k in ("id", "fir", "name", "kind", "lo", "hi", "geometry")} for a in nb]}
     atis = sorted(cs for cs in positions if cs.startswith("EP") and facility(cs) == "ATIS")
-    return {"layers": own.get("layers") or {}, "source": own.get("source_label") or own.get("source") or "",
-            "acc_positions": sorted(own.get("acc_positions") or {}),
+    return {"layers": own.get("layers") or {}, "acc_positions": sorted(own.get("acc_positions") or {}),
             "sectors": acc_sectors(own), "tma": tma_groups(kinds["tma"], own),
             "twr": ctr_groups(kinds["ctr"], own, coords, positions), "fis": fis_groups(fis_sl, own),
             "atis": atis, "stacks": stacks, "nb": [{"id": a["id"], "chain": a["chain"]} for a in nb], "geo": geo}
@@ -656,6 +653,6 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
                                  "atis_code": info.get("atis_code"), "text_atis": info.get("text_atis")}}
     # wycinki sąsiadów na podglądach: obsadzone (id → pierwsze stanowisko online z listy OWNER); reszta nieobsadzona
     nb = {a["id"]: o for a in static.get("nb") or () if (o := first_online(a["chain"], online))}
-    return {"layers": static["layers"], "source": static["source"], "sectors": sectors, "tma": tma, "twr": twr,
+    return {"layers": static["layers"], "sectors": sectors, "tma": tma, "twr": twr,
             "fis": fis, "atis": atis, "stacks": stacks, "nb": nb, "pos": pos,
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra}}
