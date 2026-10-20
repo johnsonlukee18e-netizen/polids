@@ -124,7 +124,7 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
 
     monkeypatch.setattr(vatsim_api, "get_feed", down)
     d = client.get("/api/vatsim/me").json()
-    assert d["online"] == [] and "data feed" in d["online_error"] and d["error"] == d["online_error"]
+    assert d["online"] == [] and d["online_error"] == "Network data unavailable" and d["error"] == d["online_error"]
     assert d["bookings_error"] is None and [b["callsign"] for b in d["bookings"]] == ["EDDB_TWR", "EPWA_TWR"]
 
     monkeypatch.setattr(vatsim_api, "get_bookings", down)
@@ -150,7 +150,7 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
     monkeypatch.setattr(vatsim_api, "get_feed", as_list)
     d = client.get("/api/vatsim/me").json()
     # komunikat o data feed (tekst z routers/vatsim.py), nie 500
-    assert d["online"] == [] and d["online_error"] == "Live data feed unavailable"
+    assert d["online"] == [] and d["online_error"] == "Network data unavailable"
 
 
 # --- frontend: czyste funkcje HOME w Node -----------------------------------------------------------------------

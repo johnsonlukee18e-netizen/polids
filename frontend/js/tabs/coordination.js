@@ -75,7 +75,7 @@ export default {
           const keys = ownedKeys(data.chains, st.pos, online);
           const ons = data.positions.filter((p) => online.has(p.callsign) && p.callsign !== st.pos).map((p) => shortCs(p.callsign));
           own.innerHTML = (keys.length ? `Covers: <b>${esc(keys.join(", "))}</b>.` : "Covers no LoA sector now.")
-            + (net === false ? " Online data unavailable."
+            + (net === false ? " Network data unavailable."
               : net ? ` Online: ${ons.length ? esc(ons.join(", ")) : "none of these positions"}.` : "");
         } else own.textContent = "All transfers, not split by sector.";
         const firs = [...new Set([...v.out, ...v.in].map((r) => r.fir))];

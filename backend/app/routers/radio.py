@@ -26,7 +26,7 @@ from . import vatsim as vatsim_api
 router = APIRouter(prefix="/api/radio", tags=["radio"])
 log = logging.getLogger("polids.radio")
 # komunikaty błędów widoczne na stronie: bez nazwy dostawcy danych i pliku (szczegóły w logu serwera)
-ONLINE_UNAVAILABLE = "Online data unavailable"
+ONLINE_UNAVAILABLE = "Network data unavailable"
 LOA_UNAVAILABLE = "LOA data unavailable"
 
 

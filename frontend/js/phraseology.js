@@ -7,7 +7,7 @@ import { embedBar } from "./tabs/aip.js";
 // ramką widać, dlaczego, i przycisk otwierający frazeologię w nowej karcie. 0.12.6: napisy bez nazwy serwisu,
 // pasek nad ramką bez adresu strony.
 export function mountPhraseology(pane, ctx) {
-  iframeWithFallback(pane, ctx.config.links.phraseology, "", { showUrl: false });
+  iframeWithFallback(pane, ctx.config.links.phraseology);
   embedBar(pane);
   const note = h(`<div class="embed-note hint">Checking whether the page can be shown in a frame…</div>`);
   pane.insertBefore(note, pane.querySelector("iframe"));

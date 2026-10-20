@@ -134,7 +134,7 @@ def test_radio_online_upstream_error(client, monkeypatch):
     monkeypatch.setattr(vatsim_api, "get_feed", down)
     r = client.get("/api/radio/online")
     # komunikat bez nazwy dostawcy danych i bez szczegółów błędu (runda 15)
-    assert r.status_code == 502 and r.json()["detail"] == "Online data unavailable"
+    assert r.status_code == 502 and r.json()["detail"] == "Network data unavailable"
 
     async def no_bookings():
         raise UpstreamError("timeout")

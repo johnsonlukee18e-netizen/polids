@@ -202,7 +202,6 @@
 .rb-loa-fir { flex: none; color: var(--muted); }
 .rb-loa-fir b { color: var(--yellow); }
 .rb-loa-t { flex: 0 1 auto; min-width: 12ch; overflow: hidden; text-overflow: ellipsis; color: #fff; font-weight: 700; }
-.rb-loa-v { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .rb-loa-n { flex: none; font: 11px var(--mono); color: #b9c2b9; }
 .rb-loa-sp { flex: 1; }
 .rb-loa-a, .rb-loa-x { flex: none; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #c3cdc3;

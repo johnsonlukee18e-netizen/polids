@@ -317,7 +317,7 @@ def test_board_upstream_error(client, monkeypatch):
     assert r.status_code == 200
     d = r.json()
     # komunikat bez nazwy dostawcy danych i bez szczegółów błędu (runda 15)
-    assert d["net"]["ok"] is False and d["net"]["error"] == "Online data unavailable"
+    assert d["net"]["ok"] is False and d["net"]["error"] == "Network data unavailable"
     assert all(s["owner"] is None for s in d["sectors"]) and d["online"] == {}
     assert all(t["owner"] is None for s in d["stacks"] for t in s["tiles"])
     assert len(d["sectors"]) == 30 and all(a["online"] is False for a in d["atis"])

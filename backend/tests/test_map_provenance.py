@@ -100,6 +100,6 @@ def test_feed_errors_neutral(client, monkeypatch):
     monkeypatch.setattr(nav_api, "get_feed", down)
     for url in ("/api/vatsim/online", "/api/vatsim/pilots?bbox=44,5,60,35&ep=1", "/api/nav/sectors/online"):
         r = client.get(url)
-        assert r.status_code == 502 and r.json()["detail"] == "Live data feed unavailable", url
+        assert r.status_code == 502 and r.json()["detail"] == "Network data unavailable", url
     r = client.get("/api/vatsim/bookings")
     assert r.status_code == 502 and r.json()["detail"] == "ATC bookings unavailable"

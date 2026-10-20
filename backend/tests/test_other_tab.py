@@ -255,12 +255,13 @@ const api = await import(process.argv[2]);
 const bar = (...args) => { const pane = { items: [], append(x) { this.items.push(x.html); } };
   api.iframeWithFallback(pane, ...args); return pane.items; };
 console.log(JSON.stringify({ plain: bar("https://example.test/a?b=1&c=2", "Note"),
-  hidden: bar("https://example.test/a?b=1&c=2", "", { showUrl: false }) }));
+  hidden: bar("https://example.test/a?b=1&c=2") }));
 """
 
 
 def test_frame_bar_without_url(tmp_path):
-    """OTHER › PHRASEOLOGY: pasek nad ramką bez adresu strony (adres mówi tylko, skąd jest strona), przycisk ↗ zostaje."""
+    """Pasek nad ramką (INOP, AD CIV/MIL/VFR, PHRASEOLOGY) bez adresu strony (adres mówi tylko, skąd jest strona),
+    przycisk ↗ i uwaga zostają."""
     node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
     if not node:
         pytest.skip("brak Node.js")
@@ -271,13 +272,10 @@ def test_frame_bar_without_url(tmp_path):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     url = "https://example.test/a?b=1&amp;c=2"
-    # domyślnie (INOP, AD CIV, AD MIL, AD VFR) pasek jak dotąd: adres, uwaga, przycisk
     plain_bar, plain_frame = out["plain"]
-    assert f'<span class="hint mono">{url}</span>' in plain_bar and '<span class="hint">Note</span>' in plain_bar
+    assert '<span class="hint">Note</span>' in plain_bar and "hint mono" not in plain_bar
     hidden_bar, hidden_frame = out["hidden"]
     assert "hint mono" not in hidden_bar and "example.test" not in hidden_bar.replace(f'href="{url}"', "")
     assert f'<a class="btn" href="{url}" target="_blank" rel="noopener">Open in new tab ↗</a>' in hidden_bar
     assert hidden_frame == plain_frame and f'src="{url}"' in hidden_frame
-    # frazeologia korzysta z paska bez adresu
-    assert 'iframeWithFallback(pane, ctx.config.links.phraseology, "", { showUrl: false });' in (
-        FRONTEND / "js" / "phraseology.js").read_text("utf-8")
+    assert "example.test" not in plain_bar.replace(f'href="{url}"', "")

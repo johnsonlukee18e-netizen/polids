@@ -114,7 +114,7 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
   const pdf = pdfPath(f?.pdf);
   // tytuł LOA podaje już FIR sąsiada (LOA EPWW – EDWW (Bremen)); bez LOA: FIR i nazwa ze stosu
   const head = `<div class="rb-loa-h"><b class="rb-loa-tag">LOA</b>${f ? "" : `<span class="rb-loa-fir"><b>${esc(fir)}</b> ${esc(title)}</span>`}`
-    + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span><span class="rb-loa-v" title="${esc(f.version)}">${esc(f.version)}</span>` : "")
+    + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
     + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Open the LOA in COORDINATION › DOCUMENTS (← returns to RADIO)">COORDINATION ›</button>`
       + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="Open the LOA PDF">PDF ↗</a>` : "")
