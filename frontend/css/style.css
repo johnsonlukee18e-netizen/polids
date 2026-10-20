@@ -354,7 +354,6 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .map.light .maplabel > div { color: #1b2a1b; background: rgba(255,255,255,.85); }
 .map.light .maplabel .firname { color: #5c6670; }
 .map.light .acicon svg { fill: #0b3d91; stroke: #fff; }
-.map.light .acicon span { color: #0b3d91; background: rgba(255,255,255,.85); }
 .acicon.sel svg { fill: #ff9f1a; }
 
 /* MAP: panel boczny */
@@ -489,8 +488,6 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .acicon { background: none; border: 0; }
 .acicon .ac { position: relative; width: 20px; height: 20px; }
 .acicon svg { width: 20px; height: 20px; fill: #f2d21b; stroke: #000; stroke-width: 1; }
-.acicon span { position: absolute; left: 18px; top: -4px; white-space: nowrap; font: 11px/1.2 var(--mono); color: #f2d21b;
-  background: rgba(0,0,0,.7); padding: 0 3px; border-radius: 0; }
 
 /* Karta z odnośnikiem do serwisu, który nie daje się osadzić w ramce */
 .ext-card { max-width: 760px; }

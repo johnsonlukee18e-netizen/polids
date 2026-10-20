@@ -184,12 +184,13 @@ def test_flight_endpoint(client):
     r = client.get("/api/viff/flight/lot3827")
     assert r.status_code == 200 and r.json()["callsign"] == "LOT3827" and r.json()["states"]["AA"].startswith("AA")
     r = client.get("/api/viff/flight/ABC123")
-    assert r.status_code == 404 and "vIFF does not know flight ABC123" in r.json()["detail"]
+    # 0.12.6: komunikaty bez nazwy źródła (vIFF, IFPS) i bez adresu z błędu
+    assert r.status_code == 404 and r.json()["detail"] == "No flow data for flight ABC123"
     for bad in ("X", "LOT-1", "ABCDEFGHIJK"):
         assert client.get(f"/api/viff/flight/{bad}").status_code == 400
     viff._get = fake({"/ifps/callsign": UpstreamError("timeout")})
     r = client.get("/api/viff/flight/LOT3827")
-    assert r.status_code == 502 and "vIFF" in r.json()["detail"]
+    assert r.status_code == 502 and r.json()["detail"] == "Flow data unavailable"
     # HTTP 404 z vIFF = nieznany lot, nie awaria
     resp = httpx.Response(404, request=httpx.Request("GET", "https://api.viffsys.com/ifps/callsign"))
     err = UpstreamError("404")

@@ -75,7 +75,7 @@ const STATE_CLASS = { FI: "fi", SI: "si", SU: "su", AA: "aa", TA: "ta" };
 export function stateChip(v, states) {
   if (!v) return "";
   const label = v.state === "SU" && v.suspension ? "SU " + v.suspension.replace(/^FLS-?/, "") : v.state;
-  const tip = [states?.[v.state] || v.state, v.atfcm_status && `vIFF: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`]
+  const tip = [states?.[v.state] || v.state, v.atfcm_status && `ATFCM: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`]
     .filter(Boolean).join(" · ");
   return `<span class="fs fs-${STATE_CLASS[v.state] || "fi"}" title="${esc(tip)}">${esc(label)}</span>${v.ready ? ` <span class="fs fs-rea" title="REA: ready to depart before the slot">REA</span>` : ""}`;
 }
@@ -132,7 +132,7 @@ export function chartHtml(tv, now, pilot = () => null, sel = null) {
       <td class="t">${esc(f.entry)}</td><td class="t">${esc(f.exit)}</td></tr>`;
   }).join("");
   const active = tv.active ?? tv.status === 1;
-  return `<div class="vf-title"><span class="vf-kind" title="TV (traffic volume) in vIFF: sector or area with a set capacity">TV sector</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
+  return `<div class="vf-title"><span class="vf-kind" title="TV (traffic volume): sector or area with a set capacity">TV sector</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
       ${active ? `<span class="vs-chip on">ACTIVE</span>` : `<span class="vs-chip">inactive</span>`}
       <button class="vf-close" title="Close chart">✕</button></div>
     <div class="vf-body">
@@ -141,7 +141,7 @@ export function chartHtml(tv, now, pilot = () => null, sel = null) {
       <span>capacity: <b>${tv.entries_cap ?? "∞"}</b> entries/h · <b>${tv.occupancy_cap ?? "∞"}</b> at once</span></div>
     ${svg}
     <div class="vf-legend"><span><i class="vf-ok"></i>&lt; 90 %</span><span><i class="vf-near"></i>90–100 %</span><span><i class="vf-over"></i>&gt; capacity</span>
-      <span><i class="vf-capl"></i>capacity</span><span class="vf-stat">vIFF ${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · peak ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} ·
+      <span><i class="vf-capl"></i>capacity</span><span class="vf-stat">${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · peak ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} ·
       entries per 20 min: ${(tv.windows || []).map((w) => w.entries).join(" · ") || "–"}</span></div>
     <div class="vf-fhead">Flights in sector within the hour <span>(${(tv.flights || []).length})</span></div>
     ${rows ? `<div class="vf-tblwrap"><table class="vf-tbl"><thead><tr><th>Callsign</th><th>ADEP</th><th>ADES</th><th>Type</th><th>Entry</th><th>Exit</th></tr></thead>

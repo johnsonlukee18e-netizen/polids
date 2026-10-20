@@ -126,7 +126,7 @@ def test_ecfmp_zapas_z_viff(monkeypatch):
     monkeypatch.setattr(viff, "_get", viff_get)
     out = __import__("asyncio").run(ecfmp.measures(overview.AERODROMES, NOW))
     m = out["measures"][0]
-    assert out["source"] == "vIFF" and "ECFMP unavailable" in out["error"]
+    assert out["source"] == "vIFF" and out["error"] is None  # 0.12.6: dane z zapasu bez dopisku, skąd są
     assert m["value"] == 180 and m["value_text"] == "every 3 min" and m["state"] == "active"
     assert m["start"] == "2026-10-08T14:30:00+00:00" and m["end"] == "2026-10-08T17:30:00+00:00"
 

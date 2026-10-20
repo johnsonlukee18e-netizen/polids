@@ -13,12 +13,16 @@ odstęp między startami w minutach). Używamy go, gdy ECFMP nie odpowiada.
 Nazwy pól pochodzą z odpowiedzi API i z kodu ECFMP (app/Enums/FlowMeasureType.php, FilterType.php)."""
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 
 from .http_cache import UpstreamError, fetch_text
 
+log = logging.getLogger("polids.ecfmp")
 API = "https://ecfmp.vatsim.net/api/v1"
+# komunikat w panelu, gdy nie odpowiada ani ECFMP, ani zapas (0.12.6: bez nazw i adresów źródeł, szczegóły w logu)
+FLOW_DOWN = "Flow measures unavailable"
 FIR_EPWW = "EPWW"
 CACHE_SECONDS = 120
 FIR_CACHE_SECONDS = 86400
@@ -153,7 +157,8 @@ async def firs() -> dict[int, str]:
 async def measures(airports=(), now: datetime | None = None) -> dict:
     """Restrykcje ECFMP dotyczące FIR EPWW (albo polskich lotnisk), obowiązujące i zgłoszone na później.
 
-    Przy błędzie ECFMP próbujemy jeszcze vIFF; gdy i to nie wyjdzie, zwracamy pustą listę z komunikatem."""
+    Przy błędzie ECFMP próbujemy jeszcze vIFF (bez komunikatu: dane są); gdy i to nie wyjdzie, zwracamy pustą listę
+    z komunikatem FLOW_DOWN."""
     now = now or datetime.now(timezone.utc)
     ads = {a.upper() for a in airports}
     try:
@@ -167,14 +172,15 @@ async def measures(airports=(), now: datetime | None = None) -> dict:
         items = [measure(m, fir_ids, now) for m in raw if isinstance(m, dict)]
         return _result(items, ads, "ECFMP", None)
     except (UpstreamError, ValueError, KeyError, TypeError, AttributeError) as exc:   # Attribute: np. "measure" nie jako obiekt
-        ecfmp_error = f"ECFMP unavailable: {exc}"
+        log.warning("ECFMP: %s", exc)
     from . import viff as viff_service  # import tutaj, żeby nie robić zależności na starcie
     try:
         data = await viff_service._get("/etfms/ecfmp", ttl=CACHE_SECONDS)
         items = [viff_measure(m, now) for m in (data if isinstance(data, list) else []) if isinstance(m, dict)]
-        return _result(items, ads, "vIFF", f"{ecfmp_error} – data from vIFF (/etfms/ecfmp)")
+        return _result(items, ads, "vIFF", None)
     except Exception as exc:  # noqa: BLE001 - zapas: każdy błąd vIFF kończy się komunikatem w panelu
-        return {"measures": [], "source": None, "error": f"{ecfmp_error}; vIFF fallback did not respond either: {exc}"}
+        log.warning("ECFMP z vIFF: %s", exc)
+        return {"measures": [], "source": None, "error": FLOW_DOWN}
 
 
 def _result(items: list[dict], airports: set[str], source: str, note: str | None) -> dict:

@@ -140,7 +140,8 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
     r = client.get("/api/vatsim/me")
     assert r.status_code == 200
     d = r.json()
-    assert d["bookings"] == [] and "Expecting value" in d["bookings_error"]
+    # 0.12.6: komunikat bez nazwy i adresu źródła (szczegóły błędu tylko w logu)
+    assert d["bookings"] == [] and d["bookings_error"] == "ATC bookings unavailable"
     # wpis bez znaku i "atis" nie-listą: pominięte, bez błędu
     assert d["online"] == [] and d["online_error"] is None
 
@@ -149,7 +150,7 @@ def test_vatsim_me_upstream_errors(client, monkeypatch):
     monkeypatch.setattr(vatsim_api, "get_feed", as_list)
     d = client.get("/api/vatsim/me").json()
     # komunikat o data feed (tekst z routers/vatsim.py), nie 500
-    assert d["online"] == [] and d["online_error"].startswith("VATSIM data feed unavailable")
+    assert d["online"] == [] and d["online_error"] == "Live data feed unavailable"
 
 
 # --- frontend: czyste funkcje HOME w Node -----------------------------------------------------------------------
