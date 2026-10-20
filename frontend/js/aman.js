@@ -1,15 +1,15 @@
 // AERODROME › RUCH › AMAN: okno sekwencji przylotów na wzór AMAN Zbliżania Warszawskiego (RWY, FLOW, drabina HH:MM
 // z bieżącą godziną na dole, etykiety-strzałki z linią do czasu STA, tabela LND/SEP) i przyciski strumieni z okna ACC.
-// Sekwencja to przybliżenie (opis w dymkach): ETA = ELDT z vIFF albo z pozycji, STA = max(ETA, poprzedni STA + FLOW/140 kt).
+// Sekwencja to przybliżenie: ETA = ELDT z vIFF albo z pozycji, STA = max(ETA, poprzedni STA + FLOW/140 kt); dymki mówią
+// tylko, jak czytać okno (bez wzorów).
 // Boczne panele są budowane raz (suwak, przyciski strumieni, pola); odświeżenie i wybór lotu zmieniają tylko wartości,
 // więc przeciąganie suwaka i kliknięcie przycisku przy otwartym polu FLOW nie giną.
 import { esc, lsGet, lsSet } from "./api.js";
-import { APPROACH_KT, DEFAULT_FLOW, OTHER_COLOR, clock, fixColor, fixColors, fixOrder, hm, lndSep, overflow, sequence, stack } from "./dmancore.js";
+import { DEFAULT_FLOW, OTHER_COLOR, clock, fixColor, fixColors, fixOrder, hm, lndSep, overflow, sequence, stack } from "./dmancore.js";
 
 const OTHER = "OTHER";
-const SEQ_HINT = "Sequence (approximation): ETA = CDM ELDT or from position (great-circle distance / GS, last 10 NM 140 kt); "
-  + "on each runway in ETA order: STA = max(ETA, previous STA + FLOW / 140 kt). Bar under the distance: green = on time, "
-  + "red = the aircraft has to lose that much time (length ∝ STA − ETA).";
+const SEQ_HINT = "Arrival sequence by STA. FLOW = spacing between landings in NM; click FLOW to change it. "
+  + "Bar under the distance: green = on time, red = time to lose (longer bar = more time).";
 const num = (v) => Math.round(v * 2) / 2;
 const flowKey = (icao, rwy) => `dman.flow.${icao}.${rwy || "-"}`;
 
@@ -77,13 +77,13 @@ export function createAman(host, { icao, st, nowMs, getData }) {
 
   const box = (cls, label, val, attrs = "", title = "") => `<div class="am-box ${cls}"${attrs}${title ? ` title="${esc(title)}"` : ""}><i>${label}</i><b>${esc(val)}</b></div>`;
   const flowBox = (rwy) => box("flow", "FLOW", flowOf(icao, rwy).toFixed(1), ` data-rwy="${esc(rwy)}"`,
-    `FLOW of runway ${rwy || "?"}: spacing between landings in NM (default ${DEFAULT_FLOW.toFixed(1)}). Click to change. ${SEQ_HINT}`);
+    `FLOW of runway ${rwy || "?"}: spacing between landings in NM (default ${DEFAULT_FLOW.toFixed(1)}). Click to change.`);
   const setHtml = (node, html) => { if (node.innerHTML !== html) node.innerHTML = html; };
 
   const lndTable = (rwy) => {
     const stas = [...seq.values()].filter((x) => x.runway === rwy).map((x) => x.sta);
     const rows = lndSep(stas, nowMs() / 1000);
-    return `<table class="am-lnd" title="${esc(`Runway ${rwy || "?"}: LND = landings in the next 60/30/10 min (by STA), SEP = average spacing in NM between consecutive landings (time spacing × ${APPROACH_KT} kt).`)}">
+    return `<table class="am-lnd" title="${esc(`Runway ${rwy || "?"}: LND = landings in the next 60/30/10 min, SEP = average spacing in NM between consecutive landings.`)}">
       <tr><th>${esc(rwy || "–")}</th>${rows.map((r) => `<th>${r.window}</th>`).join("")}</tr>
       <tr><th>LND</th>${rows.map((r) => `<td>${r.lnd}</td>`).join("")}</tr>
       <tr><th>SEP</th>${rows.map((r) => `<td>${r.sep === null ? "–" : r.sep.toFixed(1)}</td>`).join("")}</tr></table>`;
@@ -122,8 +122,8 @@ export function createAman(host, { icao, st, nowMs, getData }) {
     wrap.querySelectorAll("button[data-fix]").forEach((b) => {
       const f = b.dataset.fix, off = thin.has(f);
       b.className = off ? "thin" : "full";
-      const what = f === OTHER ? (strict ? "Other entries (outside the six points of the ACC window) and unknown" : "Arrivals without an entry point on the route")
-        : b.dataset.src ? `Entry ${f} (last route point or STAR)` : `Stream ${f}`;
+      const what = f === OTHER ? (strict ? "Other and unknown entries" : "Arrivals without an entry point")
+        : b.dataset.src ? `Entry ${f}` : `Stream ${f}`;
       b.title = `${what}: ${off ? "only a thin line with the callsign" : "full labels"}. Click to toggle.`;
     });
   };
@@ -131,8 +131,9 @@ export function createAman(host, { icao, st, nowMs, getData }) {
   const sides = (d) => {
     const colors = colorsFor(d);
     const rw = runways(d);
-    const src = d.runway_in_use?.source === "ATIS" ? `from ATIS ${d.atis?.letter || ""}` : "system suggestion (no ATIS)";
-    setHtml(slot("rwy0"), box("rwy", "RWY", rw[0] || "–", "", `Landing runway ${src}`));
+    // pas w użyciu jak w OVERVIEW: z ATIS litera ATIS, bez niego pas preferowany
+    const tip = d.runway_in_use?.source === "ATIS" ? `Landing runway in use · ${`ATIS ${d.atis?.letter || ""}`.trim()}` : "Preferred landing runway";
+    setHtml(slot("rwy0"), box("rwy", "RWY", rw[0] || "–", "", tip));
     fixButtons(d, colors);
     const n = flights.length;
     setHtml(slot("top1"), rw[1] ? box("rwy", "RWY", rw[1], "", "Second landing runway") : box("cnt", "ARRIVALS", n, "", `${icao} arrivals in the sequence: ${n}`));
@@ -209,7 +210,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
       const sel = st.sel === k;
       const delayMin = t.q.delay / 60;
       const title = `${t.f.s.callsign} ${t.f.s.aircraft || ""} from ${t.f.s.departure || "?"} · entry ${t.fix === OTHER ? t.f.s.entry_fix?.fix || "?" : t.fix}
-STA ${clock(t.q.sta * 1000, false)} · ETA ${clock(t.f.eta * 1000, false)} (${t.f.s.eldt_source === "vIFF" ? "CDM ELDT" : "from position"}) · ${delayMin >= 0.5 ? `lose ${delayMin.toFixed(1)} min` : "on time"}
+STA ${clock(t.q.sta * 1000, false)} · ETA ${clock(t.f.eta * 1000, false)} (${t.f.s.eldt_source === "vIFF" ? "CDM" : "estimate"}) · ${delayMin >= 0.5 ? `lose ${delayMin.toFixed(1)} min` : "on time"}
 ${t.f.s.dist_nm ?? "?"} NM · GS ${t.f.s.groundspeed ?? "?"} kt · RWY ${t.f.runway || "?"} · no. ${t.q.order}
 Click: details · double-click: map`;
       if (t.thin) {

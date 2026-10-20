@@ -518,7 +518,7 @@ def runway_in_use(atis: dict | None, preferred: dict) -> dict:
     (source "SUGGESTED", z powodem wyboru)."""
     if atis and (atis.get("arr") or atis.get("dep")):
         return {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
-                "reason": f"From ATIS {atis.get('letter') or ''}".strip()}
+                "reason": f"ATIS {atis.get('letter') or ''}".strip()}
     return {**preferred, "source": "SUGGESTED"}
 
 

@@ -135,7 +135,7 @@ function windrose(status) {
     arrow += `<path d="M${x1},${y1} A${r - 18},${r - 18} 0 ${span > 180 ? 1 : 0} 1 ${x2},${y2}" stroke="#ffb020" stroke-width="3" fill="none"/>`;
   }
   return `<svg class="windrose" viewBox="0 0 ${size} ${size}">${defs}<circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}${marks}</svg>
-    <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>suggested</span></div>`;
+    <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>preferred</span></div>`;
 }
 
 // Pas w użyciu z ATIS albo preferowany wg systemu (wiatr, wyposażenie, LVP)
@@ -161,7 +161,7 @@ const roleOrder = (active, sugg) => (d) => (active.arr === d || sugg.arr === d ?
 function runwayTable(st) {
   const { active, sugg } = roleSets(st);
   const tags = (d) => ["arr", "dep"].map((k) => (active[k] === d ? `<span class="tag ${k}">${ROLE_LABEL[k]}</span>`
-    : sugg[k] === d ? `<span class="tag ${k} sugg" title="system suggestion">${ROLE_LABEL[k]}?</span>` : "")).join("");
+    : sugg[k] === d ? `<span class="tag ${k} sugg" title="Preferred runway">${ROLE_LABEL[k]}?</span>` : "")).join("");
   // pasy w użyciu na górze, potem z podejściem, na końcu pozostałe (np. trawiaste): w niskim oknie tabela przewija się
   const order = roleOrder(active, sugg);
   const rank = (r) => order(r.designator) * 2 + ((r.equipment || []).length ? 0 : 1);
@@ -179,7 +179,7 @@ function runwayTable(st) {
       <td class="num" style="color:${tw ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (tw ? "TW " : "") + kt(r.headwind) + " kt"}</td>
       <td class="num">${r.crosswind === null ? "–" : kt(r.crosswind) + " kt" + (!kt(r.crosswind) ? "" : r.crosswind > 0 ? " R" : " L")}</td></tr>`;
     }).join("")}
-  </tbody></table><div class="hint">TW = tailwind · ARR? / DEP? = system suggestion · hover a runway: width, surface, approaches</div>`;
+  </tbody></table><div class="hint">TW = tailwind · ARR? / DEP? = preferred runway · hover a runway: width, surface, approaches</div>`;
 }
 
 // Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak METEO › WIND, bez mapy): METAR i model 10 m

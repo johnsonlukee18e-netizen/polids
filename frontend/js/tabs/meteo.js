@@ -414,7 +414,7 @@ function windTab(pane) {
       ${mode === "3000" ? `<p class="wnd-note">${CL3}: point on the extended centreline where a 3° path reaches 3000 ft.
         Click a RWY to move the map forecast point there.</p>`
         : `<p class="wnd-note">0 ft wind: METAR and 10 m model over the aerodrome reference point; components relative to each RWY heading.</p>`}
-      <p class="wnd-note">H = headwind, T = tailwind, L/R = crosswind from the left/right, kt. ${inUse ? `ARR/DEP: RWY in use (${inUse.source === "ATIS" ? "ATIS" : "? = system suggestion"}).` : ""}</p>
+      <p class="wnd-note">H = headwind, T = tailwind, L/R = crosswind from the left/right, kt. ${inUse ? (inUse.source === "ATIS" ? `ARR/DEP: RWY in use · ${esc(`ATIS ${inUse.letter || ""}`.trim())}.` : "ARR?/DEP?: preferred runway.") : ""}</p>
     </div>`;
   };
 
@@ -445,8 +445,9 @@ function windTab(pane) {
     bar();
     side();
     loadWind();
-    // pas do lądowania w użyciu (ATIS albo sugestia systemu) jako domyślny, jeśli odpowiedź przyjdzie szybko
-    const st = api(`/api/aerodromes/${icao}/status`).then((x) => x.runway_in_use || null).catch(() => null);
+    // pas do lądowania w użyciu (ATIS albo pas preferowany) jako domyślny, jeśli odpowiedź przyjdzie szybko; z literą ATIS
+    const st = api(`/api/aerodromes/${icao}/status`)
+      .then((x) => (x.runway_in_use ? { ...x.runway_in_use, letter: x.atis?.letter || "" } : null)).catch(() => null);
     const first = await Promise.race([st, new Promise((res) => setTimeout(() => res(null), 1500))]);
     if (dead || my !== seq) return;
     inUse = first;

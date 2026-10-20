@@ -48,7 +48,7 @@ def test_aerodrome_status(client):
     # AIP AD 2.21: doloty 33, odloty 29 (wiatr 280/15 w limicie bocznego 15 kt)
     assert st["suggested_runway"] == "33" and (st["preferred"]["arr"], st["preferred"]["dep"]) == ("33", "29")
     # kontrola online z ATIS: pas w użyciu z ATIS, litera B
-    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "From ATIS B"}
+    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "ATIS B"}
     # konfiguracja preferowana z runway_config.json (AWOS › 2 PASY przy ATIS z jednym pasem), AIP AD 2.21 H24
     assert st["runway_config"] == {"arr": "33", "dep": "29"}
     assert st["lvp"]["applies"] and len(st["lvp"]["rules"]) == 3

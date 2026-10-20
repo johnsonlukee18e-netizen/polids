@@ -11,7 +11,8 @@ from .config import settings
 # 9: pasy, częstotliwości (godziny, źródło, uwaga) i elewacje lotnisk z AIP.
 # 10: 0.12.5 – angielskie godziny i uwagi w frequencies.csv, kategoria dokumentów OTHER i tytuły DOCS,
 # typy samolotów z ICAO_Aircraft.json.
-SCHEMA_VERSION = 10
+# 11: 0.12.6 – godziny i uwagi w frequencies.csv bez odnośników do rozdziałów AIP.
+SCHEMA_VERSION = 11
 
 
 class Base(DeclarativeBase):

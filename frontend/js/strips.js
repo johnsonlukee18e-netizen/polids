@@ -19,7 +19,8 @@ const stateTxt = (st, d) => STATE_TXT[st] || d?.states?.[st] || st;
 // kolor CTOT = opóźnienie jak w liście lotów NM: < 15 min, < 30, < 45, ≥ 45
 const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 const RULES = { I: "IFR", V: "VFR", Y: "IFR/V", Z: "VFR/I" };
-const RWY_SRC = { ATIS: "ATIS", SUGGESTED: "system suggestion, no ATIS", CDM: "CDM" };
+// pas w użyciu jak w OVERVIEW: z ATIS litera ATIS, bez niego pas preferowany; CDM = pas przydzielony w A-CDM
+export const rwySrc = (src, letter) => (src === "ATIS" ? `ATIS ${letter || ""}`.trim() : { SUGGESTED: "preferred", CDM: "CDM" }[src] || "");
 const WAKE = { L: "light", M: "medium", H: "heavy", J: "super (A388)" };
 
 const ph = (t) => `<span class="ph">${t}</span>`;
@@ -54,19 +55,17 @@ function ssr(s) {
   return s.squawk ? `<span class="ssr cur">${esc(s.squawk)}</span>` : ph("SSR");
 }
 
-function procHint(s, icao) {
+// opis pola SID/STAR: procedura i jej stan (przydzielona, w planie lotu, proponowana dla pasu), bez opisu dopasowania
+export function procHint(s) {
   const kind = s.kind === "arr" ? "STAR" : "SID";
   const p = s.proc;
-  if (s.rules === "V") return `${kind}: VFR flight, no procedure.`;
-  if (!s.runway) return `${kind}: runway in use unknown.`;
-  if (p?.source === "CDM") return `SID assigned (CDM): ${s.runway}/${p.name}.`;
-  if (p?.source === "route") return `${kind} ${p.name} filed in the flight plan route, RWY ${s.runway}.`;
-  if (p) return kind === "SID" ? `SID for RWY ${s.runway} ending at the first route point (${p.fix}).`
-    : `STAR for RWY ${s.runway} starting at the last route point (${p.fix}).`;
-  if (!s.route) return `No ${kind}: no route in the flight plan.`;
-  if (!s.proc_fix) return `No ${kind}: the route does not ${kind === "SID" ? "start" : "end"} with a navigation fix.`;
-  return kind === "SID" ? `No SID: no SID for RWY ${s.runway} (${icao}) ends at ${s.proc_fix}.`
-    : `No STAR: no STAR for RWY ${s.runway} (${icao}) starts at ${s.proc_fix}.`;
+  if (s.rules === "V") return `No ${kind}: VFR flight.`;
+  if (!s.runway) return `No ${kind}: runway in use unknown.`;
+  if (p?.source === "CDM") return `SID ${p.name} assigned, RWY ${s.runway}.`;
+  if (p?.source === "route") return `${kind} ${p.name} filed, RWY ${s.runway}.`;
+  if (p) return `${kind} ${p.name} proposed for RWY ${s.runway}.`;
+  if (s.proc_fix) return `No ${kind} for RWY ${s.runway} ${kind === "SID" ? "to" : "from"} ${s.proc_fix}.`;
+  return `No ${kind}.`;
 }
 
 // prawe pole (w EFES przycisk SU): najważniejszy czas z vIFF albo minuty do przylotu
@@ -119,7 +118,7 @@ function stripHtml(s, d, sel) {
   const c3 = `<div class="c c-cs" data-f="cs" data-h="${esc(statusHint(s, d))}"><span class="cs ${cs.length > 7 ? "long" : ""}">${esc(cs)}</span>
     <span class="st">${chip(s, d)}<span class="mv">${esc(movement(s, d))}</span></span></div>`;
   // 4: A (litera ATIS) / reguły + pas
-  const aH = `A = ATIS letter ${d.icao}${atis ? "" : " (ATIS not on air)"}. Below: flight rules and ${s.kind === "arr" ? "landing" : "departure"} runway${s.runway ? ` ${s.runway}${RWY_SRC[s.runway_source] ? ` (${RWY_SRC[s.runway_source]})` : ""}` : ": unknown"}.`;
+  const aH = `A = ATIS letter ${d.icao}${atis ? "" : " (ATIS not on air)"}. Below: flight rules and ${s.kind === "arr" ? "landing" : "departure"} runway${s.runway ? ` ${s.runway}${rwySrc(s.runway_source, atis) ? ` (${rwySrc(s.runway_source, atis)})` : ""}` : ": unknown"}.`;
   const c4 = `<div class="c c-a" data-f="a" data-h="${esc(aH)}">${atis ? `<b class="atis">${esc(atis)}</b>` : ph("A")}
     <span class="s">${s.rules ? `<span class="ru ${s.rules === "V" ? "vfr" : ""}">${RULES[s.rules] || esc(s.rules)}</span>` : ""}${s.runway ? `<b class="rw">${esc(s.runway)}</b>` : ph("RWY")}</span></div>`;
   // 5: SID/STAR / CFL + SSR; lokalny: CUR / CFL + SSR
@@ -134,7 +133,7 @@ function stripHtml(s, d, sel) {
   const low = `<span class="s"><span class="cfl" data-f="cfl" data-h="${esc(cflH)}">${level}</span><span data-f="ssr" data-h="${esc(ssrH)}">${ssr(s)}</span></span>`;
   const top = local
     ? `<span class="pr" data-f="prv" data-h="CUR: current altitude / level.">${ph("PRV")}${air ? `<span class="cur"><i>CUR</i>${lvl(s.altitude)}</span>` : ph("CUR")}</span>`
-    : s.proc ? `<b class="proc" data-f="proc" data-h="${esc(procHint(s, d.icao))}">${esc(s.proc.name)}</b>` : `<span data-f="proc" data-h="${esc(procHint(s, d.icao))}">${ph(s.kind === "arr" ? "STAR" : "SID")}</span>`;
+    : s.proc ? `<b class="proc" data-f="proc" data-h="${esc(procHint(s))}">${esc(s.proc.name)}</b>` : `<span data-f="proc" data-h="${esc(procHint(s))}">${ph(s.kind === "arr" ? "STAR" : "SID")}</span>`;
   const c5 = `<div class="c c-proc">${top}${low}</div>`;
   const c6 = `<div class="c c-taxi" data-f="taxi" data-h="TAXI / GATE: taxi route and stand (not available).">${ph("TAXI")}${ph("GATE")}</div>`;
   // FREETEXT: trasa (i krótkie uwagi)
@@ -463,13 +462,14 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
 
   const bar = (d) => {
     const u = d.runway_in_use || {};
-    const src = u.source === "ATIS" ? `ATIS ${esc(d.atis?.letter || "")}` : "system suggestion";
+    const fromAtis = u.source === "ATIS";
+    const tip = (role) => (fromAtis ? `${role} runway in use · ${`ATIS ${d.atis?.letter || ""}`.trim()}` : `Preferred ${role} runway`);
     const errs = [d.network_error, d.viff_error].filter(Boolean);
     const n = (k) => d[k].length;
     const noProc = !d.procedures?.sid?.length && !d.procedures?.star?.length;
-    return `<span class="kv" title="Departure runway in use (${esc(src)})"><i>DEP</i><b class="dep">${esc(u.dep || "–")}</b></span>
-      <span class="kv" title="Landing runway in use (${esc(src)})"><i>ARR</i><b class="arr">${esc(u.arr || "–")}</b></span>
-      ${u.source === "ATIS" ? "" : `<span class="kv sugg">system suggestion, no runway from ATIS</span>`}
+    return `<span class="kv" title="${esc(tip("DEP"))}"><i>DEP</i><b class="dep">${esc(u.dep || "–")}</b></span>
+      <span class="kv" title="${esc(tip("ARR"))}"><i>ARR</i><b class="arr">${esc(u.arr || "–")}</b></span>
+      ${fromAtis ? "" : `<span class="kv sugg" title="Preferred runway">PREF</span>`}
       <span class="kv"><i>ATIS</i><b>${esc(d.atis?.letter || "–")}</b></span>
       <span class="kv" title="A-CDM: TOBT, TSAT, TTOT${d.viff_error ? " (no data: unknown)" : ""}"><i>A-CDM</i>${d.viff_error ? "?" : d.cdm ? "yes" : "no"}</span>
       ${noProc ? `<span class="kv sugg">no SID/STAR for ${esc(d.icao)}</span>` : ""}

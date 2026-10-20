@@ -29,6 +29,7 @@ const cases = {
   cfgTail: st({ arr: "29", dep: "29", source: "ATIS" }, epwa(150, 15), { arr: "15", dep: "15" }),
   noCfg: st({ arr: "29", dep: "29", source: "ATIS" }, epwa(300, 12), {}, { arr: null, dep: null }),
   sugSplit: st({ arr: "33", dep: "29", source: "SUGGESTED" }, epwa(300, 3), { arr: "33", dep: "29" }),
+  atisK: { ...st({ arr: "33", dep: "29", source: "ATIS" }, epwa(310, 14)), atis: { letter: "K" } },
   epkk: st({ arr: "25", dep: "25", source: "SUGGESTED" }, [rw("07", 78, 240, 8), rw("25", 258, 240, 8)], { arr: "25", dep: "25" }, {}),
   noWind: st({ arr: "29", dep: "29", source: "ATIS" }, epwa(null, null), {}, {}),
   empty: st({ arr: null, dep: null, source: "SUGGESTED" }, [], {}, {}),
@@ -85,14 +86,17 @@ def test_split_from_atis(awos):
     a = awos["atisSplit"]
     assert (a["arr"], a["dep"], a["rwy"]) == (["33", "ATIS"], ["29", "ATIS"], ["33", "ATIS"])
     s = awos["sugSplit"]
-    assert (s["arr"], s["dep"]) == (["33", "suggested"], ["29", "suggested"])
+    assert (s["arr"], s["dep"]) == (["33", "PREF"], ["29", "PREF"]) and s["why"] == "preferred runway"
+    # stan pasa jak w OVERVIEW: litera ATIS przy pasie z ATIS
+    k = awos["atisK"]
+    assert (k["arr"], k["dep"], k["why"]) == (["33", "ATIS K"], ["29", "ATIS K"], "runway in use · ATIS K")
 
 
 def test_second_runway_when_atis_has_one(awos):
     """ATIS z jednym pasem (2 PASY wybrane ręcznie): pas z ATIS zostaje, drugi z rozdziału, który go zawiera."""
     # sugestia systemu (pasy preferowane z AIP AD 2.21): ARR 33 / DEP 29
     c = awos["atisOneCalm"]
-    assert (c["arr"], c["dep"], c["rwy"]) == (["33", "suggested"], ["29", "ATIS"], ["29", "ATIS"])
+    assert (c["arr"], c["dep"], c["rwy"]) == (["33", "PREF"], ["29", "ATIS"], ["29", "ATIS"])
     # sugestia bez rozdziału (jeden pas do lądowania i startu): konfiguracja preferowana EPWA z runway_config.json
     lvp = awos["atisOneLvp"]
     assert (lvp["arr"], lvp["dep"]) == (["33", "auto"], ["29", "ATIS"])
@@ -111,9 +115,9 @@ def test_second_runway_when_atis_has_one(awos):
 def test_single_runway_and_no_data(awos):
     """Lotnisko z jednym pasem: w 2 PASY druga kolumna to przeciwny kierunek; bez pasów nic się nie wywraca."""
     k = awos["epkk"]
-    assert (k["arr"], k["dep"], k["rwy"]) == (["25", "suggested"], ["07", "auto"], ["25", "suggested"])
+    assert (k["arr"], k["dep"], k["rwy"]) == (["25", "PREF"], ["07", "auto"], ["25", "PREF"])
     assert "single-runway aerodrome" in k["why"]
-    assert awos["empty"]["rwy"] == [None, "suggested"] and awos["empty"]["dep"] == [None, "suggested"]
+    assert awos["empty"]["rwy"] == [None, "PREF"] and awos["empty"]["dep"] == [None, "PREF"]
     assert awos["nostatus"]["des"] is None
 
 

@@ -309,10 +309,12 @@ const ROWS = [["inst", `INST <i class="aw-sym" title="${SYM}">SYM</i>`], ["avg",
 const MODES = [["one", "1 RWY", "One runway: wind and RVR in the TDZ / MID / END zones of the selected direction"],
   ["split", "2 RWYS", "Two runways: DEP and ARR columns, each with its own runway choice (wind, components, RVR TDZ)"]];
 
+// pas w użyciu jak w OVERVIEW: "ATIS K" (litera ATIS) albo "PREF" (pas preferowany)
+const rwySrc = (st) => (st?.runway_in_use?.source === "ATIS" ? `ATIS ${st.atis?.letter || ""}`.trim() : "PREF");
 // układ bez ręcznego wyboru: 2 PASY, gdy pas do lądowania i do startu w użyciu (ATIS albo sugestia) są różne
 const autoMode = (u) => (u?.arr && u?.dep && u.arr !== u.dep ? "split" : "one");
 
-// Pasy kolumn bez ręcznego wyboru: { rwy, arr, dep }, każdy { des, src, why } (src: ATIS / sugestia / auto).
+// Pasy kolumn bez ręcznego wyboru: { rwy, arr, dep }, każdy { des, src, why } (src: "ATIS K" / "PREF" / "auto").
 // 1 PAS: pas do lądowania w użyciu. 2 PASY: pasy do lądowania i startu w użyciu. Gdy w użyciu jest jeden pas X
 // (2 PASY wybrane ręcznie), drugi pas: z rozdziału ARR / DEP, który zawiera X, najpierw z sugestii systemu, potem
 // z konfiguracji preferowanej teraz (pasy preferowane z AIP AD 2.21, EPWA ARR 33 / DEP 29), o ile drugi pas nie ma
@@ -321,10 +323,10 @@ const autoMode = (u) => (u?.arr && u?.dep && u.arr !== u.dep ? "split" : "one");
 // kierunek lądowań).
 function autoRunways(st) {
   const u = st?.runway_in_use || {}, rwys = st?.runways || [];
-  const src = u.source === "ATIS" ? "ATIS" : "suggested", why = `runway in use (${u.source === "ATIS" ? "ATIS" : "system suggestion"})`;
+  const src = rwySrc(st), why = u.source === "ATIS" ? `runway in use · ${src}` : "preferred runway";
   const x = u.arr || u.dep || rwys[0]?.designator || null, use = (des) => ({ des, src, why });
   if (u.arr && u.dep && u.arr !== u.dep) return { rwy: use(u.arr), arr: use(u.arr), dep: use(u.dep) };
-  for (const [p, s, label] of [[st?.preferred, "suggested", "system suggestion"], [st?.runway_config, "auto", "preferred aerodrome configuration"]]) {
+  for (const [p, s, label] of [[st?.preferred, "PREF", "preferred runways"], [st?.runway_config, "auto", "preferred aerodrome configuration"]]) {
     if (!p?.arr || !p?.dep || p.arr === p.dep || ![p.arr, p.dep].includes(x)) continue;
     const r = rwys.find((q) => q.designator === (p.arr === x ? p.dep : p.arr));
     if (!r || (r.headwind ?? 0) < -5) continue;
@@ -334,8 +336,7 @@ function autoRunways(st) {
   const other = rwys.filter((r) => r.designator !== x && r.designator !== recip(x));
   const y = (other.length ? other : rwys.filter((r) => r.designator !== x))
     .sort((a, b) => (b.headwind ?? -99) - (a.headwind ?? -99) || Math.abs(a.crosswind ?? 0) - Math.abs(b.crosswind ?? 0))[0];
-  const yWhy = other.length ? `second runway chosen automatically: direction of another runway with the largest headwind component (only ${x} in use)`
-    : `single-runway aerodrome: opposite direction of ${x}`;
+  const yWhy = other.length ? `second runway: largest headwind component (only ${x} in use)` : `single-runway aerodrome: opposite direction of ${x}`;
   return { rwy: use(x), arr: use(x), dep: y ? { des: y.designator, src: "auto", why: yWhy } : use(x) };
 }
 
@@ -427,7 +428,7 @@ export function mountAwos(el, icao) {
     <div class="aw-mid">
       <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-wbar">
         <span class="aw-mode">${MODES.map(([m, l, tip]) => `<button data-mode="${m}" title="${tip}">${l}</button>`).join("")}</span>
-        <button class="aw-auto" title="Automatic: layout and runways in use (ATIS, otherwise the system suggestion), 2 RWYS when the landing and take-off runways differ.
+        <button class="aw-auto" title="Automatic: layout and runways in use (ATIS, otherwise the preferred runway), 2 RWYS when the landing and take-off runways differ.
 Click to clear the manual choice of layout and runways for ${esc(icao)}; it also lapses when the runways in use change or after 12 h.">AUTO</button><span class="aw-man" hidden>MANUAL</span><div class="aw-simnote" title="SYM = simulated sensor: wind measured every 1 s, the screen refreshes every ${WIND_REFRESH_S} s: INST = last measurement, 2 MIN = mean of the measurements over 2 min, 10 MIN MAX = highest measurement over 10 min.
 RVR without a reported value: >2000 M at visibility ≥ 1500 m (9999, CAVOK), simulated (SYM) when lower."><b>SYM</b> simulated · INST every ${WIND_REFRESH_S} s, 2 min mean, 10 min max</div></div></div>
       <div class="aw-atis"></div>
@@ -498,12 +499,12 @@ RVR without a reported value: >2000 M at visibility ≥ 1500 m (9999, CAVOK), si
       const use = !!st && b.dataset.mode === am;
       b.classList.toggle("active", b.dataset.mode === modeKey);
       b.classList.toggle("use", use);
-      b.title = MODES.find(([m]) => m === b.dataset.mode)[2] + (use ? `\nAutomatic layout (${u?.source === "ATIS" ? "ATIS" : "system suggestion"})` : "");
+      b.title = MODES.find(([m]) => m === b.dataset.mode)[2] + (use ? `\nAutomatic layout (${rwySrc(st)})` : "");
     });
     $(".aw-auto").classList.toggle("active", !!st && !man);
     $(".aw-man").hidden = !man;
     $(".aw-man").title = man ? `Layout or runway chosen manually with runways in use ARR ${u?.arr || "–"} / DEP ${u?.dep || "–"}`
-      + ` (${u?.source === "ATIS" ? "ATIS" : "system suggestion"}), remembered for ${icao} in this browser.\nReturns to automatic`
+      + ` (${rwySrc(st)}), remembered for ${icao} in this browser.\nReturns to automatic`
       + ` (now ${am === "split" ? "2 RWYS" : "1 RWY"}) after clicking AUTO, when these runways change or at`
       + ` ${new Date(manual.t + MAN_TTL).toISOString().slice(11, 16)}Z (12 h after the choice).` : "";
   };
