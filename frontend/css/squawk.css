@@ -48,5 +48,7 @@ table.data.sq-table tr.sq-special td { background: #0c160a; }
 .sq-scode.emerg { color: var(--bad); }
 /* zaznaczony wiersz (szukany kod): napisy białe na zielonym tle */
 table.data.sq-table tr.selected .sq-label, table.data.sq-table tr.selected .sq-minor { color: #fff; }
+/* znaczniki grupy (poza zielonym EPWW) i przydziału też białe: szare i zielone giną na zielonym tle */
+table.data.sq-table tr.selected .tag.sq-grp:not(.own), table.data.sq-table tr.selected .sq-ar-a { color: #fff; border-color: #fff; }
 /* ostre krawędzie jak w PANDORZE (karty, pola, znaczniki) */
 .view[data-tab="squawk"] :is(.btn, .field, .card, .card h3, input, .tag) { border-radius: 0; }

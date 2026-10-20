@@ -80,10 +80,40 @@ const nPools = (n) => `${n} ${plural(n, "pool", "pools")}`;
 export const rangeText = (p) => (p.to && p.to !== p.from ? `${p.from}–${p.to}` : p.from);
 const countOf = (p) => p.count ?? rangeSize(p.from, p.to || p.from);
 
-// pule kodu w odpowiedzi (wynik lookup): grupa i zakres każdej; "" = w żadnej
-export function hitsText(r) {
+// lista prefiksów w odpowiedzi: cały obszar PA, do 4 prefiksów wprost, dłuższa jako liczba (pełna lista w wierszu)
+export function unitsBrief(text, pa, areas) {
+  const t = String(text || "").split(/\s+/).filter(Boolean);
+  if (wholeArea(text, pa, areas)) return `whole ${pa}`;
+  return t.length > 4 ? `${t.length} units` : t.join(" ");
+}
+// co odróżnia pulę od innych pul tej samej grupy i zakresu: w EUR-E przydział = jednostka, retencja = kto nadał kod
+// (full: też obszar retencji, gdy kilka pul ma ten sam opis); MIL, CIV/MIL i APP poza NATO (tam wszystkie MIL)
+export function poolBrief(p, areas, full = false) {
+  const parts = [];
+  if (p.category === "eur-e") {
+    if (p.ar === "R") {
+      parts.push(`retention${full ? ` in ${unitsBrief(p.unit, p.pa, areas) || "–"}` : ""} (assigned by ${unitsBrief(p.assigned_by) || "–"})`);
+    } else parts.push(unitsBrief(p.unit, p.pa, areas) || "–");
+  }
+  if (p.category !== "nato" && p.civ_mil && p.civ_mil !== "CIV") parts.push(civMil(p.civ_mil));
+  if (p.app === "APP") parts.push("APP");
+  return parts.join(" ");
+}
+// pule kodu w odpowiedzi (wynik lookup) w kolejności listy; pule tej samej grupy i zakresu razem:
+// "EUR-E 0020–0037: LB, LH, LU" (areas = meta.participating_areas); "" = w żadnej
+export function hitsText(r, areas) {
   if (!r.pools.length) return "";
-  return `${r.special.length ? "Also in" : "In"} ${nPools(r.pools.length)}: ${r.pools.map((p) => `${catTag(p.category)} ${rangeText(p)}`).join(" · ")}`;
+  const pools = [...r.pools].sort((a, b) => codeValue(a.from) - codeValue(b.from) || catIndex(a.category) - catIndex(b.category)
+    || codeValue(a.to || a.from) - codeValue(b.to || b.from));
+  const groups = new Map();
+  pools.forEach((p) => { const k = `${catTag(p.category)} ${rangeText(p)}`; groups.set(k, [...(groups.get(k) || []), p]); });
+  const parts = [...groups].map(([k, ps]) => {
+    let briefs = ps.map((p) => poolBrief(p, areas));
+    if (new Set(briefs).size < briefs.length) briefs = ps.map((p) => poolBrief(p, areas, true));
+    briefs = briefs.filter(Boolean);
+    return briefs.length ? `${k}: ${briefs.join(", ")}` : k;
+  });
+  return `${r.special.length ? "Also in" : "In"} ${nPools(r.pools.length)}: ${parts.join(" · ")}`;
 }
 // czego kod nie ma (wynik lookup): "" = leży w puli
 export function missText(r) {
@@ -104,9 +134,13 @@ const poolHay = (p) => [`${p.from}-${p.to}`, catTag(p.category), p.pa, p.unit, c
   p.ar, arInfo(p.ar).text, p.destination, p.via, p.protection, p.remarks, p.type, ...Object.values(p.raw || {})]
   .filter(Boolean).join(" ").toUpperCase();
 export const rowHay = (r) => (r.kind === "special" ? `${r.s.code} SPECIAL ${r.s.label || ""}`.toUpperCase() : poolHay(r.p));
+// słowo równe nazwie grupy (EPWW, CCAMS, NATO, EUR-E) = dokładnie ta grupa albo obszar PA (EUR-E: też pule EPWW),
+// nie wzmianka w uwagach (np. "Protection ensured by CCAMS" przy pulach EUR-E); inne słowa: fragment tekstu wiersza
+const GROUP_WORDS = new Set(CATEGORIES.map((c) => c.tag));
+const inGroup = (r, w) => r.kind === "pool" && (catTag(r.p.category) === w || String(r.p.pa || "").toUpperCase() === w);
 export function filterRows(rows, words = []) {
   if (!words.length) return rows;
-  return rows.filter((r) => { const t = rowHay(r); return words.every((w) => t.includes(w)); });
+  return rows.filter((r) => { const t = rowHay(r); return words.every((w) => (GROUP_WORDS.has(w) ? inGroup(r, w) : t.includes(w))); });
 }
 // wiersz zaznaczony dla szukanego kodu: ten kod specjalny albo pula, w której kod leży
 export const rowHas = (r, code) => isCode(code) && (r.kind === "special" ? r.s.code === code : inRange(code, r.p));
@@ -150,6 +184,10 @@ const specialRow = (r, code) => `<tr class="sq-special${rowHas(r, code) ? " sele
   <td class="sq-range sq-scode${EMERGENCY.has(r.s.code) ? " emerg" : ""}">${esc(r.s.code)}</td><td></td>
   <td colspan="${COLS - 2}"><b class="sq-label">${esc(r.s.label || "")}</b></td></tr>`;
 
+// activate(arg): nowy tekst pola albo null (pole zostaje). arg undefined = przycisk menu; arg równy addr (kod w adresie
+// przy ostatnim wejściu albo wpisaniu) = Wstecz na wpis, w którym potem wpisano tekst filtra: tekst zostaje
+export const textFromAddress = (arg, addr) => (arg === undefined || arg === addr ? null : String(arg));
+
 export function answerHtml(data, text) {
   const q = parseQuery(text);
   if (q.error) return `<p class="sq-bad">${esc(q.error)}</p>`;
@@ -159,7 +197,7 @@ export function answerHtml(data, text) {
   const r = lookup(data, q.code);
   const big = (c) => `<b class="sq-big${EMERGENCY.has(c) ? " emerg" : ""}">${esc(c)}</b>`;
   const lines = r.special.map((s) => `<p>${big(s.code)} <b class="sq-label">${esc(s.label || "")}</b></p>`);
-  const pools = hitsText(r), miss = missText(r);
+  const pools = hitsText(r, data.meta?.participating_areas), miss = missText(r);
   if (pools) lines.push(`<p>${r.special.length ? "" : `${big(q.code)} `}<span class="sq-hit">${esc(pools)}</span></p>`);
   if (miss) lines.push(`<p class="hint">${r.special.length ? "" : `${big(q.code)} `}${esc(miss)}</p>`);
   return lines.join("");
@@ -172,7 +210,8 @@ export default {
       <div class="card sq-card">
         <div class="sq-top">
           <input class="field sq-q" type="text" autocomplete="off" spellcheck="false" placeholder="Code or text: 7700, EPWW, LR…"
-            title="A code highlights its pools, text filters the list" aria-label="Search SSR codes">
+            title="A code highlights its pools, text filters the list; EPWW, CCAMS, NATO or EUR-E shows that group"
+            aria-label="Search SSR codes">
           <div class="sq-answer"></div>
           <span class="hint sq-count"></span>
         </div>
@@ -190,7 +229,8 @@ export default {
     const count = pane.querySelector(".sq-count");
     const scroller = pane.querySelector(".sq-scroll");
     const body = pane.querySelector(".sq-table tbody");
-    let data = null, rows = [], loadedAt = 0, seq = 0;
+    // addr = kod w adresie tej zakładki (ostatni zapisany albo z adresu); wpisany tekst go nie zmienia
+    let data = null, rows = [], loadedAt = 0, seq = 0, addr = "";
 
     const drawList = (scroll) => {
       if (!data) return;
@@ -235,15 +275,16 @@ export default {
       update(true);
       const q = parseQuery(input.value);
       // sam pełny kod = krok do cofnięcia; tekst, puste albo niepełne pole nie zmienia adresu
-      if (q.code && !q.words.length) remember("squawk", q.code);
+      if (q.code && !q.words.length) { addr = q.code; remember("squawk", addr); }
     });
     input.addEventListener("keydown", (e) => { if (e.key === "Escape" && input.value) { input.value = ""; input.dispatchEvent(new Event("input")); } });
     window.addEventListener(ONLINE_EVENT, () => { if (!data) load(); });
     update(false);
     load();
-    // #squawk/7700: kod z adresu (← i Wstecz); przycisk menu (arg undefined) zostawia wpisany tekst
+    // #squawk/7700: kod z adresu (← i Wstecz) trafia do pola tylko, gdy adres wskazuje inny kod niż ostatnio
     return { activate: (arg) => {
-      if (arg !== undefined && arg !== input.value.trim()) { input.value = arg; update(true); }
+      const text = textFromAddress(arg, addr);
+      if (text !== null) { addr = text; input.value = text; update(true); }
       if (data && Date.now() - loadedAt > RELOAD_MS) load();
       input.focus();
     } };
