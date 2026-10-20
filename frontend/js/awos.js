@@ -212,12 +212,12 @@ function rvrFor(p, des, pos, sims, phase) {
   if (!p || !d) return null;
   const met = (p.rvr || []).filter((x) => rwyNorm(x.runway) === d);
   if (met.length) {
-    return { src: "METAR", list: met, tip: `RVR from METAR: ${met.map((x) => `R${x.runway}/${x.value}${x.trend || ""}`).join(" ")}` };
+    return { src: "METAR", list: met, tip: `RVR ${met.map((x) => `R${x.runway}/${x.value}${x.trend || ""}`).join(" ")}` };
   }
   if (!has(p.visibility_m)) return null;
   if (p.cavok || p.visibility_m >= 1500) {
     return { src: "P2000", list: [{ runway: d, value: "P2000" }],
-      tip: `RVR above 2000 m (P2000): METAR without RVR groups, ${p.cavok ? "CAVOK" : `visibility ${p.visibility_m >= 9999 ? "10 km or more" : p.visibility_m + " m"}`} (≥ 1500 m)` };
+      tip: `RVR above 2000 m (P2000): ${p.cavok ? "CAVOK" : `visibility ${p.visibility_m >= 9999 ? "10 km or more" : p.visibility_m + " m"}`} (≥ 1500 m)` };
   }
   const [key, i] = rvrSlot(d, pos), q = sims?.get(key)?.s[i];
   if (!q || !q.hist.length) return null;
@@ -230,10 +230,8 @@ function rvrFor(p, des, pos, sims, phase) {
     const t = base * (mean(q.hist.slice(-300)) - mean(q.hist.slice(-600, -300)));
     trend = t >= 100 ? "U" : t <= -100 ? "D" : "N";
   }
-  const from = others.length ? `the mean RVR of other runways in METAR (${Math.round(base)} m)`
-    : `visibility ${p.visibility_m} m × ${k} (${RVR_TXT[phase] || "day: no sun data"})`;
   return { src: "SYM", list: [{ runway: d, value, trend }],
-    tip: `RVR ${pos} SIMULATED: METAR gives no RVR for runway ${d}; based on ${from}, 1 min mean, trend over 10 min` };
+    tip: `RVR ${pos} SIMULATED (SYM), runway ${d}: 1 min mean, trend over 10 min${phase !== "DAY" && RVR_TXT[phase] ? ` · ${RVR_TXT[phase]}` : ""}` };
 }
 const windStr = (dir, spd) => `${dir}/${pad(spd, 2)} KT`;
 
@@ -298,8 +296,8 @@ function arcPath(a, b, r = 80) {
   return `M${x1},${y1} A${r},${r} 0 ${ext > 180 ? 1 : 0} 1 ${x2},${y2}`;
 }
 
-const SYM = "instantaneous wind simulated from METAR";
-const SYM_RVR = "RVR simulated from visibility (METAR gives no RVR for this runway)";
+const SYM = "simulated instantaneous wind";
+const SYM_RVR = "simulated RVR";
 // pos: miejsce czujnika RVR (kolumny DEP / ARR pokazują RVR strefy przyziemienia)
 const COLS_SPLIT = [{ k: "dep", title: "DEP", sel: "dep", lag: 0, pos: "TDZ" }, { k: "arr", title: "ARR", sel: "arr", lag: 2, pos: "TDZ" }];
 const COLS_ONE = [{ k: "tdz", title: "TDZ", sel: "rwy", lag: 0, pos: "TDZ" }, { k: "mid", title: "MID", sel: "rwy", lag: 1, pos: "MID" },
@@ -429,9 +427,9 @@ export function mountAwos(el, icao) {
     <div class="aw-mid">
       <div class="aw-windwrap"><div class="aw-winds"></div><div class="aw-wbar">
         <span class="aw-mode">${MODES.map(([m, l, tip]) => `<button data-mode="${m}" title="${tip}">${l}</button>`).join("")}</span>
-        <button class="aw-auto" title="Automatic: layout and runways from ATIS (without ATIS from the system suggestion), 2 RWYS when the landing and take-off runways differ.
-Click to clear the manual choice of layout and runways for ${esc(icao)}; it also lapses when the runways in use change or after 12 h.">AUTO</button><span class="aw-man" hidden>MANUAL</span><div class="aw-simnote" title="VATSIM has no wind or RVR sensors. The simulated sensor measures the wind every 1 s, the screen refreshes every ${WIND_REFRESH_S} s: INST = last measurement, 2 MIN = mean of the measurements over 2 min, 10 MIN MAX = highest measurement over 10 min.
-RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥ 1500 m (9999, CAVOK), RVR simulated from visibility (SYM) when lower. VIS, clouds and temperature are from METAR."><b>SYM</b> ${SYM} · INST every ${WIND_REFRESH_S} s, 2 min mean and 10 min max from 1 s measurements</div></div></div>
+        <button class="aw-auto" title="Automatic: layout and runways in use (ATIS, otherwise the system suggestion), 2 RWYS when the landing and take-off runways differ.
+Click to clear the manual choice of layout and runways for ${esc(icao)}; it also lapses when the runways in use change or after 12 h.">AUTO</button><span class="aw-man" hidden>MANUAL</span><div class="aw-simnote" title="SYM = simulated sensor: wind measured every 1 s, the screen refreshes every ${WIND_REFRESH_S} s: INST = last measurement, 2 MIN = mean of the measurements over 2 min, 10 MIN MAX = highest measurement over 10 min.
+RVR without a reported value: >2000 M at visibility ≥ 1500 m (9999, CAVOK), simulated (SYM) when lower."><b>SYM</b> simulated · INST every ${WIND_REFRESH_S} s, 2 min mean, 10 min max</div></div></div>
       <div class="aw-atis"></div>
       <div class="aw-ovl" hidden><div class="aw-h"><span class="t"></span><button class="aw-x" title="Close (Esc)">CLOSE ✕</button></div><div class="aw-ovl-body"></div></div>
     </div>
@@ -531,7 +529,7 @@ RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥
     c.row.rvr.innerHTML = r ? r.list.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;
     c.row.rvr.classList.toggle("warn", !!r && r.list.some((x) => !String(x.value).startsWith("P")));
     c.rvrTh.innerHTML = r?.src === "SYM" ? `RVR <i class="aw-sym" title="${SYM_RVR}">SYM</i>` : "RVR";
-    c.rvrTr.title = r ? r.tip : "RVR: no data (METAR without visibility or no runway)";
+    c.rvrTr.title = r ? r.tip : "RVR: no data (no visibility or no runway)";
   };
 
   // wartości zmieniające się co WIND_REFRESH_S sekund
@@ -589,7 +587,7 @@ RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥
         <div class="aw-letter"><b>${esc(a.letter)}</b><span class="aw-stn">${a.callsign.split(" / ").map(esc).join("<br>")}<br><em>${esc(a.freq || "")}</em></span></div>
         <div class="aw-atistxt">${atisLines(a.lines).map((l) => `<div class="ln">${esc(l) || "&nbsp;"}</div>`).join("") || `<span class="dim">no ATIS text</span>`}</div></div>`;
     }).join("") : `<div class="aw-atiscol off"><div class="aw-h"><span>ATIS</span></div><div class="aw-letter"><b>–</b></div>
-      <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : `No ATIS station for ${esc(icao)} on the VATSIM network.`}</span></div></div>`;
+      <div class="aw-atistxt"><b>ATIS offline</b><br><span class="dim">${st?.network_error ? esc(st.network_error) : "No ATIS online now."}</span></div></div>`;
   };
 
   const drawTop = () => {
@@ -608,7 +606,7 @@ RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥
     const v = vmc(p), vm = $(".aw-vmc");
     vm.className = "aw-box aw-vmc " + (v || "").toLowerCase();
     vm.innerHTML = `${v || "–"}${p?.flight_category ? `<small>${esc(p.flight_category)}</small>` : ""}`;
-    vm.title = "VMC in the CTR (SERA.5005): visibility ≥ 5 km and cloud ceiling ≥ 1500 ft" + (p?.flight_category ? `\nMETAR category: ${p.flight_category}` : "");
+    vm.title = "VMC in the CTR: visibility ≥ 5 km and cloud ceiling ≥ 1500 ft" + (p?.flight_category ? `\nFlight category: ${p.flight_category}` : "");
     $(".aw-sun").innerHTML = sun ? `<span class="k">Sun UTC · ${sunPhase(sun)}</span><span class="aw-sunrow">${[["BMCT", sun.civil_dawn, "beginning of morning civil twilight"],
       ["SR", sun.sunrise, "sunrise"], ["SS", sun.sunset, "sunset"], ["EECT", sun.civil_dusk, "end of evening civil twilight"]]
       .map(([k, t, tip]) => `<span title="${tip}"><i>${k}</i>${t || "--:--"}</span>`).join("")}</span>` : "";
@@ -633,7 +631,7 @@ RVR: from METAR; when METAR gives no RVR for a runway: >2000 M at visibility ≥
   // --- nakładka METAR / TAF / NOTAM
   // RVR bez grup w METAR: co wtedy pokazuje AWOS w kolumnach
   const rvrNone = (p) => (!has(p.visibility_m) ? "–" : p.cavok || p.visibility_m >= 1500
-    ? "not in METAR · visibility ≥ 1500 m: AWOS >2000 M" : "not in METAR · AWOS: RVR simulated from visibility (SYM)");
+    ? "not reported · visibility ≥ 1500 m: AWOS >2000 M" : "not reported · AWOS: simulated RVR (SYM)");
   const decoded = (p) => {
     const age = metarAge(p.time);
     const rows = [["Observation", p.time ? `day ${p.time.slice(0, 2)}, ${p.time.slice(2, 4)}:${p.time.slice(4, 6)} UTC${age !== null ? ` (${ageText(age)} ago)` : ""}` : "–"],

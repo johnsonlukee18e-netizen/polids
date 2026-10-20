@@ -316,8 +316,8 @@ def test_card_upstream_errors(client, monkeypatch):
     monkeypatch.setattr(aerodromes, "get_tafs", tafs)
     monkeypatch.setattr(aerodromes, "get_feed", down)
     d = client.get("/api/aerodromes/EDDB/card").json()
-    assert d["metar"] is None and d["taf"] is None and d["errors"] == ["METAR: timeout (test)"]
-    assert d["network_error"] == "VATSIM: timeout (test)" and d["updated"] is None
+    assert d["metar"] is None and d["taf"] is None and d["errors"] == ["METAR unavailable"]
+    assert d["network_error"] == "Network data unavailable" and d["updated"] is None
     assert d["positions"] and all(p["online"] is None for p in d["positions"])
 
 # --- frontend/js/aerolist.js w Node: adres zakładki, wyszukiwanie bez polskich znaków, FIR z ICAO -----------------

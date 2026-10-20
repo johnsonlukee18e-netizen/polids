@@ -527,7 +527,11 @@ def test_strip_tab_and_ruch_wiring():
     assert 'const lad = (k) => !c && t.ttotSrc === k;' in dm
     assert 'R("ATOT", hm(v.atot), lad("ATOT") ? "hl"' in dm and '(c ? v.ctot : lad("CTOT")) ? "hl"' in dm
     assert '!c ? (lad("ETOT") ? "hl" : "")' in dm and '"same as the label on the ETOT ladder"})' not in dm
-    # przepustowość odlotów: "vIFF A-CDM" tylko na lotnisku z A-CDM
-    assert 'cdm() ? "vIFF A-CDM" : ' in dm and "/h (vIFF A-CDM)." not in dm
+    # przepustowość odlotów: "A-CDM" tylko na lotnisku z A-CDM; bez nazw źródeł danych w dymkach (0.12.6)
+    assert 'cdm() ? "A-CDM" : "aerodrome without A-CDM"' in dm and "vIFF A-CDM" not in dm
+    am = (FRONTEND / "js" / "aman.js").read_text("utf-8")
+    code = "\n".join(ln.split(" // ")[0] for ln in (dm + am).splitlines() if not ln.strip().startswith(("//", "*", "/*")))
+    for word in ("from vIFF", "in vIFF", "(vIFF)", "VATSIM", ".ese file", "flight plan remarks"):
+        assert word not in code, word
     for css in ("dman.css", "strips.css"):
         assert f"css/{css}" in (FRONTEND / "index.html").read_text("utf-8")

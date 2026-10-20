@@ -7,6 +7,16 @@
 .ov > .toolbar.ov-bar { margin: 0 0 6px; }
 .ov-bar label.sc { gap: 6px; }
 .ov-bar select.ov-pos { font: 700 13px var(--mono); max-width: 330px; }
+/* MINE / ALL: przyciski jak INFO / AWOS / TRAFFIC, wybrany zielony; obok liczba ukrytych lotnisk */
+.ov-bar .ov-scope { display: inline-flex; flex: none; border: 1px solid var(--line); }
+.ov-bar .ov-scope[hidden] { display: none; }
+.ov-scope button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 10px;
+  font: 700 11px var(--mono); letter-spacing: .5px; cursor: pointer; border-radius: 0; }
+.ov-scope button:last-child { border-right: 0; }
+.ov-scope button:hover { color: var(--text); background: var(--panel-2); }
+.ov-scope button.on { background: #14240f; color: var(--green-hi); }
+.ov-bar .ov-hidden { flex: none; color: var(--warn); white-space: nowrap; }
+.ov-bar .ov-hidden:empty { display: none; }
 .ov-bar .ov-pos-note { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-bar .ov-net { max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -62,6 +72,18 @@
 .ov .wx.ov-taf { color: #c9d4c9; }
 .ov .wx.ov-taf .cont { display: inline-block; padding-left: 4ch; }
 .ov-lvp-why { padding-left: 2ch; font: 11px var(--mono); color: var(--warn); }
+/* pas w użyciu: z ATIS pełna zielona ramka z literą, preferowany kreskowana (jak PREFERRED RWY w AERODROME) */
+.ov-rwy { display: inline-flex; flex: none; align-items: baseline; gap: 4px; padding: 0 5px; border: 1px solid var(--ok);
+  font: 700 12px/16px var(--mono); color: #fff; white-space: nowrap; }
+.ov-rwy.pref { border-color: var(--cyan); border-style: dashed; }
+.ov-rwy i { font: 700 10px/16px var(--ui); font-style: normal; color: var(--muted); letter-spacing: .4px; }
+.ov-rwy i.src { color: var(--green-hi); }
+.ov-rwy.pref i.src { color: var(--cyan); }
+.ov-rwy b.arr { color: var(--rw-arr); }
+.ov-rwy b.dep { color: var(--rw-dep); }
+/* ALL: lotnisko obsługiwane teraz przez kogoś innego (znak stanowiska), wiersz przygaszony */
+.ov-by { flex: none; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.ov-aero.other > .ov-aero-head .ic { color: var(--muted); }
 .ov-lvp-why.ok { color: var(--ok); }
 
 /* --- NOTAM */

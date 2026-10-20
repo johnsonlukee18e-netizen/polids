@@ -22,6 +22,10 @@ SYM = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
 LABEL = {"rvr_m": "RVR", "vis_m": "visibility", "ceiling_ft": "ceiling"}
 UNIT = {"rvr_m": "m", "vis_m": "m", "ceiling_ft": "ft"}
 PHASES = (("prep", "Preparation"), ("lvp", "LVP"), ("cancel", "Cancellation"))
+NO_LVP = "No LVP at this aerodrome"
+# fragmenty uwag z lvp.json o pochodzeniu i odczytaniu progów (paragrafy, poprawki AIRAC, "taken as"): zostają
+# w pliku dla opiekunów danych, w dymku tylko uwagi operacyjne (ILS, starty, tendencja)
+_NOTE_SKIP = re.compile(r"\bAIP\b|\bAMDT\b|\bpara\b|taken as|reconstructed", re.I)
 
 # icao -> {"obs": czas METAR, "prev": (stan, od kiedy) przed tym METAR, "cur": (stan, od kiedy) po nim, "reasons": [...]}
 _memory: dict[str, dict] = {}
@@ -53,7 +57,7 @@ def _cond_text(key: str, spec, eq: int | None = None) -> str:
 def phase_text(phase: dict | None) -> str:
     """'RVR < 550 m or ceiling < 200 ft' (do dymków w interfejsie)."""
     if not phase:
-        return "not in AIP"
+        return "none"
     parts = [_cond_text(k, phase[k], phase.get("rvr_eq_m") if k == "vis_m" else None) for k in LABEL if k in phase]
     return (" and " if phase.get("logic") == "and" else " or ").join(parts)
 
@@ -92,7 +96,7 @@ def _check(phase: dict, m: Metar) -> dict:
         vals = _values(key, phase, m)
         if not vals:
             results.append(False)
-            missing.append(f"{_cond_text(key, phase[key])} (not in METAR)")
+            missing.append(f"{_cond_text(key, phase[key])} (not reported)")
             continue
         ok = [v is None and not worse or v is not None and fn(v, lim) for _, v, lim in vals]
         met = any(ok) if worse else all(ok)
@@ -150,19 +154,27 @@ def transition(cfg: dict, m: Metar, prev: tuple[str | None, datetime | None], ob
     return None, None, []
 
 
+def _note(text: str | None) -> str | None:
+    """Uwaga z lvp.json do dymka: części rozdzielone ';' bez tych o pochodzeniu progów (_NOTE_SKIP), None, gdy nic
+    nie zostaje ('ILS CAT IIIA RWY 33, …; no take-offs with RVR < 125 m')."""
+    parts = [x.strip() for x in (text or "").split(";")]
+    return "; ".join(x for x in parts if x and not _NOTE_SKIP.search(x)) or None
+
+
 def _hhmm(t: datetime | None) -> str | None:
     return t.strftime("%H:%MZ") if t else None
 
 
 def evaluate(m: Metar | None, icao: str, now: datetime | None = None) -> dict:
     """Stan LVP lotniska: {"state": "LVP" | "PREP" | "CANCELLED" | None, "applies", "reasons", "since", "until",
-    "scope", "source", "verified", "note", "rules", "thresholds"}. applies False (AIP nie przewiduje LVP): state None
-    i reason. since: od kiedy LVP albo kiedy odwołane, until: koniec 30 min stanu CANCELLED."""
+    "scope", "verified", "note", "rules", "thresholds"}. applies False (AIP nie przewiduje LVP): state None
+    i reason. since: od kiedy LVP albo kiedy odwołane, until: koniec 30 min stanu CANCELLED. Bez "source" z lvp.json
+    (paragraf AIP): interfejs nie pokazuje, skąd są progi; note tylko z uwagami operacyjnymi (_note)."""
     code = icao.upper()
     cfg = thresholds(code)
     base = {"state": None, "applies": cfg.get("applies", True), "reasons": [], "since": None, "until": None,
-            "scope": cfg.get("scope"), "source": cfg.get("source"), "verified": cfg.get("verified", True),
-            "note": cfg.get("note"), "reason": cfg.get("reason")}
+            "scope": cfg.get("scope"), "verified": cfg.get("verified", True), "note": _note(cfg.get("note")),
+            "reason": None if cfg.get("applies", True) else NO_LVP}
     if not base["applies"]:
         return {**base, "rules": [], "thresholds": None}
     base["rules"] = rules(cfg)
