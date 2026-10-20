@@ -378,7 +378,7 @@ def test_chart_kind():
         "STANDARD ARRIVAL CHART INSTRUMENT (STAR) - ICAO (RWY 06, RWY 24)": "STAR",
         "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24 (CAT A/B/C/D)": "IAC",
         "VISUAL APPROACH CHART - ICAO": "VFR", "VISUAL OPERATION CHART": "VFR",
-        "ATC SURVEILLANCE MINIMUM ALTITUDE CHART - ICAO": "OTHER", "BIRD CONCENTRATION": "OTHER",
+        "ATC SURVEILLANCE MINIMUM ALTITUDE CHART - ICAO": "OTHER", "BIRD CONCENTRATION": "OTHER", "HOT SPOT": "ADC",
     }
     assert {t: eaip.chart_kind(t) for t in kinds} == kinds
     assert eaip.chart_kind("instrument approach chart") == "IAC"
@@ -504,7 +504,7 @@ VARIANT_HTML = """<html><body><table>
 <tr><td><a href="AD_2_EPWA_12-2.pdf"></a></td></tr>
 <tr><td>VISUAL APPROACH CHART - ICAO</td><td><table><tr><td><a href="AD_2_EPWA_13-1.pdf"></a></td></tr></table></td></tr>
 <tr><td>AIRCRAFT PARKING/DOCKING CHART - ICAO<td><a href="AD_2_EPWA_5-1.pdf"></a>
-<tr><td></td><td><a href="AD_2_EPWA_6-1.pdf" title="BIRD CONCENTRATION CHART"></a></td></tr>
+<tr><td></td><td><a href="AD_2_EPWA_14-1.pdf" title="BIRD CONCENTRATION CHART"></a></td></tr>
 <tr><td></td><td><a href="AD_2_EPWA_7-1.pdf"><img src="p.gif" alt="AERODROME OBSTACLE CHART - ICAO TYPE A"></a></td></tr>
 </table></body></html>"""
 
@@ -523,7 +523,7 @@ def test_parse_charts_real_eaip_variants():
         "12-2": ("INSTRUMENT APPROACH CHART - ICAO RWY 33", "RWY 33 IAC (2/2)", "IAC"),
         "13-1": ("VISUAL APPROACH CHART - ICAO", "VISUAL APPROACH", "VFR"),
         "5-1": ("AIRCRAFT PARKING/DOCKING CHART - ICAO", "PARKING", "APDC"),
-        "6-1": ("BIRD CONCENTRATION CHART", "BIRD CONCENTRATION", "OTHER"),
+        "14-1": ("BIRD CONCENTRATION CHART", "BIRD CONCENTRATION", "OTHER"),
         "7-1": ("AERODROME OBSTACLE CHART - ICAO TYPE A", "OBSTACLE TYPE A", "OBST"),
     }
 

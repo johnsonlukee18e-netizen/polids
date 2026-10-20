@@ -5,8 +5,9 @@ a tabela map AD 2.24 ("Charts | Pages") jest osobną tabelą wewnątrz komórki 
 z tytułem i komórka z odnośnikiem do PDF-u (sama ikona, bez tekstu i bez alt). Parser z 0.12.5 sklejał wtedy wszystkie
 tytuły w jeden (wszystkie 37 map EPWA z tym samym tytułem i rodzajem OBST, zrzut w issue #21).
 
-Tytuły EPWA 1-23 jak na zrzucie z issue #21, reszta (24-37) dopisana w tym samym stylu (strona EPWA jest za długa dla
-narzędzia, którym ją czytaliśmy, AD 2.24 nie dało się odczytać). EPBY, EPLL, EPZG: tytuły jak na stronach PAŻP."""
+Tytuły i pliki EPWA jak w eAIP (zrzut z issue #21 i strony serii map AD 2 EPWA <n>-en-GB.html: strona AD 2 EPWA jest
+za długa dla narzędzia, którym ją czytaliśmy). EPBY, EPLL, EPZG: tytuły jak na stronach PAŻP. Tytuły są wstawiane do
+HTML-a bez zmian, więc "&" jest zapisane jako "&amp;" (jak na stronie)."""
 
 PKG = "https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/"
 
@@ -46,30 +47,35 @@ EPWA = [
     ("EPWA - AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 15, RWY 33)", "06", "6-3", "OBSTACLE TYPE A RWY 15/33", "OBST"),
     ("EPWA - PRECISION APPROACH TERRAIN CHART - ICAO (RWY 11)", "07", "7-1", "PATC RWY 11", "OBST"),
     ("EPWA - PRECISION APPROACH TERRAIN CHART - ICAO (RWY 33)", "07", "7-3", "PATC RWY 33", "OBST"),
-    (f"EPWA - {SID} (RNAV RWY 11)", "08", "8-1", "RWY 11 SID", "SID"),
-    (f"EPWA - {SID} (RNAV RWY 15)", "08", "8-5", "RWY 15 SID", "SID"),
-    (f"EPWA - {SID} (RNAV RWY 29)", "08", "8-9", "RWY 29 SID", "SID"),
-    (f"EPWA - {SID} (RNAV RWY 33)", "08", "8-13", "RWY 33 SID", "SID"),
+    (f"EPWA - {SID} (RNAV RWY 11)", "08", "08-1", "RWY 11 SID", "SID"),
+    (f"EPWA - {SID} (RNAV RWY 15)", "08", "08-5", "RWY 15 SID", "SID"),
+    (f"EPWA - {SID} (RNAV RWY 29)", "08", "08-9", "RWY 29 SID", "SID"),
+    (f"EPWA - {SID} (RNAV RWY 33)", "08", "08-13", "RWY 33 SID", "SID"),
     (f"EPWA - {STAR} (RNAV RWY 11)", "10", "10-1", "RWY 11 STAR", "STAR"),
     (f"EPWA - {STAR} (RNAV RWY 15)", "10", "10-5", "RWY 15 STAR", "STAR"),
     (f"EPWA - {STAR} (RNAV RWY 29)", "10", "10-9", "RWY 29 STAR", "STAR"),
     (f"EPWA - {STAR} (RNAV RWY 33)", "10", "10-13", "RWY 33 STAR", "STAR"),
     (f"EPWA - {IAC} (ILS z CAT II or LOC z) RWY 11 (CAT A,B,C,D)", "12", "12-1", "RWY 11 ILS Z CAT II / LOC Z", "IAC"),
     (f"EPWA - {IAC} (ILS y CAT II) RWY 11 (CAT A,B,C,D)", "12", "12-3", "RWY 11 ILS Y CAT II", "IAC"),
-    (f"EPWA - {IAC} (ILS z CAT II/III or LOC z) RWY 33 (CAT A,B,C,D)", "12", "12-5", "RWY 33 ILS Z CAT II/III / LOC Z", "IAC"),
-    (f"EPWA - {IAC} (ILS y CAT II/III) RWY 33 (CAT A,B,C,D)", "12", "12-7", "RWY 33 ILS Y CAT II/III", "IAC"),
-    (f"EPWA - {IAC} (ILS or LOC) RWY 15 (CAT A,B,C,D)", "12", "12-9", "RWY 15 ILS / LOC", "IAC"),
-    (f"EPWA - {IAC} (ILS z or LOC z) RWY 29 (CAT A,B,C,D)", "12", "12-11", "RWY 29 ILS Z / LOC Z", "IAC"),
-    (f"EPWA - {IAC} (ILS y) RWY 29 (CAT A,B,C,D)", "12", "12-13", "RWY 29 ILS Y", "IAC"),
-    (f"EPWA - {IAC} (VOR) RWY 11 (CAT A,B,C,D)", "12", "12-15", "RWY 11 VOR", "IAC"),
-    (f"EPWA - {IAC} (VOR) RWY 29 (CAT A,B,C,D)", "12", "12-17", "RWY 29 VOR", "IAC"),
-    (f"EPWA - {IAC} (VOR) RWY 33 (CAT A,B,C,D)", "12", "12-19", "RWY 33 VOR", "IAC"),
-    (f"EPWA - {IAC} (RNP) RWY 11 (CAT A,B,C,D)", "12", "12-21", "RWY 11 RNP", "IAC"),
-    (f"EPWA - {IAC} (RNP) RWY 15 (CAT A,B,C,D)", "12", "12-25", "RWY 15 RNP", "IAC"),
-    (f"EPWA - {IAC} (RNP) RWY 29 (CAT A,B,C,D)", "12", "12-29", "RWY 29 RNP", "IAC"),
-    (f"EPWA - {IAC} (RNP) RWY 33 (CAT A,B,C,D)", "12", "12-33", "RWY 33 RNP", "IAC"),
-    ("EPWA - VFR ARRIVAL AND DEPARTURE ROUTES", "13", "13-1", "VFR ARRIVAL AND DEPARTURE ROUTES", "VFR"),
-    ("BIRD CONCENTRATIONS", "14", "14-1", "BIRD CONCENTRATIONS", "OTHER"),
+    (f"EPWA - {IAC} (ILS z CAT II &amp; III or LOC z) RWY 33 (CAT A,B,C,D)", "12", "12-5",
+     "RWY 33 ILS Z CAT II & III / LOC Z", "IAC"),
+    (f"EPWA - {IAC} (ILS y CAT II &amp; III) RWY 33 (CAT A,B,C,D)", "12", "12-7", "RWY 33 ILS Y CAT II & III", "IAC"),
+    (f"EPWA - {IAC} (ILS x CAT II &amp; III or LOC x) RWY 33 (CAT A,B,C,D)", "12", "12-9",
+     "RWY 33 ILS X CAT II & III / LOC X", "IAC"),
+    (f"EPWA - {IAC} (VOR) RWY 11 (CAT A,B,C,D)", "12", "12-11", "RWY 11 VOR", "IAC"),
+    (f"EPWA - {IAC} (VOR) RWY 15 (CAT A,B,C,D)", "12", "12-13", "RWY 15 VOR", "IAC"),
+    (f"EPWA - {IAC} (VOR) RWY 29 (CAT A,B,C,D)", "12", "12-15", "RWY 29 VOR", "IAC"),
+    (f"EPWA - {IAC} (VOR) RWY 33 (CAT A,B,C,D)", "12", "12-17", "RWY 33 VOR", "IAC"),
+    (f"EPWA - {IAC} (RNP) RWY 11 (CAT A,B,C,D)", "12", "12-19", "RWY 11 RNP", "IAC"),
+    (f"EPWA - {IAC} (RNP) RWY 15 (CAT A,B,C,D)", "12", "12-23", "RWY 15 RNP", "IAC"),
+    (f"EPWA - {IAC} (RNP) RWY 29 (CAT A,B,C,D)", "12", "12-27", "RWY 29 RNP", "IAC"),
+    (f"EPWA - {IAC} (RNP) RWY 33 (CAT A,B,C,D)", "12", "12-31", "RWY 33 RNP", "IAC"),
+    # dwie mapy o tym samym tytule
+    ("EPWA - VFR ARRIVAL, DEPARTURE AND TRANSIT ROUTES", "13", "13-1", "VFR ARRIVAL, DEPARTURE AND TRANSIT ROUTES (1/2)",
+     "VFR"),
+    ("EPWA - VFR ARRIVAL, DEPARTURE AND TRANSIT ROUTES", "13", "13-3", "VFR ARRIVAL, DEPARTURE AND TRANSIT ROUTES (2/2)",
+     "VFR"),
+    ("EPWA - BIRD CONCENTRATIONS", "14", "14-1", "BIRD CONCENTRATIONS", "OTHER"),
 ]
 
 # EPBY: SID konwencjonalne i RNP dla tej samej drogi startowej, tytuły z przedrostkiem i bez, "CHART - INSTRUMENT"
@@ -86,8 +92,9 @@ EPBY = [
     (f"EPBY - {SID_BY} (RNP RWY 08)", "08", "08-5", "RWY 08 RNP SID", "SID"),
     (f"EPBY - {SID_BY} (RNP RWY 26)", "08", "08-7", "RWY 26 RNP SID", "SID"),
     (f"{STAR_BY} (RWY 08, RWY 26)", "10", "10-1", "RWY 08/26 STAR", "STAR"),
-    (f"EPBY - {STAR_BY} (RNP RWY 08)", "10", "10-3", "RWY 08 STAR", "STAR"),
-    (f"EPBY - {STAR_BY} (RNP RWY 26)", "10", "10-5", "RWY 26 STAR", "STAR"),
+    # STAR konwencjonalna dla obu dróg startowych i RNP dla każdej osobno: RNP w nazwie
+    (f"EPBY - {STAR_BY} (RNP RWY 08)", "10", "10-3", "RWY 08 RNP STAR", "STAR"),
+    (f"EPBY - {STAR_BY} (RNP RWY 26)", "10", "10-5", "RWY 26 RNP STAR", "STAR"),
     (f"EPBY - {IAC} (ILS z) RWY 26 (CAT A,B,C,D)", "12", "12-1", "RWY 26 ILS Z", "IAC"),
     (f"EPBY - {IAC} (ILS y or LOC y) RWY 26 (CAT A/B/C/D)", "12", "12-3", "RWY 26 ILS Y / LOC Y", "IAC"),
     (f"EPBY - {IAC} (VOR z) RWY 08 (CAT A/B/C/D)", "12", "12-5", "RWY 08 VOR Z", "IAC"),

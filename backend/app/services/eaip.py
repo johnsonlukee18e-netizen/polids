@@ -207,7 +207,12 @@ CHART_KINDS = (("OBST", ("OBSTACLE", "TERRAIN")),
                ("STAR", ("STANDARD ARRIVAL", "INSTRUMENT ARRIVAL", "ARRIVAL CHART", "(STAR)")),
                ("IAC", ("INSTRUMENT APPROACH", "APPROACH CHART")),
                ("APDC", ("PARKING", "DOCKING")),
-               ("ADC", ("AERODROME CHART", "GROUND MOVEMENT", "AREAS OF RESPONSIBILITY")))
+               ("ADC", ("AERODROME CHART", "GROUND MOVEMENT", "AREAS OF RESPONSIBILITY", "HOT SPOT")))
+# tytuł bez słów z CHART_KINDS (albo numer strony zamiast tytułu): rodzaj z numeru serii w nazwie PDF-u (AD_2_EPWA_8-1:
+# seria 8), numeracja jednakowa na wszystkich lotniskach eAIP IFR; serie 9 (mapa obszaru), 11 i 14 (ptaki) zostają OTHER
+SERIES_KINDS = {2: "ADC", 3: "ADC", 4: "APDC", 5: "ADC", 6: "OBST", 7: "OBST", 8: "SID", 10: "STAR", 12: "IAC", 13: "VFR"}
+# odnośnik do PDF-u mapy dowolnego lotniska (tabela z takim odnośnikiem nie jest częścią komórki, w której stoi)
+CHART_PDF = re.compile(r"AD_2_[A-Z]{4}_\d+-\d+\.pdf", re.I)
 
 # lotniska z częścią AD 2 eAIP IFR (AD 1.3, AIRAC AMDT 10-26); ta sama lista co AD2 w frontend/js/tabs/aip.js.
 # Inny kod EPxx nie trafia do PAŻP (każdy dawałby pobranie strony, której nie ma).
@@ -243,13 +248,16 @@ HIDDEN_TAGS = {"del", "s", "strike"}
 HIDDEN_CLASS = re.compile(r"deleted", re.I)
 HIDDEN_STYLE = re.compile(r"display\s*:\s*none", re.I)
 MAX_ROWSPAN = 500
+FOLD_MAX = 1000          # znaków: dłuższa tabela bez map nie jest tytułem i nie trafia do komórki, w której stoi
 
 
 class _Rows(HTMLParser):
     """Wiersze tabel jako drzewo i odnośniki w kolejności strony. Strona AD 2 eAIP PAŻP to tabela układu (każdy
     nagłówek i akapit w osobnym wierszu), a tabela map AD 2.24 stoi w komórce tej tabeli: wiersz tabeli zagnieżdżonej
     jest osobnym wierszem (z rodzicem = wiersz, w którego komórce stoi tabela), a jego tekst nie trafia do komórki
-    rodzica (w 0.12.5 trafiał i wszystkie mapy EPWA dostawały jeden sklejony tytuł). Komórka: tekst i tekst z podziałem
+    rodzica (w 0.12.5 trafiał i wszystkie mapy EPWA dostawały jeden sklejony tytuł). Wyjątek: krótka tabela bez
+    odnośnika do PDF-u mapy (np. tytuł mapy w małej tabeli w komórce tytułu) po zamknięciu jest tekstem komórki,
+    w której stoi (jak w 0.12.5), a jej wiersze nie liczą się jako osobne (folded). Komórka: tekst i tekst z podziałem
     na linie (<br>, <p>, <div> zaczynają nową linię). Tekstu i odnośników skreślonych w poprawce i ukrytych nie bierzemy. <td> bez </td>
     i <tr> bez </tr> zamyka poprzednią komórkę / wiersz tej samej tabeli; <td> bez <tr> otwiera wiersz (jak przeglądarka);
     komórka z rowspan przechodzi do następnych wierszy tej samej tabeli. Nie rzuca wyjątku na żadnej zbitce znaczników:
@@ -260,7 +268,9 @@ class _Rows(HTMLParser):
         self.rows: list[dict] = []        # wszystkie wiersze w kolejności otwarcia
         self.links: list[dict] = []       # odnośniki w kolejności strony: {href, title, alt, text, row}
         self._stack: list[dict] = []      # otwarte wiersze (najbardziej wewnętrzny na końcu)
-        self._tables: list[dict] = []     # otwarte tabele: {owner: wiersz, w którym stoi tabela, span: [(komórka, ile)]}
+        # otwarte tabele: {owner: wiersz, w którym stoi tabela, span: [(komórka, ile)], rows: wiersze tej tabeli,
+        # links: jest w niej odnośnik do PDF-u mapy, text: tekst całej tabeli (None: dłuższy niż FOLD_MAX)}
+        self._tables: list[dict] = []
         self._hide: list[list] = []       # otwarte elementy skreślone / ukryte: [znacznik, ile takich samych w środku]
         self._a: dict | None = None       # otwarty <a href>
 
@@ -277,6 +287,17 @@ class _Rows(HTMLParser):
             row["cell"].append(data)
         if self._a is not None:
             self._a["text"].append(data)
+        if self._tables:
+            self._table_text(self._tables[-1], data)
+
+    @staticmethod
+    def _table_text(table: dict, data: str):
+        if table["text"] is not None:
+            table["size"] += len(data)
+            if table["size"] > FOLD_MAX:
+                table["text"] = None
+            else:
+                table["text"].append(data)
 
     def _hide_open(self, tag: str, attrs: dict):
         if tag in VOID:
@@ -304,9 +325,11 @@ class _Rows(HTMLParser):
             carried = [dict(c) for c, n in table["span"] if n > 0]
             table["span"] = [(c, n - 1) for c, n in table["span"] if n > 1]
         row = {"cells": carried, "cell": None, "links": [], "parent": table["owner"] if table else None,
-               "level": level, "table": table, "rowspan": 1, "hide": hide, "cell_hide": hide}
+               "level": level, "table": table, "rowspan": 1, "hide": hide, "cell_hide": hide, "folded": False}
         self._stack.append(row)
         self.rows.append(row)
+        if table is not None:
+            table["rows"].append(row)
 
     def _close_cell(self, row):
         if row["cell"] is None:
@@ -331,7 +354,26 @@ class _Rows(HTMLParser):
         while len(self._tables) > level:
             while self._row is not None and self._row["level"] >= len(self._tables):
                 self._close_row()
-            self._tables.pop()
+            self._fold(self._tables.pop())
+
+    def _fold(self, table: dict):
+        """Zamknięta tabela: z odnośnikiem do mapy zostaje osobnymi wierszami (tabela nadrzędna też ma wtedy mapę);
+        krótka bez odnośnika staje się tekstem komórki, w której stoi, i tekstem tabeli nadrzędnej."""
+        parent = self._tables[-1] if self._tables else None
+        if table["links"] or table["text"] is None:
+            if parent is not None:
+                parent["links"] = parent["links"] or table["links"]
+                if table["text"] is None:
+                    parent["text"] = None
+            return
+        text = "".join(table["text"])
+        for r in table["rows"]:
+            r["folded"] = True
+        owner = table["owner"]
+        if owner is not None and owner is self._row and owner["cell"] is not None and owner["level"] == len(self._tables):
+            owner["cell"].append(text)
+        if parent is not None:
+            self._table_text(parent, text)
 
     def handle_starttag(self, tag, attrs):
         a = {k: v or "" for k, v in attrs}
@@ -340,7 +382,7 @@ class _Rows(HTMLParser):
         depth = len(self._hide)                      # skreślenia otwarte przed tym znacznikiem
         self._hide_open(tag, a)
         if tag == "table":
-            self._tables.append({"owner": self._row, "span": []})
+            self._tables.append({"owner": self._row, "span": [], "rows": [], "links": False, "text": [], "size": 0})
         elif tag == "tr":
             self._open_row(depth)
         elif tag in ("td", "th"):
@@ -362,6 +404,8 @@ class _Rows(HTMLParser):
             row = self._row
             self._a = {"href": href, "title": a.get("title") or "", "alt": "", "text": [], "row": row}
             self.links.append(self._a)
+            if self._tables and CHART_PDF.search(href):
+                self._tables[-1]["links"] = True
         elif tag == "img" and self._a is not None and not self._hide and a.get("alt") and not self._a["alt"]:
             self._a["alt"] = a["alt"]
 
@@ -388,6 +432,7 @@ class _Rows(HTMLParser):
 
     def close(self):
         super().close()
+        self._close_tables(0)                        # tabele bez </table> na końcu strony
         while self._stack:
             self._close_row()
         self._a = None
@@ -405,23 +450,38 @@ def _clean_title(text: str, icao: str) -> str:
     return re.sub(rf"^{icao}\s*[-–]\s*", "", t, flags=re.I)
 
 
-# opis odnośnika, który nie jest tytułem (alt ikony PDF-u)
-JUNK_ALT = re.compile(r"\W*(?:pdf|icon|image|img|link|download|open)?\W*(?:\.(?:gif|png|jpe?g|svg))?", re.I)
+# opis odnośnika albo tekst komórki z odnośnikiem, który nie jest tytułem (alt ikony PDF-u, "PDF", "Open PDF")
+JUNK_ALT = re.compile(r"\W*(?:(?:pdf|icon|image|img|link|download|open|view|file)\W*)*(?:\.(?:gif|png|jpe?g|svg))?", re.I)
+JUNK_MAX = 40            # znaków: dłuższy tekst nie jest opisem ikony (i nie trafia do JUNK_ALT)
+
+
+def _junk(text: str) -> bool:
+    """Opis odnośnika ("PDF", "pdf.gif") albo nazwa pliku mapy ("AD_2_EPWA_2-1.pdf"), a nie tytuł."""
+    return (len(text) <= JUNK_MAX and JUNK_ALT.fullmatch(text) is not None) or CHART_PDF.search(text) is not None
 
 
 def _row_title(row: dict) -> dict | None:
-    """Komórka z tytułem wiersza: pierwsza niepusta, która nie jest numerem strony ("AD 2 EPZG 2-1", "2-1")."""
-    return next((c for c in row["cells"] if c["text"] and not PAGE_LABEL.fullmatch(c["text"])), None)
+    """Komórka z tytułem wiersza: pierwsza niepusta, która nie jest numerem strony ("AD 2 EPZG 2-1", "2-1") ani
+    opisem odnośnika ("PDF", nazwa pliku)."""
+    return next((c for c in row["cells"] if c["text"] and not PAGE_LABEL.fullmatch(c["text"]) and not _junk(c["text"])),
+                None)
+
+
+def _whole_title(line: str) -> bool:
+    """Linia, która jest całym tytułem mapy, a nie jego częścią ("EPWA - AERODROME" / "GROUND MOVEMENT CHART - ICAO",
+    "... CHART - ICAO" / "(APN 1,7A,7B,9)"): ze słowem CHART."""
+    return re.search(r"\bCHART\b", line, re.I) is not None
 
 
 def _split_titles(cell: dict, icao: str, n: int) -> list[str] | None:
     """Kilka tytułów w jednej komórce dla n map tego wiersza (w kolejności): podział po przedrostku "<ICAO> - " albo po
-    liniach, gdy daje dokładnie n części; inaczej None."""
+    liniach, gdy daje dokładnie n części (po liniach tylko wtedy, gdy każda linia jest tytułem); inaczej None (jeden
+    tytuł w kilku liniach i kilka PDF-ów jednej mapy: wspólny tytuł)."""
     parts = [p for p in re.split(rf"(?=\b{icao}\s*[-–]\s)", cell["text"], flags=re.I) if p.strip(" -–")]
     if len(parts) == n:
         return parts
     lines = [" ".join(x.split()) for x in cell["raw"].split("\n") if x.strip()]
-    return lines if len(lines) == n else None
+    return lines if len(lines) == n and all(_whole_title(x) for x in lines) else None
 
 
 def _glued(text: str, icao: str) -> bool:
@@ -440,12 +500,13 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
     mapy). Bez tytułu: title odnośnika, alt obrazka, tekst odnośnika spoza tabeli, numer strony "AD 2 EPWA 2-1".
 
     Wpis: id "2-1" (numer z nazwy pliku, bez zer z przodu, 08-1 → 8-1), page "AD 2 EPWA 2-1", full (pełny tytuł),
-    title (krótka nazwa, short_names), kind (ADC, APDC, SID, STAR, IAC, VFR, OBST, OTHER), url."""
+    title (krótka nazwa, short_names), kind (ADC, APDC, SID, STAR, IAC, VFR, OBST, OTHER: z tytułu, a gdy tytuł nic
+    nie mówi, z numeru serii, SERIES_KINDS), url."""
     icao = icao.upper()
     p = _Rows()
     p.feed(html)
     p.close()
-    own = {id(r): _row_title(r) for r in p.rows}
+    own = {id(r): None if r["folded"] else _row_title(r) for r in p.rows}
     # wiersze, w których (w tabeli zagnieżdżonej) jest wiersz z tytułem: tabela układu, nie wiersz jednej mapy
     outer: set[int] = set()
     for r in p.rows:
@@ -490,17 +551,20 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
             text = parts[k] if parts else cell["text"]
             texts[i] = "" if _glued(text, icao) else text
 
-    out = []
+    out, named = [], []
     for i, (link, url, m, _) in enumerate(found):
         cid = f"{int(m.group(2))}-{int(m.group(3))}"
-        alt = link["alt"] if not JUNK_ALT.fullmatch(link["alt"]) else ""
+        alt = "" if _junk(link["alt"]) else link["alt"]
         loose = " ".join("".join(link["text"]).split()) if link["row"] is None else ""
         text = next((t for t in (texts[i], link["title"], alt, loose) if t and not _glued(t, icao)), "")
         full = _clean_title(text, icao) or f"AD 2 {icao} {cid}"
-        out.append({"id": cid, "page": f"AD 2 {icao} {cid}", "title": full, "full": full, "kind": chart_kind(full),
-                    "url": url})
+        kind = chart_kind(full)
+        named.append((full, kind))               # krótka nazwa z rodzaju według tytułu ("AD 2 EPWA 8-1" bez "SID")
+        if kind == "OTHER":
+            kind = SERIES_KINDS.get(int(m.group(2)), "OTHER")
+        out.append({"id": cid, "page": f"AD 2 {icao} {cid}", "title": full, "full": full, "kind": kind, "url": url})
     try:
-        for c, name in zip(out, short_names([(c["full"], c["kind"]) for c in out])):
+        for c, name in zip(out, short_names(named)):
             c["title"] = name
     except Exception:   # nieprzewidziany tytuł: zostają pełne tytuły, lista map działa dalej
         log.exception("eAIP %s: krótkie nazwy map", icao)
@@ -509,9 +573,11 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
 
 # --- krótkie nazwy map (0.12.6, issue #21): na liście sama nazwa jednej mapy ("AERODROME", "RWY 29 SID",
 # "PARKING APN 2", "RWY 11 ILS Z CAT II / LOC Z"), pełny tytuł w dymku. Bez przedrostka lotniska, "- ICAO" i słów
-# ogólnych (CHART, STANDARD ... INSTRUMENT, AERODROME przed dłuższą nazwą). RNAV/RNP przy SID/STAR i kategorie statków
-# powietrznych (CAT A,B,C,D) przy podejściach tylko wtedy, gdy odróżniają mapy o tej samej nazwie (EPBY: SID
-# konwencjonalny i RNP dla RWY 08); mapy o tym samym tytule (EPLL: dwa SID RNP RWY 25) dostają "(1/2)", "(2/2)".
+# ogólnych (CHART, STANDARD ... INSTRUMENT, AERODROME przed dłuższą nazwą). RNAV/RNP przy SID/STAR tylko wtedy, gdy
+# ta sama droga startowa ma SID/STAR o innym typie nawigacji (EPBY: SID konwencjonalny i RNP dla RWY 08, STAR
+# konwencjonalna dla RWY 08/26 i RNP dla RWY 08 i RWY 26); kategorie statków powietrznych (CAT A,B,C,D) przy
+# podejściach tylko do rozróżnienia map o tej samej nazwie; mapy o tym samym tytule (EPLL: dwa SID RNP RWY 25)
+# dostają "(1/2)", "(2/2)".
 SHORT_PHRASES = tuple((re.compile(p, re.I), r) for p, r in (
     (r"\bAERODROME OBSTACLE CHART\b", "OBSTACLE"),
     (r"\bPRECISION APPROACH TERRAIN CHART\b", "PATC"),
@@ -528,7 +594,9 @@ RWY_LIST = re.compile(r"\bRWYS?\s*(\d{2}[LRC]?(?:\s*(?:,|/|&|\bAND\b)\s*(?:RWYS?
 ACFT_CAT = re.compile(r"\(?\bCAT\s+([A-EH](?:\s*[,/]\s*[A-EH])*)\b\)?", re.I)
 NAV_SPEC = re.compile(r"\b(RNAV|RNP|GNSS|CONVENTIONAL|CONV)\b", re.I)
 # nawias z oznaczeniem procedury albo miejsca postoju: bez nawiasu ("(ILS z) RWY 24" → "RWY 24 ILS Z", "(APN 2)" → "APN 2")
-UNWRAP = re.compile(r"\(\s*((?:APN|TWY|ILS|LOC|VOR|NDB|RNP|RNAV|GNSS|GLS|DME|SRA|LPV|LNAV|TACAN|MIL)\b[^()]*)\)", re.I)
+# (także z jednym nawiasem w środku: "(APN 1, 2 (DE-ICING), 3)" → "APN 1, 2 (DE-ICING), 3", "(PAR)" → "PAR")
+UNWRAP = re.compile(r"\(\s*((?:APN|TWY|ILS|LOC|VOR|NDB|RNP|RNAV|GNSS|GLS|DME|SRA|LPV|LNAV|TACAN|PAR|MIL)\b"
+                    r"(?:[^()]|\([^()]*\))*)\)", re.I)
 DESIGNATOR = re.compile(r"\b(ILS|LOC|VOR|NDB|RNP|RNAV|GLS|GNSS|DME|LPV|SRA|TACAN)\s+([a-z])\b")
 
 
@@ -596,14 +664,33 @@ def _short(parts: tuple[str, str, str, str], kind: str, level: int) -> str:
     return " ".join(w for w in words if w)
 
 
+def _nav_needed(charts: list[tuple[str, str]], parts: list[tuple[str, str, str, str]]) -> list[int]:
+    """1 dla SID/STAR, których droga startowa (bez drogi: każda) ma też SID/STAR tego rodzaju o innym typie
+    nawigacji (konwencjonalny "" / RNAV / RNP): nazwa od razu z RNAV/RNP; inaczej 0."""
+    out = [0] * len(charts)
+    for kind in ("SID", "STAR"):
+        idx = [i for i, (_, k) in enumerate(charts) if k == kind]
+        rwys = {i: parts[i][1][4:].split("/") if parts[i][1] else [] for i in idx}
+        navs: dict[str, set[str]] = {}            # droga startowa ("*": bez drogi) -> typy nawigacji
+        for i in idx:
+            for r in rwys[i] or ["*"]:
+                navs.setdefault(r, set()).add(parts[i][2])
+        every = set().union(*navs.values()) if navs else set()
+        for i in idx:
+            mixed = [navs[r] | navs.get("*", set()) for r in rwys[i]] if rwys[i] else [every]
+            out[i] = int(any(len(n) > 1 for n in mixed))
+    return out
+
+
 def short_names(charts: list[tuple[str, str]]) -> list[str]:
     """Krótkie nazwy dla listy (pełny tytuł, rodzaj): mapy o tej samej nazwie dostają szczegóły (poziom 1: RNAV/RNP,
     kategorie; poziom 2: pełny tytuł) tylko do rozróżnienia, a jednakowe na każdym poziomie - "(1/2)", "(2/2)"."""
     parts = [_name_parts(full, kind) for full, kind in charts]
+    base = _nav_needed(charts, parts)
 
     def name(i: int, level: int) -> str:
         full, kind = charts[i]
-        return full if level >= 2 else (_short(parts[i], kind, level) or full)
+        return full if level >= 2 else (_short(parts[i], kind, max(level, base[i])) or full)
 
     def by_name(idx: list[int], level: int) -> list[list[int]]:
         groups: dict[str, list[int]] = {}

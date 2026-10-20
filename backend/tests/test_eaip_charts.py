@@ -8,6 +8,7 @@ import random
 import re
 import tempfile
 from collections import Counter
+from html import unescape
 
 os.environ.setdefault("POLIDS_DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
 
@@ -25,11 +26,11 @@ def parse(html, icao="EPWA"):
 
 
 def want(icao, charts=None):
-    """Oczekiwane wpisy z tabeli w eaip_pages.py: id bez zer z przodu, adres PDF-u ze spacją jako %20."""
+    """Oczekiwane wpisy z tabeli w eaip_pages.py: id bez zer z przodu, adres PDF-u ze spacją jako %20, "&amp;" → "&"."""
     out = []
     for title, folder, page, short, kind in (PAGES[icao] if charts is None else charts):
         n, m = page.split("-")
-        full = re.sub(rf"^{icao} - ", "", title)
+        full = re.sub(rf"^{icao} - ", "", unescape(title))
         out.append({"id": f"{int(n)}-{int(m)}", "page": f"AD 2 {icao} {int(n)}-{int(m)}", "title": short, "full": full,
                     "kind": kind, "url": docs(icao, folder, page)})
     return out
@@ -47,13 +48,13 @@ def test_epwa_no_glued_titles_and_kind_counts():
     # żaden tytuł nie jest nagłówkiem tabeli ani sklejką kilku map (błąd z 0.12.5)
     assert not [c for c in charts if "Charts" in c["full"] or "Pages" in c["full"] or "EPWA" in c["full"]]
     assert all(len(c["title"]) <= 60 for c in charts)
-    assert Counter(c["kind"] for c in charts) == {"ADC": 3, "APDC": 6, "OBST": 4, "SID": 4, "STAR": 4, "IAC": 14,
-                                                  "VFR": 1, "OTHER": 1}
+    assert Counter(c["kind"] for c in charts) == {"ADC": 3, "APDC": 6, "OBST": 4, "SID": 4, "STAR": 4, "IAC": 13,
+                                                  "VFR": 2, "OTHER": 1}
     names = [c["title"] for c in charts]
     assert len(set(names)) == len(names)
     for name in ("AERODROME", "AREAS OF RESPONSIBILITY", "PARKING APN 1, 7A, 7B, 9", "OBSTACLE TYPE A RWY 11/29",
                  "PATC RWY 11", "RWY 29 SID", "RWY 11 STAR", "RWY 11 ILS Z CAT II / LOC Z",
-                 "GROUND MOVEMENT (A380-800, AN-124-100, B747-8, C-5B GALAXY)"):
+                 "RWY 33 ILS X CAT II & III / LOC X", "GROUND MOVEMENT (A380-800, AN-124-100, B747-8, C-5B GALAXY)"):
         assert name in names
 
 
@@ -69,6 +70,10 @@ def _variants():
                          r"<tr><td>\2</td><td>\1</td></tr>", rows)
     page_text = re.sub(r'(AD_2_EPWA_(\d+-\d+)\.pdf" target="_blank">)<img[^>]*>', r"\1AD 2 EPWA \2", rows)
     td_header = rows.replace("<th>Charts</th><th>Pages</th>", "<td><b>Charts</b></td><td><b>Pages</b></td>")
+    # tytuł w małej tabeli w komórce tytułu (jak w 0.12.5: tabela bez PDF-u mapy jest tekstem swojej komórki)
+    title_table = re.sub(r"<p>(.*?)</p>", r"<table><tr><td><p>\1</p></td></tr></table>", rows)
+    # odnośnik w tabeli w komórce "Pages", z tekstem "PDF" (opis odnośnika, nie tytuł)
+    pdf_text = re.sub(r'(<a [^>]*>)<img[^>]*></a>', r"<table><tr><td>\1PDF</a></td></tr></table>", rows)
     return {
         "flat": rows,
         "two_layout_levels": f'<table><tr><td><table><tr><td></td><td>{rows}</td></tr></table></td></tr></table>',
@@ -76,6 +81,8 @@ def _variants():
         "header_row_as_td": f"<table><tr><td>{td_header}</td></tr></table>",
         "link_cell_first": f"<table><tr><td>{links_first}</td></tr></table>",
         "page_number_link_text": f"<table><tr><td>{page_text}</td></tr></table>",
+        "title_in_nested_table": f"<table><tr><td>{title_table}</td></tr></table>",
+        "pdf_link_text_in_nested_table": f"<table><tr><td>{pdf_text}</td></tr></table>",
         # tabela map bez </td>, </tr>, </p> i </table> w środku tabeli układu
         "unclosed_tags": f"<table><tr><td>{sloppy}</td></tr><tr><td><p>EPWA AD 2.25</p></td></tr></table>",
     }
@@ -99,10 +106,24 @@ def test_several_charts_in_one_cell():
     for row in (lines, prefixed):
         got = [(c["id"], c["title"], c["kind"]) for c in parse(_page(f"<table><tr><td><table>{row}</table></td></tr></table>"))]
         assert got == [("8-1", "RWY 11 SID", "SID"), ("8-5", "RWY 15 SID", "SID"), ("8-9", "RWY 29 SID", "SID")], row
-    # liczba tytułów nie pasuje do liczby PDF-ów: zamiast sklejki numer strony
+    # liczba tytułów nie pasuje do liczby PDF-ów: zamiast sklejki numer strony (rodzaj z numeru serii)
     glued = prefixed.replace("EPWA - STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO (RNAV RWY 29)", "")
-    got = [(c["id"], c["title"]) for c in parse(_page(f"<table>{glued}</table>"))]
-    assert got == [("8-1", "AD 2 EPWA 8-1"), ("8-5", "AD 2 EPWA 8-5"), ("8-9", "AD 2 EPWA 8-9")]
+    got = [(c["id"], c["title"], c["kind"]) for c in parse(_page(f"<table>{glued}</table>"))]
+    assert got == [("8-1", "AD 2 EPWA 8-1", "SID"), ("8-5", "AD 2 EPWA 8-5", "SID"), ("8-9", "AD 2 EPWA 8-9", "SID")]
+
+
+def test_one_title_on_two_lines_with_two_pdfs():
+    # jeden tytuł w dwóch liniach i dwa PDF-y jednej mapy: wspólny tytuł, a nie dwie połówki tytułu
+    two = (f'<a href="{pdf("EPWA", "05", "5-1")}"><img alt=""></a> <a href="{pdf("EPWA", "05", "5-2")}"><img alt=""></a>')
+    rows = {
+        "<td>EPWA - AERODROME<br/>GROUND MOVEMENT CHART - ICAO</td>":
+            [("5-1", "GROUND MOVEMENT (1/2)", "ADC"), ("5-2", "GROUND MOVEMENT (2/2)", "ADC")],
+        "<td><p>EPWA - AIRCRAFT PARKING, DOCKING CHART - ICAO</p><p>(APN 1,7A,7B,9)</p></td>":
+            [("5-1", "PARKING APN 1, 7A, 7B, 9 (1/2)", "APDC"), ("5-2", "PARKING APN 1, 7A, 7B, 9 (2/2)", "APDC")],
+    }
+    for cell, expected in rows.items():
+        html = _page(f"<table><tr><td><table><tr>{cell}<td>{two}</td></tr></table></td></tr></table>")
+        assert [(c["id"], c["title"], c["kind"]) for c in parse(html)] == expected, cell
 
 
 def test_rowspan_in_nested_chart_table():
@@ -117,6 +138,27 @@ def test_rowspan_in_nested_chart_table():
                    ("3-1", "AREAS OF RESPONSIBILITY", "AERODROME CHART AREAS OF RESPONSIBILITY", "ADC")]
 
 
+def test_nested_tables_in_title_and_link_cells():
+    # tytuł w tabeli zagnieżdżonej w komórce tytułu i odnośnik z tekstem "PDF" w tabeli w komórce odnośnika
+    a = (f'<tr><td><table><tr><td><p>EPWA - AERODROME CHART - ICAO</p></td></tr></table></td>'
+         f'<td><a href="{pdf("EPWA", "02", "2-1")}"><img alt=""></a></td></tr>')
+    b = (f'<tr><td>EPWA - AERODROME CHART AREAS OF RESPONSIBILITY</td>'
+         f'<td><table><tr><td><a href="{pdf("EPWA", "03", "3-1")}">PDF</a></td></tr></table></td></tr>')
+    c = (f'<tr><td><table><tr><td>EPWA - AIRCRAFT PARKING, DOCKING CHART</td></tr><tr><td>- ICAO (APN 2)</td></tr></table>'
+         f'</td><td><table><tr><td>AD 2 EPWA 4-11</td><td><a href="{pdf("EPWA", "04", "4-11")}">Open PDF</a></td></tr>'
+         f'<tr><td>AD 2 EPWA 4-12</td><td><a href="{pdf("EPWA", "04", "4-12")}">AD_2_EPWA_4-12.pdf</a></td></tr>'
+         f'</table></td></tr>')
+    got = [(x["id"], x["title"], x["full"], x["kind"]) for x in parse(_page(f"<table>{a}{b}{c}</table>"))]
+    apdc = "AIRCRAFT PARKING, DOCKING CHART - ICAO (APN 2)"
+    assert got == [("2-1", "AERODROME", "AERODROME CHART - ICAO", "ADC"),
+                   ("3-1", "AREAS OF RESPONSIBILITY", "AERODROME CHART AREAS OF RESPONSIBILITY", "ADC"),
+                   ("4-11", "PARKING APN 2 (1/2)", apdc, "APDC"), ("4-12", "PARKING APN 2 (2/2)", apdc, "APDC")]
+    # tabela układu wokół tabeli map nie oddaje tytułu nagłówka ani sąsiedniej tabeli bez map
+    legend = "<table><tr><td>Legend</td></tr></table>"
+    got = parse(_page(f"<table><tr><td>EPWA AD 2.24{legend}<table>{a}{b}</table></td></tr></table>"))
+    assert [x["title"] for x in got] == ["AERODROME", "AREAS OF RESPONSIBILITY"]
+
+
 def test_deleted_and_hidden_text():
     # skreślone w poprawce (klasa AmdtDeleted..., <del>) i ukryte (display:none) nie wchodzą do tytułu ani listy
     rows = (f'<tr><td><span class="AmdtDeletedAIRAC">EPWA - OLD CHART</span><span class="AmdtInsertedAIRAC">EPWA - '
@@ -127,6 +169,19 @@ def test_deleted_and_hidden_text():
             f'<td><a href="{pdf("EPWA", "14", "14-1")}"></a></td></tr>')
     got = [(c["id"], c["full"]) for c in parse(_page(f"<table><tr><td><table>{rows}</table></td></tr></table>"))]
     assert got == [("2-1", "AERODROME CHART - ICAO"), ("14-1", "BIRD CONCENTRATIONS")]
+
+
+def test_kind_from_series_when_title_says_nothing():
+    # tytuł bez słów rodzaju albo numer strony zamiast tytułu: rodzaj z serii w nazwie PDF-u (4 postojowe, 8 SID,
+    # 12 podejścia); serie 9 (mapa obszaru), 11 i 14 (ptaki) zostają OTHER; krótka nazwa bez rodzaju z serii
+    charts = (("AIRCRAFT PARKING CHART - ICAO", "04", "4-1"), ("HOT SPOT", "04", "4-3"), ("", "08", "08-1"),
+              ("EPKK - AREA CHART ICAO - ARRIVAL AND TRANSIT ROUTES", "09", "09-1"), ("", "11", "11-1"),
+              ("EPKK - BIRD CONCENTRATIONS", "14", "14-1"), ("RWY 25 ADDITIONAL INFORMATION", "12", "12-9"))
+    rows = "".join(f'<tr><td>{t}</td><td><a href="{pdf("EPKK", f, p)}"><img alt=""></a></td></tr>' for t, f, p in charts)
+    got = [(c["id"], c["title"], c["kind"]) for c in parse(_page(f"<table>{rows}</table>"), "EPKK")]
+    assert got == [("4-1", "PARKING", "APDC"), ("4-3", "HOT SPOT", "ADC"), ("8-1", "AD 2 EPKK 8-1", "SID"),
+                   ("9-1", "AREA ARRIVAL AND TRANSIT ROUTES", "OTHER"), ("11-1", "AD 2 EPKK 11-1", "OTHER"),
+                   ("14-1", "BIRD CONCENTRATIONS", "OTHER"), ("12-9", "ADDITIONAL INFORMATION RWY 25", "IAC")]
 
 
 # --- krótkie nazwy
@@ -151,6 +206,14 @@ def test_short_names_examples():
         "INSTRUMENT APPROACH CHART - ICAO (VOR z) RWY 19 (CAT A,B,C,D)": "RWY 19 VOR Z",
         "INSTRUMENT APPROACH CHART - ICAO (RNP RWY 07) CAT A,B,C,D": "RWY 07 RNP",
         "INSTRUMENT APPROACH CHART - ICAO (ILS) RWY 25 (CAT A/B/C/D)": "RWY 25 ILS",
+        "INSTRUMENT APPROACH CHART - ICAO (ILS z CAT II &amp; III or LOC z) RWY 33 (CAT A,B,C,D)":
+            "RWY 33 ILS Z CAT II &amp; III / LOC Z",
+        "INSTRUMENT APPROACH CHART - ICAO (ILS x CAT II & III or LOC x) RWY 33 (CAT A,B,C,D)": "RWY 33 ILS X CAT II & III / LOC X",
+        # nawias w nawiasie (EPKT) i PAR (EPRA)
+        "AIRCRAFT PARKING, DOCKING CHART - ICAO (APN 1, 2 (DE-ICING), 3)": "PARKING APN 1, 2 (DE-ICING), 3",
+        "INSTRUMENT APPROACH CHART - ICAO (PAR) RWY 07 (CAT A,B,C,D,E) MILITARY USE ONLY": "RWY 07 PAR MILITARY USE ONLY",
+        "INSTRUMENT APPROACH CHART - ICAO (NDB z) RWY 25 (CAT A,B,C,D,E) MILITARY USE ONLY": "RWY 25 NDB Z MILITARY USE ONLY",
+        "HOT SPOT": "HOT SPOT",
         "VISUAL APPROACH CHART - ICAO (RWY 26)": "VISUAL APPROACH RWY 26",
         "VISUAL OPERATION CHART": "VISUAL OPERATION",
         "VFR ARRIVAL AND DEPARTURE ROUTES": "VFR ARRIVAL AND DEPARTURE ROUTES",
@@ -167,6 +230,17 @@ def test_short_names_details_only_to_tell_charts_apart():
     sid = "STANDARD DEPARTURE CHART INSTRUMENT (SID) - ICAO"
     assert short(f"{sid} (RWY 08)", f"{sid} (RNP RWY 08)", f"{sid} (RNP RWY 26)") == \
         ["RWY 08 SID", "RWY 08 RNP SID", "RWY 26 SID"]
+    # te same drogi startowe w innym zestawie (EPBY: STAR konwencjonalna RWY 08/26, RNP osobno dla RWY 08 i RWY 26)
+    star = "STANDARD ARRIVAL CHART - INSTRUMENT (STAR) - ICAO"
+    assert short(f"{star} (RWY 08, RWY 26)", f"{star} (RNP RWY 08)", f"{star} (RNP RWY 26)") == \
+        ["RWY 08/26 STAR", "RWY 08 RNP STAR", "RWY 26 RNP STAR"]
+    # EPPO: konwencjonalna i RNAV tylko dla RWY 28; RWY 10 ma jedną STAR
+    assert short(f"{star} (RWY 28)", f"{star} (RNAV RWY 10)", f"{star} (RNAV RWY 28)") == \
+        ["RWY 28 STAR", "RWY 10 STAR", "RWY 28 RNAV STAR"]
+    # STAR bez drogi startowej (wszystkie) i RNP dla RWY 08; same RNAV dla różnych dróg: bez RNAV
+    assert short(f"{star}", f"{star} (RNP RWY 08)") == ["STAR", "RWY 08 RNP STAR"]
+    assert short(f"{sid} (RNAV RWY 11)", f"{sid} (RNAV RWY 29)", f"{star} (RWY 11)") == \
+        ["RWY 11 SID", "RWY 29 SID", "RWY 11 STAR"]
     iac = "INSTRUMENT APPROACH CHART - ICAO"
     assert short(f"{iac} (VOR) RWY 24 (CAT A,B)", f"{iac} (VOR) RWY 24 (CAT C/D)", f"{iac} (VOR) RWY 06 (CAT A,B,C,D)") == \
         ["RWY 24 VOR CAT A/B", "RWY 24 VOR CAT C/D", "RWY 06 VOR"]
