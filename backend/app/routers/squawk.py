@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from ..config import settings
@@ -6,16 +8,21 @@ from ..services.squawk import lookup, normalize, valid_code
 
 # SQUAWK (0.12.3): pule kodów SSR z EUROCONTROL CAL (FIR EPWW, CCAMS, NATO, EUR-E) i kody specjalne
 router = APIRouter(prefix="/api/squawk", tags=["squawk"])
+log = logging.getLogger(__name__)
 
 
 def _data() -> dict:
-    """data/seed/squawk.json z pamięci, dopóki plik się nie zmieni (po imporcie CAL bez restartu serwera)."""
+    """data/seed/squawk.json z pamięci, dopóki plik się nie zmieni (po imporcie CAL bez restartu serwera). Błąd dla
+    użytkownika bez nazwy pliku (0.12.6, issue #21: bez dopisków skąd dane), szczegóły w logu serwera."""
+    path = settings.seed_dir / "squawk.json"
     try:
-        return normalize(seed_json(settings.seed_dir / "squawk.json"))
+        return normalize(seed_json(path))
     except FileNotFoundError as exc:
-        raise HTTPException(404, "SQUAWK: file data/seed/squawk.json missing") from exc
+        log.warning("SQUAWK: brak pliku %s", path)
+        raise HTTPException(404, "SQUAWK: no data") from exc
     except (OSError, ValueError) as exc:
-        raise HTTPException(500, f"SQUAWK: cannot read file data/seed/squawk.json ({exc})") from exc
+        log.warning("SQUAWK: nie da się odczytać %s: %s", path, exc)
+        raise HTTPException(500, "SQUAWK: data unavailable") from exc
 
 
 @router.get("")
@@ -24,7 +31,7 @@ def squawk():
 
     `pools`: [{from, to, count, category, pa, unit, civ_mil, app, assigned_by, ar, destination, via, protection,
     remarks, ver, sheet, row}] posortowane po kategorii (epww, ccams, nato, eur-e) i kodzie. `special`: [{code,
-    label, meaning, source, note?, excluded?}]. `meta`: źródło, wydanie CAL, data importu, obszary uczestniczące
+    label}] (sam tytuł, np. 0001 LPR). `meta`: źródło, wydanie CAL, data importu, obszary uczestniczące
     (participating_areas), liczba pul w kategoriach (counts). `note`: opis pliku."""
     return _data()
 

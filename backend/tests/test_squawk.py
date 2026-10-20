@@ -22,7 +22,8 @@ from backend.app.config import DATA_DIR, settings  # noqa: E402
 from backend.app.importers import squawk_cal  # noqa: E402
 from backend.app.services.squawk import CATEGORIES, lookup, normalize, parse_codes, pool_size, valid_code  # noqa: E402
 
-SPECIAL = {"7500", "7600", "7700", "2000", "7000", "1000"}
+SPECIAL = {"7500", "7600", "7700", "2000", "7000", "1000", "0001"}
+LPR = "LPR – RESCUE / MEDICAL TRANSPORT MISSION"
 REAL_CAL = DATA_DIR / "import" / "eurocontrol-icao-eur-cal-v4-13.xls"
 POOL_KEYS = ["from", "to", "count", "category", "pa", "unit", "civ_mil", "app", "assigned_by", "ar", "destination", "via",
              "protection", "remarks", "ver", "sheet", "row"]
@@ -87,11 +88,10 @@ def test_seed_file():
     # format jak z importera (jedna pula na wiersz): ręczna poprawka musi zostawić ten sam układ
     assert path.read_text("utf-8") == squawk_cal.dumps(raw)
     assert list(raw) == ["_uwaga", "meta", "special", "pools"] and "_status" not in raw
+    # 0.12.6 (issue #21): kody specjalne tylko z tytułem (bez opisu i źródła), 0001 LPR jak w OM EPWW
     special = {s["code"]: s for s in raw["special"]}
-    assert set(special) == SPECIAL and all(s["meaning"] and s["source"] for s in special.values())
-    assert special["7000"]["source"] == "SERA.13005" and "CCAMS" in special["1000"]["source"]
-    assert special["1000"]["excluded"] == ["EPCE", "EPDA", "EPDE", "EPIR", "EPKS", "EPLK", "EPLY", "EPMB", "EPMI",
-                                           "EPMM", "EPOK", "EPPR", "EPPW", "EPSN", "EPTM"]
+    assert set(special) == SPECIAL and all(list(s) == ["code", "label"] and s["label"] for s in special.values())
+    assert special["0001"]["label"] == LPR and special["7700"]["label"] == "EMERGENCY"
     meta = raw["meta"]
     assert (meta["source"], meta["layout"], meta["edition"], meta["skipped"]) == (REAL_CAL.name, "CAL", "4.13", 0)
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", meta["generated"]) and meta["participating_areas"]["EUR-E"] == EUR_E
@@ -122,6 +122,11 @@ def test_api_squawk(client):
     hit = client.get("/api/squawk/lookup", params={"code": "1500"}).json()
     assert [(p["category"], p["civ_mil"]) for p in hit["pools"]] == [("nato", "MIL")]
     assert client.get("/api/squawk/lookup", params={"code": " 1000 "}).json()["special"][0]["code"] == "1000"
+    # 0001: kod specjalny LPR i pule, na które się nakłada (EPWW 0001–0017 i przydział LR)
+    hit = client.get("/api/squawk/lookup", params={"code": "0001"}).json()
+    assert hit["special"] == [{"code": "0001", "label": LPR}]
+    assert [(p["category"], p["from"], p["to"], p["unit"]) for p in hit["pools"]] == [
+        ("epww", "0001", "0017", "EP"), ("eur-e", "0001", "0017", "LR")]
     for bad, word in (("7800", "8 and 9"), ("77", "octal"), ("abcd", "octal"), ("77000", "octal")):
         r = client.get("/api/squawk/lookup", params={"code": bad})
         assert r.status_code == 422 and word in r.json()["detail"], bad
@@ -131,10 +136,13 @@ def test_api_squawk(client):
 
 def test_api_reads_changed_seed(client, tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "seed_dir", tmp_path)
-    assert client.get("/api/squawk").status_code == 404
+    r = client.get("/api/squawk")
+    # błąd bez nazwy pliku i ścieżki (0.12.6: bez dopisków skąd dane)
+    assert r.status_code == 404 and r.json()["detail"] == "SQUAWK: no data"
     f = tmp_path / "squawk.json"
     f.write_text("{zepsuty", "utf-8")
-    assert client.get("/api/squawk").status_code == 500
+    r = client.get("/api/squawk")
+    assert r.status_code == 500 and r.json()["detail"] == "SQUAWK: data unavailable"
     f.write_text(json.dumps({"pools": [{"from": "4400", "to": "4477", "unit": "EP", "remarks": "TEST"}],
                              "special": [{"code": "7700"}]}), "utf-8")
     os.utime(f, ns=(f.stat().st_atime_ns, f.stat().st_mtime_ns + 5_000_000_000))
@@ -204,9 +212,11 @@ def test_real_cal_command(tmp_path, capsys):
     assert "# pule: 207 (epww 5, ccams 37, nato 5, eur-e 160)" in printed and "7401–7477" in printed
     assert json.loads(out.read_text("utf-8"))["pools"] == []   # --dry-run nic nie zapisuje
     assert squawk_cal.main([str(REAL_CAL), "--out", str(out)]) == 0
-    # ten sam plik co w repozytorium (poza datą importu): _uwaga i special zostają, _status znika
+    # ten sam plik co w repozytorium (poza datą importu): _uwaga i special (także 0001 spoza arkusza) zostają,
+    # _status znika
     gen = re.compile(r'"generated": "[^"]*"')
     assert gen.sub("", out.read_text("utf-8")) == gen.sub("", seed)
+    assert {"code": "0001", "label": LPR} in json.loads(out.read_text("utf-8"))["special"]
 
 
 # --- importer: układ CAL na SYNTETYCZNYM arkuszu (walidacja kodów i kategorie)
@@ -407,7 +417,8 @@ def test_import_command_keeps_special_codes(tmp_path, capsys):
     path = _xlsx(tmp_path / "cal.xlsx")
     out = tmp_path / "squawk.json"
     out.write_text(json.dumps({"_uwaga": "opis", "_status": "czeka", "meta": None,
-                               "special": [{"code": "7700", "label": "EMERGENCY"}], "pools": []}), "utf-8")
+                               "special": [{"code": "7700", "label": "EMERGENCY"}, {"code": "0001", "label": LPR}],
+                               "pools": []}), "utf-8")
     assert squawk_cal.main([str(path), "--out", str(out), "--dry-run"]) == 0
     assert json.loads(out.read_text("utf-8"))["_status"] == "czeka"   # --dry-run nic nie zapisuje
     assert squawk_cal.main([str(path), "--out", str(out)]) == 0
@@ -415,7 +426,8 @@ def test_import_command_keeps_special_codes(tmp_path, capsys):
     assert "0100–0177" in printed and "wydanie CAL: 4.13" in printed and "układ: generic" in printed
     data = json.loads(out.read_text("utf-8"))
     assert list(data) == ["_uwaga", "meta", "special", "pools"]
-    assert data["special"] == [{"code": "7700", "label": "EMERGENCY"}] and data["meta"]["source"] == "cal.xlsx"
+    assert data["special"] == [{"code": "7700", "label": "EMERGENCY"}, {"code": "0001", "label": LPR}]
+    assert data["meta"]["source"] == "cal.xlsx"
     assert len(data["pools"]) == 5 and all(isinstance(p["from"], str) for p in data["pools"])
     assert out.read_text("utf-8") == squawk_cal.dumps(data)
     assert len(normalize(data)["pools"]) == 5
@@ -479,30 +491,58 @@ const pools = [
     protection: "EUR-D", remarks: "Protection ensured by CCAMS" },
   { from: "1500", to: "1577", count: 64, category: "nato", pa: "NATO", unit: "ED EP", civ_mil: "MIL", ar: "A" },
   { from: "0101", to: "0117", count: 15, category: "eur-e", pa: "EUR-E", unit: "EP EY LB", civ_mil: "CIV", ar: "R", assigned_by: "EB",
-    destination: "ALL", ver: "4.12" },
+    destination: "ALL", remarks: "Protection ensured by CCAMS", ver: "4.12" },
   { from: "7401", to: "7477", count: 63, category: "eur-e", pa: "EUR-E", unit: "LR", civ_mil: "CIV_MIL", app: "APP", ar: "A", destination: "LR" },
   { from: "4000", to: "4000", count: 1, category: "epww", unit: "EPKK", type: "SINGLE", remarks: "", match: ["unit"], raw: { NOTE: "abc" } }];
 const areas = { "EUR-E": ["EP", "EY", "LB"] };
-const data = { pools, special: [{ code: "7700", label: "EMERGENCY" }, { code: "1000", label: "MODE S CONSPICUITY" }] };
-const empty = { pools: [], special: data.special };
+const special = [{ code: "7700", label: "EMERGENCY" }, { code: "1000", label: "MODE S CONSPICUITY" },
+  { code: "0001", label: "LPR – RESCUE / MEDICAL TRANSPORT MISSION" }];
+const data = { pools, special, meta: { participating_areas: areas } };
+const empty = { pools: [], special };
+const rows = sq.listRows(data);
+const key = (r) => (r.kind === "special" ? `S:${r.s.code}` : `${r.p.category}:${r.p.from}`);
 const short = (r) => [r.special.map((s) => s.code), r.pools.map((p) => `${p.category}:${p.from}`)];
+const FILTERS = ["", "ep", "special", "ccams", "retention", "7450", "4131 ccams", "eb all", "abc", "v4.12", "civ/mil app",
+  "rescue", "77", "sheet", "4.5", "eur-e", "epww", "nato", "protection", "protection ccams"];
+// pule tego samego zakresu i grupy (w EUR-E częste): odpowiedź musi je rozróżniać
+const dup = { pools: [
+  { from: "0020", to: "0037", category: "eur-e", pa: "EUR-E", unit: "LH", civ_mil: "CIV", ar: "A" },
+  { from: "0020", to: "0037", category: "eur-e", pa: "EUR-E", unit: "LB", civ_mil: "CIV", ar: "A" },
+  { from: "0020", to: "0037", category: "eur-e", pa: "EUR-E", unit: "LZ", civ_mil: "MIL", ar: "A" },
+  { from: "0020", to: "0027", category: "eur-e", pa: "EUR-E", unit: "EP EY LB", civ_mil: "CIV", ar: "R", assigned_by: "LG" },
+  { from: "0020", to: "0037", category: "eur-e", pa: "EUR-E", unit: "EP EY LB", civ_mil: "CIV", ar: "R", assigned_by: "ED" },
+  { from: "0020", to: "0037", category: "eur-e", pa: "EUR-E", unit: "LB", civ_mil: "CIV", ar: "R", assigned_by: "ED" },
+  { from: "0020", to: "0037", category: "ccams", pa: "CCAMS", unit: "EE EF EP ES EY LB", civ_mil: "CIV", ar: "A" },
+  { from: "0001", to: "0077", category: "epww", pa: "EUR-E", unit: "EP", civ_mil: "MIL", ar: "A" },
+  { from: "0030", to: "0030", category: "eur-e", pa: "EUR-E", unit: "EE EF EG EI EK", ar: "R", assigned_by: "EE EF EG EI EK EN" }],
+  special: [] };
 console.log(JSON.stringify({
   isCode: ["7700", "0000", "7777", "7800", "0900", "770", "77000", "", null, 7700].map(sq.isCode),
   size: [sq.rangeSize("0100", "0177"), sq.rangeSize("0000", "7777"), sq.rangeSize("7700", "7700"), sq.rangeSize("0170", "0207")],
   inRange: ["7400", "7401", "7477", "7500"].map((c) => sq.inRange(c, pools[0])).concat([sq.inRange("4000", { from: "4000" })]),
   check: ["", " 7700 ", "77", "7800", "9", "77a", "77000", "0000"].map(sq.checkCode),
-  categories: sq.CATEGORIES.map((c) => [c.id, c.label, c.tag]), lines: sq.CATEGORIES.map((c) => c.line), def: sq.DEFAULT_VIEW,
-  views: sq.CATEGORIES.map((c) => sq.viewPools(pools, c.id).map((p) => `${p.category}:${p.from}`)),
-  counts: sq.viewCounts(pools), countsEmpty: sq.viewCounts(undefined),
+  query: ["", " 7700 ", "77", "7", "7800", "77000", "4131 ccams", "ep  lk", "CCAMS 4131 7450", "0001", "77a"].map(sq.parseQuery),
+  categories: sq.CATEGORIES.map((c) => [c.id, c.tag]), lines: sq.CATEGORIES.map((c) => c.line),
+  rows: rows.map(key),
+  rowsBad: [sq.listRows(null).length, sq.listRows({ pools: [{ from: "0800" }, null, { from: "4400", category: "epww" }], special: [{ code: "77" }, null] }).map(key)],
+  filter: FILTERS.map((q) => sq.filterRows(rows, sq.parseQuery(q).words).map(key)),
+  has: ["0001", "7450", "4000", "7700", "1234", "", "77"].map((c) => rows.filter((r) => sq.rowHas(r, c)).map(key)),
+  count: [sq.countText(rows, rows), sq.countText(sq.filterRows(rows, ["CCAMS"]), rows), sq.countText(sq.filterRows(rows, ["SPECIAL"]), rows),
+    sq.countText([], [])],
   ar: ["A", "R", "", "X"].map((a) => [sq.arInfo(a).text, sq.arInfo(a).tip.slice(0, 1)]),
   civMil: ["CIV", "MIL", "CIV_MIL", "", undefined].map(sq.civMil),
   whole: [sq.wholeArea("EP EY LB", "EUR-E", areas), sq.wholeArea("LB EP EY", "EUR-E", areas), sq.wholeArea("EP EY", "EUR-E", areas),
     sq.wholeArea("EP EY LB LK", "EUR-E", areas), sq.wholeArea("EP EY LB", "CCAMS", areas), sq.wholeArea("EP EY LB", "EUR-E", null)],
   lookup: [sq.lookup(data, "7450"), sq.lookup(data, "0101"), sq.lookup(data, "7700"), sq.lookup(data, "1234"),
-    sq.lookup(empty, "7700"), sq.lookup(null, "7700")].map(short),
-  miss: [sq.lookup(data, "7450"), sq.lookup(data, "7700"), sq.lookup(data, "1234"), sq.lookup(empty, "1234")].map(sq.missText),
-  hits: [sq.hitText(pools[0], areas), sq.hitText(pools[4], areas), sq.hitText(pools[4], {}), sq.hitText(pools[5], areas), sq.hitText(pools[6], areas)],
-  filter: ["", "ep", "ccams", "retention", "7450", "4000", "eb all", "abc", "7700", "v4.12", "civ/mil app"].map((q) => sq.filterPools(pools, q).map((p) => `${p.category}:${p.from}`)),
+    sq.lookup(data, "0001"), sq.lookup(empty, "7700"), sq.lookup(null, "7700")].map(short),
+  hits: ["7450", "0001", "0005", "7700", "1234", "0101"].map((c) => sq.hitsText(sq.lookup(data, c), areas)),
+  hitsDup: [sq.hitsText(sq.lookup(dup, "0025"), areas), sq.hitsText(sq.lookup(dup, "0030"), areas), sq.hitsText(sq.lookup(dup, "0035"))],
+  unitsBrief: [sq.unitsBrief("EP EY LB", "EUR-E", areas), sq.unitsBrief("EE EF EG EI EK"), sq.unitsBrief("EE EF EG EI"), sq.unitsBrief(""),
+    sq.unitsBrief("EP EY LB", "EUR-E", null)],
+  fromAddr: [[undefined, "7700"], ["7700", "7700"], ["", "7700"], ["1500", "7450"], ["7700", ""], ["", ""]].map(([a, b]) => sq.textFromAddress(a, b)),
+  miss: [sq.lookup(data, "7450"), sq.lookup(data, "7700"), sq.lookup(data, "1234"), sq.lookup(empty, "1234"), sq.lookup(data, "0001")].map(sq.missText),
+  answer: ["", "77", "7", "7800", "0001", "7450", "7700", "1234", "ccams", "4131 ccams"].map((t) => sq.answerHtml(data, t)),
+  answerLoading: sq.answerHtml(null, "7700"),
   plural: [0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024].map((n) => sq.plural(n, "code", "codes")),
   range: [sq.rangeText(pools[0]), sq.rangeText(pools[6]), sq.rangeText({ from: "1000" })],
   tag: ["epww", "eur-e", "inne", undefined].map(sq.catTag),
@@ -540,52 +580,126 @@ def test_js_check_code(js):
     assert res[7] == ("0000", True, None)
 
 
-def test_js_categories_and_views(js):
-    # te same kategorie co w importerze, domyślnie pule EPWW
-    assert [c[0] for c in js["categories"]] == list(CATEGORIES) and js["def"] == "epww"
-    assert [c[1] for c in js["categories"]] == ["EPWW", "CCAMS", "NATO", "EUR-E (all)"]
+def test_js_search_query(js):
+    """0.12.6 (issue #21): jedno pole na górze. Same cyfry = kod (pełny zaznacza, niepełny: ile cyfr brakuje, 8/9 albo
+    za długi: podpowiedź), lista się wtedy nie filtruje; tekst = słowa filtra, pełny kod wśród nich tylko zaznacza."""
+    q = [(x["code"], x["error"], x["more"], x["words"]) for x in js["query"]]
+    assert q[0] == ("", None, 0, []) and q[1] == ("7700", None, 0, []) and q[2] == ("", None, 2, []) and q[3] == ("", None, 3, [])
+    assert q[4][0] == "" and "8 and 9" in q[4][1] and q[4][2:] == (0, [])
+    assert q[5][0] == "" and "4 digits" in q[5][1]
+    assert q[6] == ("4131", None, 0, ["CCAMS"]) and q[7] == ("", None, 0, ["EP", "LK"])
+    assert q[8] == ("4131", None, 0, ["CCAMS", "7450"]) and q[9] == ("0001", None, 0, [])
+    assert q[10] == ("", None, 0, ["77A"])   # cyfry z literą: zwykły tekst filtra, bez błędu
+
+
+def test_js_one_list(js):
+    """Jedna lista zamiast przełącznika grup (EPWW, CCAMS, NATO, EUR-E): kody specjalne i pule po kodzie, kod specjalny
+    przed pulą od tego samego kodu (0001 LPR przed EPWW 0001–0017), pule tego samego zakresu: EPWW pierwsze."""
+    assert js["rows"] == ["S:0001", "epww:0001", "eur-e:0101", "S:1000", "nato:1500", "ccams:2001", "epww:4000", "epww:7401",
+                          "eur-e:7401", "S:7700"]
+    assert js["rowsBad"] == [0, ["epww:4400"]]   # złe kody pomijane
+    assert js["categories"] == [["epww", "EPWW"], ["ccams", "CCAMS"], ["nato", "NATO"], ["eur-e", "EUR-E"]]
     assert js["lines"][0].startswith("EPWW – pools from which FIR EPWW assigns codes itself")
-    assert "CCAMS" in js["lines"][1] and "VATSIM" in js["lines"][1] and "military" in js["lines"][2]
-    assert all(c in js["lines"][3] for c in ("Poland", "Lithuania", "Kaliningrad", "Belarus", "retention"))
-    # widoki po kodzie; EUR-E (wszystkie) = wiersze EUR-E sąsiadów i pule EPWW
-    assert js["views"] == [["epww:0001", "epww:4000", "epww:7401"], ["ccams:2001"], ["nato:1500"],
-                           ["epww:0001", "eur-e:0101", "epww:4000", "epww:7401", "eur-e:7401"]]
-    assert js["counts"] == {"epww": 3, "ccams": 1, "nato": 1, "eur-e": 5}
-    assert js["countsEmpty"] == {"epww": 0, "ccams": 0, "nato": 0, "eur-e": 0}
+    assert "military" in js["lines"][2] and "retention" in js["lines"][3]
+    # opisy grup bez dopisków skąd (CAL, VATSIM, plugin, UNIT …)
+    assert not any(re.search(r"\bCAL\b|VATSIM|plugin|UNIT|\(", line) for line in js["lines"])
+    assert js["tag"] == ["EPWW", "EUR-E", "INNE", "?"]
     assert js["ar"] == [["allocation", "A"], ["retention", "R"], ["–", ""], ["X", ""]]
     assert js["civMil"] == ["CIV", "MIL", "CIV/MIL", "", ""]
     assert js["whole"] == [True, True, False, False, False, False]
-    assert js["tag"] == ["EPWW", "EUR-E", "INNE", "?"]
 
 
-def test_js_lookup_and_filter(js):
-    # kod w pulach wszystkich kategorii
+def test_js_filter_and_highlight(js):
+    every = js["rows"]
+    f = dict(zip(["", "ep", "special", "ccams", "retention", "7450", "4131 ccams", "eb all", "abc", "v4.12", "civ/mil app",
+                  "rescue", "77", "sheet", "4.5", "eur-e", "epww", "nato", "protection", "protection ccams"], js["filter"]))
+    assert f[""] == every and f["7450"] == every and f["77"] == every   # sam kod (pełny albo niepełny) nie filtruje
+    assert f["ep"] == ["epww:0001", "eur-e:0101", "nato:1500", "ccams:2001", "epww:4000", "epww:7401"]   # EP też w EPKK
+    assert f["special"] == ["S:0001", "S:1000", "S:7700"] and f["rescue"] == ["S:0001"]
+    assert f["ccams"] == f["4131 ccams"] == ["ccams:2001"] and f["retention"] == f["eb all"] == ["eur-e:0101"]
+    assert f["abc"] == ["epww:4000"] and f["civ/mil app"] == ["eur-e:7401"]
+    # nazwa grupy = dokładnie ta grupa (zamiast dawnych przycisków grup): "ccams" bez puli EUR-E, która tylko wspomina
+    # CCAMS w uwagach; "eur-e" = pule obszaru EUR-E razem z pulami EPWW (jak dawny widok "EUR-E (all)")
+    assert f["eur-e"] == ["epww:0001", "eur-e:0101", "epww:7401", "eur-e:7401"]
+    assert f["epww"] == ["epww:0001", "epww:4000", "epww:7401"] and f["nato"] == ["nato:1500"]
+    assert f["protection"] == ["eur-e:0101", "ccams:2001"] and f["protection ccams"] == ["ccams:2001"]
+    # bez wersji wiersza i arkusza w filtrze
+    assert f["v4.12"] == f["4.5"] == f["sheet"] == []
+    # zaznaczenie: kod specjalny i pule, w których kod leży (0001 LPR i pula EPWW 0001–0017 razem)
+    assert js["has"] == [["S:0001", "epww:0001"], ["epww:7401", "eur-e:7401"], ["epww:4000"], ["S:7700"], [], [], []]
+    assert js["count"] == ["7 pools · 3 special codes", "1 of 7 pools · 0 of 3 special codes", "0 of 7 pools · 3 special codes",
+                           "0 pools · 0 special codes"]
+
+
+def test_js_lookup_answer(js):
     assert js["lookup"] == [[[], ["epww:7401", "eur-e:7401"]], [[], ["eur-e:0101"]], [["7700"], []], [[], []],
-                            [["7700"], []], [[], []]]
-    miss = js["miss"]
-    assert miss[0] == "" and miss[1] == "Not in any CAL pool (EPWW, CCAMS, NATO, EUR-E)."
-    assert miss[2] == miss[3] == "– not a special code and not in any CAL pool (EPWW, CCAMS, NATO, EUR-E)."
-    assert js["hits"] == ["7401–7477 (63 codes) · CIV · allocation: EP · dest EP · protection ES",
-                          "0101–0117 (15 codes) · CIV · retention (whole EUR-E), assigned by EB · dest ALL",
-                          "0101–0117 (15 codes) · CIV · retention (EP EY LB), assigned by EB · dest ALL",
-                          "7401–7477 (63 codes) · CIV/MIL APP · allocation: LR · dest LR",
-                          "4000 (1 code) · EPKK · SINGLE"]
-    assert js["filter"] == [
-        ["epww:7401", "epww:0001", "ccams:2001", "nato:1500", "eur-e:0101", "eur-e:7401", "epww:4000"],
-        ["epww:7401", "epww:0001", "ccams:2001", "nato:1500", "eur-e:0101", "epww:4000"],   # EP też w EPKK
-        ["ccams:2001"], ["eur-e:0101"], ["epww:7401", "eur-e:7401"], ["epww:4000"], ["eur-e:0101"], ["epww:4000"], [],
-        ["eur-e:0101"], ["eur-e:7401"]]
-    # 0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024 (0.12.5: po angielsku – liczba pojedyncza tylko dla 1)
+                            [["0001"], ["epww:0001"]], [["7700"], []], [[], []]]
+    assert js["hits"] == ["In 2 pools: EPWW 7401–7477 · EUR-E 7401–7477: LR CIV/MIL APP", "Also in 1 pool: EPWW 0001–0017",
+                          "In 1 pool: EPWW 0001–0017", "", "", "In 1 pool: EUR-E 0101–0117: retention (assigned by EB)"]
+    # pule tej samej grupy i zakresu razem, każda z tym, co ją odróżnia (jednostka, MIL, retencja: kto nadał kod;
+    # ten sam opis dwóch pul: też obszar retencji); kolejność jak w liście (od kodu, grupa, do kodu)
+    same = "EUR-E 0020–0037: LH, LB, LZ MIL, retention in whole EUR-E (assigned by ED), retention in LB (assigned by ED)"
+    assert js["hitsDup"] == [
+        f"In 8 pools: EPWW 0001–0077: MIL · CCAMS 0020–0037 · EUR-E 0020–0027: retention (assigned by LG) · {same}",
+        f"In 8 pools: EPWW 0001–0077: MIL · CCAMS 0020–0037 · {same} · EUR-E 0030: retention (assigned by 6 units)",
+        "In 7 pools: EPWW 0001–0077: MIL · CCAMS 0020–0037 · EUR-E 0020–0037: LH, LB, LZ MIL, "
+        "retention in EP EY LB (assigned by ED), retention in LB (assigned by ED)"]
+    for text in js["hitsDup"]:
+        items = [g.split(": ", 1)[0] + " " + b for g in text.split(": ", 1)[1].split(" · ")
+                 for b in (g.split(": ", 1)[1].split(", ") if ": " in g else [""])]
+        assert len(items) == len(set(items)), text
+    assert js["unitsBrief"] == ["whole EUR-E", "5 units", "EE EF EG EI", "", "EP EY LB"]
+    # adres przy activate(): menu i ten sam kod co ostatnio zostawiają wpisany tekst, inny kod (też "") go podmienia
+    assert js["fromAddr"] == [None, None, "", "1500", "7700", None]
+    assert js["miss"] == ["", "Not in any pool.", "– not a special code and not in any pool.",
+                          "– not a special code and not in any pool.", ""]
+    a = dict(zip(["", "77", "7", "7800", "0001", "7450", "7700", "1234", "ccams", "4131 ccams"], js["answer"]))
+    assert a[""] == a["ccams"] == "" and "2 more digits" in a["77"] and "3 more digits" in a["7"]
+    assert 'class="sq-bad"' in a["7800"] and "8 and 9" in a["7800"]
+    # kod specjalny: sam tytuł, bez opisu; 0001 pokazuje tytuł LPR i pulę EPWW, na którą się nakłada
+    assert "LPR – RESCUE / MEDICAL TRANSPORT MISSION" in a["0001"] and "Also in 1 pool: EPWW 0001–0017" in a["0001"]
+    assert 'class="sq-big emerg">7700</b> <b class="sq-label">EMERGENCY</b>' in a["7700"] and "Not in any pool." in a["7700"]
+    assert "In 2 pools: EPWW 7401–7477 · EUR-E 7401–7477: LR CIV/MIL APP" in a["7450"] and "not a special code" in a["1234"]
+    assert "4131" in a["4131 ccams"] and "not a special code" in a["4131 ccams"]
+    assert "Loading" in js["answerLoading"]
+    assert not any(re.search(r"\bCAL\b|EUROCONTROL|source", x) for x in js["answer"] + js["hits"] + js["miss"])
+    # 0, 1, 2, 4, 5, 12, 14, 22, 25, 64, 112, 1024 (po angielsku – liczba pojedyncza tylko dla 1)
     assert js["plural"] == ["codes", "code"] + ["codes"] * 10
     assert js["range"] == ["7401–7477", "4000", "1000"]
 
 
+def _code_only(src: str) -> str:
+    """Kod JS bez komentarzy (/* */ i linii //)."""
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return "\n".join(line for line in src.splitlines() if not line.strip().startswith("//"))
+
+
 def test_squawk_tab_wiring():
-    """Zakładka czyta /api/squawk, adres #squawk/<kod>, przełącznik kategorii; bez starego pustego stanu
-    "pule nie są zaimportowane"; arkusz stylów podpięty."""
+    """Zakładka czyta /api/squawk, adres #squawk/<kod>; jedno pole wyszukiwania nad jedną listą (bez przełącznika
+    grup pul i osobnego panelu kodów specjalnych); arkusz stylów podpięty."""
     src = (settings.frontend_dir / "js" / "tabs" / "squawk.js").read_text("utf-8")
-    assert 'api("/api/squawk")' in src and 'remember("squawk", c.code)' in src and "activate: (arg)" in src
-    assert 'data-view="${c.id}"' in src and "setView(b.dataset.view)" in src
+    assert 'api("/api/squawk")' in src and 'remember("squawk", addr)' in src and "activate: (arg)" in src
+    # Wstecz na wpis z tym samym kodem nie kasuje tekstu filtra: pole podmienia tylko inny kod w adresie
+    assert "textFromAddress(arg, addr)" in src and "arg !== input.value" not in src
+    assert "data-view" not in src and "setView" not in src and "sq-special\"><h3>" not in src
+    assert src.count("<input") == 1 and 'class="field sq-q"' in src and "scrollIntoView" in src
     assert "soon(" not in src and "IMPORT_CMD" not in src and "zaimportowan" not in src
     index = (settings.frontend_dir / "index.html").read_text("utf-8")
     assert 'href="/static/css/squawk.css"' in index
+
+
+def test_squawk_tab_without_provenance():
+    """0.12.6 (issue #21): w napisach zakładki żadnych dopisków skąd dane (wydanie CAL, plik arkusza, data importu,
+    wiersz arkusza, źródła kodów specjalnych, stopka ICAO/SERA/AIP); polskie znaki tylko w liniach komentarza."""
+    src = (settings.frontend_dir / "js" / "tabs" / "squawk.js").read_text("utf-8")
+    code = _code_only(src)
+    for word in ("EUROCONTROL", "CAL ", "CAL\"", "· CAL", "source", "SERA", "ICAO", "AIP", "sheet", "import $", "squawk.json",
+                 "VATSIM", "plugin", "meaning", "excluded", "meta.edition", "Ver<"):
+        assert word not in code, word
+    polish = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+    bad = [line for line in src.splitlines() if polish.search(line) and not line.strip().startswith("//")]
+    assert not bad, bad
+    css = re.sub(r"/\*.*?\*/", "", (settings.frontend_dir / "css" / "squawk.css").read_text("utf-8"), flags=re.S)
+    assert "shadow" not in css and "glow" not in css
+    assert all(r.strip() == "0" for r in re.findall(r"border(?:-[a-z]+)*-radius:\s*([^;}]+)", css))
+    assert not re.search(r"[.#][\w-]*(ad-|ads|advert|banner|sponsor|promo)", css + code)
