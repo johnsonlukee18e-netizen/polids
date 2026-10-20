@@ -127,7 +127,7 @@ export function aeroHtml(r) {
 // online albo jest wybranym stanowiskiem (wybrany sam siebie nie podpisuje, jak w ATCISS)
 function epHtml(r, data, x) {
   if (r.ep_unknown) {
-    const sc = r.scope.length ? ` Row for positions covering the sectors listed in the LOA: ${r.scope.join(", ")}.` : "";
+    const sc = r.scope.length ? ` For positions covering: ${r.scope.join(", ")}.` : "";
     return `<span class="cr-unk" title="${esc(data.unknown_label + "." + sc)}">${esc(data.unknown_label)}</span>`;
   }
   const on = x.pos ? new Set([...x.online, x.pos]) : x.online;
@@ -171,8 +171,7 @@ export function sumHtml(v, { pos = "", firs = [], off = new Set(), typesOff = ne
   return `<b>${v.shown}</b> of ${v.total} transfers`
     + (pos ? ` · position <b>${esc(pos)}</b>` : " · all positions")
     + (v.toks.length ? ` · filter <b>${esc(v.toks.join(" "))}</b>` : "")
-    + `<span class="cr-off">${firTxt}${types.length ? ` · hidden <b>${esc(types.join(", "))}</b>` : ""}</span>`
-    + `<span class="hint"> · PDF extract (data/seed/loa.json), the PDF prevails</span>`;
+    + `<span class="cr-off">${firTxt}${types.length ? ` · hidden <b>${esc(types.join(", "))}</b>` : ""}</span>`;
 }
 
 // zasady z LOA (przekazanie kontroli, VFR, inne) dla FIR-ów z tabeli
@@ -180,7 +179,7 @@ export function notesHtml(data, firs) {
   const list = (title, items) => (items?.length ? `<h5>${esc(title)}</h5><ul>${items.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
   return firs.filter((f) => data.notes?.[f]).map((f) => {
     const n = data.notes[f];
-    return `<div class="cr-note"><h4>${esc(n.title || f)} <small>${esc(n.version)}</small></h4>`
+    return `<div class="cr-note"><h4>${esc(n.title || f)}</h4>`
       + list("Transfer of control and communication", n.silent) + list("VFR", n.vfr) + list("Other rules", n.other) + "</div>";
   }).join("");
 }
@@ -196,24 +195,14 @@ export function positionOptions(positions, selected) {
   }).join("");
 }
 
-// --- DOKUMENTY: karta dokumentu (nazwa, typ, FIR-y, AIRAC – wyróżniony, gdy bieżący cykl, data, wersja, sektory)
-const dmy = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join(".") : "");
-export function docCardHtml(d, { selected = false, airac = "" } = {}) {
-  const firs = d.firs.filter((f) => f !== "EPWW" || d.type === "LOP");
-  const tags = [`<span class="cd-tag ty">${esc(d.type)}</span>`, ...firs.map((f) => `<span class="cd-tag fir">${esc(f)}</span>`)];
-  if (d.airac) {
-    tags.push(`<span class="cd-tag airac${d.current ? " cur" : ""}" title="${d.current ? "current AIRAC cycle" : `current cycle: ${esc(airac)}`}">AIRAC ${esc(d.airac)}</span>`);
-  }
-  const meta = [dmy(d.effective) && `from ${dmy(d.effective)}`, d.version, `${d.count} transfers`].filter(Boolean).map(esc).join(" · ")
-    + (d.registered === false ? ` · <span class="cd-new">${esc(d.note || "no entry in coordination.json")}</span>` : "");
+// --- DOKUMENTY: karta dokumentu – sama nazwa i przyciski (PDF, przekazania z dokumentu); typ, FIR-y, AIRAC, data,
+// wersja i sektory zostają w danych (filtry listy, adresy), na karcie ich nie ma (issue #21)
+export function docCardHtml(d, { selected = false } = {}) {
   const url = String(d.url || "").startsWith("/files/docs/") && d.exists ? d.url : "";
-  return `<div class="cd-card${selected ? " on" : ""}" data-doc="${esc(d.id)}" tabindex="0" title="${esc(d.note || d.name)}">
+  return `<div class="cd-card${selected ? " on" : ""}" data-doc="${esc(d.id)}" tabindex="0">
     <div class="cd-name">${esc(d.name)}</div>
-    <div class="cd-tags">${tags.join("")}</div>
-    <div class="cd-meta">${meta}</div>
-    ${d.positions.length ? `<div class="cd-pos">${d.positions.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</div>` : ""}
     <div class="cd-act">${url ? `<a class="btn" href="${esc(encodeURI(url))}" target="_blank" rel="noopener" title="Open the PDF: ${esc(d.name)}">PDF ↗</a>`
-      : `<span class="error">missing file ${esc(d.file)}</span>`}
+      : `<span class="error">PDF unavailable</span>`}
       ${d.count ? `<button type="button" class="btn cd-agr" title="Transfers from this document">LoA ›</button>` : ""}</div>
   </div>`;
 }

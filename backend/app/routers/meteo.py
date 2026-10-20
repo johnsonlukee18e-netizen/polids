@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, timezone
 
@@ -11,12 +12,14 @@ from ..services import qnh as qnh_svc
 from ..services import sun as sun_svc
 from ..services import upperwind
 from ..services.aerolist import airport_entry
-from ..services.http_cache import UpstreamError
+from ..services.http_cache import UpstreamError, describe
 from ..services.metar import parse_metar
 from ..services.runways import wind_components
 from ..services.weather import get_metars, get_tafs
 
 router = APIRouter(prefix="/api/meteo", tags=["meteo"])
+# pełna przyczyna błędu pobrania (adres, komunikat httpx) tylko w logu, w odpowiedzi krótki opis (describe)
+log = logging.getLogger("polids.meteo")
 
 
 def _ids(ids: str) -> list[str]:
@@ -36,7 +39,8 @@ async def metar(ids: str = Query(..., description="Comma-separated ICAO codes"))
     try:
         raw = await get_metars(icaos)
     except UpstreamError as exc:
-        raise HTTPException(502, f"METAR source unavailable: {exc}") from exc
+        log.warning("METEO, METAR: %s", exc)
+        raise HTTPException(502, f"METAR unavailable: {describe(exc)}") from exc
     return [{"icao": i, "raw": raw.get(i), "parsed": parse_metar(raw[i]).to_dict() if raw.get(i) else None}
             for i in icaos]
 
@@ -47,7 +51,8 @@ async def taf(ids: str = Query(...)):
     try:
         raw = await get_tafs(icaos)
     except UpstreamError as exc:
-        raise HTTPException(502, f"TAF source unavailable: {exc}") from exc
+        log.warning("METEO, TAF: %s", exc)
+        raise HTTPException(502, f"TAF unavailable: {describe(exc)}") from exc
     return [{"icao": i, "raw": raw.get(i)} for i in icaos]
 
 
@@ -90,7 +95,8 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     try:
         metar = (await get_metars([ad["icao"]])).get(ad["icao"])
     except UpstreamError as exc:
-        metar_error = f"METAR unavailable: {exc}"
+        log.warning("WIND %s, METAR: %s", ad["icao"], exc)
+        metar_error = f"METAR unavailable: {describe(exc)}"
     p = parse_metar(metar) if metar else None
     metar_wind = {"dir": p.wind_dir, "speed": p.wind_speed, "gust": p.wind_gust, "variable": p.wind_variable,
                   "var_from": p.wind_var_from, "var_to": p.wind_var_to, "time": p.time} if p else None
@@ -98,7 +104,9 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     try:
         model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]])
     except UpstreamError as exc:
-        model_error = f"Open-Meteo forecast unavailable: {exc}"
+        # w exc krótki powód (upperwind.model_winds), pełny komunikat z adresem w exc.__cause__
+        log.warning("WIND %s, prognoza: %s", ad["icao"], f"{exc} ({exc.__cause__})" if exc.__cause__ else exc)
+        model_error = f"Wind forecast unavailable: {describe(exc)}"
     surface_model = model[0]["surface"] if model else None
     runways = []
     for i, r in enumerate(ad["runways"]):

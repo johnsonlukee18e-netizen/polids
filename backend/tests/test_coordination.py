@@ -1,6 +1,7 @@
 """COORDINATION (0.12.3): parsowanie przekazań z LOA, etykiety polskich sektorów → kolejność przejmowania, wybór
 stanowiska (kto obsługuje sektor) i GET /api/coordination."""
 import json
+import logging
 import shutil
 from urllib.parse import quote
 
@@ -239,7 +240,7 @@ def test_endpoint(client):
     # wiersze z pustą stroną polską (LKAA, LZBB): adnotacja i sektory z LOA
     lkaa = [r for r in d["agreements"] if r["fir"] == "LKAA"]
     assert all(r["ep_unknown"] and "J LOW" in r["ep_chains"] and "T LOW" in r["ep_chains"] for r in lkaa)
-    assert d["unknown_label"] == "sector not specified in LOA"
+    assert d["unknown_label"] == "sector not specified"
     assert {"ALUKA", "ARSAP", "DIBED", "RASAN"} <= set(d["cops"]) and "-" not in d["cops"]
     ps = {p["callsign"]: p for p in d["positions"]}
     assert {"EPWW_DBT_CTR", "EPWW_ALL_CTR", "EPSC_TWR", "EPGD_APP", "EPPO_S_APP"} <= set(ps)
@@ -283,6 +284,9 @@ def test_endpoint_position(client):
     on = {(r["fir"], r["ep"]) for r in d["agreements"] if r["applies"]}
     assert ("EDWW", "B LOW") in on and ("EDWW", "EPSC TMA") in on and ("ESAA", "") in on
     assert not any(f in ("LKAA", "LZBB", "UKLV") for f, _ in on)   # Praha, Bratysława i Lwów: sektory J, R, T
+    # ESAA: wiersze bez sektora dotyczą wszystkich polskich sektorów z LOA, także F HIGH (jak B HIGH)
+    esaa = next(r for r in d["agreements"] if r["fir"] == "ESAA" and not r["ep"])
+    assert {"B HIGH", "F MID", "F HIGH"} <= set(esaa["scope"])
     # DBT sam przejmuje też T (jest w kolejności T LOW): widzi LOA z Pragą
     d = client.get("/api/coordination?position=EPWW_DBT_CTR").json()
     assert "T LOW" in d["selected"]["owned"] and any(r["applies"] and r["fir"] == "LKAA" for r in d["agreements"])
@@ -307,7 +311,7 @@ def test_endpoint_krakow_tma_west(client):
     assert any(r["applies"] and r["fir"] == "LZBB" for r in d["agreements"])
 
 
-def test_endpoint_unregistered_pdf(client, monkeypatch, tmp_path):
+def test_endpoint_unregistered_pdf(client, monkeypatch, tmp_path, caplog):
     """Nowy PDF wrzucony do data/docs/LOA (bez wpisu w coordination.json) jest w COORDINATION › DOKUMENTY i w errors."""
     docs = tmp_path / "docs"
     shutil.copytree(settings.docs_dir, docs)
@@ -321,16 +325,34 @@ def test_endpoint_unregistered_pdf(client, monkeypatch, tmp_path):
     assert extra[0]["exists"] and extra[0]["type"] == "LOA" and extra[0]["name"] == "LOA EPWW UMMV Minsk (AIRAC 2611)"
     assert d["errors"] == ["LOA/LOA EPWW UMMV Minsk (AIRAC 2611).pdf: PDF without an entry in data/seed/coordination.json "
                            "(add its name, FIRs and AIRAC)"]
+    # uwagi do danych: w logu serwera (zakładka ich nie pokazuje), ten sam zestaw tylko raz
+    client.get("/api/coordination")
+    client.get("/api/coordination?position=EPWW_DBT_CTR")
+    logged = [r.getMessage() for r in caplog.records if r.name == "polids.coordination"]
+    assert logged == ["COORDINATION: " + d["errors"][0]]
 
 
-def test_endpoint_errors(client, monkeypatch, tmp_path):
+def test_docs_charts_unknown_aerodrome_neutral(client):
+    """0.12.6: GET /api/docs/charts/<ICAO> dla lotniska bez map – komunikat bez nazwy źródła."""
+    r = client.get("/api/docs/charts/EPKS")
+    assert r.status_code == 404 and r.json()["detail"] == "Aerodrome charts: no charts for EPKS"
+
+
+def test_endpoint_errors(client, monkeypatch, tmp_path, caplog):
     assert client.get("/api/coordination?position=EPWW%20CTR").status_code == 400
     assert client.get("/api/coordination?position=EPWW_D_CTR&online=a;b").status_code == 400
     monkeypatch.setattr(settings, "seed_dir", tmp_path)
-    r = client.get("/api/coordination")
-    assert r.status_code == 404 and "coordination.json" in r.json()["detail"]
+    # 0.12.6 (issue #21): na ekranie bez nazw plików i ścieżek, szczegóły w logu serwera
+    with caplog.at_level(logging.WARNING, logger="polids.coordination"):
+        r = client.get("/api/coordination")
+    assert r.status_code == 404 and r.json()["detail"] == "Data unavailable"
+    assert "data/seed/coordination.json" in caplog.text
     (tmp_path / "coordination.json").write_text("{zepsuty", "utf-8")
-    assert client.get("/api/coordination").status_code == 500
+    r = client.get("/api/coordination")
+    assert r.status_code == 500 and r.json()["detail"] == "Data unavailable"
+    (tmp_path / "coordination.json").write_text("[]", "utf-8")
+    r = client.get("/api/coordination")
+    assert r.status_code == 500 and r.json()["detail"] == "Data unavailable"
     # bez loa.json i ownership.json: dokumenty są, przekazań brak (bez folderu data/docs: bez kart z samych PDF-ów)
     monkeypatch.setattr(settings, "docs_dir", tmp_path / "brak")
     (tmp_path / "coordination.json").write_text(json.dumps(COORD), "utf-8")

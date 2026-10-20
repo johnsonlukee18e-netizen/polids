@@ -1,5 +1,5 @@
 {
- "_uwaga": "SQUAWK: pule kodów SSR (Mode A) z EUROCONTROL / ICAO EUR CAL (SSR Code Allocation List) dla FIR EPWW i kody specjalne. Kody zawsze jako 4 cyfry ósemkowe w cudzysłowie (\"0100\"). pools: z arkusza data/import/eurocontrol-icao-eur-cal-v4-13.xls; plik nadpisuje importer (python -m backend.app.importers.squawk_cal data/import/eurocontrol-icao-eur-cal-v4-13.xls), zostawia _uwaga i special. Kategorie (category): epww = PA EUR-E, A/R A, Unit dokładnie EP (FIR EPWW przydziela sam); ccams = PA CCAMS, A, Unit z EP (przydział centralny CCAMS); nato = PA NATO, A, Unit z EP (pule wojskowe); eur-e = pozostałe wiersze PA EUR-E (przydziały innych członków EUR-E i retencja R). Pola puli: from, to, count (liczba kodów, ósemkowo), category, pa (obszar uczestniczący), unit (kto używa kodów), civ_mil, app (ENR/APP), assigned_by (Unit which assigned: kto przydzielił kody retencji), ar (A = przydział, R = retencja), destination, via, protection, remarks, ver (wersja CAL ostatniej zmiany wiersza), sheet i row (miejsce w arkuszu). special: kody o stałym znaczeniu – ogólne zasady ICAO/SERA, nie z arkusza CAL; do potwierdzenia w AIP Polska ENR 1.6.",
+ "_uwaga": "SQUAWK: pule kodów SSR (Mode A) z EUROCONTROL / ICAO EUR CAL (SSR Code Allocation List) dla FIR EPWW i kody specjalne. Kody zawsze jako 4 cyfry ósemkowe w cudzysłowie (\"0100\"). pools: z arkusza data/import/eurocontrol-icao-eur-cal-v4-13.xls; plik nadpisuje importer (python -m backend.app.importers.squawk_cal data/import/eurocontrol-icao-eur-cal-v4-13.xls), zostawia _uwaga i special. Kategorie (category): epww = PA EUR-E, A/R A, Unit dokładnie EP (FIR EPWW przydziela sam); ccams = PA CCAMS, A, Unit z EP (przydział centralny CCAMS); nato = PA NATO, A, Unit z EP (pule wojskowe); eur-e = pozostałe wiersze PA EUR-E (przydziały innych członków EUR-E i retencja R). Pola puli: from, to, count (liczba kodów, ósemkowo), category, pa (obszar uczestniczący), unit (kto używa kodów), civ_mil, app (ENR/APP), assigned_by (Unit which assigned: kto przydzielił kody retencji), ar (A = przydział, R = retencja), destination, via, protection, remarks, ver (wersja CAL ostatniej zmiany wiersza), sheet i row (miejsce w arkuszu). special: kody o stałym znaczeniu, każdy tylko z kodem i tytułem (code, label; zakładka SQUAWK pokazuje sam tytuł, bez opisu); 0001 = LPR w trakcie misji ratunkowej / transportu medycznego (jak w OM EPWW, nakłada się na pulę EPWW 0001–0017). Listę special poprawia się ręcznie w tym pliku: importer jej nie zmienia.",
  "meta": {
   "source": "eurocontrol-icao-eur-cal-v4-13.xls",
   "layout": "CAL",
@@ -28,12 +28,13 @@
   "skipped": 0
  },
  "special": [
-  {"code": "7500", "label": "UNLAWFUL INTERFERENCE", "meaning": "unlawful interference (e.g. hijacking)", "source": "ICAO Doc 8168 PANS-OPS Vol I and Doc 4444 PANS-ATM; SERA (Regulation (EU) 923/2012), Section 13 – SSR transponder"},
-  {"code": "7600", "label": "RADIO FAILURE", "meaning": "radio communication failure (RCF)", "source": "ICAO Doc 8168 PANS-OPS Vol I and Doc 4444 PANS-ATM; SERA (Regulation (EU) 923/2012), Section 13 – SSR transponder"},
-  {"code": "7700", "label": "EMERGENCY", "meaning": "emergency (distress)", "source": "ICAO Doc 8168 PANS-OPS Vol I and Doc 4444 PANS-ATM; SERA (Regulation (EU) 923/2012), Section 13 – SSR transponder"},
-  {"code": "2000", "label": "NO ATC CODE", "meaning": "no code assigned by ATC – entering SSR airspace before receiving ATC instructions", "source": "ICAO Doc 8168 PANS-OPS Vol I (transponder operation)"},
-  {"code": "7000", "label": "VFR CONSPICUITY", "meaning": "conspicuity code for VFR flights without a code assigned by ATC", "source": "SERA.13005"},
-  {"code": "1000", "label": "MODE S CONSPICUITY", "meaning": "Mode S conspicuity code: the aircraft is identified by the callsign transmitted via Mode S, no discrete code", "source": "EUROCONTROL (Mode S conspicuity code A1000); VATSIM: CCAMS plugin for EuroScope (github.com/kusterjs/CCAMS, CCAMS.h)", "note": "On VATSIM code 1000 is assigned by the CCAMS plugin to aircraft with a Mode S transponder when the destination and the departure aerodrome (or the controller position) are in the Mode S area. Polish military aerodromes are excluded – CCAMS gives a discrete code there.", "excluded": ["EPCE", "EPDA", "EPDE", "EPIR", "EPKS", "EPLK", "EPLY", "EPMB", "EPMI", "EPMM", "EPOK", "EPPR", "EPPW", "EPSN", "EPTM"]}
+  {"code": "7500", "label": "UNLAWFUL INTERFERENCE"},
+  {"code": "7600", "label": "RADIO FAILURE"},
+  {"code": "7700", "label": "EMERGENCY"},
+  {"code": "2000", "label": "NO ATC CODE"},
+  {"code": "7000", "label": "VFR CONSPICUITY"},
+  {"code": "1000", "label": "MODE S CONSPICUITY"},
+  {"code": "0001", "label": "LPR – RESCUE / MEDICAL TRANSPORT MISSION"}
  ],
  "pools": [
   {"from": "0001", "to": "0017", "count": 15, "category": "epww", "pa": "EUR-E", "unit": "EP", "civ_mil": "CIV", "app": "ENR", "assigned_by": "", "ar": "A", "destination": "EP", "via": "", "protection": "", "remarks": "", "ver": "4.5", "sheet": "CAL", "row": 8},

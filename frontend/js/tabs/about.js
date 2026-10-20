@@ -1,6 +1,11 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["20.10.2026", "0.12.6 – per issue #21: the interface no longer says where data comes from or how values are worked out; error messages are short and neutral. CHECKLIST moved into OTHER as a sub-tab after PHRASEOLOGY (old #checklist addresses redirect, ticks are kept), with a new TIPS checklist: five tips for controllers."],
+  ["20.10.2026", "AERODROME › OVERVIEW: the runway in use for each aerodrome – from ATIS with its letter (solid frame) or the preferred runway (dashed PREF frame), ARR/DEP when they differ. MINE/ALL switch for ACC and APP positions: MINE hides the aerodromes another online controller covers now (\"N hidden\" lists who), ALL shows them with that callsign."],
+  ["20.10.2026", "AD CIV: one entry per chart with a short name (AERODROME, PARKING APN 2, RWY 29 SID, RWY 11 ILS Z CAT II / LOC Z) and the full title in the tooltip; filters ADC, APDC, SID, STAR, IAC, VFR, OBST with correct counts. AIRCRAFT: values in boxes – a small label over a large value, coloured by category (identification, performance, weight and wake, dimensions), with the ARC code; a click on a type opens its photo in place."],
+  ["20.10.2026", "MAP: the aircraft label has three lines (callsign and ground speed; level; type, wake and destination) and shows only on hover, in an opaque box; the selected flight keeps its label; no white aircraft tooltip. The airspace tooltip on MAP and the RADIO tooltips show who controls each airspace now, without the coverage order. COORDINATION: document cards show only the title and the PDF / LoA buttons; the RADIO LOA panel has no revision line."],
+  ["20.10.2026", "SQUAWK: one list of all code pools and special codes sorted by code, with one search field on top – a code highlights its pools and scrolls to them, text filters the list, a group name (EPWW, CCAMS, NATO, EUR-E) shows that group; special codes show the title only; new special code 0001 LPR – rescue / medical transport mission."],
   ["18.10.2026", "0.12.5 – per issue #18: the whole interface in English and with sharp edges (no rounded corners, square checkboxes and sliders, no drop shadows), as in PANSA systems. The left menu, EMERGENCY included, fits without scrolling down to 600 px window height. AERODROME views are now INFO, AWOS and TRAFFIC; TRAFFIC no longer shows OFFLINE flights (known only from vIFF, pilot not connected)."],
   ["18.10.2026", "RADIO: colours as in the sector file – unstaffed airspace light grey, staffed dark, the same in LOW, MID and HIGH; TMA and CTR outlines in sector-file colours instead of blue and yellow; borders of the neighbour ACC sectors and the APP/TWR areas of aerodromes near the FIR border (e.g. LZTT, LKMT, EDDB); buttons and position tiles as on the PANDORA photo; the layer buttons always fit their labels."],
   ["18.10.2026", "METEO: WIND and RADAR right after METAR/TAF, before GAMET; WIND always opens at 0 ft. QNH: the regional QNH map redrawn like the PANSA chart, with TMA and CTR outlines from the sector files (TMA ŁÓDŹ with its part C), the FIR border as one olive line, EPIR in regions 3 and 4 with its MCTR outline from the chart, all captions in the default view also on 1366x768 screens."],
@@ -69,16 +74,16 @@ const CHANGES = [
 const TILES = [
   ["aerodrome", "AERODROME", "FIR EPWW overview, aerodrome lists of EPWW and neighbours, the aerodrome on one screen: METAR, wind, runways, ATIS, NOTAM, AWOS, TRAFFIC (DMAN/AMAN)."],
   ["meteo", "METEO", "METAR and TAF of aerodromes, surface and approach wind, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
-  ["map", "MAP", "VATSIM traffic, airspace at the selected level, TMA/CTR, sector capacity and flight status from vIFF."],
-  ["radio", "RADIO", "One page as in PANDORA: EPWW ACC sectors on LOW/MID/HIGH previews with frequencies, APP/TWR/FIS layers, ATIS and neighbour positions; a neighbour FIR name opens the LOA extract."],
-  ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents with tags."],
+  ["map", "MAP", "Traffic with labels on hover, airspace at the selected level, TMA/CTR, sector capacity and flight details."],
+  ["radio", "RADIO", "One page: EPWW ACC sectors on LOW/MID/HIGH previews with frequencies, APP/TWR/FIS layers, ATIS and neighbour positions; a neighbour FIR name opens its LOA."],
+  ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents as PDF."],
   ["sytop", "SYT OP", "Active NOTAMs of FIR EPWW and the main aerodromes."],
   ["strip", "STRIP", "EFES flight progress strips for the 15 main aerodromes; a click opens the extended label window."],
   ["callsign", "CALLSIGN", "Airline radiotelephony callsigns."],
-  ["aircraft", "AIRCRAFT", "ICAO aircraft types by manufacturer, wake turbulence categories, performance, photos."],
-  ["squawk", "SQUAWK", "SSR code pools of FIR EPWW from EUROCONTROL CAL and special codes."],
+  ["aircraft", "AIRCRAFT", "ICAO aircraft types by manufacturer with their values in boxes: wake turbulence categories, performance, dimensions, photos."],
+  ["squawk", "SQUAWK", "SSR code pools of FIR EPWW and special codes in one list with search."],
   ["conversion", "CONVERSION", "Unit conversion: pressure, height, FL at QNH, speed, Mach; UTC and Poland LT clocks."],
-  ["checklist", "CHECKLIST", "Position opening and closing, handover, runway change."],
+  ["other", "OTHER", "Documents, phraseology and checklists: position opening and closing, handover, runway change, tips for controllers."],
   ["emergency", "EMERGENCY", "ASSIST and emergency checklists."],
 ];
 
@@ -108,6 +113,7 @@ export default {
         + row("Navigation", `${c.nav_points ?? "–"} points, ${c.airway_segments ?? "–"} airway segments, ${c.sectors ?? "–"} sectors, ${c.atc_positions ?? "–"} ATC positions`)
         + row("CARTO key", ctx.config.carto_api_key ? "loaded" : "none (the map uses the Esri fallback base map)")
         + row("OpenAIP key", ctx.config.openaip_api_key ? "loaded" : "none")
+        + row("Wind forecast", `<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a>, CC BY 4.0`)
         + row("Login", ctx.me?.user ? `${esc(ctx.me.user.name || "")} (CID ${esc(ctx.me.user.cid)})${ctx.me.admin ? ", administrator" : ""}` : "off (local mode)")
         + row("API", `<a href="/docs" target="_blank">/docs</a>`);
     };

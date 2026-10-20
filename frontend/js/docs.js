@@ -16,8 +16,6 @@ export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
   const wrap = h(`<div class="mapwrap">
     <div class="mapside">
       <div class="ms-card"><h4>Documents</h4><div class="list doc-list"></div></div>
-      <p class="hint">Put new PDFs into the <span class="mono">data/docs/</span> folder
-      (subfolder = category) and click “Refresh”.</p>
       <p class="hint">LOA and LOP: <a href="#coordination/docs">COORDINATION › DOCUMENTS</a>.</p>
       <button class="btn refresh">Refresh</button>
     </div>
@@ -39,7 +37,7 @@ export function mountDocs(pane, ctx, { start = "", onPick = () => {} } = {}) {
   const load = async () => {
     docs = otherDocs(await api("/api/docs"));
     if (!docs.length) {
-      list.innerHTML = `<p class="hint">No documents in data/docs/.</p>`;
+      list.innerHTML = `<p class="hint">No documents.</p>`;
       return;
     }
     const groups = {};

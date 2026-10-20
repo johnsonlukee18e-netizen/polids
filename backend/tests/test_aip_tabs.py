@@ -21,8 +21,8 @@ const strip = await import(process.argv[3]);
 const base = process.argv[4];
 const pdf = (id) => `https://x.test/AD_2_EPZG_${id}.pdf`;
 const charts = [
-  { id: "2-1", page: "AD 2 EPZG 2-1", title: "AERODROME CHART - ICAO", kind: "AD", url: pdf("2-1") },
-  { id: "12-1", page: "AD 2 EPZG 12-1", title: "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24", kind: "IAC", url: pdf("12-1") },
+  { id: "2-1", page: "AD 2 EPZG 2-1", title: "AERODROME", full: "AERODROME CHART - ICAO", kind: "ADC", url: pdf("2-1") },
+  { id: "12-1", page: "AD 2 EPZG 12-1", title: "RWY 24 ILS Z", full: "INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24", kind: "IAC", url: pdf("12-1") },
   { id: "12-3", page: "AD 2 EPZG 12-3", title: 'APPROACH <b>"x" & y</b>', kind: "IAC", url: pdf("12-3") },
   { id: "10-1", page: "AD 2 EPZG 10-1", title: "STANDARD ARRIVAL CHART", kind: "STAR", url: pdf("10-1") },
 ];
@@ -45,9 +45,10 @@ console.log(JSON.stringify({
   rowsNone: aip.chartRows(charts, { kind: "SID" }),
   kindIds: aip.KINDS.map(([k]) => k),
   // filtr po wyborze mapy spoza filtra: [filtr, id mapy]
-  picks: [["IAC", "12-3"], ["IAC", "2-1"], ["", "2-1"], ["STAR", ""], ["AD", ""], ["AD", "99-9"], ["STAR", "10-1"], ["SID", "12-1"]]
+  picks: [["IAC", "12-3"], ["IAC", "2-1"], ["", "2-1"], ["STAR", ""], ["ADC", ""], ["ADC", "99-9"], ["STAR", "10-1"], ["SID", "12-1"]]
     .map(([k, id]) => aip.kindAfterPick(charts, k, id)),
-  pickEmpty: aip.kindAfterPick([], "AD", "2-1"),
+  pickEmpty: aip.kindAfterPick([], "ADC", "2-1"),
+  tips: charts.map(aip.chartTip),
 }));
 """
 
@@ -104,10 +105,11 @@ def test_chart_list(js):
     # sekcja AD 2.24 na stronie AD 2 (fragment tekstowy) dla przycisku przy braku listy
     assert js["section"] == "https://x.test/eAIP/AD%202%20EPZG%201-en-GB.html#:~:text=EPZG%20AD%202.24"
     assert js["sectionEmpty"] == ""
-    assert js["kindIds"] == ["AD", "SID", "STAR", "IAC", "VFR", "OBST", "OTHER"]
+    # 0.12.6: mapa lotniska (ADC) i mapy postojowe (APDC) osobno
+    assert js["kindIds"] == ["ADC", "APDC", "SID", "STAR", "IAC", "VFR", "OBST", "OTHER"]
     # przyciski rodzajów: ALL z liczbą wszystkich map i tylko rodzaje obecne na liście, z liczbą map; wybrany ma "on"
     kinds = re.findall(r'data-kind="([A-Z]*)"[^>]*>([A-Z]+) <small>(\d+)</small>', js["kinds"])
-    assert kinds == [("", "ALL", "4"), ("AD", "AD", "1"), ("STAR", "STAR", "1"), ("IAC", "IAC", "2")]
+    assert kinds == [("", "ALL", "4"), ("ADC", "ADC", "1"), ("STAR", "STAR", "1"), ("IAC", "IAC", "2")]
     assert re.findall(r'class="gbtn chl-kind on" data-kind="([A-Z]*)"', js["kinds"]) == ["IAC"]
     assert re.findall(r'class="gbtn chl-kind on" data-kind="([A-Z]*)"', js["kindsAll"]) == [""]
     assert 'title="Instrument approach charts"' in js["kinds"]
@@ -119,6 +121,11 @@ def test_chart_list(js):
     assert '<a class="chl-pdf" href="https://x.test/AD_2_EPZG_12-1.pdf" target="_blank" rel="noopener"' in js["rows"]
     assert "APPROACH &lt;b&gt;&quot;x&quot; &amp; y&lt;/b&gt;" in js["rows"] and "<b>" not in js["rows"]
     assert js["rowsNone"] == '<p class="hint">No charts of this type.</p>'
+    # 0.12.6: na liście krótka nazwa mapy, pełny tytuł w dymku (bez pełnego tytułu: nazwa)
+    assert '<span class="chl-tt">RWY 24 ILS Z</span>' in js["rows"]
+    assert 'title="AD 2 EPZG 12-1: INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24"' in js["rows"]
+    assert js["tips"] == ["AD 2 EPZG 2-1: AERODROME CHART - ICAO", "AD 2 EPZG 12-1: INSTRUMENT APPROACH CHART - ICAO (ILS z) RWY 24",
+                          'AD 2 EPZG 12-3: APPROACH <b>"x" & y</b>', "AD 2 EPZG 10-1: STANDARD ARRIVAL CHART"]
 
 
 def test_tabs_wiring():
@@ -144,8 +151,8 @@ def test_kind_filter_survives_redraw(js):
     """Runda 14 (przegląd): draw() wyłączał filtr, gdy wybrana mapa (domyślnie pierwsza, AD) była innego rodzaju, więc
     kliknięcie SID / STAR / IAC nic nie robiło. Filtr wyłącza tylko wybór mapy spoza filtra (adres, historia ←, pierwsze
     wczytanie z mapą w adresie) i tylko wtedy, gdy ta mapa jest ukryta filtrem."""
-    assert js["picks"] == ["IAC", "", "", "", "AD", "AD", "STAR", ""]
-    assert js["pickEmpty"] == "AD"   # bez listy map filtr bez zmian
+    assert js["picks"] == ["IAC", "", "", "", "ADC", "ADC", "STAR", ""]
+    assert js["pickEmpty"] == "ADC"   # bez listy map filtr bez zmian
     draw = AIP[AIP.index("  const draw = () => {"):AIP.index('  el.addEventListener("click"')]
     assert "kind =" not in draw and "kindAfterPick" not in draw
     # przycisk filtra: sam filtr i rysowanie; pick() i pierwsze wczytanie: kindAfterPick dla wybranej mapy
@@ -153,3 +160,12 @@ def test_kind_filter_survives_redraw(js):
     assert "const picked = (id) => { if (data?.charts?.length) kind = kindAfterPick(data.charts, kind, id); };" in AIP
     assert "picked(sel); draw(); };" in AIP and "pick(id) { sel = id; picked(id); draw(); }" in AIP
     assert AIP.count("kindAfterPick(") == 2   # definicja i picked()
+
+
+def test_no_provenance_notes():
+    """0.12.6 (issue #21): bez dopisków, skąd jest lista map (eAIP, PANSA, AIRAC), i bez nazwy serwera w komunikatach."""
+    code = "\n".join(line for line in AIP.splitlines() if not line.lstrip().startswith("//"))
+    for text in ("PANSA", "Charts from AD 2.24", "from eAIP", "in eAIP", "AIRAC amendment", "chl-src", "(AD 2.24)`"):
+        assert text not in code, text
+    assert "Loading the chart list…" in AIP and "Chart list unavailable: " in AIP
+    assert ">AD 2.24 ↗</a>" in AIP and ">AD 2 TEXT ↗</a>" in AIP

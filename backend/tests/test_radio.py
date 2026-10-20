@@ -133,7 +133,15 @@ def test_radio_online_upstream_error(client, monkeypatch):
 
     monkeypatch.setattr(vatsim_api, "get_feed", down)
     r = client.get("/api/radio/online")
-    assert r.status_code == 502 and "VATSIM" in r.json()["detail"]
+    # komunikat bez nazwy dostawcy danych i bez szczegółów błędu (runda 15)
+    assert r.status_code == 502 and r.json()["detail"] == "Network data unavailable"
+
+    async def no_bookings():
+        raise UpstreamError("timeout")
+
+    monkeypatch.setattr(vatsim_api, "get_bookings", no_bookings)
+    r = client.get("/api/radio/bookings")
+    assert r.status_code == 502 and r.json()["detail"] == "ATC bookings unavailable"
 
 
 def test_radio_bookings_only_known_positions(client):
@@ -249,6 +257,7 @@ def test_radio_loa(client):
         assert f["title"] and f["pdf"].startswith("/files/docs/LOA/") and f["transfers"], key
     assert {t["dir"] for t in d["firs"]["LKAA"]["transfers"]} == {"in", "out"}
     assert client.get(d["firs"]["EDWW"]["pdf"]).status_code == 200  # PDF przez /files/docs
+    assert set(d) == {"firs"}  # bez opisu źródła wyciągu (runda 15)
 
 
 def test_radio_loa_errors(client, monkeypatch, tmp_path):
@@ -256,11 +265,11 @@ def test_radio_loa_errors(client, monkeypatch, tmp_path):
     client.get("/api/radio/positions")  # dane z vacs-data i VATSpy już w pamięci
     monkeypatch.setattr(settings, "seed_dir", tmp_path)
     r = client.get("/api/radio/loa")
-    assert r.status_code == 404 and "LOA" in r.json()["detail"]
+    assert r.status_code == 404 and r.json()["detail"] == "LOA data unavailable"
     (tmp_path / "loa.json").write_text("{zepsuty", "utf-8")
     (tmp_path / "names_de.json").write_text("[]", "utf-8")
     r = client.get("/api/radio/loa")
-    assert r.status_code == 500 and "loa.json" in r.json()["detail"]
+    assert r.status_code == 500 and r.json()["detail"] == "LOA data unavailable"  # bez nazwy pliku
     (tmp_path / "loa.json").write_text('{"_uwaga": "bez firs"}', "utf-8")
     assert client.get("/api/radio/loa").status_code == 500
     ps = {p["callsign"]: p for p in client.get("/api/radio/positions").json()}

@@ -2,7 +2,8 @@
 
 Składamy w jednym zapytaniu to, co kontroler sprawdza przed objęciem stanowiska:
 1. poziom przejściowy (services/tl.py) – jeden dla całego kraju, z najniższego QNH kontrolowanych lotnisk,
-2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP (services/lvp.py),
+2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP (services/lvp.py) i pasem w użyciu: z ATIS, a bez
+   niego pas preferowany – te same funkcje co AERODROME › INFO (services/runways.py), więc wartości są te same,
 3. NOTAM-y obowiązujące teraz (services/notam.py, pola B)/C) ),
 4. restrykcje ECFMP dla FIR EPWW (services/ecfmp.py) i regulacje vIFF na sektorach EP,
 5. Airport Monitor vIFF: przepustowość i ruch z vIFF oraz liczby odlotów/przylotów z sieci VATSIM.
@@ -12,6 +13,10 @@ lotnisk bierzemy z pliku .ese: kolejność przejmowania (lista OWNER) wycinków 
 przed pierwszym sektorem ACC EPWW to "miejscowe" (TWR, APP) – lotnisko trafia pod każde z nich; sektory ACC z dalszej
 części listy przejmują lotnisko top-down, więc dostają je do swojego zestawu. Nazwy wycinków i listy OWNER są
 w pliku sektorowym, więc zestawy zmieniają się razem z nim, bez tabel w kodzie.
+
+Kto obsługuje lotnisko teraz (przełącznik MINE / ALL we froncie): kolejność przejmowania CTR lotniska od poziomu APP
+w górę (coverage_orders) i stanowiska online poza moim (covered_by). Lotnisko, które przed mną obsługuje ktoś inny
+(np. EPWW_S_CTR, gdy otwieram EPWW_ALL_CTR), ma w odpowiedzi `covered_by` i MINE je ukrywa.
 
 Każdy panel ma swój komunikat błędu: awaria jednego źródła (np. serwera NOTAM) nie psuje pozostałych."""
 
@@ -30,7 +35,8 @@ from .http_cache import UpstreamError
 from .lvp import evaluate as evaluate_lvp
 from .metar import parse_metar
 from .notam import get_notams
-from .vatsim import FACILITY_TYPES, controller_info, parse_atis
+from .runways import atis_state, runway_in_use, runway_state
+from .vatsim import FACILITY_TYPES, controller_info, match_positions, parse_atis
 from .weather import get_metars, get_tafs
 
 # Lotniska kontrolowane w FIR EPWW – ta sama lista co w podmenu AERODROME (frontend/js/tabs/aerodrome.js)
@@ -41,7 +47,11 @@ AERODROMES = ["EPBY", "EPGD", "EPKK", "EPKT", "EPLB", "EPLL", "EPMO", "EPPO", "E
 _SLICE = re.compile(r"^(EP[A-Z]{2})_(?:M?CTR|[LU]?TMA|APP|DEP|DIR)", re.I)
 _ACC = re.compile(r"^EPWW_[A-Z0-9_]*(?:CTR|FSS)$")
 _FIS = re.compile(r"information", re.I)       # FIS ma własne sektory, nie lotniska – pomijamy w filtrze
+_CTR = re.compile(r"^EP[A-Z]{2}_M?CTR", re.I)  # wycinki CTR lotniska (EPWA_CTR, EPKK_CTR07, EPKT_CTR26)
+_DIR = re.compile(r"^EP[A-Z]{2}_DIR\d", re.I)  # wycinki dyrektora przy pasie (EPWA_DIR11_A, EPKK_DIR07)
+_INFO = re.compile(r"_(?:I|IE|IW|IS|IN)_[A-Z]+$")  # stanowiska informacji (EPWA_I_APP, EPGD_IE_APP)
 TOWER_SUFFIXES = ("TWR", "GND", "DEL", "RMP")
+ATC_SUFFIXES = {"CTR", "FSS", "APP", "DEP", *TOWER_SUFFIXES}   # stanowiska ATC (bez ATIS i obserwatorów)
 GROUPS = [("ACC", "ACC / FIR"), ("APP", "APP / approach"), ("TWR", "TWR / aerodrome")]
 
 
@@ -60,18 +70,80 @@ def _kind(callsign: str, name: str) -> str | None:
     return None
 
 
-def chains(db: Session) -> dict[str, list[list[str]]]:
-    """Kolejność przejmowania wycinków każdego lotniska: {ICAO: [[znaki stanowisk], ...]} z pliku .ese EPWW."""
+def _slices(db: Session) -> list[tuple[str, str, list[str]]]:
+    """Wycinki lotnisk z listy z pliku .ese EPWW: [(ICAO, nazwa wycinka, [znaki stanowisk z listy OWNER])]."""
     by_id = {p.position_id: p.callsign for p in db.scalars(select(AtcPosition))}
-    out: dict[str, list[list[str]]] = {}
+    out = []
     for s in db.scalars(select(Sector).where(Sector.fir == "EPWW").order_by(Sector.name)):
         m = _SLICE.match(s.name)
         if not m or m.group(1).upper() not in AERODROMES:
             continue
         owners = [by_id[o] for o in s.owners.split(":") if o in by_id]
         if owners:
-            out.setdefault(m.group(1).upper(), []).append(owners)
+            out.append((m.group(1).upper(), s.name, owners))
     return out
+
+
+def chains(db: Session) -> dict[str, list[list[str]]]:
+    """Kolejność przejmowania wycinków każdego lotniska: {ICAO: [[znaki stanowisk], ...]} z pliku .ese EPWW."""
+    out: dict[str, list[list[str]]] = {}
+    for icao, _name, owners in _slices(db):
+        out.setdefault(icao, []).append(owners)
+    return out
+
+
+def directors(slices: list[tuple[str, str, list[str]]]) -> set[str]:
+    """Stanowiska dyrektora (EPWA_F_APP, EPKK_KK_APP): APP, które jest pierwsze (przed ACC, bez informacji) tylko
+    w wycinkach EPxx_DIRnn. To nie są sektory podejścia, tylko pomoc APP przy pasie (jak directors() w radioboard.py)."""
+    first: dict[str, set[bool]] = {}
+    for _icao, name, owners in slices:
+        loc = next((cs for cs in owners if not _ACC.match(cs) and not _INFO.search(cs)), None)
+        if loc:
+            first.setdefault(loc, set()).add(bool(_DIR.match(name)))
+    return {cs for cs, k in first.items() if k == {True} and cs.split("_")[-1] in ("APP", "DEP")}
+
+
+def coverage_orders(db: Session, sl: list[tuple[str, str, list[str]]] | None = None) -> dict[str, list[list[str]]]:
+    """Kolejność przejmowania każdego lotniska od poziomu APP w górę: {ICAO: [[znaki], ...]}, po jednej na każdą różną
+    listę OWNER wycinków CTR lotniska (lotnisko bez CTR: wszystkich jego wycinków). Bez wieży, GND i DEL samego
+    lotniska, stanowisk informacji i dyrektorów: EPWA_CTR = EPWA_APP › EPWA_N_APP › EPWA_S_APP › EPWW_C_CTR › …
+    `sl`: wycinki z _slices(db), gdy już są pod ręką."""
+    sl = _slices(db) if sl is None else sl
+    dirs = directors(sl)
+    ctr = {icao for icao, name, _ in sl if _CTR.match(name)}
+    out: dict[str, list[list[str]]] = {}
+    for icao, name, owners in sl:
+        if icao in ctr and not _CTR.match(name):
+            continue
+        order = [cs for cs in owners if not (cs.startswith(icao + "_") and cs.split("_")[-1] in TOWER_SUFFIXES)
+                 and not _INFO.search(cs) and cs not in dirs]
+        if order and order not in out.setdefault(icao, []):
+            out[icao].append(order)
+    return out
+
+
+def covered_by(orders: list[list[str]], me: str, others: set[str]) -> str | None:
+    """Stanowisko online, które obsługuje lotnisko zamiast mnie, albo None (lotnisko moje).
+
+    W każdej kolejności przejmowania lotniska (coverage_orders) liczy się pierwsze stanowisko online; ja jestem online
+    zawsze (`others` = pozostali). Lotnisko jest moje, gdy w którejś kolejności jestem pierwszy albo gdy nikt z niej nie
+    jest online (bez innych kontrolerów MINE i ALL pokazują to samo); inaczej obsługuje je pierwszy online z pierwszej
+    kolejności."""
+    by = None
+    for order in orders:
+        hit = next((cs for cs in order if cs == me or cs in others), None)
+        if hit is None or hit == me:
+            return None
+        by = by or hit
+    return by
+
+
+def online_others(feed: dict, positions: list, me: str, cid: str | None = None) -> set[str]:
+    """Stanowiska z pliku .ese zajęte teraz przez innych: zalogowani kontrolerzy (bez ATIS i obserwatorów) dopasowani
+    do stanowisk jak w EuroScope (match_positions), bez mojego stanowiska i bez połączeń z moim CID."""
+    ctrls = [c for c in feed.get("controllers", []) if str(c.get("callsign") or "").upper().split("_")[-1] in ATC_SUFFIXES
+             and not (cid and str(c.get("cid")) == str(cid))]
+    return set(match_positions(ctrls, positions)) - {me.upper()}
 
 
 def position_airports(db: Session) -> dict[str, list[str]]:
@@ -140,8 +212,8 @@ async def _weather(icaos: list[str]) -> tuple[dict, dict, list[str]]:
     async def one(fn, label):
         try:
             return await fn(icaos)
-        except (UpstreamError, ValueError, KeyError, TypeError) as exc:   # Key/TypeError: inny kształt JSON z AWC
-            errors.append(f"{label}: {exc}")
+        except (UpstreamError, ValueError, KeyError, TypeError):   # Key/TypeError: inny kształt JSON z AWC
+            errors.append(f"{label} unavailable")
             return {}
 
     metars, tafs = await asyncio.gather(one(get_metars, "METAR"), one(get_tafs, "TAF"))
@@ -206,9 +278,9 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
     async def one(icao):
         try:
             return icao, await get_notams(icao), None
-        except (UpstreamError, ValueError) as exc:
-            # UpstreamError zaczyna się od adresu z kodem lotniska: bez niego ten sam błąd skleja się w jedną linię
-            return icao, None, str(exc).split(": ", 1)[-1] if str(exc).startswith("http") else str(exc)
+        except (UpstreamError, ValueError):
+            # jeden komunikat dla wszystkich lotnisk z błędem (bez adresu serwera i treści wyjątku)
+            return icao, None, "unavailable"
 
     items, errors = [], {}
     for icao, data, error in await asyncio.gather(*(one(i) for i in icaos)):
@@ -221,8 +293,8 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
                               "end": n.get("end"), "perm": n.get("perm"), "est": n.get("est"),
                               "schedule": n.get("schedule"), "raw": n.get("raw")})
     items.sort(key=lambda n: (n["icao"], n["id"] or ""))
-    error = "; ".join(f"{', '.join(ads)}: {msg}" for msg, ads in errors.items())
-    return {"notams": items, "error": f"NOTAM server: {error}" if errors else None}
+    error = "; ".join(f"{', '.join(ads)}" for ads in errors.values())
+    return {"notams": items, "error": f"NOTAMs unavailable: {error}" if errors else None}
 
 
 def tv_restrictions(volumes, now: datetime) -> list[dict]:
@@ -251,12 +323,14 @@ async def _flow(airports: list[str], now: datetime) -> dict:
             data = await viff_service._get("/etfms/trafficVolumes",
                                            {"filter": "EP", "active": "false", "activeAndDisabled": "true"}, ttl=300)
             return tv_restrictions(data, now), None
-        except Exception as exc:  # noqa: BLE001 - vIFF nie ma dokumentacji błędów, panel pokazuje treść wyjątku
-            return [], f"vIFF unavailable: {exc}"
+        except Exception:  # noqa: BLE001 - vIFF nie ma dokumentacji błędów: każdy błąd to brak danych
+            return [], "Sector regulations unavailable"
 
     measures, (restrictions, viff_error) = await asyncio.gather(
         ecfmp_service.measures(airports, now), viff_tvs())
-    return {**measures, "restrictions": restrictions, "viff_error": viff_error}
+    # restrykcje z zapasowego źródła (source vIFF) to te same dane: bez komunikatu; bez żadnego źródła – brak danych
+    error = "Flow measures unavailable" if measures.get("error") and not measures.get("source") else None
+    return {**measures, "error": error, "restrictions": restrictions, "viff_error": viff_error}
 
 
 def monitor_hours(buckets, now: datetime) -> dict:
@@ -284,8 +358,8 @@ async def _monitor(icaos: list[str], now: datetime) -> dict:
     async def grab(path, params=None, ttl=None):
         try:
             return await viff_service._get(path, params, ttl=ttl), None
-        except Exception as exc:  # noqa: BLE001
-            return None, f"{path}: {exc}"
+        except Exception:  # noqa: BLE001
+            return None, path
 
     (load, e1), (cad, e2), (restricted, e3) = await asyncio.gather(
         grab("/etfms/airports", {"filter": "EP", "date": now.date().isoformat()}),
@@ -316,14 +390,16 @@ async def _monitor(icaos: list[str], now: datetime) -> dict:
                      "known": bool(info), "regulated": regs,
                      "avg_delay": round(sum(delays) / len(delays)) if delays else None}
     errors = [e for e in (e1, e2, e3) if e]
-    return {"airports": out, "error": "vIFF unavailable: " + "; ".join(errors) if errors else None}
+    return {"airports": out, "error": "Data unavailable" if errors else None}
 
 
-async def overview(db: Session, position: str | None = None, now: datetime | None = None) -> dict:
-    """Wszystko do widoku OVERVIEW w jednym zapytaniu; panele pobierane równolegle, każdy ze swoim błędem."""
+async def overview(db: Session, position: str | None = None, now: datetime | None = None,
+                   cid: str | None = None) -> dict:
+    """Wszystko do widoku OVERVIEW w jednym zapytaniu; panele pobierane równolegle, każdy ze swoim błędem.
+    `cid`: CID zalogowanego użytkownika (jego połączenia w sieci nie zabierają mu lotnisk w filtrze MINE)."""
     now = now or datetime.now(timezone.utc)
     shown, pos = airports_for(db, position)
-    names = {a.icao: a.name for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.in_(AERODROMES)))}
+    ads = {a.icao: a for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.in_(AERODROMES)))}
     # QNH liczymy ze wszystkich kontrolowanych lotnisk (zasada TL dotyczy całego FIR-u), nawet przy filtrze
     (metars, tafs, wx_errors), feed, notams, flow, monitor = await asyncio.gather(
         _weather(AERODROMES), _feed(), _notams(shown, now), _flow(shown, now), _monitor(shown, now))
@@ -331,16 +407,29 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     parsed = {i: parse_metar(m) for i, m in metars.items() if m}
     qnhs = {i: (p.qnh if p else None) for i, p in parsed.items()}
     tl = tl_service.fir_level({i: qnhs.get(i) for i in AERODROMES})
+    stations = feed["feed"].get("controllers", []) + feed["feed"].get("atis", [])
+    # kto obsługuje lotnisko przede mną: tylko przy stanowisku ACC / APP (wieża przeskakuje do PRZEGLĄDU lotniska)
+    mine = pos["callsign"] if pos and pos["kind"] in ("ACC", "APP") else None
+    sl = _slices(db) if mine else []
+    # dyrektor (EPWA_F_APP) pracuje przy pasie razem z APP, nie zamiast niego: jego lotniska nikt mu nie zabiera
+    # (inaczej przy APP online MINE byłoby u dyrektora zawsze puste); MINE = ALL
+    if mine in directors(sl):
+        mine = None
+    orders = coverage_orders(db, sl) if mine else {}
+    others = online_others(feed["feed"], list(db.scalars(select(AtcPosition))), mine, cid) if mine else set()
     aerodromes = []
     for icao in shown:
         p = parsed.get(icao)
         atis = info.get(icao, {}).get("atis")
+        lvp = evaluate_lvp(p, icao)
         aerodromes.append({
-            "icao": icao, "name": names.get(icao, icao),
+            "icao": icao, "name": ads[icao].name if icao in ads else icao,
             "metar": metars.get(icao), "parsed": p.to_dict() if p else None, "taf": tafs.get(icao),
-            "lvp": evaluate_lvp(p, icao),
+            "lvp": lvp,
             "atis": {"callsign": atis["callsign"], "letter": atis["letter"], "lines": atis["lines"]} if atis else None,
+            "runway": _runway(ads.get(icao), p, lvp, stations, now),
             "atc": info.get(icao, {}).get("atc", []),
+            "covered_by": covered_by(orders.get(icao, []), mine, others) if mine else None,
             "traffic": {k: info.get(icao, {}).get(k, 0) for k in ("departures", "arrivals", "prefiles")},
             "monitor": monitor["airports"].get(icao),
         })
@@ -350,10 +439,24 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
             "notams": notams["notams"], "notam_error": notams["error"], "flow": flow, "monitor_error": monitor["error"]}
 
 
+def _runway(ad: Aerodrome | None, parsed, lvp: dict, stations: list[dict], now: datetime) -> dict | None:
+    """Pas w użyciu jak w AERODROME › INFO: z ATIS (source "ATIS", litera), a bez pasa z ATIS preferowany
+    (source "SUGGESTED", powód wyboru). Lotnisko bez pasów w bazie: None."""
+    if ad is None or not ad.runways:
+        return None
+    state = runway_state(ad, parsed, lvp, now)
+    atis = atis_state(stations, ad.icao, [r["designator"] for r in state["runways"]])
+    use = runway_in_use(atis, state["preferred"])
+    if not use.get("arr"):
+        return None
+    return {"arr": use["arr"], "dep": use["dep"] or use["arr"], "source": use["source"],
+            "letter": atis["letter"] if atis and use["source"] == "ATIS" else None, "reason": use.get("reason")}
+
+
 async def _feed() -> dict:
     """Data feed VATSIM; przy awarii puste dane i komunikat (panele pokazują je bez ATIS i bez ruchu)."""
     from ..routers import vatsim as vatsim_api   # ten sam cache i to samo miejsce podmiany w testach i demo
     try:
         return {"feed": await vatsim_api.get_feed(), "error": None}
-    except (UpstreamError, ValueError) as exc:
-        return {"feed": {}, "error": f"VATSIM: {exc}"}
+    except (UpstreamError, ValueError):
+        return {"feed": {}, "error": "Network data unavailable"}

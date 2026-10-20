@@ -200,20 +200,20 @@ def _upstream(cause: Exception) -> UpstreamError:
 def test_error_text_real_httpx_messages():
     """Prawdziwe komunikaty httpx: pusty przy timeout, adres i link MDN przy HTTP 5xx – krótko, po angielsku, bez adresu."""
     req = httpx.Request("GET", notam.notam_url("EPGD"))
-    assert notam._error_text(_upstream(httpx.ReadTimeout("", request=req))) == "no response (timeout)"
-    assert notam._error_text(_upstream(httpx.ConnectTimeout("", request=req))) == "no response (timeout)"
+    assert notam.error_text(_upstream(httpx.ReadTimeout("", request=req))) == "no response (timeout)"
+    assert notam.error_text(_upstream(httpx.ConnectTimeout("", request=req))) == "no response (timeout)"
     status = httpx.HTTPStatusError("Server error '503 Service Unavailable' for url '...'\nFor more information check: "
                                    "https://developer.mozilla.org/", request=req, response=httpx.Response(503, request=req))
-    assert notam._error_text(_upstream(status)) == "HTTP 503"
-    assert notam._error_text(_upstream(httpx.ConnectError("All connection attempts failed", request=req))) == \
+    assert notam.error_text(_upstream(status)) == "HTTP 503"
+    assert notam.error_text(_upstream(httpx.ConnectError("All connection attempts failed", request=req))) == \
         "no connection"
-    assert notam._error_text(_upstream(httpx.RemoteProtocolError("Server disconnected", request=req))) == \
+    assert notam.error_text(_upstream(httpx.RemoteProtocolError("Server disconnected", request=req))) == \
         "connection interrupted"
     # inne: pierwsza linia, bez adresów, najwyżej 80 znaków; pusty komunikat – nazwa błędu
-    long = notam._error_text(UpstreamError(f"{notam.notam_url('EPKK')}: bad thing at https://x.test/a?b=1 " + "x" * 200
+    long = notam.error_text(UpstreamError(f"{notam.notam_url('EPKK')}: bad thing at https://x.test/a?b=1 " + "x" * 200
                                            + "\nsecond line"))
     assert long.startswith("bad thing at") and "http" not in long and "second" not in long and len(long) <= 80
-    assert notam._error_text(UpstreamError(f"{notam.notam_url('EPKK')}: ")) == "error (UpstreamError)"
+    assert notam.error_text(UpstreamError(f"{notam.notam_url('EPKK')}: ")) == "error (UpstreamError)"
 
 
 @pytest.fixture
@@ -397,7 +397,9 @@ def test_api_aerodrome_notams_unchanged(client):
     assert set(d["notams"][0]) == {"id", "raw", "fields", "start", "end", "perm", "est", "schedule"}
     assert d["other"] == 3
     r = client.get("/api/notam/EPKK")
-    assert r.status_code == 502 and "NOTAM server unavailable" in r.json()["detail"]
+    assert r.status_code == 502 and r.json()["detail"].startswith("NOTAM server unavailable: ")
+    # 0.12.6 (issue #21): bez adresu serwera NOTAM w komunikacie
+    assert "http" not in r.json()["detail"] and "plvacc" not in r.json()["detail"]
 
 
 # --- frontend: czyste funkcje zakładki SYT OP (Node, bez przeglądarki) -------------------------------------------
@@ -513,3 +515,13 @@ def test_sytop_tab_uses_navigation_and_escaping():
     assert 'remember("sytop", argOf(loc, sort))' in src and "activate(arg)" in src
     assert "/api/notam/fir/EPWW" in src and "onclick=" not in src
     assert "soon(" not in src
+
+
+def test_sytop_no_provenance_notes():
+    """0.12.6 (issue #21): bez dopisków, skąd są NOTAM-y (nazwa i adres serwera)."""
+    from backend.app.config import ROOT_DIR
+    src = (ROOT_DIR / "frontend" / "js" / "tabs" / "sytop.js").read_text("utf-8")
+    code = "\n".join(line for line in src.splitlines() if not line.lstrip().startswith("//"))
+    for text in ("PL vACC", "plvacc", "source:", "sytop-src", "fetched from"):
+        assert text not in code, text
+    assert ">refresh every 10 min</span>" in src and "No NOTAM data – no location responded." in src

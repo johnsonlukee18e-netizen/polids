@@ -15,7 +15,7 @@ export default {
           <span class="hint msg"></span>
         </form>
         <p class="hint admins"></p>
-        <table class="data users"><thead><tr><th>CID</th><th>Note</th><th>Name (VATSIM)</th><th>Added</th>
+        <table class="data users"><thead><tr><th>CID</th><th>Note</th><th>Name</th><th>Added</th>
           <th>Last login</th><th></th></tr></thead><tbody></tbody></table>
       </div>
       <div class="card">
@@ -34,7 +34,7 @@ export default {
       try {
         const [data, denied] = await Promise.all([api("/api/admin/users"), api("/api/admin/denied")]);
         $(".admins").textContent = data.admins.length
-          ? `Administrators (from configuration, always have access): ${data.admins.join(", ")}`
+          ? `Administrators (always have access): ${data.admins.join(", ")}`
           : "No administrators in POLIDS_AUTH_ADMIN_CIDS.";
         $(".users tbody").innerHTML = data.users.length ? data.users.map((u) => `<tr data-cid="${esc(u.cid)}">
           <td class="mono">${esc(u.cid)}</td>

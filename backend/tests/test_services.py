@@ -354,3 +354,36 @@ def test_runway_heading_ignores_bad_true_heading():
     assert runway_heading("16", 16.0) == 160
     assert runway_heading("34", 34.0) == 340
     assert runway_heading("09ES", None) == 90
+
+
+def test_upstream_error_described_without_server():
+    """Błąd pobierania w interfejsie bez adresu i nazwy serwera (issue #21): rodzaj błędu z wyjątku httpx, inaczej
+    komunikat bez przedrostka "<adres>: " i bez adresów w treści."""
+    import httpx
+
+    from backend.app.services.http_cache import UpstreamError, describe
+
+    req = httpx.Request("GET", "https://metar.example.net/metar.php?id=EPWA")
+
+    def wrapped(cause):
+        try:
+            try:
+                raise cause
+            except httpx.HTTPError as exc:
+                raise UpstreamError(f"{req.url}: {exc}") from exc
+        except UpstreamError as up:
+            return up
+
+    assert describe(wrapped(httpx.ReadTimeout("", request=req))) == "no response (timeout)"
+    assert describe(wrapped(httpx.ConnectError("All connection attempts failed", request=req))) == "no connection"
+    status = httpx.HTTPStatusError("Server error for url 'https://metar.example.net/'", request=req,
+                                   response=httpx.Response(503, request=req))
+    assert describe(wrapped(status)) == "HTTP 503"
+    assert describe(wrapped(httpx.RemoteProtocolError("Server disconnected", request=req))) == "connection interrupted"
+    assert describe(UpstreamError("https://api.example.com/v1/forecast: [Errno -3] DNS")) == "[Errno -3] DNS"
+    assert describe(UpstreamError("data.example.net: timeout")) == "timeout"
+    assert describe(UpstreamError("no network")) == "no network"
+    assert describe(UpstreamError("HTTP 400: bad request")) == "HTTP 400: bad request"
+    long = describe(UpstreamError("https://x.test/a: bad thing at https://y.test/q?b=1 " + "x" * 200 + "\nsecond"))
+    assert long.startswith("bad thing at") and "http" not in long and "second" not in long and len(long) <= 80
+    assert describe(UpstreamError("")) == "error"

@@ -51,8 +51,10 @@ export function adcivArg(arg) {
 }
 export const aeroOf = (arg) => adcivArg(arg).icao;
 
-// rodzaje map (kind z backendu, services/eaip.py: chart_kind) w kolejności przycisków filtra
-export const KINDS = [["AD", "Aerodrome, parking and ground movement charts"], ["SID", "Standard instrument departure charts"],
+// rodzaje map (kind z backendu, services/eaip.py: chart_kind) w kolejności przycisków filtra;
+// 0.12.6: mapa lotniska (ADC) i mapy postojowe (APDC) osobno
+export const KINDS = [["ADC", "Aerodrome, ground movement and areas of responsibility charts"],
+  ["APDC", "Aircraft parking and docking charts"], ["SID", "Standard instrument departure charts"],
   ["STAR", "Standard instrument arrival charts"], ["IAC", "Instrument approach charts"], ["VFR", "Visual approach and VFR charts"],
   ["OBST", "Obstacle and terrain charts"], ["OTHER", "Other charts"]];
 const KIND_TIP = Object.fromEntries(KINDS);
@@ -71,10 +73,12 @@ export function kindAfterPick(charts, kind, id) {
   const c = charts.find((x) => x.id === id) || charts[0];
   return kind && c && c.kind !== kind ? "" : kind;
 }
+// wiersz: krótka nazwa mapy (title), pełny tytuł (full) w dymku
+export const chartTip = (c) => `${c.page}: ${c.full || c.title}`;
 export function chartRows(charts, { kind = "", selected = "" } = {}) {
   const list = charts.filter((c) => !kind || c.kind === kind);
   if (!list.length) return `<p class="hint">No charts of this type.</p>`;
-  return list.map((c) => `<div class="chl-row${c.id === selected ? " on" : ""}" data-chart="${esc(c.id)}" tabindex="0" title="${esc(c.page)}: ${esc(c.title)}">
+  return list.map((c) => `<div class="chl-row${c.id === selected ? " on" : ""}" data-chart="${esc(c.id)}" tabindex="0" title="${esc(chartTip(c))}">
     <span class="chl-kd" title="${esc(KIND_TIP[c.kind] || c.kind)}">${esc(c.kind)}</span><span class="chl-tt">${esc(c.title)}</span>
     <a class="chl-pdf" href="${esc(c.url)}" target="_blank" rel="noopener" title="Open ${esc(c.page)} (PDF) in a new tab">PDF ↗</a></div>`).join("");
 }
@@ -92,12 +96,11 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
       <div class="ms-card"><h4>${esc(icao)} · CHARTS</h4>
         <div class="chl-name">${esc(name)}</div>
         <div class="chl-kinds"></div>
-        <div class="chl-list"><p class="hint">Loading the chart list from eAIP…</p></div></div>
+        <div class="chl-list"><p class="hint">Loading the chart list…</p></div></div>
       <div class="chl-act">
         <a class="btn chl-open" target="_blank" rel="noopener" hidden>PDF ↗</a>
-        <a class="btn" href="${esc(text)}" target="_blank" rel="noopener" title="AD 2 ${esc(icao)}: AD 2.1–AD 2.25 textual data in eAIP">AD 2 TEXT ↗</a>
+        <a class="btn" href="${esc(text)}" target="_blank" rel="noopener" title="AD 2 ${esc(icao)}: aerodrome textual data (AD 2.1–AD 2.25)">AD 2 TEXT ↗</a>
       </div>
-      <p class="hint chl-src">Charts from AD 2.24 of the eAIP IFR (PANSA), current AIRAC amendment.</p>
     </div>
     <iframe class="embed viewer" style="background:#333" title="Chart"></iframe>
   </div>`);
@@ -110,8 +113,8 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     if (!charts.length) {
       const sec = chartsSectionUrl(data.page || text, icao);
       $(".chl-kinds").innerHTML = "";
-      $(".chl-list").innerHTML = `<p class="error">Chart list not available: ${esc(data.error || "no charts")}.</p>`
-        + (sec ? `<p><a class="btn" href="${esc(sec)}" target="_blank" rel="noopener">AD 2.24 in eAIP ↗</a></p>` : "");
+      $(".chl-list").innerHTML = `<p class="error">Chart list unavailable: ${esc(data.error || "no charts")}.</p>`
+        + (sec ? `<p><a class="btn" href="${esc(sec)}" target="_blank" rel="noopener" title="Aerodrome charts section (AD 2.24)">AD 2.24 ↗</a></p>` : "");
       if (text && viewer.getAttribute("src") !== text) viewer = frameGo(viewer, text);
       return;
     }
@@ -124,7 +127,7 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
     const open = $(".chl-open");
     open.hidden = false;
     open.href = c.url;
-    open.title = `${label}: ${c.title}`;
+    open.title = chartTip({ ...c, page: label });
     open.textContent = `${label} PDF ↗`;
     if (viewer.getAttribute("src") !== c.url) viewer = frameGo(viewer, c.url);
   };
@@ -175,7 +178,7 @@ export const adciv = {
       ...AD2.map(([icao]) => ({ id: icao, label: icao, fill: true, render: chartsPage(icao) })),
     ], { arg: argOf });
     sub.nav.querySelectorAll("button[data-id]").forEach((b) => {
-      b.title = b.dataset.id === EAIP ? "eAIP IFR: the whole browser (table of contents)" : `${names[b.dataset.id]} – charts (AD 2.24)`;
+      b.title = b.dataset.id === EAIP ? "The whole eAIP IFR (table of contents)" : `${names[b.dataset.id]} – charts`;
     });
     return {
       // arg undefined (przycisk menu): zostaje otwarta strona; "" = cały eAIP; "EPWA" = mapy EPWA; "EPWA/2-1" = mapa

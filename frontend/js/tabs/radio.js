@@ -22,7 +22,8 @@ import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS,
 
 const LS_LAYERS = "radio.layers", LS_CUT = "radio.cut";
 const REFRESH_MS = 30000;
-const LEVEL_FT = { MID: 35000, HIGH: 40000 };  // MID i HIGH mają jeden kształt sektorów
+// MID i HIGH mają jeden kształt sektorów
+const LEVEL_FT = { MID: 35000, HIGH: 40000 };
 const MAPS = [
   { key: "LOW", layer: "low", cls: "rb-low", side: "left" },
   { key: "MID", layer: "mid", cls: "rb-midmap", side: null },
@@ -113,7 +114,7 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
   const pdf = pdfPath(f?.pdf);
   // tytuł LOA podaje już FIR sąsiada (LOA EPWW – EDWW (Bremen)); bez LOA: FIR i nazwa ze stosu
   const head = `<div class="rb-loa-h"><b class="rb-loa-tag">LOA</b>${f ? "" : `<span class="rb-loa-fir"><b>${esc(fir)}</b> ${esc(title)}</span>`}`
-    + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span><span class="rb-loa-v" title="${esc(f.version)}">${esc(f.version)}</span>` : "")
+    + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
     + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Open the LOA in COORDINATION › DOCUMENTS (← returns to RADIO)">COORDINATION ›</button>`
       + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="Open the LOA PDF">PDF ↗</a>` : "")
@@ -128,14 +129,27 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
     + `<td class="cond">${esc(p.note)}</td></tr>`).join("");
   return head + `<div class="rb-loa-b">
     <div class="rb-loa-tools"><input type="search" class="rb-loa-q" placeholder="filter: COP, aerodrome, FL, sector…" aria-label="LOA filter">
-      <span class="rb-loa-cnt"></span><span class="rb-loa-n">transfers: ${out.length} from EPWW · ${inn.length} to EPWW</span>
-      <span class="hint" title="Extract from the PDF (data/seed/loa.json); if in doubt, the PDF prevails">PDF extract, the PDF prevails</span></div>
+      <span class="rb-loa-cnt"></span><span class="rb-loa-n">transfers: ${out.length} from EPWW · ${inn.length} to EPWW</span></div>
     ${loaTransfers(out, "EPWW", fir)}${loaTransfers(inn, fir, "EPWW")}
     <div class="rb-loa-rules">${loaList("Transfer of control and communication", f.silent)}${loaList("VFR", f.vfr)}${loaList("Other rules", f.other)}</div>
-    ${pos ? `<div class="rb-loa-sec"><h4>Positions and sectors per LOA <small>${arr(f.positions).length}</small></h4>
+    ${pos ? `<div class="rb-loa-sec"><h4>Positions and sectors <small>${arr(f.positions).length}</small></h4>
       <table class="rb-loa-tab pos"><thead><tr><th>Side</th><th>Position</th><th>Radio callsign</th><th>Sector</th><th>Freq.</th><th>Remarks</th></tr></thead>
       <tbody>${pos}</tbody></table></div>` : ""}
   </div>`;
+}
+
+// --- dymki (runda 15, Marek): przestrzeń, stanowisko i kto ją teraz obsługuje – bez kolejności przejmowania i bez
+// dopisków, skąd jest wartość. x: {who(cs), pos(cs), net} – zalogowany i opis stanowiska z tablicy, false = brak danych
+// o zalogowanych
+export const nowText = (owners, x) => (owners.length ? owners.map((o) => `Now: ${x.who(o) || o}`).join("\n")
+  : x.net === false ? "Now: no data" : "Now: unstaffed");
+// obszar stanowiska ACC na podglądzie: head (stanowisko i warstwa), kto, sektory warstwy w tym obszarze
+export const accTip = (g, head, x) => [head, nowText([g.owner], x), `Sectors: ${g.sectors.map((s) => s.id).join(", ")}`].join("\n");
+// etykieta APP, TWR, FIS: tytuł, stanowisko, kto teraz (bez nikogo z tej przestrzeni: ACC, który przejmuje top-down),
+// dodatki (extra); now zastępuje linijkę "kto teraz" (wieża przejmowana przez inne stanowisko)
+export function groupTip(g, title, x, extra = [], now = null) {
+  const cur = now || (g.owners.length || !g.topdown ? nowText(g.owners, x) : `Now top-down: ${x.who(g.topdown) || g.topdown}`);
+  return [title, `Position: ${x.pos(g.nominal)}`, cur, ...extra].join("\n");
 }
 
 // --- stos sąsiada (runda 11, Marek): kafelki VACS sektorów graniczących z EPWW (bez FMP). Częstotliwość tylko, gdy ktoś
@@ -150,10 +164,9 @@ const reHtml = (b) => `<div class="rb-sep"></div><div class="rb-bd rb-re" data-r
   + `<i>${esc(b.re)}</i></div>`;
 // nobody: nikt w całym stosie – tylko wtedy kafelek bez nikogo mówi o ADVISORY
 function tileHtml(t, x, nobody) {
-  const o = t.owner, chain = arr(t.chain);
-  const rt = [`${t.label}${t.alt ? ` · ${altText(t)} (VACS ${t.alt})` : ""}`, `Position: ${x.pos(t.callsign)}`,
-    o ? `Now: ${x.who(o) || o}` : x.net === false ? "VATSIM: no data" : nobody ? `Now: unstaffed – ADVISORY ${ADVISORY_FQ}` : "Now: unstaffed",
-    ...(chain.length > 1 ? [`Coverage order: ${chain.map(x.nm).join(" › ")}`] : [])].join("\n");
+  const o = t.owner;
+  const rt = [`${t.label}${t.alt ? ` · ${altText(t)}` : ""}`, `Position: ${x.pos(t.callsign)}`,
+    !o && nobody ? `Now: unstaffed – ADVISORY ${ADVISORY_FQ}` : nowText(o ? [o] : [], x)].join("\n");
   const by = o && o !== t.callsign ? `<i class="rb-by">${esc(byShort(x.nm(o)))}</i>` : "";
   return `<div class="rb-box ${o ? "on" : "off"}" data-rt="${esc(rt)}"><b class="rb-id">${esc(t.label)}</b>`
     + `${o ? `<span class="rb-ln">${by}<span class="rb-fq">${esc(x.freq(o))}</span></span>` : ""}</div>`;
@@ -162,8 +175,9 @@ export function nbStackHtml(st, x) {
   const tiles = arr(st.tiles), bands = stackBands(tiles);
   const owners = [...new Set(tiles.map((t) => t.owner).filter(Boolean))];
   const nobody = x.net !== false && tiles.length > 0 && !owners.length;
-  const flat = !bands.some((b) => b.top || b.fl || b.re);  // bez wysokości (UMMV, UKLV): bez osi z lewej
-  const tipH = [`${st.fir} ${st.title}: sectors bordering FIR EPWW as in VACS (without FMP)`,
+  // bez wysokości (UMMV, UKLV): bez osi z lewej
+  const flat = !bands.some((b) => b.top || b.fl || b.re);
+  const tipH = [`${st.fir} ${st.title}: sectors bordering FIR EPWW`,
     ...(flat ? [] : ["numbers between the tiles: vertical limits (FL)"]),
     ...(bands.some((b) => b.re) ? ["dash and range (e.g. +315): new band group, not adjacent to the bands above"] : []),
     ...(nobody ? [`Nobody online – ADVISORY ${ADVISORY_FQ}`] : owners.map((o) => `Online: ${x.who(o) || o}`)), `Click: LOA EPWW – ${st.fir}`].join("\n");
@@ -171,7 +185,7 @@ export function nbStackHtml(st, x) {
     + (nobody ? `<div class="rb-unicom">ADVISORY ${ADVISORY_FQ}</div>` : "")
     + (bands.length ? bands.map((b) => `${b.re ? reHtml(b) : ""}${b.top ? bdHtml(b.top) : ""}`
       + `<div class="rb-bxs">${b.tiles.map((t) => tileHtml(t, x, nobody)).join("")}</div>${b.fl ? bdHtml(b.fl) : ""}`).join("")
-      : `<div class="rb-none">no VACS sectors</div>`) + "</div>";
+      : `<div class="rb-none">no sectors</div>`) + "</div>";
 }
 
 // --- etykieta podglądu (sektor ACC, APP, TWR, FIS) w odmianach: 0 pełna (ID nad częstotliwością), 1 skrócona (ID
@@ -215,7 +229,8 @@ export const lblLines = (nominal, owners, x) => owners.slice(0, 2).map((o) => ({
 // lotniska, potem w pierwszej; w pozostałych sama nazwa (↑WA APP), reszta w dymku. Część obsługiwana przez własne
 // stanowisko zawsze z częstotliwością (WA S APP w TMA Warszawa, Łódź i Radom), jak sektory ACC
 export function tmaLines(parts, x) {
-  const keeper = new Map();  // znak → id części, w której etykieta ma jego częstotliwość
+  // znak → id części, w której etykieta ma jego częstotliwość
+  const keeper = new Map();
   [(g, cs) => cs === g.nominal && cs.slice(0, 4) === g.icao, (g, cs) => cs === g.nominal, (g, cs) => cs.slice(0, 4) === g.icao]
     .forEach((ok) => parts.forEach((g) => { const cs = g.owners[0]; if (cs && ok(g, cs) && !keeper.has(cs)) keeper.set(cs, g.id); }));
   return new Map(parts.map((g) => {
@@ -249,7 +264,7 @@ export default {
         ${MAPS.map((m) => m.key === "MID" ? `<div class="rb-mid">
             <div class="rb-btns">${LAYERS.map((l) => `<button type="button" data-ly="${l.id}" title="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>
             <div class="rb-status"></div>
-            <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour tile without frequency, nobody in the whole stack – ADVISORY ${ADVISORY_FQ}"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>↑ covered by (TWR)</span><span title="TMA boundary (APP layer; sector file colour)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers; sector file colour)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
+            <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour tile without frequency, nobody in the whole stack – ADVISORY ${ADVISORY_FQ}"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>↑ covered by (TWR)</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
             ${panelHtml(m)}
           </div>` : panelHtml(m)).join("")}
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
@@ -264,7 +279,8 @@ export default {
     // poziom przekroju LOW wyrównany do suwaka (adres i pamięć przeglądarki mogą mieć dowolny FL095–FL335)
     const lowCut = () => cutAt(cut, cutRange(d?.layers?.LOW));
     let d = null, geo = null, geoVer = "", err = "", border = null, noBorder = false, timer = null, loading = false, lastLoad = 0;
-    let loaFir = null;   // FIR, którego LOA jest otwarte (panel .rb-loa)
+    // FIR, którego LOA jest otwarte (panel .rb-loa)
+    let loaFir = null;
     const maps = Object.fromEntries(MAPS.map((m) => {
       const p = el.querySelector(`.rb-panel[data-map="${m.key}"]`);
       return [m.key, { ...m, el: p, svg: p.querySelector("svg"), lbls: p.querySelector(".rb-lbls"), free: p.querySelector(".rb-free") }];
@@ -279,11 +295,8 @@ export default {
       return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
     };
     const posLine = (cs) => `${cs}${d?.pos?.[cs]?.name ? ` · ${d.pos[cs].name}` : ""} ${d?.pos?.[cs]?.frequency || ""}`.trim();
-    const chainText = (ch) => ch.map(nm).join(" › ");
     // linijki etykiet (lblLines, tmaLines, twrLines): częstotliwości i nazwy z tablicy
     const lx = () => ({ freq: freqOf, nm, on, pos: d?.pos });
-    const nowText = (owners) => (owners.length ? owners.map((o) => `Now: ${who(o) || o}`).join("\n")
-      : d?.net?.ok === false ? "VATSIM: no data" : "Now: unstaffed");
 
     // --- pasek ATIS
     function renderAtis() {
@@ -297,7 +310,7 @@ export default {
         return `<button type="button" class="rb-at ${o ? "on" : "off"}" data-icao="${esc(a.icao)}" data-rt="${esc(rt)}">`
           + `<span class="rb-ati">${esc(a.callsign.replace(/_ATIS$/, "").replace(/_/g, " "))}</span><span class="rb-fq">${esc(fq)}</span>`
           + `${o?.atis_code ? `<b class="rb-code">${esc(o.atis_code)}</b>` : ""}</button>`;
-      }).join("") || `<span class="rb-none">No ATIS positions in the .ese file.</span>`;
+      }).join("") || `<span class="rb-none">No ATIS positions.</span>`;
     }
 
     // --- stosy sąsiadów (nbStackHtml): nazwy, częstotliwości i zalogowani z tablicy
@@ -316,25 +329,22 @@ export default {
     }
 
     // --- podglądy
-    // dymek obszaru stanowiska: kto, które sektory warstwy i ich kolejność przejmowania
-    const accTip = (g, layer) => {
+    // dymek obszaru stanowiska: kto i które sektory warstwy (accTip); etykiety APP, TWR i FIS: groupTip
+    const tx = () => ({ who, pos: posLine, net: d?.net?.ok !== false });
+    const accTipOf = (g, layer) => {
       const ly = d.layers?.[layer];
-      return [`${displayName(g.owner)} · ${layer}${ly?.label ? ` ${ly.label}` : ""}`, nowText([g.owner]),
-        `Sectors: ${g.sectors.map((s) => s.id).join(", ")}`,
-        ...g.sectors.map((s) => `${s.id}: ${s.nominal !== g.owner ? `sector position ${nm(s.nominal)}, ` : ""}coverage order ${chainText(s.chain)}`)].join("\n");
+      return accTip(g, `${displayName(g.owner)} · ${layer}${ly?.label ? ` ${ly.label}` : ""}`, tx());
     };
-    const groupTip = (g, title, extra = [], now = null) => [title, `Position: ${posLine(g.nominal)}`,
-      now || (g.owners.length || !g.topdown ? nowText(g.owners) : `Now top-down: ${who(g.topdown) || g.topdown}`), ...extra,
-      `Coverage order: ${chainText(g.chains[0] || [])}`].join("\n");
 
     // etykiety podglądu: {lb (model etykiety), at: [lat, lon], kind, box?, dot?}; APP, TWR i FIS tylko na LOW;
     // kolejność układania: lblPrio. Sektory ACC: jedna etykieta na stanowisko (accGroups)
     function labelsFor(m, groups) {
       const out = [], x = lx();
       if (layers.has(m.layer)) {
-        groups.forEach((g) => { if (g.at) out.push({ at: g.at, kind: "acc", lb: { ...accLabel(g, displayName(g.owner), x), rt: accTip(g, m.key) } }); });
+        groups.forEach((g) => { if (g.at) out.push({ at: g.at, kind: "acc", lb: { ...accLabel(g, displayName(g.owner), x), rt: accTipOf(g, m.key) } }); });
       }
-      if (m.key !== "LOW") return out;  // APP, TWR i FIS to przestrzeń dolna: na podglądzie LOW
+      // APP, TWR i FIS to przestrzeń dolna: na podglądzie LOW
+      if (m.key !== "LOW") return out;
       if (layers.has("app")) {
         // etykieta na część TMA (stanowisko części: WA APP, WA N APP, WA S APP; TMA proceduralna: wieża, np. SC TWR);
         // linijki i jedna częstotliwość przejmującego na kilka części: tmaLines
@@ -343,10 +353,9 @@ export default {
           const { ls, more } = parts.get(g.id);
           const id = nm(g.nominal), proc = /_TWR$/.test(g.nominal);
           const title = `${g.tma}${g.id !== g.tma ? ` – part ${id}` : ""} (${g.lo ? flText(g.lo) : "GND"}–${flText(g.hi)})`;
-          const extra = [...(proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : []),
-            ...(g.apps.length > 1 ? [`APP in this part: ${g.apps.map((c) => `${nm(c)} ${d.pos[c]?.frequency || ""}`).join(", ")}`] : [])];
+          const extra = proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : [];
           out.push({ at: g.at, box: g.box, kind: "app", dot: "app", lb: { cls: "app",
-            state: g.owners.length ? "on" : "off", id, ls, more, rt: groupTip(g, title, extra) } });
+            state: g.owners.length ? "on" : "off", id, ls, more, rt: groupTip(g, title, tx(), extra) } });
         });
       }
       const twra = layers.has("twra");
@@ -359,7 +368,7 @@ export default {
           const id = nm(g.nominal);
           out.push({ at: g.at, box: g.box, kind: "twr", dot: "twr", lb: { cls: "twr", state: tw ? "on" : cover ? "cov" : "off", id,
             ls, extra: atl,
-            icao: g.icao, k: g.icao, rt: groupTip(g, `${g.id} · ${g.icao}`, [...extra, "Click: AERODROME"],
+            icao: g.icao, k: g.icao, rt: groupTip(g, `${g.id} · ${g.icao}`, tx(), [...extra, "Click: AERODROME"],
               cover ? `Tower offline – covered by ${g.owners.map((o) => who(o) || o).join(", ")}` : null) } });
         });
       }
@@ -369,7 +378,7 @@ export default {
           const ls = lblLines(g.nominal, g.owners, x), id = nm(g.nominal);
           out.push({ at: g.at, kind: "fis", dot: "fis", lb: { cls: "fis", state: g.owners.length ? "on" : "off", id,
             ls, more: Math.max(0, g.owners.length - 2),
-            rt: groupTip(g, `${g.id} (up to ${flText(g.hi)})`) } });
+            rt: groupTip(g, `${g.id} (up to ${flText(g.hi)})`, tx()) } });
         });
       }
       return out;
@@ -490,10 +499,9 @@ export default {
       const n = d ? controllersOn(d.online) : 0;
       const net = d?.net;
       s.innerHTML = !d ? (err ? `<span class="error">${esc(err)}</span>` : "Loading…")
-        : `${net?.ok ? `VATSIM ${esc(utcHhmm(net.updated))} · ${n} on the board` : `<span class="error">${esc(net?.error || "VATSIM: no data")}</span>`}`
-          + (noBorder ? ` <span class="error">No FIR EPWW boundary (VATSpy): previews without the FIR outline.</span>` : "")
+        : `${net?.ok ? `Updated ${esc(utcHhmm(net.updated))} · ${n} on the board` : `<span class="error">${esc(net?.error || "No data")}</span>`}`
+          + (noBorder ? ` <span class="error">No FIR EPWW boundary: previews without the FIR outline.</span>` : "")
           + (err ? ` <span class="error">${esc(err)}</span>` : "");
-      s.title = d?.source ? `Coverage order: ${d.source}` : "";
     }
     let raf = 0;
     // jeden błąd (np. dziwne dane) nie zatrzymuje reszty strony
@@ -526,7 +534,8 @@ export default {
           noBorder = !b;
           border = b || EPWW_BBOX;
         } else if (geo && r.ver !== geoVer) {
-          geoVer = "";  // nowa wersja danych bez geometrii w odpowiedzi: pobierzemy ją zaraz (?geo=1)
+          // nowa wersja danych bez geometrii w odpowiedzi: pobierzemy ją zaraz (?geo=1)
+          geoVer = "";
           setTimeout(load, 0);
         }
         d = r;
@@ -623,9 +632,10 @@ export default {
         const data = await loadLoa();
         html = loaHtml(fir, title, data?.firs?.[fir] || null, radioOf);
       } catch (e) {
-        html = loaHtml(fir, title, null, radioOf, { msg: `LOA: ${e.message}` });
+        html = loaHtml(fir, title, null, radioOf, { msg: e.message || "LOA data unavailable" });
       }
-      if (loaFir !== fir) return;   // w międzyczasie zamknięty albo otwarty inny FIR
+      // w międzyczasie zamknięty albo otwarty inny FIR
+      if (loaFir !== fir) return;
       loaBox.innerHTML = html;
       loaBox.querySelector(".rb-loa-b").scrollTop = 0;
     }

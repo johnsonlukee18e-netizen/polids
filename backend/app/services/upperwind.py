@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Aerodrome, NavPoint
-from .http_cache import UpstreamError, fetch_text
+from .http_cache import UpstreamError, describe, fetch_text
 from .procedures import procedures
 from .runways import equipment_for, runway_heading
 
@@ -36,7 +36,7 @@ MIN_RWY_M = 1200
 # nawierzchnia miękka albo pas awaryjny ("GRASS", "Grass", "GRS", "GRE", "G", "grassy", "GRS Emergency Strip")
 SOFT_SURFACE = re.compile(r"gras|grs|\bgre\b|grv|gravel|turf|emergency|^g$", re.I)
 EARTH_NM = 3440.065
-METHOD_LABEL = {"procedure": "FAF from procedure", "centreline": "extended centreline, 3°"}
+METHOD_LABEL = {"procedure": "FAF", "centreline": "extended centreline, 3°"}
 
 
 # --- geometria na kuli
@@ -218,7 +218,7 @@ def parse_forecast(text: str, now: datetime | None = None) -> list[dict]:
     godziny UTC w każdym punkcie, w kolejności zapytania."""
     data = json.loads(text)
     if isinstance(data, dict) and data.get("error"):
-        raise UpstreamError(f"Open-Meteo: {data.get('reason') or 'error'}")
+        raise UpstreamError(data.get("reason") or "error")
     now = now or datetime.now(timezone.utc)
     stamp = now.strftime("%Y-%m-%dT%H:00")
     out = []
@@ -251,8 +251,7 @@ def upstream_reason(exc: UpstreamError) -> str:
             body = None
         reason = body.get("reason") if isinstance(body, dict) else None
         return f"HTTP {resp.status_code}" + (f": {reason}" if reason else f" {resp.reason_phrase}".rstrip())
-    msg = str(exc)
-    return msg[len(OPEN_METEO_URL) + 2:] if msg.startswith(OPEN_METEO_URL + ": ") else msg
+    return describe(exc)
 
 
 async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
@@ -270,7 +269,7 @@ async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
     try:
         res = parse_forecast(text)
     except (ValueError, KeyError, TypeError, IndexError) as exc:
-        raise UpstreamError(f"Open-Meteo: unreadable response ({exc})") from exc
+        raise UpstreamError(f"unreadable response ({exc})") from exc
     if len(res) != len(points):
-        raise UpstreamError(f"Open-Meteo: {len(res)} points in the response instead of {len(points)}")
+        raise UpstreamError(f"{len(res)} points in the response instead of {len(points)}")
     return res

@@ -48,7 +48,7 @@ def test_aerodrome_status(client):
     # AIP AD 2.21: doloty 33, odloty 29 (wiatr 280/15 w limicie bocznego 15 kt)
     assert st["suggested_runway"] == "33" and (st["preferred"]["arr"], st["preferred"]["dep"]) == ("33", "29")
     # kontrola online z ATIS: pas w użyciu z ATIS, litera B
-    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "From ATIS B"}
+    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "ATIS B"}
     # konfiguracja preferowana z runway_config.json (AWOS › 2 PASY przy ATIS z jednym pasem), AIP AD 2.21 H24
     assert st["runway_config"] == {"arr": "33", "dep": "29"}
     assert st["lvp"]["applies"] and len(st["lvp"]["rules"]) == 3
@@ -120,7 +120,7 @@ def test_route_without_navdata(client):
 
 def test_checklists_and_emergency(client):
     ids = [c["id"] for c in client.get("/api/checklists").json()["checklists"]]
-    assert ids == ["open-position", "close-position", "handover-takeover", "rwy-change"]
+    assert ids == ["open-position", "close-position", "handover-takeover", "rwy-change", "controller-tips"]
     procs = client.get("/api/emergency").json()["procedures"]
     assert len(procs) == 18 and procs[1]["id"] == "A06" and any(p["id"] == "RCF" for p in procs)
 
@@ -308,7 +308,7 @@ def test_viff_endpoints(client, monkeypatch):
 
     monkeypatch.setattr(viff, "_get", down)
     r = client.get("/api/viff/departures/EPWA")
-    assert r.status_code == 502 and "vIFF" in r.json()["detail"]
+    assert r.status_code == 502 and r.json()["detail"] == "Flow data unavailable"  # 0.12.6: bez nazwy źródła
 
 
 def test_vacs_sector_chains(client):

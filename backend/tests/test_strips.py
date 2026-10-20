@@ -288,6 +288,14 @@ out.place = {
   left: m.placeWin({ x: -40, top: 200, bottom: 246 }, 432, 400, 1600, 900),
   tall: m.placeWin({ x: 600, top: 300, bottom: 346 }, 432, 700, 1600, 768),
 };
+// opis pola SID/STAR i stan pasa w opisie pola A: dane i ich stan, bez opisu dopasowania
+const hint = (o) => m.procHint({ kind: "dep", rules: "I", runway: "29", route: "EVINA DCT", ...o });
+const sid = (source) => ({ name: "EVIN1G", fix: "EVINA", source });
+out.procHint = [hint({ proc: sid("fix") }), hint({ proc: sid("route") }), hint({ proc: sid("CDM") }),
+  hint({ kind: "arr", proc: { name: "BIMPA6U", fix: "BIMPA", source: "fix" } }), hint({ proc: null, proc_fix: "XXXXX" }),
+  hint({ kind: "arr", proc: null, proc_fix: "XXXXX" }), hint({ proc: null, proc_fix: null }), hint({ rules: "V", proc: null }),
+  hint({ runway: null, proc: null })];
+out.rwySrc = [["ATIS", "K"], ["ATIS", null], ["SUGGESTED", "K"], ["CDM", "K"], [null, "K"]].map(([s, l]) => m.rwySrc(s, l));
 console.log(JSON.stringify(out));
 """
 
@@ -557,3 +565,33 @@ def test_strips_css_sharp_edges():
     radii = re.findall(r"border-radius:\s*([^;}]+)", css)
     assert radii and all(r.strip() in ("0", "50%") for r in radii), radii
     assert "text-shadow" not in css and "box-shadow" not in css
+
+
+def test_strips_no_provenance_text():
+    """Issue #21: opisy pól paska i belki bez dopisków, skąd pochodzi wartość (vIFF, VATSIM, plik .ese, EuroScope,
+    baza typów, plan lotu VATSIM, IFPS); same dane, czasy i stany zostają."""
+    for src in (STRIPS_JS.read_text("utf-8"), STRIP_TAB_JS.read_text("utf-8")):
+        code = _code(src)
+        for word in ("vIFF", "VATSIM", ".ese", "EuroScope", "type database", "IFPS)", "deptime", "from the network",
+                     "Flight not in", "not in VATSIM"):
+            assert word not in code, word
+    js = STRIPS_JS.read_text("utf-8")
+    for txt in ("ATOT: actual take-off time.", "CTOT: ATFM slot", "TTOT: target take-off time (A-CDM), no slot.",
+                "CFL field: RFL (requested flight level).", "click: flight details · double-click: map · CFL = RFL<"):
+        assert txt in js, txt
+    # pas w użyciu jak w OVERVIEW: ATIS z literą albo PREF; bez "system suggestion" i bez "no runway from ATIS"
+    code = _code(js)
+    assert "system suggestion" not in code and "from ATIS" not in code and "no ATIS" not in code
+    assert '`<span class="kv sugg" title="Preferred runway">PREF</span>`' in js
+
+
+def test_strip_proc_hint_and_runway_state(xl):
+    """Issue #21: pole SID/STAR mówi, jaka procedura i w jakim stanie (proponowana, w planie lotu, przydzielona), a nie,
+    jak ją dobrano; stan pasa jak w OVERVIEW (ATIS z literą, pas preferowany, CDM)."""
+    assert xl["procHint"] == [
+        "SID EVIN1G proposed for RWY 29.", "SID EVIN1G filed, RWY 29.", "SID EVIN1G assigned, RWY 29.",
+        "STAR BIMPA6U proposed for RWY 29.", "No SID for RWY 29 to XXXXX.", "No STAR for RWY 29 from XXXXX.", "No SID.",
+        "No SID: VFR flight.", "No SID: runway in use unknown."]
+    assert xl["rwySrc"] == ["ATIS K", "ATIS", "preferred", "CDM", ""]
+    for h in xl["procHint"]:
+        assert not re.search(r"route point|ending at|starting at|flight plan route|\(CDM\)|ends at|starts at", h), h

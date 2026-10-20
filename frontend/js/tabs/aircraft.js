@@ -1,8 +1,11 @@
-import { api, debounce, esc, fmt, h, letterMenu, remember } from "../api.js";
+import { api, debounce, esc, h, letterMenu, remember } from "../api.js";
 
 const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
 };
+// skrót kategorii RECAT-EU obok litery w kratce ("E|M↓"): J = super, strzałka = górna / dolna część kategorii
+const RECAT_SHORT = { A: "J", B: "H↑", C: "H↓", D: "M↑", E: "M↓", F: "L" };
+const WTC = { L: "Light", M: "Medium", H: "Heavy", J: "Super" };
 // opis typu wg ICAO Doc 8643 (np. L2J): rodzaj statku, liczba silników (C = sprzężone), rodzaj silników
 const KIND = { L: "landplane", S: "seaplane", A: "amphibian", G: "gyrocopter", H: "helicopter", T: "tiltrotor" };
 const ENGINE = { J: "jet", T: "turboprop/turboshaft", P: "piston", E: "electric", R: "rocket" };
@@ -29,66 +32,131 @@ function makerGroups(list, primary) {
 // "A-300(B4/C4/F4)-600" -> "A-300-600", "737-800, BBJ2" -> "737-800"
 const searchName = (a) => `${a.manufacturer || ""} ${(a.model || a.icao).split(",")[0].replace(/\([^()]*\)/g, "")
   .split("/")[0].replace(/\s+/g, " ").trim()}`.trim();
-// osiągi z wersji produkcyjnych typu: od–do, gdy wersje się różnią (*_max z serwera), inaczej jedna wartość
-const range = (lo, hi, digits = 0, unit = "") => (hi == null || hi === lo ? fmt(lo, digits, unit)
-  : `${fmt(lo, digits)}–${fmt(hi, digits, unit)}`);
-const mach = (lo, hi) => (lo == null ? "–" : `M${+Number(lo).toFixed(3)}${hi == null || hi === lo ? "" : `–${+Number(hi).toFixed(3)}`}`);
-const describe = (d) => (!d ? "–"
-  : `${esc(d)} – ${KIND[d[0]] || "?"}, ${d[1] === "C" ? "coupled" : `${esc(d[1])} ×`} ${ENGINE[d[2]] || "?"}`);
-function engines(a) {
-  const kind = a.engine_type || ENGINE[a.description?.[2]];
-  const count = a.engine_count ?? (a.description?.[1] === "C" ? "coupled" : null);
-  if (count == null && !kind) return "–";
-  return `${esc(count ?? "–")}${count === "coupled" ? "" : " ×"} ${esc(kind || "–")}`;
+
+// --- wartości w kratkach (czysty tekst; escapowanie przy składaniu HTML) ---
+// liczba bez zbędnych zer: 27.2, 27.05, 54.1; masa w tonach z jednym miejscem po przecinku
+const num = (v) => String(+Number(v).toFixed(2));
+const tons = (kg) => String(Math.round(kg / 100) / 10);
+const flevel = (ft) => String(Math.round(ft / 100)).padStart(3, "0");
+const mach = (m) => String(+Number(m).toFixed(3));
+// osiągi z wersji produkcyjnych typu: od–do, gdy wersje się różnią (*_max z serwera), inaczej jedna wartość;
+// porównanie po zaokrągleniu, żeby nie było "2–2 t" (MLW 1970 i 2047 kg)
+const span = (lo, hi, f) => {
+  if (lo == null) return "";
+  const a = f(lo), b = hi == null ? a : f(hi);
+  return a === b ? a : `${a}–${b}`;
+};
+const unit = (v, u) => (v ? `${v}${u}` : "");
+const pre = (p, v) => (v ? `${p}${v}` : "");
+
+// opis typu słownie: "L2J" -> "landplane, 2 × jet"
+export function describe(d) {
+  if (!d || d.length < 3) return "";
+  return `${KIND[d[0]] || "?"}, ${d[1] === "C" ? "coupled" : `${d[1]} ×`} ${ENGINE[d[2]] || "?"}`;
 }
-// skąd dane: plik ICAO, osiągi spoza niego z aircraft-database.com (zakresy z wersji produkcyjnych typu)
-function sources(a) {
-  const perf = [a.engine_type && "engine type", a.mlw != null && "MLW", a.ceiling_ft != null && "ceiling",
-    (a.vmo_kt != null || a.mmo != null) && "Vmo/Mmo"].filter(Boolean);
-  const ranged = ["mlw_max", "ceiling_ft_max", "vmo_kt_max", "mmo_max"].some((k) => a[k] != null);
-  return "Source: ICAO_Aircraft.json (ICAO Doc 8643)"
-    + (perf.length ? `; ${perf.join(", ")}: aircraft-database.com` : "")
-    + (ranged ? ". Ranges span the type's production variants." : ".");
+// silniki do kratki ENG: liczba (z bazy albo z opisu typu) i rodzaj; T w opisie śmigłowca i tiltrotora (H2T, T2T)
+// to turbina wałowa
+export function engines(a) {
+  const d = a.description || "";
+  const kind = a.engine_type || (d[2] === "T" ? (/^[HT]/.test(d) ? "turboshaft" : "turboprop") : ENGINE[d[2]]);
+  const count = a.engine_count ?? (d[1] === "C" ? "coupled" : /^\d$/.test(d[1] || "") ? d[1] : null);
+  return [count, kind].filter((x) => x != null && x !== "").join(" ");
 }
-// EUROCONTROL Aircraft Performance Database: strona typu (details.aspx?ICAO=…) obok strony głównej z config
+// kod literowy lotniska (ARC) wg rozpiętości skrzydeł: A < 15 m, B < 24, C < 36, D < 52, E < 65, F < 80;
+// bez kodu dla śmigłowców i wiatrakowców (średnica wirnika) i powyżej 80 m
+export function arcCode(a) {
+  const s = Number(a.wingspan);
+  if (a.wingspan == null || !(s > 0) || /^[HG]/.test(a.description || "")) return "";
+  return "ABCDEF"[[15, 24, 36, 52, 65, 80].findIndex((m) => s < m)] || "";
+}
+
+// Rekord jako kratki: mała etykieta nad dużą wartością, kolor wg kategorii (id = identyfikacja, perf = osiągi,
+// wake = masa i turbulencja, dim = wymiary). Puste wartości pomijane. {cat, label, value, title?, key?, cls?}:
+// key = kratka wyróżniona (kod ICAO), cls = klasa wartości (kolor kategorii RECAT-EU)
+export function boxes(a) {
+  const b = (cat, label, value, extra) => ({ cat, label, value, ...extra });
+  // śmigłowiec i wiatrakowiec: w polu rozpiętości jest średnica wirnika
+  const rotor = /^[HG]/.test(a.description || "");
+  return [
+    b("id", "ICAO", a.icao, { key: true }),
+    b("id", "IATA", a.iata),
+    b("id", "DESC", a.description, { title: describe(a.description) }),
+    b("perf", "ENG", engines(a)),
+    b("perf", "VMO", unit(span(a.vmo_kt, a.vmo_kt_max, num), " kt")),
+    b("perf", "MMO", pre("M", span(a.mmo, a.mmo_max, mach))),
+    b("perf", "CEILING", pre("FL", span(a.ceiling_ft, a.ceiling_ft_max, flevel))),
+    b("wake", "MTOW", a.mtow ? `${tons(a.mtow)} t` : ""),
+    b("wake", "MLW", unit(span(a.mlw, a.mlw_max, tons), " t")),
+    b("wake", "WTC", a.wtc, { title: WTC[a.wtc] }),
+    b("wake", "WTG", a.wtg),
+    b("wake", "RECAT", a.recat ? `${a.recat}${RECAT_SHORT[a.recat] ? `|${RECAT_SHORT[a.recat]}` : ""}` : "",
+      { title: a.recat && RECAT[a.recat] ? `RECAT-EU ${a.recat} – ${RECAT[a.recat]}` : "", cls: `recat-${a.recat}` }),
+    b("dim", rotor ? "ROTOR" : "WINGSPAN", a.wingspan ? `${num(a.wingspan)} m` : ""),
+    b("dim", "ARC", arcCode(a)),
+    b("dim", "LENGTH", a.length ? `${num(a.length)} m` : ""),
+    b("dim", "HEIGHT", a.height ? `${num(a.height)} m` : ""),
+  ].filter((x) => x.value != null && x.value !== "");
+}
+const box = (x) => `<div class="acb ${x.cat}${x.key ? " key" : ""}"${x.title ? ` title="${esc(x.title)}"` : ""}>`
+  + `<span>${x.label}</span><b${x.cls ? ` class="${esc(x.cls)}"` : ""}>${esc(x.value)}</b></div>`;
+
+// strona typu w bazie osiągów (details.aspx?ICAO=…) obok strony głównej z config
 let PERF = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.aspx";
 const perfUrl = (icao) => PERF.replace(/default\.aspx.*$/i, `details.aspx?ICAO=${encodeURIComponent(icao)}`);
 
-// Rekord w dwóch liniach: kod ICAO duży po lewej, reszta jednolitą czcionką (jeden rekord na typ ICAO)
-function record(a, i) {
+// Rekord: nazwa typu w linii tytułu (z odnośnikiem do osiągów), pod nią kratki z wartościami
+export function record(a, i) {
   return `<div class="ac-rec" data-i="${i}">
-    <div class="ac-icao">${esc(a.icao)}</div>
-    <div class="ac-l1">${esc(a.manufacturer || "")} ${esc(a.model)}
-      <a class="perf" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener" title="EUROCONTROL Aircraft Performance Database">performance ↗</a></div>
-    <div class="ac-l2">${esc(a.description || "–")} · WTC <b>${esc(a.wtc || "–")}</b> · RECAT-EU <b class="recat-${esc(a.recat)}">${esc(a.recat || "–")}</b>
-      · span ${fmt(a.wingspan, 1, " m")} · len ${fmt(a.length, 1, " m")} · hgt ${fmt(a.height, 1, " m")} · MTOW ${a.mtow ? Math.round(a.mtow / 100) / 10 + " t" : "–"}</div>
+    <div class="ac-name"><span>${esc(`${a.manufacturer || ""} ${a.model || ""}`.trim() || a.icao)}</span>
+      <a class="ac-perf" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener">Performance ↗</a></div>
+    <div class="ac-boxes">${boxes(a).map(box).join("")}</div>
   </div>`;
+}
+
+// Rozwinięty rekord (klik): zdjęcie, opis typu i kategorii RECAT-EU słownie, odnośniki do kolejnych zdjęć
+// i do wyszukiwarki bazy osiągów (dla typów, których strony osiągów nie ma)
+export function detail(a) {
+  const q = encodeURIComponent(searchName(a));
+  const lines = [a.description && `${a.description} – ${describe(a.description)}`,
+    a.recat && RECAT[a.recat] && `RECAT-EU ${a.recat} – ${RECAT[a.recat]}`].filter(Boolean);
+  return `<div class="ac-detail">
+    <div class="photo-box"><span class="hint">Loading photo…</span></div>
+    <div class="ac-info">${lines.map((l) => `<div>${esc(l)}</div>`).join("")}
+      <div class="ac-links"><a href="https://www.jetphotos.com/photo/keyword/${q}" target="_blank" rel="noopener">More photos ↗</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${q}" target="_blank" rel="noopener">Image search ↗</a>
+        <a href="${esc(PERF)}" target="_blank" rel="noopener">Performance search ↗</a></div></div>
+  </div>`;
+}
+
+// Podpis pod zdjęciem: odnośnik do strony zdjęcia (autor i licencja) nazwany wg funkcji, bez nazwy serwisu;
+// sam tekst podpisu tylko przy własnym zdjęciu bez strony (np. autor)
+export function photoCredit(p) {
+  if (p.page) return `<a href="${esc(p.page)}" target="_blank" rel="noopener">Photo page ↗</a>`;
+  return p.credit ? esc(p.credit) : "";
 }
 
 export default {
   mount(root, ctx) {
     PERF = ctx.config.links?.performance_db || PERF;
     let prefix = "";
-    let maker = ""; // aktywny przycisk producenta; litera albo ponowny klik wraca do zwykłego widoku
+    // aktywny przycisk producenta; litera albo ponowny klik wraca do zwykłego widoku
+    let maker = "";
     const letters = letterMenu(root, (l) => { prefix = l; setMaker(""); load(); });
     const pane = h(`<div class="pane ac-pane">
       <nav class="ac-makers">${MAKERS.map(([k, l]) => `<button class="gbtn" data-m="${k}" title="All ${l} types">${l}</button>`).join("")}</nav>
-      <div class="split">
-      <div class="list">
-        <div class="toolbar">
-          <input type="search" class="q" placeholder="ICAO type, model, manufacturer…" size="32">
-          <select class="wtc"><option value="">WTC: all</option><option>L</option><option>M</option><option>H</option><option>J</option></select>
-          <select class="recat"><option value="">RECAT-EU: all</option>${Object.entries(RECAT).map(([k, v]) => `<option value="${k}">${k} – ${v}</option>`).join("")}</select>
-          <span class="hint count"></span>
-        </div>
-        <div class="ac-list"></div>
+      <div class="toolbar">
+        <input type="search" class="q" placeholder="ICAO type, model, manufacturer…" size="32">
+        <select class="wtc"><option value="">WTC: all</option><option>L</option><option>M</option><option>H</option><option>J</option></select>
+        <select class="recat"><option value="">RECAT-EU: all</option>${Object.entries(RECAT).map(([k, v]) => `<option value="${k}">${k} – ${v}</option>`).join("")}</select>
+        <span class="hint count"></span>
       </div>
-      <div class="detail"><div class="card"><p class="hint">Select a type from the list to show its details and photo.</p></div></div>
-    </div></div>`);
+      <div class="ac-list"></div>
+    </div>`);
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
     let rows = [];
     let seq = 0;
+    let current = null;
 
     // przyciski producentów: aktywny podświetlony, w podmenu liter wtedy żadna litera nie jest zaznaczona
     const setMaker = (m) => {
@@ -109,12 +177,14 @@ export default {
         $(".ac-list").innerHTML = `<p class="error">Could not load aircraft types: ${esc(e.message)}</p>`;
         return;
       }
-      if (my !== seq) return; // starsza odpowiedź przyszła po nowszej
+      // starsza odpowiedź przyszła po nowszej
+      if (my !== seq) return;
       const [, label, primary] = MAKERS.find(([k]) => k === maker) || [];
       const groups = label ? makerGroups(data, primary) : [];
       rows = label ? groups.flatMap(([, list]) => list) : data;
+      current = null;
       $(".count").textContent = `${label ? label + ": " : ""}${types(rows.length)}${groups.length > 1 ? ` in ${groups.length} groups` : ""}`
-        + (rows.length === 500 ? " (first 500 shown)" : "");
+        + (rows.length === 500 ? " (first 500 shown)" : "") + (rows.length ? " · click a type for its photo" : "");
       let i = 0;
       $(".ac-list").innerHTML = !rows.length ? `<p class="hint ac-empty">No${label ? ` ${label}` : ""} types for these filters.</p>`
         : !label ? rows.map(record).join("")
@@ -122,56 +192,48 @@ export default {
             ${list.map((a) => record(a, i++)).join("")}</div>`).join("");
     };
 
-    const show = (a) => {
-      $(".detail").innerHTML = `<div class="card">
-        <h3 class="ac-title"><span class="ac-icao" style="font-size:26px">${esc(a.icao)}</span> ${esc(a.manufacturer)} ${esc(a.model)}</h3>
-        <div class="perf-links"><a class="btn" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener">EUROCONTROL Aircraft Performance: ${esc(a.icao)} ↗</a>
-          <a class="hint" href="${esc(PERF)}" target="_blank" rel="noopener">database search ↗</a></div>
-        <div class="photo-box"><span class="hint">Loading photo…</span></div>
-        <dl class="props">
-          <dt>Description</dt><dd>${describe(a.description)}</dd>
-          <dt>WTC (ICAO)</dt><dd>${esc(a.wtc || "–")}</dd>
-          <dt>WTG (ICAO)</dt><dd>${esc(a.wtg || "–")}</dd>
-          <dt>RECAT-EU</dt><dd class="recat-${esc(a.recat)}">${esc(a.recat || "–")} ${a.recat ? "– " + RECAT[a.recat] : ""}</dd>
-          <dt>Wingspan</dt><dd>${fmt(a.wingspan, 2, " m")}</dd>
-          <dt>Length</dt><dd>${fmt(a.length, 2, " m")}</dd>
-          <dt>Height</dt><dd>${fmt(a.height, 2, " m")}</dd>
-          <dt>MTOW / MLW</dt><dd>${fmt(a.mtow, 0, " kg")} / ${range(a.mlw, a.mlw_max, 0, " kg")}</dd>
-          <dt>Engines</dt><dd>${engines(a)}</dd>
-          <dt>Ceiling</dt><dd>${range(a.ceiling_ft, a.ceiling_ft_max, 0, " ft")}</dd>
-          <dt>Vmo / Mmo</dt><dd>${range(a.vmo_kt, a.vmo_kt_max, 0, " kt")} / ${mach(a.mmo, a.mmo_max)}</dd>
-          <dt>IATA</dt><dd>${esc(a.iata || "–")}</dd>
-        </dl>
-        <p class="hint">${esc(sources(a))}</p></div>`;
-      const box = $(".photo-box");
-      const links = `<a href="https://www.jetphotos.com/photo/keyword/${encodeURIComponent(searchName(a))}" target="_blank" rel="noopener">JetPhotos ↗</a> ·
-        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchName(a))}" target="_blank" rel="noopener">Google Images ↗</a>`;
+    // rozwinięty rekord przy dolnej krawędzi listy przewijany do widoku (najmniejszy ruch)
+    const reveal = (rec) => rec.scrollIntoView({ block: "nearest" });
+    // zdjęcie w rozwiniętym rekordzie; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana
+    const photo = (rec, a) => {
+      const pb = rec.querySelector(".photo-box");
       api(`/api/aircraft/${a.id}/photo`).then((p) => {
         if (current !== a) return;
-        box.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}"><div class="hint">${p.page ? `<a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.credit)}</a>` : esc(p.credit)} · ${links}</div>`;
+        const credit = photoCredit(p);
+        pb.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">${credit ? `<div class="hint">${credit}</div>` : ""}`;
+        // zdjęcie wydłuża rekord dopiero po wczytaniu
+        pb.querySelector("img").addEventListener("load", () => { if (current === a) reveal(rec); }, { once: true });
       }).catch((e) => {
         if (current !== a) return;
-        box.innerHTML = `<p class="hint">${esc(e.message)}. To use your own photo, put it in <span class="mono">data/photos/${esc(a.icao)}.jpg</span>. ${links}</p>`;
+        pb.classList.add("none");
+        pb.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
       });
     };
-    let current = null;
 
+    // klik w rekord rozwija go (zdjęcie i opis), ponowny klik zwija; odnośniki i treść rozwinięcia bez zmian
     $(".ac-list").addEventListener("click", (e) => {
+      if (e.target.closest("a, .ac-detail")) return;
       const rec = e.target.closest(".ac-rec[data-i]");
       if (!rec) return;
-      pane.querySelectorAll(".ac-rec.selected").forEach((x) => x.classList.remove("selected"));
+      const was = rec.classList.contains("selected");
+      pane.querySelectorAll(".ac-rec.selected").forEach((x) => { x.classList.remove("selected"); x.querySelector(".ac-detail")?.remove(); });
+      current = null;
+      if (was) return;
       rec.classList.add("selected");
       current = rows[rec.dataset.i];
-      show(current);
+      rec.insertAdjacentHTML("beforeend", detail(current));
+      reveal(rec);
+      photo(rec, current);
     });
     pane.querySelector(".ac-makers").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-m]");
       if (!b) return;
       // ponowny klik: zwykły widok (wszystkie); nowy producent: wszystkie jego typy, więc bez tekstu wyszukiwania
       if (b.dataset.m === maker) { prefix = ""; setMaker(""); letters.set(""); } else { $(".q").value = ""; setMaker(b.dataset.m); }
-      $(".list").scrollTop = 0;
+      $(".ac-list").scrollTop = 0;
       load();
-      remember("aircraft", maker ? "maker/" + maker : "");   // krok do cofnięcia (←), jak litery
+      // krok do cofnięcia (←), jak litery
+      remember("aircraft", maker ? "maker/" + maker : "");
     });
     $(".q").addEventListener("input", debounce(load));
     $(".wtc").addEventListener("change", load);

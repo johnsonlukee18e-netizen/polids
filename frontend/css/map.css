@@ -1,7 +1,7 @@
 /* MAP (runda 8): warstwy przestrzeni wg poziomu, listy wyboru sektorów, dymek "co jest w tym miejscu",
    kolory samolotów wg odlot / przylot / tranzyt. Bez poświaty: etykiety na pełnym ciemnym tle, dymki bez cienia.
    0.12.5 (Marek): ostre krawędzie jak w systemach PAŻP (border-radius 0 poza kropkami), mniejsze symbole na mapie,
-   etykiety samolotów jak w PEGASUS_21. */
+   etykiety samolotów jak w PEGASUS_21 (0.12.6: tylko po najechaniu). */
 
 /* --- poziom i przełączniki przestrzeni */
 .as-card .as-lvl { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; }
@@ -101,25 +101,17 @@
 .swatch.atz { background: rgba(224,138,214,.2); border: 1px solid #e08ad6; }
 .swatch.nb { border: 1px dashed #8d99a6; }
 
-/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu */
-.leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: 640px; pointer-events: none; }
+/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu. Szerokość wg wierszy (każdy w jednej
+   linijce, z godziną "since"), najwyżej szerokość mapy; dopiero na wąskiej mapie zawija się ostatnia kolumna (kto) */
+.leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: calc(100% - 8px); pointer-events: none; }
 .leaflet-tooltip.as-tip::before { display: none; }
 .as-tip td { padding: 1px 5px; }
+.as-tip td:last-child { white-space: normal; }
 .as-tip td.lv { color: var(--yellow); }
 .as-tip .fq { color: #9dff6e; font-weight: 700; }
 .as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 0; font: 700 10px/14px var(--mono); text-align: center; }
 .as-k.as-acc { color: #5fd23a; } .as-k.as-tma { color: #7f95ff; } .as-k.as-ctr { color: #ff6b6b; } .as-k.as-fis { color: #35c4b0; }
 .as-k.as-cta { color: #c9b26b; } .as-k.as-atz { color: #e08ad6; } .as-k.as-nb, .as-k.as-oth { color: #aab4bd; }
-/* kolejność przejmowania TMA / CTA / CTR: jedna linia stanowisk (zawijana) pod wierszem przestrzeni */
-.as-tip tr.as-chr td { padding: 0 5px 4px; }
-.as-ch { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 3px; max-width: 600px; }
-.asc { padding: 0 4px; border: 1px solid #2f3a2f; border-radius: 0; font: 11px/15px var(--mono); color: #c3cdc3; white-space: nowrap; }
-.asc b { font-weight: 700; }
-.asc i { font-style: normal; }
-.asc.on { color: #9dff6e; border-color: #2f6b2f; }
-.asc.off { color: #6a736a; border-color: #1f261f; }
-.asc.own { color: #062b00; background: #5fd23a; border-color: #5fd23a; }
-.asc-src { padding: 0 2px 0 4px; font: 10px/15px var(--mono); color: var(--yellow); white-space: nowrap; }
 /* podpowiedź pod liczbą przestrzeni (TMA / CTR poza wybranym poziomem) */
 .sector-info .as-note { color: var(--yellow); }
 
@@ -173,19 +165,21 @@
 .map.light .acicon.arr svg { fill: #a87c00; stroke: #fff; }
 .map.light .acicon.trn svg { fill: #2a3036; stroke: #fff; }
 .map.light .acicon.sel svg { fill: #d4380d; }
-/* etykieta jak w PEGASUS_21 (airspace.js p21Lines, p21Html): bez ramki, tła i poświaty, linijki czcionką o stałej
-   szerokości (spacje w linijce to kolumny); sam znak wywoławczy (b.cs) na zielono, prędkość (b.gs) i linijki 2-4
-   na biało jak na etykiecie DOM004 z P21; wybrany lot: znak na pomarańczowo */
-.mapwrap .acicon span.p21 { left: 12px; top: -7px; padding: 0; background: none; border-radius: 0; font: 11px/12px var(--mono); }
-.acicon span.p21 i, .p21-sample i { display: block; font-style: normal; white-space: pre; color: #f4f6f8; }
-.acicon span.p21 b, .p21-sample b { font-weight: inherit; }
-.acicon span.p21 b.cs, .p21-sample b.cs { color: #00ff00; }
-.acicon.sel span.p21 b.cs { color: #ff9f1a; }
-.map.light .acicon span.p21 { background: none; }
-.map.light .acicon span.p21 i { color: #1d2329; }
-.map.light .acicon span.p21 b.cs { color: #0a7a36; }
-.map.light .acicon.sel span.p21 b.cs { color: #b02e08; }
-.p21-sample { display: block; padding: 2px 3px; background: #000; font: 10px/11px var(--mono); }
+/* etykieta jak w PEGASUS_21 (airspace.js p21Lines, p21Html), od 0.12.6 tylko w okienku po najechaniu na samolot
+   (wybrany lot: cały czas): nieprzezroczyste czarne tło z cienką ramką, czytelne na każdym podkładzie, bez cienia
+   i poświaty. Linijki czcionką o stałej szerokości (spacje w linijce to kolumny); sam znak wywoławczy (b.cs) na
+   zielono, prędkość (b.gs) i linijki 2-3 na biało jak na etykiecie DOM004 z P21; wybrany lot: znak i ramka na
+   pomarańczowo. Bez marginesu, który Leaflet dodaje dymkom z boku: odstęp od samolotu to samo przesunięcie dymka
+   (AC_LABEL_GAP w airspace.js) */
+.leaflet-tooltip.ac-lbl { margin: 0; padding: 2px 4px; background: #000; border: 1px solid #4a584a; border-radius: 0; box-shadow: none;
+  color: #f4f6f8; font: 11px/12px var(--mono); }
+.leaflet-tooltip.ac-lbl::before { display: none; }
+.leaflet-tooltip.ac-lbl.sel { border-color: #ff9f1a; }
+.ac-lbl i, .p21-sample i { display: block; font-style: normal; white-space: pre; color: #f4f6f8; }
+.ac-lbl b, .p21-sample b { font-weight: inherit; }
+.ac-lbl b.cs, .p21-sample b.cs { color: #00ff00; }
+.ac-lbl.sel b.cs { color: #ff9f1a; }
+.p21-sample { display: block; padding: 2px 3px; background: #000; border: 1px solid #4a584a; font: 10px/11px var(--mono); }
 .lgx .lgx-i.p21 { align-items: flex-start; }
 .ac-key { display: flex; gap: 10px; margin: -2px 0 2px 38px; font: 11px var(--mono); color: var(--muted); }
 .ac-key span { display: inline-flex; align-items: center; gap: 2px; }
@@ -199,7 +193,7 @@
    tylko tam, gdzie to kropka */
 .mapwrap .btn, .mapwrap .field, .mapwrap select, .mapwrap textarea, .mapwrap .ms-card, .mapwrap .ms-card h4, .mapwrap .seg,
 .mapwrap .swatch, .mapwrap .lg-line, .mapwrap .ab, .mapwrap .atcb, .mapwrap .fs, .mapwrap .vf-bar, .mapwrap .vf-row,
-.mapwrap .maplabel > div, .mapwrap .acicon span, .mapwrap .leaflet-tooltip, .mapwrap .leaflet-popup-content-wrapper,
+.mapwrap .maplabel > div, .mapwrap .leaflet-tooltip, .mapwrap .leaflet-popup-content-wrapper,
 .mapwrap .leaflet-container .leaflet-bar, .mapwrap .leaflet-container .leaflet-bar a,
 .mapwrap .leaflet-container .leaflet-bar a:first-child, .mapwrap .leaflet-container .leaflet-bar a:last-child,
 .mapwrap .leaflet-control.viff-chart, .mapwrap .leaflet-control.fd-panel, .mapwrap .leaflet-control-attribution { border-radius: 0; }

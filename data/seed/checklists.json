@@ -1,5 +1,5 @@
 {
- "_uwaga": "Checklisty z zakładki CHECKLIST; 'open-position' jest też w AERODROME. Format jak w vatiris (github.com/minsulander/vatiris, frontend/src/data/checklist, GPL-3.0): punkt 'Co...AKCJA', sections = {indeks pierwszego punktu: nagłówek}. Dozwolone znaczniki: <b> <i> <tt>.",
+ "_uwaga": "Checklisty z OTHER › CHECKLIST (do 0.12.5 osobna zakładka CHECKLIST, kolejność = kolejność w podmenu); 'open-position' jest też w AERODROME › OVERVIEW. Format jak w vatiris (github.com/minsulander/vatiris, frontend/src/data/checklist, GPL-3.0): punkt 'Co...AKCJA' (bez '...' sam tekst), sections = {indeks pierwszego punktu: nagłówek}, numbered: true numeruje punkty. Dozwolone znaczniki: <b> <i> <tt>. 'controller-tips': TOP 5 TIPS dla kontrolerów z plakatu SKYbrary (bookshelf/116.pdf), lewa strona, bez źródła w interfejsie.",
  "aerodrome": "open-position",
  "checklists": [
   {
@@ -43,7 +43,7 @@
     "ATC channel <tt>/closing in 10</tt> and <tt>.break</tt>...SEND",
     "Above controller: traffic handoff, location, status...COORDINATE",
     "Pilots: contact above/downstream controller or advisory...TRANSMIT & TRANSFER",
-    "Voice & text announcement: <i>&lt;station&gt; now closed</i>...TRANSMIT",
+    "Voice & text announcement: <i><station> now closed</i>...TRANSMIT",
     "ATC channel <tt>/closed</tt>...SEND",
     "EuroScope, audio client, VACS...DISCONNECT & CLOSE"
    ]
@@ -93,6 +93,19 @@
     "Runway configuration EuroScope...CHANGE",
     "ATIS...UPDATE",
     "Amend departure clearances...TRANSMIT"
+   ]
+  },
+  {
+   "id": "controller-tips",
+   "label": "TIPS",
+   "title": "Tips for controllers",
+   "numbered": true,
+   "items": [
+    "Frequency changes should be kept separate from other instructions",
+    "Avoid issuing more than two instructions in one transmission",
+    "If it is urgent – sound urgent",
+    "Avoid distractions – especially the telephone",
+    "If you are unsure, always check"
    ]
   }
  ]

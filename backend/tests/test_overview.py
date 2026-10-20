@@ -38,7 +38,7 @@ def test_tl_fir_level():
     fir = tl.fir_level(qnhs)
     assert (fir["fl"], fir["text"], fir["qnh_min"], fir["qnh_icao"]) == (90, "FL090", 994, "EPRZ")
     assert fir["low"] == ["EPKK", "EPRZ"] and fir["stations"] == 4 and fir["missing"] == ["EPSC"]
-    assert fir["ta_ft"] == 6500 and "om.plvacc.pl" in fir["source_url"]
+    assert fir["ta_ft"] == 6500 and "source" not in fir and "source_url" not in fir
     ok = tl.fir_level({"EPWA": 1009, "EPKK": 996})
     assert (ok["fl"], ok["text"], ok["low"], ok["missing"], ok["uncertain"]) == (80, "FL080", [], [], False)
     assert (ok["threshold_hpa"], ok["normal"], ok["raised"]) == (995, "FL080", "FL090")
@@ -126,7 +126,7 @@ def test_ecfmp_zapas_z_viff(monkeypatch):
     monkeypatch.setattr(viff, "_get", viff_get)
     out = __import__("asyncio").run(ecfmp.measures(overview.AERODROMES, NOW))
     m = out["measures"][0]
-    assert out["source"] == "vIFF" and "ECFMP unavailable" in out["error"]
+    assert out["source"] == "vIFF" and out["error"] is None  # 0.12.6: dane z zapasu bez dopisku, skąd są
     assert m["value"] == 180 and m["value_text"] == "every 3 min" and m["state"] == "active"
     assert m["start"] == "2026-10-08T14:30:00+00:00" and m["end"] == "2026-10-08T17:30:00+00:00"
 
@@ -250,7 +250,8 @@ def client(monkeypatch_module):
     monkeypatch_module.setattr(ecfmp, "fetch_text", ecfmp_fetch)
     # zegar stały: dane testowe (NOTAM-y, środki ECFMP) mają daty z 08.10.2026, a router woła overview() bez now
     real = overview.overview
-    monkeypatch_module.setattr(overview, "overview", lambda db, position=None, now=None: real(db, position, now or NOW))
+    monkeypatch_module.setattr(overview, "overview",
+                               lambda db, position=None, now=None, **kw: real(db, position, now or NOW, **kw))
     with TestClient(main.app) as c:
         yield c
 
@@ -322,7 +323,7 @@ def test_overview_tl_niskie_qnh_poza_filtrem(client, monkeypatch):
 
 
 def test_overview_awaria_zrodel(client, monkeypatch):
-    """Awaria vIFF, ECFMP i METAR-u nie psuje reszty: każdy panel ma swój komunikat po polsku."""
+    """Awaria vIFF, ECFMP i METAR-u nie psuje reszty: każdy panel ma swój komunikat (bez nazwy źródła danych)."""
     async def boom_wx(icaos):
         raise UpstreamError("metar.vatsim.net: timeout")
 
@@ -336,9 +337,12 @@ def test_overview_awaria_zrodel(client, monkeypatch):
     monkeypatch.setattr(viff, "_get", boom_viff)
     monkeypatch.setattr(ecfmp, "fetch_text", boom_ecfmp)
     d = client.get("/api/overview?position=EPWA_APP").json()
-    assert "METAR" in d["wx_error"] and "vIFF" in d["monitor_error"]
-    assert "ECFMP unavailable" in d["flow"]["error"] and d["flow"]["measures"] == []
-    assert "vIFF" in d["flow"]["viff_error"]
+    assert d["wx_error"] == "METAR unavailable" and d["monitor_error"] == "Data unavailable"
+    assert d["flow"]["error"] == "Flow measures unavailable" and d["flow"]["measures"] == []
+    assert d["flow"]["viff_error"] == "Sector regulations unavailable"
+    # komunikaty bez adresów serwerów i nazw dostawców
+    errs = " ".join(str(d[k]) for k in ("wx_error", "monitor_error")) + d["flow"]["error"] + d["flow"]["viff_error"]
+    assert not any(x in errs for x in ("vIFF", "ECFMP", "viffsys", "timeout", "http"))
     # bez METAR-ów nie ma poziomu przejściowego (ATIS go nie zastępuje)
     assert d["tl"]["fl"] is None and "no QNH" in d["tl"]["rule"] and d["tl"]["text"] == "–"
     # NOTAM-y i ATIS działają dalej
@@ -348,7 +352,7 @@ def test_overview_awaria_zrodel(client, monkeypatch):
 
 
 def test_overview_awaria_notam_vatsim_taf(client, monkeypatch):
-    """Awaria serwera NOTAM, data feedu VATSIM i TAF-ów: odpowiedź 200, komunikaty po polsku, jeden błąd NOTAM
+    """Awaria serwera NOTAM, data feedu VATSIM i TAF-ów: odpowiedź 200, komunikaty bez nazwy źródła, jeden błąd NOTAM
     dla wszystkich lotnisk zamiast osobnej linii na każde."""
     async def boom_notam(icao):
         raise UpstreamError(f"https://cv.plvacc.pl/notam/get-icao-format?icao={icao}&read=true: timeout")
@@ -365,8 +369,8 @@ def test_overview_awaria_notam_vatsim_taf(client, monkeypatch):
     r = client.get("/api/overview?position=EPWA_APP")
     assert r.status_code == 200
     d = r.json()
-    assert d["notams"] == [] and d["notam_error"] == "NOTAM server: EPLL, EPMO, EPRA, EPWA: timeout"
-    assert "VATSIM" in d["network_error"] and "TAF" in d["wx_error"]
+    assert d["notams"] == [] and d["notam_error"] == "NOTAMs unavailable: EPLL, EPMO, EPRA, EPWA"
+    assert d["network_error"] == "Network data unavailable" and d["wx_error"] == "TAF unavailable"
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
     assert wa["atis"] is None and wa["metar"] and wa["taf"] is None and d["tl"]["fl"] == 80
 
@@ -385,3 +389,128 @@ def test_overview_viff_inny_ksztalt(client, monkeypatch):
     wa = next(a for a in r.json()["aerodromes"] if a["icao"] == "EPWA")["monitor"]
     assert wa["now"] == {"entries": None, "cap": None} and wa["rate"] is None
     assert wa["regulated"][0]["ctot"] == "1621" and wa["regulated"][0]["delay"] == 12
+
+
+# --- pas w użyciu i MINE / ALL (0.12.6) ---------------------------------------------------------------------------
+
+def test_covered_by_pierwszy_online_od_app():
+    """Lotnisko jest moje, gdy w kolejności przejmowania jestem pierwszy online albo nikt inny z niej nie jest online."""
+    wa = [["EPWA_APP", "EPWA_N_APP", "EPWW_C_CTR", "EPWW_S_CTR", "EPWW_ALL_CTR"]]
+    assert overview.covered_by(wa, "EPWW_ALL_CTR", set()) is None
+    assert overview.covered_by(wa, "EPWW_ALL_CTR", {"EPWW_S_CTR"}) == "EPWW_S_CTR"
+    assert overview.covered_by(wa, "EPWW_ALL_CTR", {"EPWW_S_CTR", "EPWA_APP"}) == "EPWA_APP"
+    # stanowisko dalej w kolejności niż ja nie zabiera lotniska
+    assert overview.covered_by(wa, "EPWW_C_CTR", {"EPWW_S_CTR", "EPWW_ALL_CTR"}) is None
+    # mnie nie ma w kolejności: lotnisko obsługuje każdy, kto z niej jest online
+    assert overview.covered_by(wa, "EPPO_S_APP", {"EPWW_ALL_CTR"}) == "EPWW_ALL_CTR"
+    assert overview.covered_by(wa, "EPPO_S_APP", {"EPKK_APP"}) is None
+    # kilka kolejności (EPKK_CTR07 / EPKK_CTR25): wystarczy, że w jednej jestem pierwszy
+    kk = [["EPKK_APP", "EPWW_J_CTR"], ["EPKK_E_APP", "EPKK_APP", "EPWW_J_CTR"]]
+    assert overview.covered_by(kk, "EPKK_E_APP", {"EPKK_APP"}) is None
+    assert overview.covered_by(kk, "EPWW_J_CTR", {"EPKK_E_APP"}) is None
+    assert overview.covered_by(kk, "EPWW_J_CTR", {"EPKK_APP"}) == "EPKK_APP"
+    assert overview.covered_by([], "EPWW_J_CTR", {"EPKK_APP"}) is None
+
+
+def test_coverage_orders_z_pliku_ese(client):
+    from backend.app.database import SessionLocal
+    with SessionLocal() as db:
+        orders = overview.coverage_orders(db)
+        dirs = overview.directors(overview._slices(db))
+    assert set(orders) == set(overview.AERODROMES)
+    assert {"EPWA_F_APP", "EPKK_KK_APP"} <= dirs and not dirs & {"EPWA_APP", "EPKK_APP", "EPKK_E_APP", "EPGD_APP"}
+    # od poziomu APP w górę: bez wieży, GND i DEL lotniska i bez dyrektora (EPWA_F_APP, EPKK_KK_APP)
+    assert orders["EPWA"][0][:4] == ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP", "EPWW_C_CTR"]
+    assert all(not cs.startswith(("EPWA_TWR", "EPWA_GND", "EPWA_DEL", "EPWA_F_")) for o in orders["EPWA"] for cs in o)
+    assert len(orders["EPKK"]) == 2 and all(o[-2:] == ["EPWW_ALL_CTR", "EPWW_ALH_CTR"] for o in orders["EPKK"])
+    assert not any("EPKK_KK_APP" in o for o in orders["EPKK"])
+    # lotnisko bez APP: od razu sektory ACC
+    assert orders["EPSC"] == [["EPWW_DBT_CTR", "EPWW_DBF_CTR", "EPWW_N_CTR", "EPWW_ALL_CTR", "EPWW_ALH_CTR"]]
+
+
+def test_online_others(client):
+    from backend.app.database import SessionLocal
+    from backend.app.models import AtcPosition
+    feed = {"controllers": [{"callsign": "EPWW_S_CTR", "frequency": "123.625", "cid": 11},
+                            {"callsign": "EPWW_CTR", "frequency": "125.450", "cid": 12},       # ALL na częstotliwości
+                            {"callsign": "EPWA_APP", "frequency": "128.805", "cid": 13},
+                            {"callsign": "EPWA_OBS", "frequency": "199.998", "cid": 14},
+                            {"callsign": "EPKK_ATIS", "frequency": "118.800", "cid": 15}],
+            "atis": [{"callsign": "EPWA_ATIS", "frequency": "120.455", "cid": 16}]}
+    with SessionLocal() as db:
+        positions = list(db.scalars(__import__("sqlalchemy").select(AtcPosition)))
+    # dopasowanie jak w EuroScope: EPWW_CTR na 125.450 to EPWW_ALL_CTR, czyli moje stanowisko
+    assert overview.online_others(feed, positions, "EPWW_ALL_CTR") == {"EPWW_S_CTR", "EPWA_APP"}
+    # moje połączenie (CID) się nie liczy, nawet na innym stanowisku
+    assert overview.online_others(feed, positions, "EPWW_ALL_CTR", cid="11") == {"EPWA_APP"}
+    assert overview.online_others({}, positions, "EPWW_ALL_CTR") == set()
+
+
+def test_overview_mine_all(client, monkeypatch):
+    """EPWW_ALL_CTR przy EPWW_S_CTR i EPWA_APP online: lotniska, które obsługują oni, mają covered_by (MINE je ukrywa)."""
+    feed = {**FEED, "controllers": FEED["controllers"] + [
+        {"callsign": "EPWW_S_CTR", "frequency": "123.625", "name": "Ola", "cid": 2}]}
+
+    async def fake_feed():
+        return feed
+
+    monkeypatch.setattr(vatsim_api, "get_feed", fake_feed)
+    d = client.get("/api/overview?position=EPWW_ALL_CTR").json()
+    by = {a["icao"]: a["covered_by"] for a in d["aerodromes"]}
+    assert d["airports"] == overview.AERODROMES        # serwer zwraca wszystkie, przełącznik jest we froncie
+    assert {i for i, cs in by.items() if cs == "EPWA_APP"} == {"EPLL", "EPMO", "EPRA", "EPWA"}
+    assert by["EPKK"] == by["EPRZ"] == by["EPLB"] == "EPWW_S_CTR"
+    # S CTR nie ma w kolejności EPGD, EPSC i EPSY przed ALL: zostają moje
+    assert by["EPGD"] is None and by["EPSC"] is None and by["EPSY"] is None
+    # EPWA_APP widzi swoje lotniska (EPWW_S_CTR jest dalej w kolejności)
+    app = client.get("/api/overview?position=EPWA_APP").json()
+    assert [a["covered_by"] for a in app["aerodromes"]] == [None] * 4
+    # dyrektor pracuje przy pasie razem z APP: EPWA_APP online nie zabiera mu EPWA (MINE nie jest puste)
+    f = client.get("/api/overview?position=EPWA_F_APP").json()
+    assert [(a["icao"], a["covered_by"]) for a in f["aerodromes"]] == [("EPWA", None)]
+    # bez stanowiska i przy wieży nie liczymy
+    assert all(a["covered_by"] is None for a in client.get("/api/overview").json()["aerodromes"])
+    assert client.get("/api/overview?position=EPKK_TWR").json()["aerodromes"][0]["covered_by"] is None
+
+
+def test_overview_mine_moj_cid(client, monkeypatch):
+    """Zalogowany użytkownik online jako EPWW_S_CTR, który wybrał EPWW_ALL_CTR: jego połączenie nie zabiera lotnisk."""
+    feed = {**FEED, "controllers": [{"callsign": "EPWW_S_CTR", "frequency": "123.625", "name": "Ja", "cid": 7}]}
+
+    async def fake_feed():
+        return feed
+
+    monkeypatch.setattr(vatsim_api, "get_feed", fake_feed)
+    from backend.app.database import SessionLocal
+    with SessionLocal() as db:
+        mine = __import__("asyncio").run(overview.overview(db, "EPWW_ALL_CTR", NOW, cid="7"))
+        other = __import__("asyncio").run(overview.overview(db, "EPWW_ALL_CTR", NOW, cid="8"))
+    assert all(a["covered_by"] is None for a in mine["aerodromes"])
+    assert next(a for a in other["aerodromes"] if a["icao"] == "EPKK")["covered_by"] == "EPWW_S_CTR"
+
+
+def test_overview_pas_w_uzyciu_jak_aerodrome(client, monkeypatch):
+    """Pas w użyciu w OVERVIEW: z ATIS (litera), a bez ATIS pas preferowany – te same wartości co AERODROME › INFO."""
+    from backend.app.routers import aerodromes
+
+    async def feed():
+        return FEED
+
+    async def metars(icaos):
+        return {i: METARS[i] for i in icaos if i in METARS}
+
+    async def tafs(icaos):
+        return {}
+
+    monkeypatch.setattr(aerodromes, "get_feed", feed)
+    monkeypatch.setattr(aerodromes, "get_metars", metars)
+    monkeypatch.setattr(aerodromes, "get_tafs", tafs)
+    d = client.get("/api/overview?position=EPWA_APP").json()
+    rw = {a["icao"]: a["runway"] for a in d["aerodromes"]}
+    # EPWA: ATIS K "RWY IN USE 33"
+    assert (rw["EPWA"]["arr"], rw["EPWA"]["dep"], rw["EPWA"]["source"], rw["EPWA"]["letter"]) == ("33", "33", "ATIS", "K")
+    # EPMO bez ATIS: pas preferowany z powodem wyboru, ten sam co w AERODROME
+    assert rw["EPMO"]["source"] == "SUGGESTED" and rw["EPMO"]["letter"] is None and rw["EPMO"]["reason"]
+    for icao in ("EPWA", "EPMO", "EPLL"):
+        st = client.get(f"/api/aerodromes/{icao}/status").json()["runway_in_use"]
+        assert (rw[icao]["arr"], rw[icao]["dep"], rw[icao]["source"]) == (st["arr"], st["dep"], st["source"]), icao

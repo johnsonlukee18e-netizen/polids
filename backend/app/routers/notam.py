@@ -6,7 +6,7 @@ from ..database import get_db
 from ..models import Aerodrome, NavPoint
 from ..services.http_cache import UpstreamError
 from ..services.aerolist import display_name
-from ..services.notam import FIR, fir_notams, get_notams, notam_url
+from ..services.notam import FIR, error_text, fir_notams, get_notams
 
 router = APIRouter(prefix="/api/notam", tags=["notam"])
 
@@ -38,4 +38,5 @@ async def notams(icao: str):
     try:
         return await get_notams(icao)
     except UpstreamError as exc:
-        raise HTTPException(502, f"NOTAM server unavailable ({notam_url(icao)}): {exc}") from exc
+        # krótki opis bez adresu serwera (jak w SYT OP), np. "NOTAM server unavailable: no response (timeout)"
+        raise HTTPException(502, f"NOTAM server unavailable: {error_text(exc)}") from exc

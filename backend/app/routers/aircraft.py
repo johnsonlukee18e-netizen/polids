@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 
@@ -11,11 +12,13 @@ from ..models import AircraftType
 from ..services.photos import fetch_photo, local_photo, photo_query
 
 router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
+log = logging.getLogger("polids.aircraft")
 
-# jeden rekord na oznaczenie typu z ICAO_Aircraft.json; *_max: górna granica osiągów, gdy wersje typu się różnią
+# jeden rekord na oznaczenie typu z ICAO_Aircraft.json; *_max: górna granica osiągów, gdy wersje typu się różnią.
+# Kolumna source (pliki, z których zbudowano rekord) zostaje w bazie, do interfejsu nie idzie.
 FIELDS = ["id", "icao", "iata", "manufacturer", "model", "description", "wtc", "wtg", "recat", "wingspan", "length",
           "height", "mtow", "use", "engine_count", "engine_type", "mlw", "mlw_max", "ceiling_ft", "ceiling_ft_max",
-          "vmo_kt", "vmo_kt_max", "mmo", "mmo_max", "source"]
+          "vmo_kt", "vmo_kt_max", "mmo", "mmo_max"]
 
 
 def _dict(a: AircraftType) -> dict:
@@ -121,7 +124,9 @@ async def photo(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depen
     try:
         found = await fetch_photo(a.icao, photo_query(a.manufacturer, a.model))
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(502, f"Could not fetch the photo from Wikipedia: {exc}") from exc
+        # przyczyna w logu serwera; w interfejsie sam komunikat
+        log.warning("AIRCRAFT: zdjęcie %s niedostępne (%s)", a.icao, exc)
+        raise HTTPException(502, "Photo unavailable") from exc
     if not found:
         raise HTTPException(404, "No photo of this type")
     return found

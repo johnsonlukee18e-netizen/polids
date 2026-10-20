@@ -19,13 +19,14 @@ from ..services.lvp import evaluate as evaluate_lvp
 from ..services.positions import all_positions
 from ..services.metar import parse_metar, qfe_from_qnh
 from ..services.procedures import procedures, strip_board
-from ..services.runways import (config_now, equipment_for, runway_config, runway_heading, select_runways,
-                                wind_components)
-from ..services.vatsim import airport_traffic, atis_in_use, controller_info, get_feed, parse_atis
+from ..services.runways import atis_state, config_now, runway_in_use, runway_state
+from ..services.vatsim import airport_traffic, controller_info, get_feed
 from ..services.weather import get_metars, get_tafs
 from ..services.sun import sun_times
 
 router = APIRouter(prefix="/api/aerodromes", tags=["aerodrome"])
+# komunikat przy awarii data feedu VATSIM (bez adresu serwera i treści wyjątku)
+NET_ERROR = "Network data unavailable"
 
 
 def _ad(db: Session, icao: str) -> Aerodrome:
@@ -81,16 +82,17 @@ async def card(icao: str, db: Session = Depends(get_db)):
     if not entry and not known:
         raise HTTPException(404, f"Unknown aerodrome {code}")
 
-    async def safe(label, coro, errs=(UpstreamError,)):
+    async def safe(msg, coro, errs=(UpstreamError,)):
         try:
             return await coro, None
-        except errs as exc:
-            return None, f"{label}: {exc}"
+        except errs:
+            return None, msg
 
-    # METAR, TAF i data feed VATSIM naraz (karta odświeża się co minutę, każde źródło z własnym błędem)
+    # METAR, TAF i data feed VATSIM naraz (karta odświeża się co minutę, każde źródło z własnym błędem: komunikat bez
+    # adresu serwera i nazwy dostawcy)
     (metars, m_err), (tafs, t_err), (feed, net_error) = await asyncio.gather(
-        safe("METAR", get_metars([code])), safe("TAF", get_tafs([code])),
-        safe("VATSIM", get_feed(), (UpstreamError, ValueError)))
+        safe("METAR unavailable", get_metars([code])), safe("TAF unavailable", get_tafs([code])),
+        safe(NET_ERROR, get_feed(), (UpstreamError, ValueError)))
     errors = [e for e in (m_err, t_err) if e]
     metar, taf = (metars or {}).get(code), (tafs or {}).get(code)
     ctrls = (feed or {}).get("controllers", []) + (feed or {}).get("atis", [])
@@ -131,30 +133,18 @@ async def status(icao: str, db: Session = Depends(get_db)):
     metar = taf = None
     try:
         metar = (await get_metars([ad.icao])).get(ad.icao)
-    except UpstreamError as exc:
-        errors.append(f"METAR: {exc}")
+    except UpstreamError:
+        errors.append("METAR unavailable")
     try:
         taf = (await get_tafs([ad.icao])).get(ad.icao)
-    except UpstreamError as exc:
-        errors.append(f"TAF: {exc}")
+    except UpstreamError:
+        errors.append("TAF unavailable")
     parsed = parse_metar(metar) if metar else None
-
-    wd = parsed.wind_dir if parsed else None
-    ws = parsed.wind_speed if parsed else None
-    cfg = runway_config(ad.icao)
-    equipment = equipment_for(ad.icao, cfg)
-    rwys = [{"designator": r.designator, "heading": runway_heading(r.designator, r.heading_true),
-             "preferred": r.preferred, "length_m": r.length_m, "width_m": r.width_m, "surface": r.surface,
-             "equipment": equipment.get(r.designator, [])} for r in ad.runways]
-    for r in rwys:
-        r["headwind"], r["crosswind"] = wind_components(wd, ws, r["heading"])
     lvp = evaluate_lvp(parsed, ad.icao)
-    # odwołane LVP (stan CANCELLED) nie wymaga już podejścia precyzyjnego; zostaje IMC z kategorii METAR
-    low_vis = lvp["state"] if lvp["state"] in ("LVP", "PREP") else (
-        "IMC" if parsed and parsed.flight_category in ("IFR", "LIFR") else None)
     now = datetime.now(timezone.utc)
-    pref = select_runways(rwys, wd, ws, equipment=equipment, low_vis=low_vis, config=cfg,
-                          gust=parsed.wind_gust if parsed else None, metar=parsed, now=now)
+    # pasy, składowe wiatru i pas preferowany: ta sama funkcja co w OVERVIEW (services/runways.py)
+    rw = runway_state(ad, parsed, lvp, now)
+    rwys, pref, cfg = rw["runways"], rw["preferred"], rw["config"]
 
     # Kontrola w sieci VATSIM: ATIS (litera, pas w użyciu) i zalogowane stanowiska lotniska
     atc, atis, net_error = [], None, None
@@ -163,28 +153,10 @@ async def status(icao: str, db: Session = Depends(get_db)):
         stations = feed.get("controllers", []) + feed.get("atis", [])
         mine = [c for c in stations if c.get("callsign", "").startswith(ad.icao + "_")]
         atc = [controller_info(c) for c in mine if not c["callsign"].endswith("_ATIS")]
-        designators = [r["designator"] for r in rwys]
-        atis_parsed = []
-        for c in sorted((c for c in mine if c["callsign"].endswith("_ATIS")), key=lambda c: c["callsign"]):
-            info = parse_atis(c.get("text_atis"), designators, c.get("atis_code"))
-            kind = "dep" if "_D_ATIS" in c["callsign"] else "arr" if "_A_ATIS" in c["callsign"] else "both"
-            atis_parsed.append((kind, info))
-            if atis is None:
-                atis = {"callsign": c["callsign"], "letter": info["letter"], "arr": None, "dep": None,
-                        "frequency": c.get("frequency"), "lines": c.get("text_atis") or []}
-            else:
-                atis["callsign"] += " / " + c["callsign"]
-                atis["letter"] = " / ".join(x for x in (atis["letter"], info["letter"]) if x)
-                atis["lines"] = atis["lines"] + (c.get("text_atis") or [])
-        if atis:
-            atis.update(atis_in_use(atis_parsed))
-    except (UpstreamError, ValueError) as exc:
-        net_error = f"VATSIM: {exc}"
-    if atis and (atis["arr"] or atis["dep"]):
-        in_use = {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
-                  "reason": f"From ATIS {atis['letter'] or ''}".strip()}
-    else:
-        in_use = {**pref, "source": "SUGGESTED"}
+        atis = atis_state(mine, ad.icao, [r["designator"] for r in rwys])
+    except (UpstreamError, ValueError):
+        net_error = NET_ERROR
+    in_use = runway_in_use(atis, pref)
 
     qfe = qfe_from_qnh(parsed.qnh, ad.elevation_ft or 0) if parsed and parsed.qnh else None
     return {
@@ -230,8 +202,8 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
     async def from_viff():
         try:
             return await viff_service.departures(ad.icao), None
-        except (UpstreamError, ValueError) as exc:
-            return None, f"vIFF: {exc}"
+        except (UpstreamError, ValueError):
+            return None, "CDM data unavailable"
 
     async def cad_info():
         # ustawienia A-CDM lotniska tylko dla DMAN, równolegle z odlotami (najwyżej kilka sekund, patrz viff.cad_info)
@@ -244,8 +216,8 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
             feed = await get_feed()
             traffic = airport_traffic(feed, ad.icao, ad.lat, ad.lon)
             updated = feed.get("general", {}).get("update_timestamp")
-        except (UpstreamError, ValueError) as exc:
-            net_error = f"VATSIM: {exc}"
+        except (UpstreamError, ValueError):
+            net_error = NET_ERROR
     types = {p.get("aircraft") for lst in traffic.values() for p in lst if p.get("aircraft")}
     wtc: dict[str, str] = {}
     if types:

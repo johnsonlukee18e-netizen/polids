@@ -329,7 +329,7 @@ export function obsInfo(time) {
 }
 
 function positionsTable(ps, unknown) {
-  if (!ps.length) return `<p class="hint">No APP, TWR, GND, DEL or ATIS positions for this aerodrome in PolIDS data${unknown ? "" : " and nobody is logged in now"}.</p>`;
+  if (!ps.length) return `<p class="hint">No APP, TWR, GND, DEL or ATIS positions for this aerodrome${unknown ? "" : " and nobody is logged in now"}.</p>`;
   return `<table class="data acard-pos"><thead><tr><th>Type</th><th>Position</th><th>Freq.</th><th>Status</th></tr></thead><tbody>
     ${ps.map((p) => {
       const on = p.online;
@@ -375,7 +375,7 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
       if (UNKNOWN.test(e.message)) {
         stop();
         el.innerHTML = `<div class="acard"><div class="acard-head"><b>${esc(icao)}</b></div>
-          <div class="acard-missing"><p>Unknown aerodrome <b>${esc(icao)}</b>: it is neither in navdata nor in the PolIDS position data.</p>
+          <div class="acard-missing"><p>Unknown aerodrome <b>${esc(icao)}</b>.</p>
           <p class="hint">Check the ICAO code. ← returns to the previous screen.</p></div></div>`;
         onMissing?.();
         return;
@@ -409,8 +409,8 @@ export function mountAeroCard(el, icao, { onInfo, onMissing } = {}) {
     $(".acard-atis").innerHTML = atis.length ? atis.map((p) => `<div class="acard-atis-one">
         <div class="hint">${esc(p.online.callsign || p.callsign)} ${esc(p.online.frequency || p.frequency)} · ${esc(p.online.name || "?")} · since&nbsp;${esc(hhmm(p.online.logon_time))}</div>
         <div class="mono atis-text">${atisHtml(p.online.text_atis) || '<span class="hint">no text</span>'}</div></div>`).join("")
-      : `<span class="hint">${net ? "No data from the VATSIM network (error above)." : "No ATIS is broadcast on the VATSIM network now."}</span>`;
-    $(".acard-upd").textContent = `VATSIM ${d.updated ? hhmm(d.updated) : "–"}`;
+      : `<span class="hint">${net ? "No data (error above)." : "No ATIS online now."}</span>`;
+    $(".acard-upd").textContent = `as of ${d.updated ? hhmm(d.updated) : "–"}`;
   };
   load();
   timer = setInterval(load, CARD_MS);

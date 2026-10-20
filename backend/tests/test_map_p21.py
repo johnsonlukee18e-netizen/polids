@@ -1,5 +1,6 @@
 """MAP (0.12.5): etykieta samolotu jak w PEGASUS_21 (airspace.js p21Lines, aircraftMarker) i symbol lotniska jako
-zamknięty wielokąt (SYMBOLS, symbolSvg, rysowanie na kanwie z closePath)."""
+zamknięty wielokąt (SYMBOLS, symbolSvg, rysowanie na kanwie z closePath). 0.12.6: etykieta w trzech linijkach (bez
+"h  s  r" i RFL) i tylko w okienku po najechaniu na samolot (acLabelSpot), bez stałych etykiet i białego dymka."""
 import json
 import math
 import re
@@ -15,7 +16,7 @@ NODE_SCRIPT = r"""
 // airspace.js przy imporcie rozszerza L.CircleMarker; aircraftMarker potrzebuje L.marker i L.divIcon
 globalThis.L = { CircleMarker: { extend: (o) => o }, divIcon: (o) => o, marker: (ll, o) => ({ ll, ...o }) };
 const as = await import(process.argv[2]);
-const dom = { callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 400, aircraft: "DC10", wake: "H", arrival: "EPWA", rfl: "24000" };
+const dom = { callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 400, aircraft: "DC10", wake: "H", arrival: "EPWA", rfl: "24000", heading: 90 };
 const tra = { callsign: "TRA005", groundspeed: 431, altitude: 27010, vs: 20, aircraft: "B737", wake: "M", arrival: "EHAM", rfl: "FL270" };
 // kanwa na niby: zapis wywołań rysowania symbolu lotniska
 const calls = [];
@@ -29,18 +30,29 @@ const out = {
   ground: as.p21Lines({ callsign: "SPKAT", groundspeed: 0, altitude: 362, aircraft: "C172", wake: "L", arrival: "EPWA", rfl: "1500" }),
   noplan: as.p21Lines({ callsign: "SPABC", groundspeed: 90, altitude: 1500, vs: null }),
   long: as.p21Lines({ callsign: "LOT3913AB", groundspeed: 85, altitude: 9000 })[0],
-  rfl: ["35000", "FL350", "F350", "350", "A045", "FL365", "VFR", "", null, "S1130"].map(as.rflFeet),
-  rfl365: as.p21Lines({ ...tra, rfl: "FL365" })[3],
-  // linijka 4 dla RFL: dziesiątki FL dwiema cyframi, poniżej TL jak linijka 2
-  rflL4: ["FL080", "FL090", "8000", "FL085", "FL350", "35000", "FL100", "A045", "4500", "A005", "FL070", "VFR"]
-    .map((r) => as.p21Lines({ ...tra, rfl: r })[3]),
-  short: as.aircraftMarker(dom, { label: true }).icon.html,
-  full: as.aircraftMarker(tra, { label: true, detail: true, exit: "MIXAT" }).icon.html,
-  noL3: as.aircraftMarker({ callsign: "SPABC", groundspeed: 90, altitude: 1500 }, { detail: true }).icon.html,
-  html: as.p21Html(dom), htmlShort: as.p21Html(dom, { detail: false }), htmlNoGs: as.p21Html({ ...dom, groundspeed: null }),
+  // RFL z planu lotu nie zmienia etykiety (linijka 4 odpadła w 0.12.6)
+  rflAny: ["FL080", "35000", "A045", "VFR", null].map((r) => as.p21Lines({ ...tra, rfl: r }, { exit: "MIXAT" })),
+  marker: as.aircraftMarker(dom, { cls: "arr sel" }),
+  markerPlain: as.aircraftMarker(tra),
+  html: as.p21Html(dom), htmlExit: as.p21Html(tra, { exit: "MIXAT" }), htmlNoGs: as.p21Html({ ...dom, groundspeed: null }),
+  htmlNoL3: as.p21Html({ callsign: "SPABC", groundspeed: 90, altitude: 1500 }),
   htmlLong: as.p21Html({ callsign: "LOT3913AB", groundspeed: 85, altitude: 9000 }),
   htmlEsc: as.p21Html({ callsign: "<X&>", groundspeed: 5 }),
   size: as.aircraftMarker(dom).icon.iconSize,
+  // okienko etykiety (90 × 40 px) obok samolotu na mapie 800 × 600: z prawej, przy prawym brzegu z lewej, przy górnej
+  // i dolnej krawędzi przesunięte w granice mapy, za szerokie na obie strony: tam, gdzie więcej miejsca
+  spot: [[400, 300], [760, 300], [400, 5], [400, 598], [30, 10], [790, 590], [20, 300], [60, 300]]
+    .map(([x, y]) => as.acLabelSpot(x, y, 90, 40, 800, 600)),
+  spotWide: [as.acLabelSpot(50, 300, 760, 40, 800, 600), as.acLabelSpot(750, 300, 760, 40, 800, 600)],
+  spotEdge: [690, 691].map((x) => as.acLabelSpot(x, 300, 90, 40, 800, 600).dir),
+  gap: as.AC_LABEL_GAP,
+  // nakładki Leafleta [lewo, góra, prawo, dół]: panel lotu z prawej na wysokości samolotu, wykres TV tuż pod samolotem,
+  // przyciski zoomu nad samolotem, nakładka z boku bez wpływu, obie strony zasłonięte (jak bez nakładek)
+  spotObst: [
+    [440, 150, [[500, 10, 790, 276]]], [300, 463, [[10, 471, 560, 590]]], [20, 75, [[10, 10, 44, 70]]],
+    [300, 300, [[600, 0, 800, 600]]], [400, 300, [[100, 200, 700, 400]]], [760, 150, [[500, 10, 790, 276]]],
+  ].map(([x, y, obst]) => ({ x, y, obst, s: as.acLabelSpot(x, y, 90, 40, 800, 600, { obst }) })),
+  exports: Object.keys(as).sort(),
   ad: as.SYMBOLS.aerodrome, half: ["aerodrome", "vor", "ndb", "vfr", "fix"].map(as.symbolHalf),
   svg: as.symbolSvg("aerodrome", "#fff"), svgFix: as.symbolSvg("fix", "#fff"),
   svgs: Object.fromEntries(["aerodrome", "vor", "ndb", "vfr", "fix"].map((n) => [n, [as.symbolSvg(n, "#fff"), as.symbolSvg(n, "#fff", 12)]])),
@@ -66,71 +78,154 @@ def js(tmp_path_factory):
 
 
 def test_p21_lines_like_reference(js):
-    # DOM004 z P21: poniżej TL (FL080) "A" i setki stóp ze strzałką wznoszenia; typ + kategoria turbulencji, cel;
-    # h s r i RFL w dziesiątkach FL (VATSIM nie ma poziomu z zezwolenia)
-    assert js["dom"] == ["DOM004   248", "A 53↑", "DC10H EPWA", "h  s  r 24"]
+    # DOM004 z P21: poniżej TL (FL080) "A" i setki stóp ze strzałką wznoszenia; typ + kategoria turbulencji, cel.
+    # 0.12.6 (Marek): trzy linijki, bez "h  s  r" i RFL
+    assert js["dom"] == ["DOM004   248", "A 53↑", "DC10H EPWA"]
     # TRA005: FL trzema cyframi, lot poziomy bez strzałki, tranzyt z punktem wyjścia z FIR-u zamiast celu
-    assert js["tra"] == ["TRA005   431", "270", "B737M MIXAT", "h  s  r 27"]
+    assert js["tra"] == ["TRA005   431", "270", "B737M MIXAT"]
 
 
 def test_p21_level_arrow_and_edge_cases(js):
     assert js["down"] == "A 53↓" and js["level"] == "A 53" and js["first"] == "A 53"  # pierwszy odczyt: bez strzałki
-    assert js["ground"] == ["SPKAT    000", "A  4", "C172L EPWA", "h  s  r A 15"]  # RFL poniżej TL jak linijka 2
-    assert js["noplan"] == ["SPABC    090", "A 15", "", "h  s  r"]  # bez planu lotu: pusta trzecia linijka
+    assert js["ground"] == ["SPKAT    000", "A  4", "C172L EPWA"]
+    assert js["noplan"] == ["SPABC    090", "A 15", ""]  # bez planu lotu: pusta trzecia linijka
     assert js["long"] == "LOT3913AB 085"
-    assert js["rfl"] == [35000, 35000, 35000, 35000, 4500, 36500, None, None, None, None]
-    assert js["rfl365"] == "h  s  r 365"  # poziom niepodzielny przez 10: trzy cyfry
-
-
-def test_p21_rfl_two_digit_tens_and_below_tl(js):
-    """Runda 14 (przegląd): FL080 / FL090 dawały jedną cyfrę ("r 8"), a RFL poniżej TL "A45" zamiast "A 45" jak w linijce 2
-    (DOM004 z P21: "A 53"). Dziesiątki FL zawsze dwiema cyframi, poniżej TL "A" i setki stóp na trzech znakach."""
-    assert js["rflL4"] == ["h  s  r 08", "h  s  r 09", "h  s  r 08", "h  s  r 085", "h  s  r 35", "h  s  r 35", "h  s  r 10",
-                           "h  s  r A 45", "h  s  r A 45", "h  s  r A  5", "h  s  r A 70", "h  s  r"]
+    # RFL z planu lotu nie ma już na etykiecie: zawsze te same trzy linijki
+    assert all(x == ["TRA005   431", "270", "B737M MIXAT"] for x in js["rflAny"])
+    assert "rflFeet" not in js["exports"]
 
 
 def _text(html):
     return re.sub(r"<[^>]+>", "", html)
 
 
-def test_aircraft_marker_label(js):
-    # bez szczegółów sam znak; ze szczegółami cztery linijki, bez <br> i bez tła w HTML
-    assert '<span class="p21"><i class="l1"><b class="cs">DOM004</b></i></span>' in js["short"]
-    full = js["full"]
-    lines = re.findall(r'<i class="l(\d)">(.*?)</i>', full)
-    assert [n for n, _ in lines] == ["1", "2", "3", "4"]
-    # tekst linijek jak p21Lines (spacje to kolumny)
-    assert [_text(x) for _, x in lines] == ["TRA005   431", "270", "B737M MIXAT", "h  s  r 27"]
-    assert lines[0][1] == '<b class="cs">TRA005</b>   <b class="gs">431</b>'
-    assert 'class="l3"' not in js["noL3"] and 'class="l4"' in js["noL3"]
+def test_aircraft_marker_without_label(js):
+    """0.12.6 (Marek): samolot na mapie bez stałej etykiety: sama sylwetka obrócona wg kursu; klasa relacji i wyboru
+    na ikonie, etykieta tylko w okienku po najechaniu (dymek Leafleta w MAP)."""
+    for m in (js["marker"], js["markerPlain"]):
+        html = m["icon"]["html"]
+        assert "p21" not in html and "<span" not in html and "<i " not in html and "DOM004" not in html
+        assert html.startswith('<div class="ac"><svg viewBox="-10 -10 20 20"') and html.endswith("</svg></div>")
+    assert "rotate(90deg)" in js["marker"]["icon"]["html"]
+    assert js["marker"]["icon"]["className"] == "acicon arr sel" and js["markerPlain"]["icon"]["className"] == "acicon"
     assert js["size"] == [14, 14]  # ikona mniejsza niż do 0.12.4 (20 px)
-
-
-def test_p21_only_callsign_green():
-    """Runda 14 (przegląd): na etykiecie DOM004 z P21 zielony jest tylko znak wywoławczy, prędkość (248) jest biała jak
-    linijki 2-4; MAP kolorował całą linijkę 1. Prędkość w osobnym <b class="gs"> poza zielonym <b class="cs">, w map.css
-    kolor tylko dla b.cs (także wybrany lot i jasny podkład), legenda z tego samego p21Html."""
-    css = (JS.parent / "css" / "map.css").read_text("utf-8")
-    assert ".acicon span.p21 b.cs, .p21-sample b.cs { color: #00ff00; }" in css
-    assert ".acicon.sel span.p21 b.cs { color: #ff9f1a; }" in css
-    assert ".map.light .acicon span.p21 b.cs { color: #0a7a36; }" in css and ".map.light .acicon.sel span.p21 b.cs { color: #b02e08; }" in css
-    # linijka 1 ani prędkość nie mają własnego koloru: biorą kolor linijek (i) jak linijki 2-4
-    rules = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
-    assert "i.l1" not in rules and "b.gs" not in rules
-    assert ".acicon span.p21 b, .p21-sample b { font-weight: inherit; }" in css
-    # legenda MAP: ten sam HTML co etykieta na mapie
-    src = (JS / "tabs" / "map.js").read_text("utf-8")
-    assert "const P21_SAMPLE = p21Html({" in src and '<span class="p21-sample">${P21_SAMPLE}</span>' in src
 
 
 def test_p21_html(js):
     assert js["html"] == ('<i class="l1"><b class="cs">DOM004</b>   <b class="gs">248</b></i><i class="l2">A 53↑</i>'
-                          '<i class="l3">DC10H EPWA</i><i class="l4">h  s  r 24</i>')
-    assert js["htmlShort"] == '<i class="l1"><b class="cs">DOM004</b></i>'
+                          '<i class="l3">DC10H EPWA</i>')
+    lines = re.findall(r'<i class="l(\d)">(.*?)</i>', js["htmlExit"])
+    assert [n for n, _ in lines] == ["1", "2", "3"]
+    assert [_text(x) for _, x in lines] == ["TRA005   431", "270", "B737M MIXAT"]
+    assert lines[0][1] == '<b class="cs">TRA005</b>   <b class="gs">431</b>'
+    # bez planu lotu: dwie linijki (pusta trzecia odpada), nigdy czwarta
+    assert 'class="l3"' not in js["htmlNoL3"] and 'class="l4"' not in js["htmlNoL3"] and js["htmlNoL3"].count("<i ") == 2
     # bez prędkości: sam znak; długi znak (9 znaków): jedna spacja przed prędkością
     assert js["htmlNoGs"].startswith('<i class="l1"><b class="cs">DOM004</b></i><i class="l2">')
     assert js["htmlLong"].startswith('<i class="l1"><b class="cs">LOT3913AB</b> <b class="gs">085</b></i>')
     assert js["htmlEsc"].startswith('<i class="l1"><b class="cs">&lt;X&amp;&gt;</b>     <b class="gs">005</b></i>')
+
+
+def _box(x, y, spot, w=90, h=40):
+    """Okienko na stronie: przesunięcie dymka to cały odstęp (map.css zeruje margines Leafleta, .ac-lbl margin: 0)."""
+    left = x + spot["off"][0] if spot["dir"] == "right" else x - w + spot["off"][0]
+    top = y - h / 2 + spot["off"][1]
+    return left, top, left + w, top + h
+
+
+def test_label_spot_inside_map(js):
+    """Okienko etykiety (90 × 40) obok samolotu w granicach mapy 800 × 600 (margines 4 px, odstęp 16 px od środka)."""
+    g = js["gap"]
+    assert g == 16
+    pts = [[400, 300], [760, 300], [400, 5], [400, 598], [30, 10], [790, 590], [20, 300], [60, 300]]
+    assert [s["dir"] for s in js["spot"]] == ["right", "left", "right", "right", "right", "left", "right", "right"]
+    assert js["spot"][0] == {"dir": "right", "off": [g, 0]} and js["spot"][1] == {"dir": "left", "off": [-g, 0]}
+    for (x, y), s in zip(pts, js["spot"]):
+        x0, y0, x1, y1 = _box(x, y, s)
+        assert x0 >= 4 and y0 >= 4 and x1 <= 796 and y1 <= 596, ((x, y), s)
+        # okienko nie zasłania samolotu: cała szerokość po jednej stronie, co najmniej odstęp od środka
+        assert x0 >= x + g or x1 <= x - g, ((x, y), s)
+    # przy prawym brzegu: z prawej tylko, gdy mieści się z marginesem 4 px (796 - 16 - 90 = 690)
+    assert js["spotEdge"] == ["right", "left"]
+    # za szerokie na obie strony: tam, gdzie więcej miejsca
+    assert js["spotWide"][0]["dir"] == "right" and js["spotWide"][1]["dir"] == "left"
+
+
+def test_label_spot_beside_overlays(js):
+    """Przegląd 0.12.6: okienko wybranego lotu wchodziło pod panel szczegółów lotu, a okienko nad wykresem TV pod jego
+    tytuł. Nakładki Leafleta to przeszkody: strona z nakładką na wysokości samolotu odpada, nakładka pod albo nad
+    samolotem przesuwa okienko w pionie; gdy obie strony zasłonięte, jak bez nakładek (w granicach mapy)."""
+    g = js["gap"]
+    res = {(c["x"], c["y"]): c["s"] for c in js["spotObst"]}
+    assert res[(440, 150)] == {"dir": "left", "off": [-g, 0]}  # panel lotu z prawej
+    assert res[(300, 463)] == {"dir": "right", "off": [g, -16]}  # nad wykresem: dół okienka 4 px nad wykresem
+    assert res[(20, 75)] == {"dir": "right", "off": [g, 19]}  # pod przyciskami zoomu: góra okienka 4 px pod nimi
+    assert res[(300, 300)] == {"dir": "right", "off": [g, 0]}  # nakładka daleko z boku: bez zmian
+    assert res[(400, 300)] == {"dir": "right", "off": [g, 0]}  # obie strony zasłonięte: jak bez nakładek
+    assert res[(760, 150)] == {"dir": "left", "off": [-g, 0]}  # samolot pod panelem: jak bez nakładek (z lewej)
+    for c in js["spotObst"]:
+        if (c["x"], c["y"]) == (400, 300):
+            continue
+        x0, y0, x1, y1 = _box(c["x"], c["y"], c["s"])
+        assert x0 >= 4 and y0 >= 4 and x1 <= 796 and y1 <= 596, c
+        for ol, ot, orr, ob in c["obst"]:
+            if (c["x"], c["y"]) == (760, 150):
+                continue  # samolot pod panelem: okienko z lewej też na panelu (od x = 500)
+            assert x1 <= ol or x0 >= orr or y1 <= ot - 4 or y0 >= ob + 4, c
+
+
+def test_p21_label_css_and_legend():
+    """Runda 14 (przegląd): na etykiecie DOM004 z P21 zielony jest tylko znak wywoławczy, prędkość (248) jest biała jak
+    linijki 2-3. 0.12.6: etykieta w nieprzezroczystym okienku (czarne tło, cienka ramka, bez cienia i zaokrągleń,
+    czytelne na każdym podkładzie), wybrany lot: znak i ramka na pomarańczowo; legenda z tego samego p21Html."""
+    css = (JS.parent / "css" / "map.css").read_text("utf-8")
+    rules = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    box = re.search(r"\.leaflet-tooltip\.ac-lbl \{([^}]*)\}", rules).group(1)
+    assert "background: #000" in box and "border: 1px solid" in box and "border-radius: 0" in box and "box-shadow: none" in box
+    assert "var(--mono)" in box
+    # bez marginesu, który Leaflet dodaje dymkom z boku (6 px): odstęp od samolotu to samo przesunięcie z acLabelSpot,
+    # inaczej okienko przy prawym brzegu wystawało do 2 px poza mapę
+    assert box.lstrip().startswith("margin: 0;")
+    assert ".leaflet-tooltip.ac-lbl::before { display: none; }" in rules  # bez strzałki dymka
+    assert ".ac-lbl b.cs, .p21-sample b.cs { color: #00ff00; }" in rules
+    assert ".ac-lbl.sel b.cs { color: #ff9f1a; }" in rules and ".leaflet-tooltip.ac-lbl.sel { border-color: #ff9f1a; }" in rules
+    # linijka 1 ani prędkość nie mają własnego koloru: biorą kolor linijek (i) jak linijki 2-3
+    assert "i.l1" not in rules and "b.gs" not in rules
+    assert ".ac-lbl b, .p21-sample b { font-weight: inherit; }" in rules
+    # stara etykieta w ikonie samolotu (span.p21) zniknęła, także z jasnych podkładów
+    assert "span.p21" not in rules and ".acicon span" not in rules
+    style = re.sub(r"/\*.*?\*/", "", (JS.parent / "css" / "style.css").read_text("utf-8"), flags=re.S)
+    assert ".acicon span" not in style
+    src = (JS / "tabs" / "map.js").read_text("utf-8")
+    assert "const P21_SAMPLE = p21Html({" in src and '<span class="p21-sample">${P21_SAMPLE}</span>' in src
+    assert "rfl:" not in src.split("const P21_SAMPLE")[1].split(");")[0]
+
+
+def test_map_hover_label_wiring():
+    """MAP: samolot dostaje okienko etykiety (dymek Leafleta na własnej warstwie acLbl nad plakietkami, pod kartami
+    lotnisk), stałe tylko u wybranego lotu; bez białego dymka "znak typ ADEP→ADES FL · arrival to …", bez przełącznika
+    etykiet P21 i progów zoomu."""
+    src = (JS / "tabs" / "map.js").read_text("utf-8")
+    code = re.sub(r"(^|\s)//.*$", r"\1", src, flags=re.M)
+    draw = code.split("const drawTraffic = () => {")[1].split("\n  };")[0]
+    assert "aircraftMarker(p, { cls: rel + (sel ? \" sel\" : \"\") })" in draw
+    assert "bindTooltip(p21Html(p, { exit })" in draw and 'pane: "acLbl"' in draw and "permanent: sel" in draw
+    assert "offset: [AC_LABEL_GAP, 0]" in draw
+    assert '"ac-lbl" + (sel ? " sel" : "")' in draw and "opacity: 1" in draw
+    assert 'on("tooltipopen", (e) => placeLabel(e.target))' in draw
+    assert "getZoom" not in draw and "detail" not in draw and "label:" not in draw
+    assert 'map.createPane("acLbl").style.zIndex = 690;' in code
+    for gone in ("traffic-detail", "P21 labels", "REL_TEXT", "arrival to ${", "→${esc(p.arrival"):
+        assert gone not in code, gone
+    # warstwa okienka: nad plakietkami lotnisk (atcAd 660) i FIR (655), pod kartami lotnisk (atcTip 700)
+    air = (JS / "airspace.js").read_text("utf-8")
+    assert '["atcFirName", 585], ["atcFir", 655], ["atcAd", 660], ["atcTip", 700]' in air
+    # okienko obok nakładek Leafleta (panel lotu, wykres TV, przyciski), także po ich zmianie bez ruchu mapy (relabel)
+    place = code.split("const placeLabel = (m) => {")[1].split("\n  };")[0]
+    assert 'querySelectorAll(".leaflet-control")' in place
+    assert "acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H, { obst })" in place
+    assert "declutter(); placeLabels(); });" in code
+    assert "const placeLabels = () => { if (mapEl.offsetWidth) layers.traffic.eachLayer(placeLabel); };" in code
 
 
 def test_aerodrome_symbol_is_closed_polygon(js):

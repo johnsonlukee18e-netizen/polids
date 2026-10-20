@@ -12,7 +12,6 @@ import aerodrome from "./tabs/aerodrome.js";
 import map from "./tabs/map.js";
 import coordination from "./tabs/coordination.js";
 import conversion from "./tabs/conversion.js";
-import checklist from "./tabs/checklist.js";
 import sytop from "./tabs/sytop.js";
 import aup from "./tabs/aup.js";
 import strip from "./tabs/strip.js";
@@ -21,10 +20,15 @@ import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
 const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
-  checklist, sytop, aup, strip, squawk, other, emergency, admin };
+  sytop, aup, strip, squawk, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
-// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY
-const MOVED = { docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"], phraseology: () => ["other", "phraseology"] };
+// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
+// #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista
+const MOVED = {
+  docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],
+  phraseology: () => ["other", "phraseology"],
+  checklist: (arg) => ["other", arg ? "checklist/" + arg : "checklist"],
+};
 const views = document.getElementById("views");
 const back = document.getElementById("nav-back");
 const mounted = {};
