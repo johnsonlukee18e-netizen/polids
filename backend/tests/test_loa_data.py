@@ -1,5 +1,6 @@
 """Dane LOA z sąsiadami (data/seed/loa.json) i ich PDF-y w data/docs/LOA."""
 import json
+import re
 
 import pytest
 
@@ -82,3 +83,15 @@ def test_both_directions_where_loa_has_them(firs):
     assert ("out", "ARR EDDB", "GOVEN", "FL120", "DBAS") in edww
     lkaa = {(t["dir"], t["traffic"], t["cop"], t["level"]) for t in firs["LKAA"]["transfers"]}
     assert ("in", "ARR EPKK", "NETIR", "↓ FL150, FL190B") in lkaa
+
+
+def test_no_document_references(firs):
+    """0.12.6 (issue #21): zasady i uwagi o stanowiskach (COORDINATION › LoA rules, panel LOA w RADIO) bez odwołań do
+    stron, załączników i rozdziałów PDF-u ani dopisków, skąd jest wartość – same dane."""
+    bad = re.compile(r"\bannex\b|\bpage\b|\bp\. ?\d|section \d|in the PDF|PDF annex|LOA table|as in the LOA|"
+                     r"in the LOA\)|underlined in the LOA|LOA parties", re.I)
+    for key, fir in firs.items():
+        texts = [s for f in ("silent", "vfr", "other") for s in fir[f]]
+        texts += [p["note"] for p in fir["positions"]] + [t["conditions"] for t in fir["transfers"]]
+        for s in texts:
+            assert not bad.search(s), f"{key}: {s}"
