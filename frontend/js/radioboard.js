@@ -14,8 +14,10 @@ export const LAYERS = [
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
-export const DEFAULT_CUT = 300;  // przekrój LOW (FL): na FL300 są wszystkie sektory LOW (F od FL285, T od FL195)
-export const CUT_STEP = 5;       // suwak wysokości LOW co 500 ft (granice wycinków w pliku .ese są co 500 ft)
+// przekrój LOW (FL): na FL300 są wszystkie sektory LOW (F od FL285, T od FL195)
+export const DEFAULT_CUT = 300;
+// suwak wysokości LOW co 500 ft (granice wycinków w pliku .ese są co 500 ft)
+export const CUT_STEP = 5;
 
 // adres "#radio/<warstwy>/fl<przekrój>": warstwy po przecinku w stałej kolejności, "none" = żadna
 export function argOf(layers, cut) {
@@ -231,7 +233,8 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
         any = true;
         yield [dx, dy, d];
       }
-      if (!any && k > 1) return;  // cały pierścień poza zasięgiem
+      // cały pierścień poza zasięgiem
+      if (!any && k > 1) return;
     }
   }
   // jedna runda w kolejności order: wybór i koszt każdej etykiety
@@ -246,7 +249,8 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
         sizes.forEach((s, v) => {
           const pv = WV[Math.min(v, WV.length - 1)] * (it.wv ?? 1);
           for (const [dx, dy, d] of ring(s, k * (v === 0 && sizes.length > 1 ? (it.near ?? near) : (it.max ?? far)))) {
-            if (d + pv >= best) continue;  // już droższy niż najlepszy
+            // już droższy niż najlepszy
+            if (d + pv >= best) continue;
             const r = rectAt(it, s, dx, dy);
             if (outside(r) || placed.some((p) => over(r, p) > 0)) continue;
             if (dots(r).length) continue;  // kropka lotniska i TMA (swoja albo cudza) zostaje widoczna
