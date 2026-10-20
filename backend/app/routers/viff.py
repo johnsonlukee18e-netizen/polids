@@ -1,3 +1,4 @@
+import logging
 import re
 
 from fastapi import APIRouter, HTTPException, Query
@@ -6,13 +7,16 @@ from ..services import viff
 from ..services.http_cache import UpstreamError
 
 router = APIRouter(prefix="/api/viff", tags=["viff"])
+log = logging.getLogger("polids.viff")
 
 
 async def _call(coro):
+    # komunikat w interfejsie bez nazwy i adresu źródła (0.12.6); szczegóły błędu tylko w logu
     try:
         return await coro
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"vIFF unavailable: {exc}") from exc
+        log.warning("vIFF: %s", exc)
+        raise HTTPException(502, "Flow data unavailable") from exc
 
 
 @router.get("/departures/{icao}")
@@ -37,5 +41,5 @@ async def flight(callsign: str):
         raise HTTPException(400, "Callsign = 2–10 letters and digits")
     f = await _call(viff.flight(callsign))
     if f is None:
-        raise HTTPException(404, f"vIFF does not know flight {callsign.upper()} (no flight plan in IFPS)")
+        raise HTTPException(404, f"No flow data for flight {callsign.upper()}")
     return f

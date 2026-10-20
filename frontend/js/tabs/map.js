@@ -1,7 +1,7 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, loadRatio, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
-import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates, colorFor, controllerRows,
-  drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
+import { FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, acLabelSpot, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates,
+  colorFor, controllerRows, drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
 import { dissolve, mainParts, pointIn } from "../dissolve.js";
@@ -52,22 +52,22 @@ const PICK_OF = Object.fromEntries(AIR.flatMap((a) => a.kinds.map((k) => [k, a.i
 const KIND_ORDER = ["acc", "tma", "ctr", "cta", "fis", "atz", "oth", "nb"];
 const KIND_TAG = { acc: "ACC", tma: "TMA", ctr: "CTR", fis: "FIS", cta: "CTA", atz: "ATZ", oth: "OTHER", nb: "FIR" };
 const OTH_HEAD = { fis: "FIS", atz: "ATZ / TRA", oth: "other" };
-// przestrzenie z kolejnością przejmowania z chains.js (APP/TWR z .ese, potem ACC): w dymku cała kolejność
+// przestrzenie z kolejnością przejmowania z chains.js (APP/TWR z .ese, potem ACC): z niej obsługujący (ownerOf);
+// samej kolejności nie pokazujemy (0.12.6, Marek: bez hierarchii w opisie przestrzeni)
 const CHAIN_KINDS = ["tma", "cta", "ctr"];
 const LEVELS = [15, 50, 100, 200, 300, 370];
 
 // Legenda w zakładkach (zwinięta domyślnie razem z całą sekcją).
-// Etykieta samolotu (zakładka Ruch): wzór jak w PEGASUS_21, ten sam HTML co na mapie (p21Html z airspace.js)
-const P21_SAMPLE = p21Html({ callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 300, aircraft: "DC10", wake: "H",
-  arrival: "EPWA", rfl: "24000" });
+// Etykieta samolotu (zakładka Ruch): wzór jak w PEGASUS_21, ten sam HTML co w okienku na mapie (p21Html z airspace.js)
+const P21_SAMPLE = p21Html({ callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 300, aircraft: "DC10", wake: "H", arrival: "EPWA" });
 const LEGEND = [
   ["air", "Airspace", () => [
     lg(`<span class="swatch own"></span>`, "staffing by online controllers: position area (one outline and fill in its colour)"),
     lg(`<span class="lg-freq">133.475</span>`, "position and frequency: one label per position", "w"),
     lg(`<b class="pos-sim">SYM</b>`, "position simulated in Positions (dashed outline, aerodrome or CTR badge with a dashed frame)"),
-    lg(`<span class="swatch fir"></span>`, "FIR boundary (VATSpy, separate switch)"),
+    lg(`<span class="swatch fir"></span>`, "FIR boundary (separate switch)"),
     `<p class="lgx-note"><b>Full split</b> (staffing off): each sector separately.</p>`,
-    lg(`<span class="swatch sec"></span>`, "ACC sector (colour of the first position in the .ese file)"),
+    lg(`<span class="swatch sec"></span>`, "ACC sector (colour of its default position)"),
     lg(`<span class="swatch tma"></span>`, "TMA (outline)"), lg(`<span class="swatch cta"></span>`, "CTA (outline)"), lg(`<span class="swatch ctr"></span>`, "CTR (outline)"),
     lg(`<span class="swatch fis"></span>`, "FIS"), lg(`<span class="swatch atz"></span>`, "ATZ / TRA"), lg(`<span class="swatch nb"></span>`, "neighbour FIR sector")].join("")],
   ["traffic", "Traffic", () => [
@@ -75,19 +75,11 @@ const LEGEND = [
     lg(plane("trn"), "transit through FIR EPWW / no flight plan in FIR EPWW"), lg(plane("sel"), "selected flight"),
     lg(`<span class="lg-line lg-flight"></span>`, "route of the selected aircraft"), lg(`<span class="lg-line lg-route"></span>`, "manually entered route"),
     lg(`<span class="p21-sample">${P21_SAMPLE}</span>`,
-      `label as in PEGASUS_21: 1. callsign, ground speed (kt); 2. Mode C: A + altitude in hundreds of ft below the
-      transition level (FL080), above it the FL; ↑ / ↓ climbing / descending since the previous update; 3. type + wake
-      category, destination (transit or departure to a foreign aerodrome: FIR exit point from the flight plan route);
-      4. h s r = assigned heading, speed and rate (not available on VATSIM), then the requested level from the flight
-      plan in tens (24 = FL240, 08 = FL080; below the transition level A + hundreds of ft, A 45 = 4500 ft)`, "w p21"),
-    `<p class="lgx-note">Only EP traffic on the map: departures from EP** aerodromes, arrivals to EP** and transits, i.e. aircraft
-      in FIR EPWW or aircraft whose remaining flight plan route (from the current position to the destination) enters FIR EPWW;
-      without a flight plan only in FIR EPWW. Departures from and arrivals to EP** stay on the map for the whole flight; a transit
-      that has left FIR EPWW (and will not return) disappears. The selected flight stays (its details keep refreshing).
-      FIR EPWW boundary: outline of the .ese sectors, including the Baltic airspace delegated to EPWW.</p>`,
-    `<p class="lgx-note">A domestic flight (EP → EP) is a departure on the ground at the departure aerodrome, within 40 NM of it
-      and while climbing, and an arrival while descending and in the second half of the route (climb / descent compared with
-      the update 30 s earlier).</p>`].join("")],
+      `aircraft label (hover an aircraft; the selected flight keeps it): 1. callsign, ground speed (kt); 2. level: A + altitude
+      in hundreds of ft below the transition level (FL080), above it the FL; ↑ / ↓ climbing / descending; 3. type + wake
+      category, destination (transit or departure abroad: FIR exit point)`, "w p21"),
+    `<p class="lgx-note">Only EP traffic on the map: departures from EP** aerodromes, arrivals to EP** and transits through
+      FIR EPWW (now or later on the route). The selected flight always stays.</p>`].join("")],
   ["pts", "Points", () => [
     lg(`<i data-sym="aerodrome"></i>`, "aerodrome"), lg(`<i data-sym="vor"></i>`, "VOR / DME"), lg(`<i data-sym="ndb"></i>`, "NDB"),
     lg(`<i data-sym="vfr"></i>`, "VFR point"), lg(`<i data-sym="fix"></i>`, "FIX point"), lg(`<span class="swatch awy"></span>`, "airway")].join("")],
@@ -95,15 +87,15 @@ const LEGEND = [
     ${lg(`<span class="ab ab-ctr">CTR</span>`, "area control (FIR)")}
     ${lg(`<span class="atcb nb"><b class="ab-icao">ESGG</b><span class="ab ab-gnd">G</span></span>`, "neighbour aerodrome with a controller", "w")}
     <p class="lgx-note">Hover a badge to see who is online (also who published the ATIS, text line by line).
-      Hover a position label with a frequency (sector, TMA, neighbour): controller details. Official sector map:
-      <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>`],
-  ["viff", "vIFF", () => [
-    lg(`<span class="swatch viff"></span>`, "TV area from the chart"), lg(`<span class="vs-chip on">ACTIVE</span>`, "scenario / TV active"),
+      Hover a position label with a frequency (sector, TMA, neighbour): controller details.
+      <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">ACC sector map ↗</a></p>`],
+  ["viff", "Capacity", () => [
+    lg(`<span class="swatch viff"></span>`, "area of the TV in the chart"), lg(`<span class="vs-chip on">ACTIVE</span>`, "scenario / TV active"),
     lg(`<span class="vf-bar"><i class="ok" style="width:60%"></i></span>`, "load &lt; 90 %"), lg(`<span class="vf-bar"><i class="near" style="width:95%"></i></span>`, "90–100 %"),
     lg(`<span class="vf-bar"><i class="over" style="width:100%"></i></span>`, "over capacity"), lg(`<span class="vf-bar"><i class="nolim" style="width:40%"></i></span>`, "no limit"),
     lg(`<span class="fs fs-fi">FI</span>`, "filed"), lg(`<span class="fs fs-si">SI</span>`, "slot (CTOT)"), lg(`<span class="fs fs-su">SU</span>`, "suspended (FLS)"),
     lg(`<span class="fs fs-aa">AA</span>`, "activated (AOBT)"), lg(`<span class="fs fs-ta">TA</span>`, "airborne (ATOT)"),
-    lg(`<span class="fd-ctot d15">+10</span><span class="fd-ctot d30">+20</span><span class="fd-ctot d45">+40</span><span class="fd-ctot d60">+50</span>`, "CTOT delay in minutes (as in the NM flight list)", "w"),
+    lg(`<span class="fd-ctot d15">+10</span><span class="fd-ctot d30">+20</span><span class="fd-ctot d45">+40</span><span class="fd-ctot d60">+50</span>`, "CTOT delay in minutes", "w"),
   ].join("")],
 ];
 
@@ -159,8 +151,6 @@ function relation(p, adIdx) {
   if (p.vs <= -300) return "arr";
   return half;
 }
-const REL_TEXT = { dep: (p) => `departure from ${p.departure}`, arr: (p) => `arrival to ${p.arrival}`,
-  trn: (p) => (p.departure || p.arrival ? "transit through FIR EPWW" : "no flight plan in FIR EPWW"), out: () => "outside EP traffic (selected flight)" };
 
 // Widok MAP: duża mapa z panelem bocznym
 function mainMap(ctx) {
@@ -168,13 +158,12 @@ function mainMap(ctx) {
   const airOn = (id, d) => (typeOf(AIRST[id]) === typeOf(d) ? AIRST[id] : d);
   const pane = h(`<div class="pane fill"><div class="mapwrap">
     <div class="mapside">
-      <div class="ms-head"><b>MAP</b><span class="hint">AIRAC ${esc(ctx.config.airac?.ident || "")}</span>
+      <div class="ms-head"><b>MAP</b>
         <button class="btn ms-hide" title="Hide panel">«</button></div>
       <section class="ms-card" data-sec="traffic">
-        <h4>VATSIM traffic</h4>
+        <h4>Traffic</h4>
         ${sw("traffic", "aircraft", true, PLANE_SVG)}
         <div class="ac-key" title="aircraft colour: departure from an EP** aerodrome, arrival to EP**, transit through FIR EPWW (or no flight plan in FIR EPWW)"><span>${plane("dep")}departure</span><span>${plane("arr")}arrival</span><span>${plane("trn")}transit</span></div>
-        ${sw("traffic-detail", "P21 labels: GS, level, type, destination")}
         ${sw("atc", "online controllers: aerodrome badges (smaller for neighbours)", true, `<span class="ab ab-twr">T</span>`)}
         <div class="atc-info hint"></div>
         <div class="traffic-info hint"></div>
@@ -190,7 +179,7 @@ function mainMap(ctx) {
           <button class="pk-btn" data-air="${a.id}" title="Choose sectors to show">all ▾</button></div>
           <div class="pk" data-air="${a.id}" hidden></div>`).join("")}
         ${sw("online", "staffing by online controllers", airOn("online", true), `<span class="swatch on"></span>`)}
-        ${sw("firs", "FIR boundaries (VATSpy)", airOn("firs", true), `<span class="swatch fir"></span>`)}
+        ${sw("firs", "FIR boundaries", airOn("firs", true), `<span class="swatch fir"></span>`)}
         <div class="sector-info hint"></div>
       </section>
       <section class="ms-card pos-card" data-sec="pos">
@@ -208,7 +197,7 @@ function mainMap(ctx) {
         <div class="route-info hint"></div>
       </section>
       <section class="ms-card vf-card" data-sec="viff">
-        <h4>Sector capacity (vIFF)</h4>
+        <h4>Sector capacity</h4>
         ${sw("viff", "traffic and capacity for the next hour", true, `<span class="swatch viff"></span>`)}
         <div class="vs-list"></div>
         <div class="vs-sub">All sectors (traffic volumes)</div>
@@ -227,9 +216,9 @@ function mainMap(ctx) {
       </section>
       <section class="ms-card" data-sec="base">
         <h4>Basemap</h4>
-        <div class="seg">${[["dark", "dark"], ["light", "light"], ["white", "white"], ["osm", "OSM"]]
+        <div class="seg">${[["dark", "dark"], ["light", "light"], ["white", "white"], ["osm", "streets"]]
           .map(([v, l]) => `<button data-base="${v}" class="${v === "dark" ? "on" : ""}">${l}</button>`).join("")}</div>
-        ${sw("openaip", "OpenAIP aviation overlay")}
+        ${sw("openaip", "aviation overlay")}
         <div class="hint openaip-note"></div>
       </section>
       <section class="ms-card lgx" data-sec="legend">
@@ -301,7 +290,7 @@ function mainMap(ctx) {
     const k = ctx.config.openaip_api_key;
     if (!k) {
       e.target.checked = false;
-      $(".openaip-note").textContent = "No key: create a free account at openaip.net and set POLIDS_OPENAIP_API_KEY in the .env file";
+      $(".openaip-note").textContent = "Overlay unavailable: no API key configured.";
       return;
     }
     if (e.target.checked) {
@@ -477,8 +466,8 @@ function mainMap(ctx) {
   const freqOf = (cs) => net.posBy[cs]?.frequency || net.vacs?.acc_positions?.[cs]?.frequency || "";
 
   // Właściciel jednego wycinka. Wynik: {c: obsługujący (w TMA / CTA / CTR tylko APP, TWR…: etykieta), top: ACC top-down,
-  // key: znak do koloru, who: znak obsługującego z kolejności (kolor TMA / CTA / CTR), ext: obsługujący spoza stanowisk .ese,
-  // ch: kolejność z chains.js (TMA, CTA, CTR)}
+  // key: znak do koloru, who: znak obsługującego z kolejności (kolor TMA / CTA / CTR), ch: kolejność z chains.js (TMA, CTA,
+  // CTR; tylko do ustalenia obsługującego i stanowiska w podziale pełnym)}
   const ownerOf = (pr, ctxo) => {
     const ch = CHAIN_KINDS.includes(pr.kind) ? airspaceChain(pr.name, pr.owner_callsigns, net.vacs) : null;
     if (!ctxo) return { c: null, top: null, key: null, who: ch?.chain[0] || null, ch };
@@ -491,7 +480,7 @@ function mainMap(ctx) {
       if (loc) return { c: on(loc), top: null, key: loc, who: loc, ch };
       const icao = (ch.local[0] || pr.name).slice(0, 4);
       const x = (pr.kind === "ctr" ? ["TWR", "APP"] : ["APP"]).map((t) => extra[icao]?.[t]?.[0]).find(Boolean);
-      if (x) return { c: x, top: null, key: x.callsign, who: x.callsign, ext: true, ch };
+      if (x) return { c: x, top: null, key: x.callsign, who: x.callsign, ch };
       const acc = ch.acc.find(on);
       return { c: null, top: acc ? on(acc) : null, key: null, who: acc || null, ch };
     }
@@ -777,24 +766,8 @@ function mainMap(ctx) {
     if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> ${nm(top)}`;
     return `<span class="muted">unstaffed</span>`;
   };
-  // TMA / CTA / CTR: wszystkie stanowiska w kolejności przejmowania (chains.js, jak w RADIO) z częstotliwością,
-  // a zalogowane z nazwiskiem kontrolera. Obsługujący na zielonym tle, zalogowani na zielono, niezalogowani szarzy;
-  // przed częścią ACC skąd jest jej kolejność (om = tabela top-down om.plvacc.pl, .ese = lista OWNER pliku sektorowego).
-  const uniq = (xs) => xs.filter((x, i) => xs.indexOf(x) === i);
-  const chainHtml = (r) => {
-    const local = uniq(r.chs.flatMap((ch) => ch.local)), acc = uniq(r.chs.flatMap((ch) => ch.acc)).filter((cs) => !local.includes(cs));
-    // wiersz z kilku wycinków może mieć oba źródła (np. EPWA_DIR* bez prefiksu w tabeli om): "om (TMA Warszawa) / .ese"
-    const tma = r.chs.find((ch) => ch.tma)?.tma;
-    const src = uniq(r.chs.map((ch) => ch.src)).sort().reverse().map((x) => (x === "om" ? `om${tma ? ` (${tma})` : ""}` : ".ese")).join(" / ");
-    const who = r.own.who;
-    const chip = (cs, c) => {
-      const st = cs === who ? " own" : !net.useOnline ? "" : c ? " on" : " off";
-      return `<span class="asc${st}"><b>${esc(displayName(cs))}</b> ${esc(c?.frequency || freqOf(cs))}${c ? ` <i>${esc(c.name || "")}</i>` : ""}</span>`;
-    };
-    const on = (cs) => (net.useOnline && net.ctxo ? onlOf(cs, net.ctxo) : null);
-    return `<div class="as-ch">${local.map((cs) => chip(cs, on(cs))).join("")}${r.own.ext ? chip(who, r.own.c) : ""}${acc.length
-      ? `<span class="asc-src">ACC per ${esc(src)}:</span>${acc.map((cs) => chip(cs, on(cs))).join("")}` : ""}</div>`;
-  };
+  // Wiersz przestrzeni: nazwa, ID, zakres pionowy, częstotliwość i kto ją teraz obsługuje (od kiedy). Bez kolejności
+  // przejmowania pod wierszem TMA / CTA / CTR (0.12.6, Marek: bez hierarchii, jak w RADIO).
   const hoverHtml = (hits, lv) => {
     // TMA / CTA / CTR: wycinki tej samej przestrzeni z tym samym obsługującym (np. konfiguracje pasów EPWA_DIR11_A, DIR15_A…)
     // w jednym wierszu z łącznym zakresem pionowym; reszta: sąsiednie pasma tego samego wycinka z tym samym obsługującym.
@@ -808,10 +781,9 @@ function mainMap(ctx) {
         if (last && nk(last.pr) === nk(v.pr) && last.w === w && v.pr.lower_ft <= last.hi) {
           last.hi = Math.max(last.hi, v.pr.upper_ft);
           if (!last.names.includes(v.pr.name)) last.names.push(v.pr.name);
-          if (v.own.ch) last.chs.push(v.own.ch);
           return;
         }
-        rows.push({ pr: v.pr, own: v.own, w, lo: v.pr.lower_ft, hi: v.pr.upper_ft, names: [v.pr.name], chs: v.own.ch ? [v.own.ch] : [] });
+        rows.push({ pr: v.pr, own: v.own, w, lo: v.pr.lower_ft, hi: v.pr.upper_ft, names: [v.pr.name] });
       });
     // jak przekrój pionowy: od najwyższej przestrzeni do najniższej
     rows.sort((a, b) => b.hi - a.hi || b.lo - a.lo || KIND_ORDER.indexOf(a.pr.kind) - KIND_ORDER.indexOf(b.pr.kind));
@@ -819,7 +791,7 @@ function mainMap(ctx) {
     const nm = (r) => (r.pr.kind === "nb" ? `<b>${esc(r.pr.label)}</b>` : `<b>${esc(r.pr.group_label)}</b> <span class="muted">${names(r)}</span>`);
     return `<div class="atc-tip-h"><b>${lv === null ? "all levels" : fl(lv)}</b> ${plural(rows.length, "airspace", "airspaces")} here</div>
       <table>${rows.map((r) => `<tr><td><span class="as-k as-${r.pr.kind}">${KIND_TAG[r.pr.kind]}</span></td><td>${nm(r)}</td>
-        <td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>${r.chs.length ? `<tr class="as-chr"><td></td><td colspan="3">${chainHtml(r)}</td></tr>` : ""}`).join("")}</table>`;
+        <td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>`).join("")}</table>`;
   };
   // Dymek etykiety stanowiska: kontroler (znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy, opis) i ATIS
   // lotniska z prefiksu znaku (ESGG_GND → ATIS ESGG), każda linijka ATIS osobno
@@ -902,7 +874,7 @@ function mainMap(ctx) {
     const fold = FOLD.includes(id);
     el.innerHTML = `<div class="pk-bar">${items.length > 12 ? `<input class="field pk-q" placeholder="search…" value="${esc(q)}">` : ""}
         <button data-pk="all">all</button><button data-pk="none">none</button></div>
-      <div class="pk-list">${!items.length ? `<div class="pk-none">${sliceErr ? esc(sliceErr) : "no sectors in the .ese file"}</div>` : [...groups].map(([head, its]) => {
+      <div class="pk-list">${!items.length ? `<div class="pk-none">${sliceErr ? esc(sliceErr) : "no sectors"}</div>` : [...groups].map(([head, its]) => {
         const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head} ${[...it.on].join(" ")}${it.who}`.toLowerCase().includes(q));
         if (!vis2.length) return "";
         const n = its.filter((it) => has(it.key)).length;
@@ -977,17 +949,16 @@ function mainMap(ctx) {
     const tags = ids.filter((id) => fs.some((pr) => pr.pick === id)).map((id) => AIR_TAG[id]).join("/");
     return `${tags} ${where}: choose ${at.length ? (at.length > 1 ? `${at[0]}–${at[at.length - 1]}` : at[0]) + " or " : ""}“all levels”`;
   };
-  // opis pod przełącznikami: liczba wycinków, kto jest online (bez opisu kolejności przejmowania: Marek, 0.12.5;
-  // zostaje tylko ostrzeżenie, gdy jej nie ma i sektory ACC idą wg listy OWNER pliku .ese)
+  // opis pod przełącznikami: liczba wycinków, kto jest online (bez opisu kolejności przejmowania i skąd ona jest:
+  // Marek, 0.12.5 i 0.12.6)
   function renderInfo(lv) {
     const el = $(".sector-info");
-    if (sliceErr) { el.innerHTML = `<span class="error">Sectors from the .ese file: ${esc(sliceErr)}</span>`; return; }
+    if (sliceErr) { el.innerHTML = `<span class="error">Sectors unavailable: ${esc(sliceErr)}</span>`; return; }
     if (!slices) { el.textContent = "loading sectors…"; return; }
     if (!slices.features.length) { el.textContent = slices.note || "no sectors"; return; }
     const cnt = {};
     vis.forEach((v) => { cnt[v.pr.pick] = (cnt[v.pr.pick] || 0) + 1; });
     const parts = [];
-    if (air.acc && !net.vacs) parts.push(`<span class="as-note">ACC ownership order unavailable: OWNER lists from the .ese file.</span>`);
     parts.push(`${lv === null ? "All levels" : "At " + fl(lv)}: ${AIR.filter((a) => air[a.id]).map((a) => `${AIR_TAG[a.id]} ${cnt[a.id] || 0}`).join(" · ") || "no layer"}.`);
     const off = offLevel(lv, cnt);
     if (off) parts.push(`<span class="as-note">${off}</span>`);
@@ -1213,7 +1184,7 @@ function mainMap(ctx) {
     const list = viffData?.sectors || [], scns = viffData?.scenarios || [];
     const byId = Object.fromEntries(list.map((t) => [t.id, t]));
     const act = scns.filter((s) => s.active), off = scns.filter((s) => !s.active);
-    $(".vs-list").innerHTML = !viffData || !$(".viff").checked ? "" : !scns.length ? `<div class="vs-none">vIFF returned no scenarios</div>`
+    $(".vs-list").innerHTML = !viffData || !$(".viff").checked ? "" : !scns.length ? `<div class="vs-none">no scenarios</div>`
       : `<div class="vs-sub">Scenarios <span>active: ${act.length} of ${scns.length}</span></div>
       ${act.map((s) => scnHtml(s, byId)).join("") || `<div class="vs-none">no scenario is active now</div>`}
       ${off.length ? `<details class="vs-more" ${store.get("map.viff.off", false) ? "open" : ""}><summary>Inactive scenarios (${off.length})</summary>
@@ -1375,12 +1346,12 @@ function mainMap(ctx) {
       <div class="fd-head"><div class="fd-l1"><b class="fd-cs">${esc(cs)}</b>${v ? stateChip(v, v.states) : ""}${v?.landed ? ` <span class="fs fs-fi">landed</span>` : ""}</div>
         <div class="fd-od"><b>${esc(adep || "????")}</b><span class="ar">→</span><b>${esc(ades || "????")}</b>${type ? `<span class="fd-tag">${esc(type)}</span>` : ""}${p?.rules ? `<span class="fd-tag">${p.rules === "V" ? "VFR" : "IFR"}</span>` : ""}</div>
         ${p ? `<div class="fd-who">${esc(p.name || "")} · CID ${esc(p.cid)}</div>` : v?.cid ? `<div class="fd-who">CID ${esc(v.cid)}</div>` : ""}</div>`;
-    const vat = p === undefined ? `<div class="fd-note">Loading VATSIM data…</div>`
+    const vat = p === undefined ? `<div class="fd-note">Loading…</div>`
       : p ? `<div class="fd-grid g4">${kv("Level", alt(p.altitude))}${kv("GS", `${esc(p.groundspeed ?? "–")} kt`)}${kv("SQ", t4(p.squawk))}${kv("HDG", p.heading ?? "–")}
-        ${kv("RFL", t4(p.rfl ? (p.rfl >= 6000 ? fl(p.rfl) : p.rfl) : ""), "from the VATSIM flight plan")}</div>`
+        ${kv("RFL", t4(p.rfl ? (p.rfl >= 6000 ? fl(p.rfl) : p.rfl) : ""), "requested flight level")}</div>`
       : `<div class="fd-note">${esc(fd.vatErr)}</div>`;
     let vf;
-    if (v === undefined) vf = `<div class="fd-note">Loading vIFF data…</div>`;
+    if (v === undefined) vf = `<div class="fd-note">Loading…</div>`;
     else if (!v) vf = `<div class="fd-note">${esc(fd.viffErr)}</div>`;
     else {
       const dtip = [v.delay !== null && v.delay !== undefined && `ATFM delay ${v.delay} min (CTOT − EOBT − taxi)`, v.ctot_reason && `reason: ${v.ctot_reason}`,
@@ -1390,31 +1361,31 @@ function mainMap(ctx) {
       vf = `<div class="fd-grid g4">
           ${kv("EOBT", t4(v.eobt))}${kv("TOBT", t4(v.tobt))}${kv("TSAT", t4(v.tsat))}${kv("CTOT", ctot, dtip || "no slot")}
           ${kv("AOBT", t4(v.aobt))}${kv("ATOT", t4(v.atot), "actual take-off")}${kv("TTOT", t4(v.ttot), "target take-off (A-CDM)")}${kv("ETA", t4(v.eta))}
-          ${kv("RFL", t4(v.rfl))}${kv("TAS", v.tas ? v.tas + " kt" : "–")}${kv("EET", eet, "flight time from the plan")}${kv("On time", t4(v.on_time), "vIFF onTime field (deviation from the plan)")}
+          ${kv("RFL", t4(v.rfl))}${kv("TAS", v.tas ? v.tas + " kt" : "–")}${kv("EET", eet, "flight time from the plan")}${kv("On time", t4(v.on_time), "deviation from the plan")}
         </div>
         <div class="fd-grid g2">
           ${kv("Regulation", v.regulation ? `<b class="fd-reg">${esc(v.regulation)}</b>` : "none")}${kv("Most penalising", t4(v.airspace), "most penalising airspace")}
-          ${kv("Airspace now", t4(v.actual_airspace))}${kv("CDM status", esc([v.cdm_status, v.is_cdm && "A-CDM"].filter(Boolean).join(" · ") || "–"), "vIFF CDM status · A-CDM = departure aerodrome with A-CDM")}
+          ${kv("Airspace now", t4(v.actual_airspace))}${kv("CDM status", esc([v.cdm_status, v.is_cdm && "A-CDM"].filter(Boolean).join(" · ") || "–"), "A-CDM = departure aerodrome with A-CDM")}
           ${kv("ATFCM status", t4(v.atfcm_status))}${kv("RWY / SID", t4(v.dep_info))}
         </div>`;
     }
     const route = v?.route || p?.route;
-    const rt = `<div class="fd-sec">Route (item 15)${!v?.route && p?.route ? " · VATSIM plan" : ""}</div>
+    const rt = `<div class="fd-sec">Route (item 15)</div>
       <div class="fd-route">${esc(route || "no route")}</div>
-      ${flight?.points?.length ? `<div class="fd-meta">on map: ${plural(flight.points.length, "point", "points")} · ${flight.distance_nm} NM${p ? " (route from the VATSIM plan)" : " (route from vIFF)"}</div>` : ""}
+      ${flight?.points?.length ? `<div class="fd-meta">on map: ${plural(flight.points.length, "point", "points")} · ${flight.distance_nm} NM</div>` : ""}
       ${flight?.warnings?.length ? `<div class="fd-warn">${flight.warnings.map(esc).join("<br>")}</div>` : ""}`;
     const secs = v?.sectors || [], hist = v?.history || [];
-    const sec = !v ? "" : `<details class="fd-x" data-x="sectors" ${fdOpen.sectors ? "open" : ""}><summary>Sector entries (vIFF) <span>${secs.length}</span></summary>
+    const sec = !v ? "" : `<details class="fd-x" data-x="sectors" ${fdOpen.sectors ? "open" : ""}><summary>Sector entries <span>${secs.length}</span></summary>
       ${secs.length ? `<table class="fd-tbl"><thead><tr><th rowspan="2">TV</th><th rowspan="2">Description</th><th colspan="2">Planned</th><th colspan="2">Calculated</th></tr>
         <tr><th>entry</th><th>exit</th><th>entry</th><th>exit</th></tr></thead><tbody>
         ${secs.map((x) => `<tr data-tv="${esc(x.tv)}" class="${esc(x.state)}" title="${x.state === "now" ? "the flight is in this sector now · " : ""}click: sector chart">
           <td class="cs">${esc(x.tv)}</td><td class="d">${esc(x.label)}</td><td class="t">${t4(x.planned_entry)}</td><td class="t">${t4(x.planned_exit)}</td>
           <td class="t">${t4(x.entry)}</td><td class="t">${t4(x.exit)}</td></tr>`).join("")}</tbody></table>`
-        : `<div class="fd-note">${v.sectors_error ? "vIFF: " + esc(v.sectors_error) : "No EP sector entries in today's data."}</div>`}</details>
-      <details class="fd-x" data-x="history" ${fdOpen.history ? "open" : ""}><summary>vIFF history <span>${hist.length}</span></summary>
+        : `<div class="fd-note">${v.sectors_error ? "Sector entries unavailable." : "No EP sector entries today."}</div>`}</details>
+      <details class="fd-x" data-x="history" ${fdOpen.history ? "open" : ""}><summary>Flight history <span>${hist.length}</span></summary>
       ${hist.length ? `<ol class="fd-hist">${hist.map((x) => `<li><span class="t" title="${esc(x.time)}">${histTime(x.time)}</span><span>${esc(x.text)}</span></li>`).join("")}</ol>`
         : `<div class="fd-note">no entries</div>`}</details>`;
-    fdEl.innerHTML = `${head}<div class="fd-body"><div class="fd-sec">Position (VATSIM)</div>${vat}<div class="fd-sec">Flight (vIFF)</div>${vf}${rt}${sec}</div>`;
+    fdEl.innerHTML = `${head}<div class="fd-body"><div class="fd-sec">Position</div>${vat}<div class="fd-sec">Flight</div>${vf}${rt}${sec}</div>`;
     fdEl.querySelector(".fd-body").scrollTop = keep;
   };
   const fitFlight = (f) => {
@@ -1443,10 +1414,10 @@ function mainMap(ctx) {
     }).catch((e) => {
       if (selected !== cs) return;
       fd.vat = null;
-      fd.vatErr = /is not online/.test(e.message) ? "Not on the VATSIM network now." : e.message;
+      fd.vatErr = /is not online/.test(e.message) ? "Not online now." : e.message;
       renderFd();
     });
-    const viffP = (/^[A-Z0-9]{2,10}$/.test(cs) ? api(`/api/viff/flight/${encodeURIComponent(cs)}`) : Promise.reject(new Error("vIFF: callsign not in ICAO format")))
+    const viffP = (/^[A-Z0-9]{2,10}$/.test(cs) ? api(`/api/viff/flight/${encodeURIComponent(cs)}`) : Promise.reject(new Error("Callsign not in ICAO format")))
       .then((v) => { if (selected === cs) { fd.viff = v; renderFd(); } })
       .catch((e) => { if (selected === cs) { fd.viff = null; fd.viffErr = e.message; renderFd(); } });
     await Promise.all([vatP, viffP]);
@@ -1483,22 +1454,38 @@ function mainMap(ctx) {
     const n = { dep: 0, arr: 0, trn: 0, out: 0 }, ep = pilots.filter((p) => !p.kept);
     ep.forEach((p) => { n[relation(p, adIdx)]++; });
     $(".traffic-info").textContent = `${plural(ep.length, "aircraft", "aircraft")} in EP traffic (departures ${n.dep}, arrivals ${n.arr}, `
-      + `transits through EPWW ${n.trn}) · ${trafficAt}. Click an aircraft: flight details and route.`;
+      + `transits through EPWW ${n.trn}) · ${trafficAt}. Hover an aircraft: label; click: flight details and route.`;
+  };
+  // Etykieta samolotu (0.12.6, Marek): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
+  // w nieprzezroczystym okienku po najechaniu na samolot, u wybranego lotu cały czas. Własna warstwa nad plakietkami
+  // lotnisk i etykietami stanowisk (pod kartami lotnisk, atcTip = 700); okienko w granicach mapy (acLabelSpot), przy
+  // otwarciu i po każdym przerysowaniu ruchu (moveend).
+  map.createPane("acLbl").style.zIndex = 690;
+  const placeLabel = (m) => {
+    const tt = m.getTooltip(), el = tt?.getElement();
+    if (!el || !m.isTooltipOpen()) return;
+    const p = map.latLngToContainerPoint(m.getLatLng()), { x: W, y: H } = map.getSize();
+    const { dir, off } = acLabelSpot(p.x, p.y, el.offsetWidth, el.offsetHeight, W, H);
+    if (tt.options.direction === dir && String(tt.options.offset) === String(off)) return;
+    Object.assign(tt.options, { direction: dir, offset: off });
+    tt.update();
   };
   const drawTraffic = () => {
     layers.traffic.clearLayers();
     if (!$(".traffic").checked || map.getSize().x < 40) return;
-    const z = map.getZoom(), b = map.getBounds().pad(0.2);
+    const b = map.getBounds().pad(0.2);
     // kept: z mapy tylko wybrany lot, reszta jest w tabeli wykresu vIFF
     pilots.filter((p) => b.contains([p.lat, p.lon]) && (!p.kept || p.callsign === selected)).forEach((p) => {
-      const rel = relation(p, adIdx);
-      // etykieta PEGASUS_21 (airspace.js); tranzyt i odlot z EP** za granicę: punkt wyjścia z FIR-u z serwera zamiast
-      // lotniska docelowego (serwer podaje exit tylko dla nich; lot krajowy, przylot: lotnisko docelowe)
+      const rel = relation(p, adIdx), sel = p.callsign === selected;
+      // tranzyt i odlot z EP** za granicę: punkt wyjścia z FIR-u z serwera zamiast lotniska docelowego (serwer podaje
+      // exit tylko dla nich; lot krajowy, przylot: lotnisko docelowe)
       const exit = rel === "trn" || rel === "dep" ? p.exit || null : null;
-      const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9, cls: rel, exit })
-        .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)} · ${esc(REL_TEXT[rel](p))}`)
+      // tooltipopen: e.target to marker (stały dymek wybranego lotu otwiera się już w addTo)
+      aircraftMarker(p, { cls: rel + (sel ? " sel" : "") })
+        .bindTooltip(p21Html(p, { exit }), { pane: "acLbl", className: "ac-lbl" + (sel ? " sel" : ""), direction: "right", offset: [10, 0],
+          opacity: 1, permanent: sel })
+        .on("tooltipopen", (e) => placeLabel(e.target))
         .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
-      if (p.callsign === selected) m.getElement()?.classList.add("sel");
     });
   };
   // Serwer odsiewa samoloty bez związku z ruchem EP (ep=1). Wybrany lot i loty z wykresu vIFF są w odpowiedzi zawsze
@@ -1532,7 +1519,6 @@ function mainMap(ctx) {
     if (viffData) renderChart();  // ADEP/ADES/typ w tabeli lotów wykresu
   };
   $(".traffic").addEventListener("change", loadTraffic);
-  $(".traffic-detail").addEventListener("change", drawTraffic);
   map.on("moveend", drawTraffic);
   every(30000, () => $(".traffic").checked && loadTraffic());
 

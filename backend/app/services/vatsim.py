@@ -15,6 +15,9 @@ from .http_cache import fetch_text
 
 DATA_FEED = "https://data.vatsim.net/v3/vatsim-data.json"
 BOOKINGS = "https://atc-bookings.vatsim.net/api/booking"
+# komunikaty w interfejsie przy awarii (0.12.6: bez nazwy i adresu źródła; szczegóły błędu tylko w logu)
+FEED_DOWN = "Live data feed unavailable"
+BOOKINGS_DOWN = "ATC bookings unavailable"
 
 
 _parsed: dict[str, tuple[str, object]] = {}

@@ -278,7 +278,8 @@ def test_simulated_acc_fir_badge(js):
 
 
 def test_map_unstaffed_wording():
-    """Runda 14 (przegląd): MAP pisał "no controller", a RADIO, jego legenda i ABOUT "unstaffed" o tym samym stanie."""
+    """Runda 14 (przegląd): MAP pisał "no controller", a RADIO, jego legenda i ABOUT "unstaffed" o tym samym stanie.
+    0.12.6: airspace.js nie rysuje już sektorów z dymkiem (drawSectors), "unstaffed" pisze sam MAP."""
     for name in ("tabs/map.js", "airspace.js"):
-        src = (JS / name).read_text("utf-8")
-        assert "no controller" not in src and "unstaffed" in src, name
+        assert "no controller" not in (JS / name).read_text("utf-8"), name
+    assert "unstaffed" in (JS / "tabs" / "map.js").read_text("utf-8")

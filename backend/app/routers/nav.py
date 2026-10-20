@@ -16,7 +16,7 @@ from ..services.http_cache import UpstreamError
 from ..services.neighbours import covered_firs, nb_positions, nb_sectors, owners_of
 from ..services.positions import position_tree
 from ..services.route import RouteResolver
-from ..services.vatsim import get_feed, match_positions
+from ..services.vatsim import FEED_DOWN, get_feed, match_positions
 
 router = APIRouter(prefix="/api/nav", tags=["map"])
 
@@ -194,7 +194,7 @@ async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     try:
         data = await get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
+        raise HTTPException(502, FEED_DOWN) from exc
     positions = db.scalars(select(AtcPosition)).all()
     online = match_positions(data.get("controllers", []), positions)
     by_id = {p.position_id: online[p.callsign] | {"position": p.callsign}

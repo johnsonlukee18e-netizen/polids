@@ -24,7 +24,7 @@ export const loadFirs = () => (firsPromise ||= api("/api/vatsim/firs").catch((e)
 export const fl = (ft) => "FL" + String(Math.round((ft || 0) / 100)).padStart(3, "0");
 
 // --- Kolejność przejmowania sektorów EPWW w warstwach LOW/MID/HIGH (dawniej łańcuchy VACS, CC BY-NC-SA 4.0).
-// Wczytywane raz przy starcie modułu, żeby sectorOwners() (też w RADIO) miało je od razu.
+// Wczytywane raz przy starcie modułu, żeby sliceOwner() miało je od razu.
 let vacsPromise = null, vacsData = null;
 // Od rundy 8 kolejność przejmowania z /api/nav/ownership (tymczasowo .ese, docelowo tabela z om.plvacc.pl); kształt jak w VACS.
 export const loadVacs = () => (vacsPromise ||= api("/api/nav/ownership").then((d) => (vacsData = d))
@@ -34,8 +34,6 @@ loadVacs().catch(() => { /* bez VACS: właściciele z listy OWNER pliku .ese */ 
 export const vacsLayer = (ft) => (ft < 33500 ? "LOW" : ft < 36500 ? "MID" : "HIGH");
 // litera sektora ACC z nazwy sektora .ese: EPWWB → B, EPWWR-N → R; EPWW-MIDSEA, TMA, CTA → null
 const accLetter = (name) => /^EPWW([A-Z])(?:-[A-Z]+)?$/.exec(name || "")?.[1] || null;
-// skrót stanowiska VACS (EPWW_DBF_CTR → DBF)
-export const vacsShort = (vacs, cs) => vacs?.acc_positions?.[cs]?.short || cs;
 
 // --- Plakietki stanowisk online jak w VATSIM Radar: lotnisko = ICAO + D/G/T/A/APP, FIR = CTR + id.
 // Po najechaniu dymek z listą: znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy online, ATIS.
@@ -126,36 +124,6 @@ export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels
   });
 }
 
-// Sektory EPWW: kolor wg właściciela; w trybie online sektor bez kontrolera to sam szary kontur.
-// online = {sector_owner: {nazwa: {callsign, frequency, name, cid}}} albo null (podział pełny z pliku .ese).
-// tipPane: warstwa dymków (np. nad plakietkami ATC), domyślnie zwykła warstwa dymków Leafleta.
-// chain: dopisz w dymku kolejność przejmowania (domyślnie nie: Marek nie chce hierarchii na mapie, tylko właściciela).
-export function drawSectors(layer, gj, online = null, { labels = true, tipPane = "tooltipPane", chain = false } = {}) {
-  gj.features.forEach((f) => {
-    const pr = f.properties;
-    const own = online ? online.sector_owner[pr.name] : null;
-    const cs = online ? own?.callsign : pr.callsign;
-    const freq = online ? own?.frequency : pr.frequency;
-    // sektor ACC rozstrzygnięty wg kolejności przejmowania: kolor wg stanowiska z tej kolejności
-    // (ten sam także przy znaku zastępczym, np. EPWW_C1_CTR na częstotliwości C)
-    const vc = online?.vacs?.[pr.name];
-    const color = online && !own ? "#555" : colorFor(vc?.key || cs || pr.name);
-    const ch = chain && vc ? `<br><span class="muted">${esc(vc.layer)}:</span> ${vc.chain.map((x) => (x === vc.owner ? `<b>${esc(x)}</b>` : esc(x))).join(" › ")}` : "";
-    const who = online ? (own ? `${esc(own.callsign)} ${esc(own.frequency)}<br>${esc(own.name || "")} (${esc(own.cid ?? "")})` : `<span class="muted">unstaffed</span>`)
-      : `${esc(cs || "")} ${esc(freq || "")}`;
-    const poly = L.geoJSON(f, { style: { color, weight: 1.2, fillColor: color, fillOpacity: online && !own ? 0 : 0.16 } })
-      .bindTooltip(`<b>${esc(pr.name)}</b> ${fl(pr.lower_ft)}–${fl(pr.upper_ft)}<br>${who}${ch}`, { sticky: true, pane: tipPane, opacity: 1 });
-    poly.addTo(layer);
-    if (labels) {
-      L.marker(poly.getBounds().getCenter(), {
-        interactive: false,
-        icon: L.divIcon({ className: "maplabel", iconSize: null,
-          html: `<div><small>${esc(pr.name)}</small>${freq ? `<br><span class="freq${own ? " on" : ""}">${esc(freq)}</span>` : ""}</div>` }),
-      }).addTo(layer);
-    }
-  });
-}
-
 // Właściciel jednego wycinka sektora (properties z /api/nav/sectors albo /api/nav/slices). Sektor ACC EPWW (B, C, … R-N):
 // pierwsze zalogowane stanowisko z kolejności przejmowania w warstwie wycinka (LOW/MID/HIGH wg jego dolnej granicy).
 // Reszta (TMA, CTR, FIS, sąsiedzi) i brak kolejności: pierwsze zalogowane z listy OWNER pliku .ese (jak w EuroScope).
@@ -174,20 +142,6 @@ export function sliceOwner(pr, byId, online, vacs = vacsData) {
   return { c: p ? online[p.callsign] : null, key: p?.callsign || null, layer: null, chain: null };
 }
 
-// Właściciel każdego sektora (sliceOwner dla całej warstwy, klucz = nazwa sektora).
-// Wynik: {sector_owner: {nazwa: kontroler}, vacs: {nazwa: {layer, chain: [skróty], owner: skrót|null, key: znak|null}}}.
-export function sectorOwners(gj, positions, online, vacs = vacsData) {
-  if (!vacsData && !vacsPromise) loadVacs().catch(() => { /* następna próba przy kolejnym rysowaniu */ });
-  const byId = Object.fromEntries(positions.map((p) => [p.position_id, p]));
-  const owners = {}, chains = {};
-  gj.features.forEach((f) => {
-    const pr = f.properties, o = sliceOwner(pr, byId, online, vacs);
-    if (o.chain) chains[pr.name] = { layer: o.layer, chain: o.chain.map((c) => vacsShort(vacs, c)), owner: o.key ? vacsShort(vacs, o.key) : null, key: o.key };
-    if (o.c) owners[pr.name] = o.c;
-  });
-  return { sector_owner: owners, vacs: chains };
-}
-
 // Wysokość do dymków: GND, stopy do wysokości przejściowej (6500 ft), wyżej poziom lotu
 export const altLabel = (ft) => (!ft ? "GND" : ft <= 6500 ? `${ft} ft` : fl(ft));
 
@@ -202,25 +156,11 @@ export const TL_FT = 8000;
 // strzałkę wznoszenia albo zniżania; mniejsza to wahania wysokości w locie poziomym
 export const VS_ARROW_FT = 100;
 
-// RFL z planu lotu VATSIM (pole altitude: "35000", "FL350", "F350", "A045", "350") w stopach albo null
-export function rflFeet(v) {
-  const t = String(v ?? "").trim().toUpperCase();
-  let m = /^F(?:L)?(\d{2,3})$/.exec(t);
-  if (m) return +m[1] * 100;
-  if ((m = /^A(\d{2,3})$/.exec(t))) return +m[1] * 100;
-  if (!/^\d{2,5}$/.test(t)) return null;
-  const n = +t;
-  return n > 0 && n < 1000 ? n * 100 : n >= 1000 ? n : null;  // 350 = FL350, 35000 = 35000 ft
-}
-
-// Etykieta samolotu jak w PEGASUS_21 (PAŻP; Marek, 0.12.5): cztery linijki czcionką o stałej szerokości, bez ramki
-// i tła. 1: znak wywoławczy i prędkość względem ziemi w węzłach (3 cyfry); 2: poziom z Mode C, poniżej poziomu
-// przejściowego "A" i wysokość w setkach stóp ("A 53" = 5300 ft), wyżej FL ("270"), ze strzałką ↑ / ↓, gdy wysokość
-// zmieniła się od poprzedniego odczytu (p.vs z climbRates); 3: typ z kategorią turbulencji ("DC10H") i lotnisko
-// docelowe, a tranzyt i odlot z EP** za granicę punkt wyjścia z FIR-u (exit, z serwera), gdy znany; 4: "h  s  r"
-// (przydzielone kurs, prędkość i prędkość pionowa: na VATSIM ich nie ma, pola puste) i poziom: VATSIM nie podaje
-// poziomu z zezwolenia, więc RFL z planu lotu w dziesiątkach FL dwiema cyframi ("24" = FL240, "08" = FL080; poziom
-// niepodzielny przez 10 trzema cyframi, poniżej TL jak linijka 2: "A 45" = 4500 ft).
+// Etykieta samolotu jak w PEGASUS_21 (PAŻP; Marek, 0.12.5; od 0.12.6 trzy linijki, bez "h  s  r" i RFL): czcionka
+// o stałej szerokości. 1: znak wywoławczy i prędkość względem ziemi w węzłach (3 cyfry); 2: poziom z Mode C, poniżej
+// poziomu przejściowego "A" i wysokość w setkach stóp ("A 53" = 5300 ft), wyżej FL ("270"), ze strzałką ↑ / ↓, gdy
+// wysokość zmieniła się od poprzedniego odczytu (p.vs z climbRates); 3: typ z kategorią turbulencji ("DC10H")
+// i lotnisko docelowe, a tranzyt i odlot z EP** za granicę punkt wyjścia z FIR-u (exit, z serwera), gdy znany.
 export function p21Lines(p, { exit = null } = {}) {
   const gs = p.groundspeed === null || p.groundspeed === undefined ? "" : String(Math.max(0, Math.round(p.groundspeed))).padStart(3, "0");
   const l1 = gs ? `${String(p.callsign || "").padEnd(8)} ${gs}` : String(p.callsign || "");
@@ -229,36 +169,38 @@ export function p21Lines(p, { exit = null } = {}) {
     : String(Math.round(a / 100)).padStart(3, "0");
   const arrow = !lvl || p.vs === null || p.vs === undefined ? "" : p.vs >= VS_ARROW_FT ? "↑" : p.vs <= -VS_ARROW_FT ? "↓" : "";
   const l3 = [`${p.aircraft || ""}${p.aircraft ? p.wake || "" : ""}`, exit || p.arrival || ""].filter(Boolean).join(" ");
-  const ft = rflFeet(p.rfl), f = ft === null ? null : Math.round(ft / 100);
-  // dziesiątki FL zawsze dwiema cyframi (FL080 → "08", jak "24" w P21: jedna cyfra wyglądałaby jak inne pole),
-  // poniżej TL jak linijka 2 ("A 45" = 4500 ft)
-  const rfl = ft === null ? "" : ft < TL_FT ? `A${String(f).padStart(3)}` : f % 10 ? String(f).padStart(3, "0") : String(f / 10).padStart(2, "0");
-  return [l1, lvl + arrow, l3, `h  s  r${rfl ? " " + rfl : ""}`];
+  return [l1, lvl + arrow, l3];
 }
 
-// Linijki etykiety jako HTML (aircraftMarker, wzór w legendzie MAP): sam znak wywoławczy albo (detail) pełna etykieta
-// PEGASUS_21 (p21Lines; pusta trzecia linijka, np. bez planu lotu, odpada). W linijce 1 tylko znak w <b class="cs">
-// (zielony, wybrany lot pomarańczowy, map.css), prędkość w osobnym <b class="gs"> w kolorze linijek 2-4, jak na
-// etykiecie DOM004 z P21; tekst linijki (textContent) bez zmian. Nie <span>: ".acicon span" w style.css to dawna
-// etykieta z tłem i pozycją absolute.
-export function p21Html(p, { detail = true, exit = null } = {}) {
+// Linijki etykiety jako HTML (okienko po najechaniu na samolot w MAP, wzór w legendzie); pusta trzecia linijka (np.
+// bez planu lotu) odpada. W linijce 1 tylko znak w <b class="cs"> (zielony, wybrany lot pomarańczowy, map.css),
+// prędkość w osobnym <b class="gs"> w kolorze linijek 2-3, jak na etykiecie DOM004 z P21; tekst linijki
+// (textContent) bez zmian.
+export function p21Html(p, { exit = null } = {}) {
   const cs = String(p.callsign || "");
-  const lines = detail ? p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2) : [[cs, 0]];
-  return lines.map(([t, i]) => {
+  return p21Lines(p, { exit }).map((t, i) => [t, i]).filter(([t, i]) => t || i !== 2).map(([t, i]) => {
     if (i) return `<i class="l${i + 1}">${esc(t)}</i>`;
     const [, gap = "", gs = ""] = /^(\s*)(.*)$/.exec(t.slice(cs.length)) || [];
     return `<i class="l1"><b class="cs">${esc(cs)}</b>${gs ? `${gap}<b class="gs">${esc(gs)}</b>` : ""}</i>`;
   }).join("");
 }
 
-// Samolot: sylwetka obrócona wg kursu (14 px, mniejsza niż do 0.12.4) i etykieta p21Html (sam znak albo, detail,
-// pełna etykieta PEGASUS_21). Bez tła: znak na zielono, reszta na biało (map.css). cls: dodatkowa klasa ikony
-// (MAP: dep / arr / trn = odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP); exit: punkt
-// wyjścia z FIR-u tranzytu albo odlotu za granicę (trzecia linijka zamiast lotniska docelowego).
-export function aircraftMarker(p, { label = true, detail = false, cls = "", exit = null } = {}) {
-  const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
-    + (label ? `<span class="p21">${p21Html(p, { detail, exit })}</span>` : "") + "</div>";
+// Samolot: sylwetka obrócona wg kursu (14 px). Od 0.12.6 bez stałej etykiety (Marek): etykieta P21 tylko w okienku po
+// najechaniu, a u wybranego lotu cały czas (MAP, acLabelSpot). cls: dodatkowa klasa ikony (MAP: dep / arr / trn =
+// odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP).
+export function aircraftMarker(p, { cls = "" } = {}) {
+  const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg></div>`;
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon" + (cls ? " " + cls : ""), html, iconSize: [14, 14], iconAnchor: [7, 7] }) });
+}
+
+// Miejsce okienka etykiety obok samolotu, w pikselach kontenera mapy: (x, y) samolot, w × h okienko, W × H mapa.
+// Z prawej, a gdy tam się nie mieści, z lewej (gdy z żadnej strony, tam, gdzie więcej miejsca); w pionie środkiem na
+// wysokości samolotu, przesunięte w granice mapy (m = margines). Wynik dla dymka Leafleta: kierunek i przesunięcie.
+export function acLabelSpot(x, y, w, h, W, H, { gap = 10, m = 4 } = {}) {
+  const fitR = x + gap + w <= W - m, fitL = x - gap - w >= m;
+  const right = fitR || (!fitL && W - x >= x);
+  const top = Math.max(m, Math.min(y - h / 2, H - m - h));
+  return { dir: right ? "right" : "left", off: [right ? gap : -gap, Math.round(top - (y - h / 2))] };
 }
 
 // Wznoszenie / zniżanie (MAP, loty krajowe): p.vs = zmiana wysokości od odczytu sprzed co najmniej minAge ms.

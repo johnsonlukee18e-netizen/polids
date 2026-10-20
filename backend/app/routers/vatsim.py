@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -15,18 +16,20 @@ from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import online_stations
 from ..services.route import RouteResolver
-from ..services.vatsim import (airport_atc, airport_traffic, bookings_by_callsign, controller_info, fir_boundaries,
-                               get_bookings, get_feed, match_positions, online_firs, pilot_info, user_bookings,
-                               user_connections)
+from ..services.vatsim import (BOOKINGS_DOWN, FEED_DOWN, airport_atc, airport_traffic, bookings_by_callsign,
+                               controller_info, fir_boundaries, get_bookings, get_feed, match_positions, online_firs,
+                               pilot_info, user_bookings, user_connections)
 
 router = APIRouter(prefix="/api/vatsim", tags=["vatsim"])
+log = logging.getLogger("polids.vatsim")
 
 
 async def _feed() -> dict:
     try:
         return await get_feed()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM data feed unavailable: {exc}") from exc
+        log.warning("data feed: %s", exc)
+        raise HTTPException(502, FEED_DOWN) from exc
 
 
 @router.get("/online")
@@ -66,7 +69,8 @@ async def bookings(prefix: str = "EP", hours: int | None = Query(None, ge=1, le=
     try:
         data = await get_bookings()
     except (UpstreamError, ValueError) as exc:
-        raise HTTPException(502, f"VATSIM ATC bookings unavailable: {exc}") from exc
+        log.warning("bookings: %s", exc)
+        raise HTTPException(502, BOOKINGS_DOWN) from exc
     until = datetime.now(timezone.utc) + timedelta(hours=hours) if hours else None
     result = bookings_by_callsign(data, prefix, until=until)
     # API rezerwacji podaje tylko CID; imię i nazwisko znamy, jeśli ta osoba jest teraz zalogowana w sieci
@@ -108,13 +112,15 @@ async def me(request: Request, db: Session = Depends(get_db)):
         out["online"] = [c | {"position": pos.get(c["callsign"])} for c in online]
         out["updated"] = (feed.get("general") or {}).get("update_timestamp")
     except Exception as exc:  # noqa: BLE001 - błąd sieci (UpstreamError), zły JSON albo nieoczekiwany kształt danych
-        out["online_error"] = f"VATSIM data feed unavailable: {exc}"
+        log.warning("data feed: %s", exc)
+        out["online_error"] = FEED_DOWN
     try:
         if isinstance(books, BaseException):
             raise books
         out["bookings"] = user_bookings(books, cid)
     except Exception as exc:  # noqa: BLE001 - jak wyżej
-        out["bookings_error"] = f"VATSIM ATC bookings unavailable: {exc}"
+        log.warning("bookings: %s", exc)
+        out["bookings_error"] = BOOKINGS_DOWN
     out["error"] = " · ".join(e for e in (out["online_error"], out["bookings_error"]) if e) or None
     return out
 

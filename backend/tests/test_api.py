@@ -308,7 +308,7 @@ def test_viff_endpoints(client, monkeypatch):
 
     monkeypatch.setattr(viff, "_get", down)
     r = client.get("/api/viff/departures/EPWA")
-    assert r.status_code == 502 and "vIFF" in r.json()["detail"]
+    assert r.status_code == 502 and r.json()["detail"] == "Flow data unavailable"  # 0.12.6: bez nazwy źródła
 
 
 def test_vacs_sector_chains(client):
