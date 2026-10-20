@@ -26,7 +26,7 @@ def local_photo(icao: str) -> dict | None:
         if img.exists():
             meta_file = settings.photos_dir / f"{code}.json"
             meta = json.loads(meta_file.read_text("utf-8")) if meta_file.exists() else {}
-            return {"url": f"/files/photos/{img.name}", "credit": meta.get("credit", "local photo"),
+            return {"url": f"/files/photos/{img.name}", "credit": meta.get("credit", ""),
                     "page": meta.get("page")}
     return None
 
