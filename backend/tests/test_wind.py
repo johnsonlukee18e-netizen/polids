@@ -110,7 +110,7 @@ def _rwy(des):
 
 def test_approach_point_from_procedure():
     p = uw.approach_point("EPXX", 362, _rwy("29"), _fixes(), PROCS)
-    assert p["method"] == "procedure" and p["method_label"] == "FAF from procedure" and p["fix"] == "XX701"
+    assert p["method"] == "procedure" and p["method_label"] == "FAF" and p["fix"] == "XX701"
     assert p["dist_nm"] == pytest.approx(7.0, abs=0.05) and p["stars"] == ["AAAAA1A", "BBBBB1A"]
     assert p["approaches"] == ["ILS Z", "RNP"] and p["rejected"] == []
     assert p["path_ft"] == pytest.approx(362 + 7 * uw.FT_PER_NM, abs=10)
@@ -194,7 +194,7 @@ def test_parse_forecast_current_hour_and_shapes():
     many = json.dumps([forecast_item(52.0, 21.0), forecast_item(52.1, 21.1, sfc=(5, 3, 4))])
     res = uw.parse_forecast(many, NOW)
     assert [r["surface"]["dir"] for r in res] == [300, 5]
-    with pytest.raises(UpstreamError, match="Open-Meteo"):
+    with pytest.raises(UpstreamError, match="^Latitude must be in range$"):
         uw.parse_forecast(json.dumps({"error": True, "reason": "Latitude must be in range"}), NOW)
 
 
@@ -225,7 +225,7 @@ def test_approach_points_endpoint(client):
     if HAVE_ESE:
         epwa = {r["designator"]: r for r in ads["EPWA"]["runways"]}
         assert {k: v["fix"] for k, v in epwa.items()} == {"11": "WA409", "15": "WA612", "29": "WA728", "33": "WA529"}
-        assert all(v["method_label"] == "FAF from procedure" for v in epwa.values())
+        assert all(v["method_label"] == "FAF" for v in epwa.values())
     if "EPRZ" in ads:
         # bez trawiastych 08L/26R, 08R/26L bez współrzędnych progu i pasów awaryjnych 09ES/27ES
         assert [r["designator"] for r in ads["EPRZ"]["runways"]] == ["09", "27"]
@@ -260,8 +260,9 @@ def test_approach_wind_degrades_without_open_meteo(client, monkeypatch):
     monkeypatch.setattr(uw, "fetch_text", down)
     monkeypatch.setattr(meteo, "get_metars", no_metar)
     d = client.get("/api/meteo/approach-wind/EPKK").json()
-    assert d["model_error"].startswith("Open-Meteo forecast unavailable: ") and "brak sieci" in d["model_error"]
-    assert d["metar_error"].startswith("METAR unavailable: ")
+    # komunikaty bez adresu i nazwy serwera
+    assert d["model_error"] == "Wind forecast unavailable: brak sieci"
+    assert d["metar_error"] == "METAR unavailable: brak sieci"
     assert d["valid"] is None and d["model_surface"] is None and d["runways"]
     for r in d["runways"]:
         assert r["w3000"] is None and r["c3000"] == {"hw": None, "xw": None} and r["lat"] and r["method"]

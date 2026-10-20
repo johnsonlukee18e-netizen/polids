@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from .http_cache import UpstreamError, fetch_text, peek
+from .http_cache import UpstreamError, describe, fetch_text, peek
 
 GAMET_URL = "https://aviation-api.imgw.pl/data/last"
 PARAMS = {"params": "gamet", "format": "json", "count": "1"}
@@ -156,13 +156,13 @@ def parse(text: str, now: datetime | None = None) -> dict:
     try:
         data = json.loads(text)
     except ValueError:
-        return {"areas": empty, "error": "Unreadable IMGW server response (not JSON)"}
+        return {"areas": empty, "error": "GAMET unavailable: unreadable response"}
     regions = _regions(data)
     if not regions:
-        return {"areas": empty, "error": "Unknown IMGW response format: no areas A1–A5"}
+        return {"areas": empty, "error": "GAMET unavailable: no areas A1–A5 in the response"}
     keys = list(AREAS) + sorted({k for r in regions for k in r if _AREA_KEY.match(str(k)) and k not in AREAS})
     areas = {k: pick([t for r in regions for t in _messages(r.get(k))], now) for k in keys}
-    error = None if any(a["text"] for a in areas.values()) else "No GAMET messages in the IMGW response"
+    error = None if any(a["text"] for a in areas.values()) else "No GAMET messages"
     return {"areas": areas, "error": error}
 
 
@@ -174,7 +174,8 @@ async def get_gamet(now: datetime | None = None) -> dict:
     try:
         text, params = await _fetch()
     except UpstreamError as exc:
-        return {**base, "areas": {a: area_info(None, now) for a in AREAS}, "error": f"IMGW server not responding: {exc}"}
+        return {**base, "areas": {a: area_info(None, now) for a in AREAS},
+                "error": f"GAMET unavailable: {describe(exc)}"}
     hit = peek(GAMET_URL, params)
     age = hit[0] if hit else 0.0
     out = {**base, **parse(text, now), "fetched_at": (now - timedelta(seconds=age)).strftime("%Y-%m-%dT%H:%M:%SZ"),

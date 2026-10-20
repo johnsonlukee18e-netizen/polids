@@ -224,7 +224,7 @@ export function qnhMap(pane) {
         <span class="nil of">of ${r.stations.length} AD</span>`);
     hot = null;
     $(".qr-reg").innerHTML = `<thead><tr><th>Reg</th><th>QNH</th><th>mmHg</th><th>inHg</th><th>Aerodromes</th></tr></thead><tbody>${data.regions.map((r) =>
-      `<tr data-r="${esc(r.id)}"${r.band ? ` class="band" title="Region ${esc(r.id)}: backup band ${BAND[r.id] || ""}, issued only when the IMGW model fails; here the lowest QNH of ${r.stations.length} band aerodromes"` : ""}>
+      `<tr data-r="${esc(r.id)}"${r.band ? ` class="band" title="Region ${esc(r.id)}: backup band ${BAND[r.id] || ""}, issued only when the regional QNH forecast fails; lowest QNH of ${r.stations.length} band aerodromes"` : ""}>
       <td class="num">${esc(r.id)}</td><td class="num q">${q4(r.qnh)}</td><td class="num">${r.qnh ? mmhg(r.qnh) : ""}</td>
       <td class="num">${r.qnh ? inhg(r.qnh) : ""}</td><td class="sta">${sta(r)}</td></tr>`).join("")}</tbody>`;
     $(".qr-tma").innerHTML = `<thead><tr><th>TMA / MTMA</th><th>AD</th><th>QNH</th><th>mmHg</th></tr></thead><tbody>${data.tmas.map((t) =>

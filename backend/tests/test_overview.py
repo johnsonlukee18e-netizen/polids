@@ -38,7 +38,7 @@ def test_tl_fir_level():
     fir = tl.fir_level(qnhs)
     assert (fir["fl"], fir["text"], fir["qnh_min"], fir["qnh_icao"]) == (90, "FL090", 994, "EPRZ")
     assert fir["low"] == ["EPKK", "EPRZ"] and fir["stations"] == 4 and fir["missing"] == ["EPSC"]
-    assert fir["ta_ft"] == 6500 and "om.plvacc.pl" in fir["source_url"]
+    assert fir["ta_ft"] == 6500 and "source" not in fir and "source_url" not in fir
     ok = tl.fir_level({"EPWA": 1009, "EPKK": 996})
     assert (ok["fl"], ok["text"], ok["low"], ok["missing"], ok["uncertain"]) == (80, "FL080", [], [], False)
     assert (ok["threshold_hpa"], ok["normal"], ok["raised"]) == (995, "FL080", "FL090")

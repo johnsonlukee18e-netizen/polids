@@ -82,6 +82,8 @@ console.log(JSON.stringify({
     const u = "https://x/a.gif?t=1", a = new Date(T), b = new Date(T + 9 * 60000);
     return [m.fetchedAt(u, a).toISOString(), m.fetchedAt(u, b).toISOString(), m.fetchedAt(u + "0", b).toISOString()];
   })(),
+  tip: m.pointTip({ designator: "29", fix: "WA728", method_label: "FAF", dist_nm: 7, path_ft: 2590,
+                    approaches: ["RNP"], rejected: ["XX702: 2.30 NM from THR (< 2.5 NM)"] }),
 }));
 """
 
@@ -156,7 +158,7 @@ def test_gamet_helpers(js):
     # przyciski A1–A5 i ALL, tekst z backendu w <pre>, odnośnik do strony IMGW przy błędzie
     view = METEO[METEO.index("function gametTab("):METEO.index("// --- ICING")]
     assert '[...GAMET_AREAS, "ALL"]' in view and "<pre>${esc(a.text)}</pre>" in view and 'api("/api/meteo/gamet")' in view
-    assert "awiacja.imgw.pl › GAMET ↗" in view and "imgEl(" in view and "clearInterval(timer)" in view
+    assert "GAMET page ↗" in view and "imgEl(" in view and "clearInterval(timer)" in view
     assert re.search(r"offsetParent\s*!==\s*null", view)
 
 
@@ -298,3 +300,23 @@ def test_sharp_edges():
 
 def test_no_glow():
     assert "text-shadow" not in CSS and "glow" not in CSS.lower().replace("bez poświaty", "")
+
+
+def test_no_provenance_text():
+    """Issue #21: bez dopisków, skąd pochodzi wartość, opis albo układ (serwer obrazów, model, plik sektorów, źródło
+    wiatru): w kodzie METEO (bez komentarzy i adresów) nie ma nazw dostawców ani "Source:"; wpisy z adresami obrazów
+    i ramek zostają (to dane, nie napisy)."""
+    code = "\n".join(re.sub(r"(^|\s)//.*$", "", line) for line in METEO.splitlines())
+    code = re.sub(r"https://[^\s\"`]*", "", code)
+    for txt in ("IMGW server", "IMGW aviation", "(IMGW)", "IMGW ·", "· IMGW", "), IMGW", "Windy ·", "Windy 900", "Windy 10",
+                "Windy model", "Windy forecast", "Windy shows", "Open-Meteo", "ECMWF", "DWD model", "DWD ·", ".ese",
+                "navdata", "FIR lists", "computed in the browser", "Source:", "awiacja", "aviation-api", "aw.source",
+                "interpolated from", "Rejected procedure"):
+        assert txt not in code, txt
+    # funkcyjne odnośniki i podpowiedzi zostają
+    assert "GAMET page ↗" in METEO and "open in new tab ↗" in METEO and "Click a RWY to move the map forecast point" in METEO
+
+
+def test_point_tip_without_rejected_fixes(js):
+    """Podpowiedź punktu podejścia: dane punktu (fix, odległość, ścieżka, podejścia) bez opisu odrzuconych punktów."""
+    assert js["tip"] == "RWY 29: WA728, FAF, 7.0 NM from THR, 3° path ≈ 2590 ft\nApproaches: RNP"

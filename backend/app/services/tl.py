@@ -14,8 +14,6 @@ TA_FT = 6500                 # wysokość przejściowa w FIR EPWW
 LOW_QNH_HPA = 995            # QNH ≤ 995 hPa na którymkolwiek lotnisku → FL090
 FL_NORMAL = 80               # TL, gdy na wszystkich kontrolowanych lotniskach QNH > 995 hPa
 FL_LOW_QNH = 90              # TL, gdy gdziekolwiek QNH ≤ 995 hPa
-SOURCE = "OM PL vACC, vFIR Warszawa Airspace › Transition level (AIRAC 2610)"
-SOURCE_URL = "https://om.plvacc.pl/docs/2610/airspace"
 
 
 def fl_text(fl: int | None) -> str:
@@ -28,7 +26,7 @@ def from_qnh(qnh: float | None) -> dict:
 
     Zwraca {"fl": 80 albo 90, "rule": opis (po angielsku)} albo {"fl": None, ...}, gdy nie ma żadnego QNH."""
     if qnh is None:
-        return {"fl": None, "rule": "no QNH from METARs – transition level cannot be determined"}
+        return {"fl": None, "rule": "no QNH – transition level cannot be determined"}
     if qnh <= LOW_QNH_HPA:
         return {"fl": FL_LOW_QNH, "rule": f"QNH ≤ {LOW_QNH_HPA} hPa at one or more aerodromes → {fl_text(FL_LOW_QNH)}"}
     return {"fl": FL_NORMAL, "rule": f"QNH > {LOW_QNH_HPA} hPa at all aerodromes → {fl_text(FL_NORMAL)}"}
@@ -38,8 +36,7 @@ def fir_level(qnhs: dict[str, float | None]) -> dict:
     """Jeden poziom przejściowy dla FIR EPWW z QNH kontrolowanych lotnisk.
 
     Zwraca {"fl", "text", "rule", "qnh_min", "qnh_icao", "low" (lotniska z QNH ≤ 995), "stations", "missing",
-    "uncertain" (FL080, ale części QNH brakuje), "threshold_hpa", "normal", "raised", "ta_ft", "source",
-    "source_url"}."""
+    "uncertain" (FL080, ale części QNH brakuje), "threshold_hpa", "normal", "raised", "ta_ft"}."""
     have = {i: q for i, q in qnhs.items() if q is not None}
     missing = sorted(i for i, q in qnhs.items() if q is None)
     icao = min(have, key=lambda i: (have[i], i)) if have else None
@@ -54,4 +51,4 @@ def fir_level(qnhs: dict[str, float | None]) -> dict:
             "low": sorted(i for i, q in have.items() if q <= LOW_QNH_HPA),
             "stations": len(have), "missing": missing, "uncertain": uncertain,
             "threshold_hpa": LOW_QNH_HPA, "normal": fl_text(FL_NORMAL), "raised": fl_text(FL_LOW_QNH),
-            "ta_ft": TA_FT, "source": SOURCE, "source_url": SOURCE_URL}
+            "ta_ft": TA_FT}

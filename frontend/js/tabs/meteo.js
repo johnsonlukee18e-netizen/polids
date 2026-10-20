@@ -227,18 +227,17 @@ function imgView(o) {
       }
       const f = fr[cur], name = multi ? `${o.title} ${f.label}` : o.title;
       $(".mimg-open").href = f.url;
-      // najpierw źródło, potem czas: w wąskim oknie ucinany jest czas (jest też w podpowiedzi), nie źródło
+      // najpierw opis, potem czas: w wąskim oknie ucinany jest czas (jest też w podpowiedzi), nie opis
       const at = got[cur] && st[cur] === "ok" ? utcHm(got[cur]) : "";
       const hint = $(".mimg-hint");
       hint.textContent = [o.note, at && `fetched\u00a0${at}`].filter(Boolean).join(" · ");   // \u00a0: bez łamania wiersza w środku
-      hint.title = `${name}: ${o.desc}${at ? `, fetched ${at}` : ""}\n${f.url}\n`
-        + `Image from the IMGW server, refreshed every ${IMG_REFRESH / 60000} min.`;
+      hint.title = `${name}: ${o.desc}${at ? `, fetched ${at}` : ""}\nRefreshed every ${IMG_REFRESH / 60000} min.`;
       msg.hidden = st[cur] === "ok";
       msg.className = `mimg-msg ${st[cur]}`;
       const html = st[cur] === "err"
         ? `<b>${esc(name)}: image failed to load</b>
-          <span>The IMGW server (aviation-api.imgw.pl) did not return the image. It may require a login to the IMGW
-          aviation service in this browser, refuse to show the image on other sites or be temporarily unavailable.</span>
+          <span>The server did not return the image. It may require a login in this browser or be temporarily
+          unavailable; try opening it in a new tab.</span>
           <span class="mimg-acts"><a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">open in new tab ↗</a>
           <button class="btn mimg-retry">Retry</button></span>`
         : `<span>Loading ${esc(name)}…</span>`;
@@ -341,8 +340,7 @@ const CL3 = "CL 3°";
 // odległość od progu zawsze z jedną cyfrą po przecinku ("3.0 NM", nie "3 NM" obok "4.9 NM")
 const nm = (v) => (v === null || v === undefined ? "–" : Number(v).toFixed(1));
 export const pointTip = (r) => `RWY ${r.designator}: ${r.fix ? r.fix + ", " : ""}${r.method_label}, ${nm(r.dist_nm)} NM from THR`
-  + `, 3° path ≈ ${r.path_ft} ft${r.approaches?.length ? `\nApproaches: ${r.approaches.join(", ")}` : ""}`
-  + `${r.rejected?.length ? `\nRejected procedure fixes: ${r.rejected.join("; ")}` : ""}`;
+  + `, 3° path ≈ ${r.path_ft} ft${r.approaches?.length ? `\nApproaches: ${r.approaches.join(", ")}` : ""}`;
 
 function windTab(pane) {
   const wrap = h(`<div class="wnd">
@@ -375,9 +373,9 @@ function windTab(pane) {
     if (url !== src) { const f = $(".wnd-frame"), g = f.cloneNode(false); g.src = src = url; f.replaceWith(g); }
     const hint = $(".wnd-hint");
     hint.textContent = up
-      ? `Windy 900 hPa ≈ 3000 ft AMSL · forecast point ${r ? `RWY ${r.designator} ${r.fix || CL3}` : "– no RWY data"}`
-      : `Windy 10 m (surface) · forecast point ${ad ? ad.icao : icao}`;
-    hint.title = `${hint.textContent}${up && r ? ` (${r.method_label}, ${nm(r.dist_nm)} NM from THR)` : ""} · Windy model: ECMWF`;
+      ? `900 hPa ≈ 3000 ft AMSL · forecast point ${r ? `RWY ${r.designator} ${r.fix || CL3}` : "– no RWY data"}`
+      : `10 m (surface) · forecast point ${ad ? ad.icao : icao}`;
+    hint.title = `${hint.textContent}${up && r ? ` (${r.method_label}, ${nm(r.dist_nm)} NM from THR)` : ""}`;
   };
 
   const bar = () => {
@@ -409,13 +407,11 @@ function windTab(pane) {
       <div class="wnd-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>0 ft model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
       <table class="data wnd-tab"><thead>${thead}</thead><tbody>${rows}</tbody></table>
       ${[aw.model_error, aw.metar_error].filter(Boolean).map((e) => `<p class="error">${esc(e)}</p>`).join("")}
-      <p class="wnd-note">Source: <a href="${esc(aw.source_url)}" target="_blank" rel="noopener">${esc(aw.source)}</a> (model ${esc(aw.model)}),
-        ${aw.valid ? `forecast for ${validTxt(aw.valid)}, fetched ${esc(aw.fetched)}` : "forecast unavailable"}. 3000 ft AMSL wind interpolated from the 1000–850 hPa levels.</p>
-      ${mode === "3000" ? `<p class="wnd-note">Approach point: the FAF/IF where STARs with an approach transition end (.ese file), if it lies 2.5–15 NM from THR
-        and within 15° of the centreline; otherwise the point on the extended centreline where a 3° path reaches 3000 ft. Click a RWY to move the Windy forecast point there.</p>`
+      <p class="wnd-note">${aw.valid ? `Forecast for ${validTxt(aw.valid)}, fetched ${esc(aw.fetched)}.` : "Forecast unavailable."}</p>
+      ${mode === "3000" ? `<p class="wnd-note">${CL3}: point on the extended centreline where a 3° path reaches 3000 ft.
+        Click a RWY to move the map forecast point there.</p>`
         : `<p class="wnd-note">0 ft wind: METAR and 10 m model over the aerodrome reference point; components relative to each RWY heading.</p>`}
-      <p class="wnd-note">H = headwind, T = tailwind, L/R = crosswind from the left/right, kt. ${inUse ? `ARR/DEP: RWY in use (${inUse.source === "ATIS" ? "ATIS" : "? = system suggestion"}).` : ""}
-        Windy shows the ECMWF model, Open-Meteo usually ICON, so the values may differ.</p>
+      <p class="wnd-note">H = headwind, T = tailwind, L/R = crosswind from the left/right, kt. ${inUse ? `ARR/DEP: RWY in use (${inUse.source === "ATIS" ? "ATIS" : "? = system suggestion"}).` : ""}</p>
     </div>`;
   };
 
@@ -531,7 +527,7 @@ function gametTab(pane) {
         title="${a === "ALL" ? "All areas, one below the other" : `Area ${a}`}">${a}</button>`).join("")}</span>
       <span class="mimg-hint gmt-hint"></span>
       <a class="btn mimg-open" href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer"
-        title="GAMET on the IMGW aviation website">awiacja.imgw.pl › GAMET ↗</a>
+        title="Open the GAMET page in a new tab">GAMET page ↗</a>
     </div>
     <div class="gmt-body">
       <div class="gmt-text"><p class="hint">Loading GAMET…</p></div>
@@ -544,7 +540,7 @@ function gametTab(pane) {
   const shown = () => !document.hidden && wrap.offsetParent !== null;
 
   // mapa rejonów: nie wczytała się (np. serwer IMGW nie wydaje obrazu innym stronom) = krótka uwaga zamiast obrazu
-  const im = imgEl("GAMET areas A1–A5 map (IMGW)");
+  const im = imgEl("GAMET areas A1–A5 map");
   im.className = "gmt-img";
   im.onerror = () => {
     if (dead) return;
@@ -552,7 +548,7 @@ function gametTab(pane) {
     $(".gmt-map").classList.add("off");   // wąska kolumna z uwagą, więcej miejsca na tekst
     const m = $(".gmt-imgmsg");
     m.hidden = false;
-    m.innerHTML = `<span>GAMET areas map (awiacja.imgw.pl) failed to load.</span>
+    m.innerHTML = `<span>GAMET areas map failed to load.</span>
       <a href="${GAMET_MAP_URL}" target="_blank" rel="noopener noreferrer">open map ↗</a>`;
   };
   $(".gmt-map").prepend(im);
@@ -562,10 +558,10 @@ function gametTab(pane) {
     wrap.querySelectorAll(".gmt-areas button").forEach((b) => b.classList.toggle("active", b.dataset.area === area));
     const hint = $(".gmt-hint");
     const at = data?.fetched_at ? `fetched ${data.fetched_at.slice(11, 16)}Z` : "";
-    hint.textContent = ["IMGW · FIR EPWW", at, data?.stale ? "old data: IMGW server not responding" : ""].filter(Boolean).join(" · ");
-    hint.title = `GAMET (area forecast for low-level flights) from the IMGW aviation website, refreshed every ${GAMET_REFRESH / 60000} min.`;
+    hint.textContent = ["FIR EPWW", at, data?.stale ? "old data: no response" : ""].filter(Boolean).join(" · ");
+    hint.title = `GAMET (area forecast for low-level flights), refreshed every ${GAMET_REFRESH / 60000} min.`;
     if (!data && !err) return;
-    const link = `<a href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer">awiacja.imgw.pl › GAMET ↗</a>`;
+    const link = `<a href="${GAMET_PAGE}" target="_blank" rel="noopener noreferrer">GAMET page ↗</a>`;
     const error = err || data?.error;
     const areas = data?.areas || {};
     const body = gametShown(areas, area).map((k) => {
@@ -631,8 +627,8 @@ function icingTab(pane) {
     const fl = ICING_LEVELS.find(([l]) => l === level)[1];
     wrap.querySelectorAll(".icg-levels button").forEach((b) => b.classList.toggle("active", b.dataset.level === level));
     const hint = wrap.querySelector(".icg-hint");
-    hint.textContent = `Windy · icing ${level.slice(0, -1)} hPa ≈ ${fl}`;
-    hint.title = `Windy, "icing" layer: probability of in-flight icing at ${level.slice(0, -1)} hPa (≈ ${fl} in ISA).`;
+    hint.textContent = `Icing ${level.slice(0, -1)} hPa ≈ ${fl}`;
+    hint.title = `Probability of in-flight icing at ${level.slice(0, -1)} hPa (≈ ${fl} in ISA).`;
     // nowa ramka zamiast zmiany src: bez kroku w historii przeglądarki (← i Wstecz cofają ekrany, nie ramkę Windy)
     frame = frameGo(frame, windyEmbedUrl({ ...WINDY_VIEWS.icing, level }));
   };
@@ -705,7 +701,7 @@ function sunTab(ctx) {
       <div class="mimg-bar">
         <b class="mimg-title">SUN</b>
         <label class="sun-l">Aerodrome <input type="text" class="sun-icao" maxlength="4" size="5" spellcheck="false"
-          title="ICAO code of any aerodrome (FIR lists, navdata)"></label>
+          title="ICAO code of any aerodrome"></label>
         <button class="btn primary sun-go">Show</button>
         <span class="mimg-hint sun-hint"></span>
       </div>
@@ -777,7 +773,7 @@ function sunTab(ctx) {
         className: "sun-tip" });
       const hint = $(".sun-hint");
       hint.textContent = `${new Date(now).toISOString().slice(11, 16)}Z · sun at zenith ${latLonTxt(s.lat, s.lon)}`;
-      hint.title = "Day/night boundary every minute (sun position computed in the browser). Click the map: sun at that point.";
+      hint.title = "Day/night boundary refreshed every minute. Click the map: sun at that point.";
       const today = new Date(now).toISOString().slice(0, 10);
       if (q && (today !== day0 || now - last >= SUN_REFRESH)) load();   // nowa doba UTC: dziś i jutro od nowa
       else if (data) side();
@@ -867,13 +863,13 @@ export default {
       { sep: true },
       { id: "gamet", label: "GAMET", fill: true, render: gametTab },
       { id: "sigwx", label: "SIGWX", fill: true, render: imgView({ key: "sigwx", title: "SIGWX", frames: [{ label: "", url: SIGWX_URL }],
-        note: "IMGW · SFC–FL100", desc: "significant weather chart SFC–FL100 (FIR EPWW), IMGW" }) },
+        note: "SFC–FL100", desc: "significant weather chart SFC–FL100 (FIR EPWW)" }) },
       { id: "icing", label: "ICING", fill: true, render: icingTab },
       { id: "qnh", label: "QNH", fill: true, render: qnhMap },
       { id: "sat-eur", label: "SAT EUR", fill: true, render: windy("sat-eur") },
       { id: "sat-pl", label: "SAT PL", fill: true, render: windy("sat-pl") },
       { id: "turb", label: "TURB", fill: true, render: imgView({ key: "turb", title: "TURB", frames: turbFrames(),
-        note: "IMGW · DWD · airliners", desc: "IMGW turbulence forecast (DWD model) for airliners" }) },
+        note: "airliners", desc: "turbulence forecast for airliners" }) },
       { id: "sun", label: "SUN", fill: true, render: sunTab(ctx) },
     ]);
   },

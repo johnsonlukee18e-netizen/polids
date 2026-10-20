@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from ..config import DATA_DIR, settings
 from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import Aerodrome, NavPoint
-from .http_cache import UpstreamError
+from .http_cache import UpstreamError, describe
 from .metar import parse_metar
 
 _Seg = list[list[float]]
@@ -95,7 +95,7 @@ async def regions(db: Session, get_metars) -> dict:
     try:
         raw = await get_metars(icaos)
     except UpstreamError as exc:
-        raw, error = {}, f"METAR source unavailable: {exc}"
+        raw, error = {}, f"METAR unavailable: {describe(exc)}"
     qnh = {i: parse_metar(m).qnh for i, m in raw.items() if m}
     ads = db.scalars(select(Aerodrome).where(Aerodrome.icao.like("EP%"))).all()
     pos = {a.icao: (a.lat, a.lon) for a in ads}
