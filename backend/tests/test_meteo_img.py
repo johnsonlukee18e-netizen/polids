@@ -1,7 +1,8 @@
 """METEO (runda 10): SAT PL i SAT EUR (Windy z własnym środkiem i zoomem), TURB (8 klatek IMGW co 3 h, odtwarzacz)
 i SIGWX (mapa IMGW odświeżana co 15 min). Obrazy IMGW wczytuje przeglądarka użytkownika, nie serwer PolIDS.
 0.12.3 (issue #13): kolejność podzakładek, GAMET (rejony A1–A5 i ALL), ICING (Windy z poziomem), SUN.
-0.12.5 (issue #18): WIND i RADAR jako środkowa grupa podzakładek, WIND zawsze od 0 ft, napisy po angielsku."""
+0.12.5 (issue #18): WIND i RADAR jako środkowa grupa podzakładek, WIND zawsze od 0 ft, napisy po angielsku.
+0.13.0 (issue #23): WIND to sam Windy jak RADAR; wiatr na wysokościach i panel pasów w AWALON (test_awalon_js.py)."""
 import json
 import re
 import shutil
@@ -82,11 +83,7 @@ console.log(JSON.stringify({
     const u = "https://x/a.gif?t=1", a = new Date(T), b = new Date(T + 9 * 60000);
     return [m.fetchedAt(u, a).toISOString(), m.fetchedAt(u, b).toISOString(), m.fetchedAt(u + "0", b).toISOString()];
   })(),
-  note: [m.forecastNote({ valid: "2026-10-12T12:00Z", fetched: "12:04Z" }),
-         m.forecastNote({ valid: null, model_error: "Wind forecast unavailable: no connection" }),
-         m.forecastNote({ valid: null }), m.forecastNote(null)],
-  tip: m.pointTip({ designator: "29", fix: "WA728", method_label: "FAF", dist_nm: 7, path_ft: 2590,
-                    approaches: ["RNP"], rejected: ["XX702: 2.30 NM from THR (< 2.5 NM)"] }),
+  moved: ["windVec", "hwTxt", "xwTxt", "validTxt", "forecastNote", "pointTip"].filter((k) => k in m),
 }));
 """
 
@@ -135,6 +132,9 @@ def test_windy_views(js):
     assert w["sat-pl"] == RADAR_URL.replace("lon=19.3", "lon=19.0").replace("overlay=radar", "overlay=satellite")
     for url in w.values():
         assert url.startswith("https://embed.windy.com/embed2.html?") and "metricWind=kt" in url
+    # 0.13.0: WIND to sam wiatr Windy przy ziemi, bez punktu prognozy (detail= i marker= puste), szablon RADAR
+    assert w["wind"] == RADAR_URL.replace("overlay=radar", "overlay=wind")
+    assert "&level=surface&" in w["wind"] and "&detail=&" in w["wind"] and "&marker=&" in w["wind"]
 
 
 def test_icing_levels(js):
@@ -263,16 +263,18 @@ def test_images_loaded_by_browser():
     assert re.search(r"offsetParent\s*!==\s*null", view)
 
 
-def test_wind_opens_at_0ft():
-    """Issue #18: WIND zawsze otwiera się na wietrze przy ziemi (0 ft); 3000 ft tylko do zamknięcia podzakładki, bez
-    zapamiętywania (wcześniej zapamiętany wybór 3000 ft w localStorage jest pomijany)."""
-    view = METEO[METEO.index("function windTab("):METEO.index("// --- GAMET")]
-    assert re.search(r'let mode = "0";', view)
-    assert not re.search(r'lsSet\("meteo\.wind\.mode"', METEO) and not re.search(r'lsGet\("meteo\.wind\.mode"', METEO)
-    # pozostałe wybory WIND (lotnisko, pas lotniska) nadal zapamiętane
-    assert 'lsGet("meteo.wind.ad")' in view and "lsGet(rwyKey())" in view
-    # przyciski 0 ft / 3000 ft: 0 ft pierwszy
-    assert '<button data-m="0">0 ft</button><button data-m="3000">3000 ft (approach)</button>' in view
+def test_wind_is_plain_windy(js):
+    """Issue #23: w METEO › WIND tylko czysty Windy (bez punktu prognozy, panelu, przycisków i obliczeń); funkcje wiatru
+    przeniesione do wind.js (AWALON, AERODROME), panel pasów do AWALON."""
+    mount = METEO[METEO.index("export default {"):]
+    assert '{ id: "wind", label: "WIND", fill: true, render: windy("wind") },' in mount
+    for word in ("windTab", "windyUrl", "approach-wind", "approach-points", "meteo.wind.", "/status", "MAIN_AD",
+                 "wnd-side", "wnd-bar", "pointTip", "forecastNote", "windVec"):
+        assert word not in METEO, word
+    assert js["moved"] == []
+    aero = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
+    assert 'import { windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "../wind.js";' in aero
+    assert 'import { colorize, wxLines } from "./meteo.js";' in aero
 
 
 def test_strings_in_english():
@@ -285,17 +287,18 @@ def test_strings_in_english():
     code = "\n".join(re.sub(r"(^|\s)//.*$", "", line) for line in src.splitlines())
     assert not re.findall(r".{0,30}[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ].{0,30}", code)
     for txt in ("Updated ", ">Show</button>", "refresh every 2 min", ">FIT</button>", "image failed to load", ">Retry</button>",
-                "Loading GAMET…", "No GAMET for area", "approach wind 3000 ft", "surface wind", "Main aerodromes",
-                "CIVIL TWILIGHT", "Point on map"):
+                "Loading GAMET…", "No GAMET for area", "CIVIL TWILIGHT", "Point on map"):
         assert txt in METEO, txt
 
 
 def test_sharp_edges():
-    """Issue #18: ostre krawędzie jak w PANDORZE: zaokrąglenia tylko na prawdziwych kółkach (legenda słońca)."""
+    """Issue #18: ostre krawędzie jak w PANDORZE: zaokrąglenia tylko na prawdziwych kółkach (legenda słońca).
+    0.13.0: wind.css bez własnych pól wyboru (zostały w dawnym METEO › WIND), więc bez reguł border-radius."""
     wind = (FRONTEND / "css" / "wind.css").read_text("utf-8")
-    for name, css in (("meteoimg.css", CSS), ("wind.css", wind)):
+    awalon = (FRONTEND / "css" / "awalon.css").read_text("utf-8")
+    for name, css in (("meteoimg.css", CSS), ("wind.css", wind), ("awalon.css", awalon)):
         radii = re.findall(r"([^{}]*)\{[^}]*border-radius:\s*([^;}]+)", css)
-        assert radii, name
+        assert radii or name == "wind.css", name
         for sel, val in radii:
             assert val.strip() == "0" or (val.strip() == "50%" and "lg-sub" in sel), (name, sel.strip(), val)
     assert re.search(r"\.sun-tip \{[^}]*border-radius: 0", CSS)
@@ -316,15 +319,5 @@ def test_no_provenance_text():
                 "navdata", "FIR lists", "computed in the browser", "Source:", "awiacja", "aviation-api", "aw.source",
                 "interpolated from", "Rejected procedure"):
         assert txt not in code, txt
-    # funkcyjne odnośniki i podpowiedzi zostają
-    assert "GAMET page ↗" in METEO and "open in new tab ↗" in METEO and "Click a RWY to move the map forecast point" in METEO
-
-
-def test_point_tip_without_rejected_fixes(js):
-    """Podpowiedź punktu podejścia: dane punktu (fix, odległość, ścieżka, podejścia) bez opisu odrzuconych punktów."""
-    assert js["tip"] == "RWY 29: WA728, FAF, 7.0 NM from THR, 3° path ≈ 2590 ft\nApproaches: RNP"
-
-
-def test_forecast_note_once(js):
-    """WIND: ważność prognozy pod tabelą; przy błędzie pobrania tylko czerwony komunikat, bez drugiego "unavailable"."""
-    assert js["note"] == ["Forecast for 12:00Z 12.10, fetched 12:04Z.", "", "Forecast unavailable.", "Forecast unavailable."]
+    # funkcyjne odnośniki zostają
+    assert "GAMET page ↗" in METEO and "open in new tab ↗" in METEO
