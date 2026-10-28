@@ -183,7 +183,7 @@ function runwayTable(st) {
   </tbody></table><div class="hint">TW = tailwind · ARR? / DEP? = preferred runway · hover a runway: width, surface, approaches</div>`;
 }
 
-// Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak panel pasów w AWALON › lotnisko): METAR i model 10 m
+// Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak panel pasów w AWALON › lotnisko): METAR i prognoza 10 m
 // (Open-Meteo) w punkcie lotniska, 3000 ft AMSL w punkcie FAF/IF z procedury albo na przedłużeniu osi (3°)
 function approachWind(aw, st, err) {
   // lotnisko bez pasów w bazie (część lądowisk z listy EPWW, np. EPGM): nie ma czego liczyć, to nie błąd
@@ -204,8 +204,8 @@ function approachWind(aw, st, err) {
       <td class="pt ${r.method}">${esc(r.fix || "CL 3°")}</td></tr>`;
   }).join("");
   // komunikaty błędów neutralne, bez nazwy dostawcy i treści wyjątku z serwera
-  const errs = [aw.model_error && "Forecast unavailable", aw.metar_error && "METAR unavailable"].filter(Boolean);
-  return `<div class="apw-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>model 10 m</i><b>${windVec(aw.model_surface)}</b></span></div>
+  const errs = [aw.model_error && "Wind forecast unavailable", aw.metar_error && "METAR unavailable"].filter(Boolean);
+  return `<div class="apw-sfc"><span><i>0 ft METAR</i><b>${windVec(aw.metar_wind)}</b></span><span><i>10 m FCST</i><b>${windVec(aw.model_surface)}</b></span></div>
     <table class="data apw-tab"><thead><tr><th rowspan="2">RWY</th><th colspan="2">0 ft · H/T XW</th><th colspan="2">3000 ft</th><th rowspan="2">Point</th></tr>
       <tr><th>METAR</th><th>10 m</th><th>wind</th><th>H/T XW</th></tr></thead><tbody>${rows}</tbody></table>
     ${errs.length ? `<div class="error apw-err" title="${esc(errs.join("\n"))}">${errs.map(esc).join(" · ")}</div>` : ""}

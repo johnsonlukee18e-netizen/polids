@@ -46,7 +46,9 @@ def test_neutral_messages():
         assert '"Network data unavailable"' in (FRONTEND / name).read_text("utf-8"), name
     # wiatr w punktach podejścia (INFO): błędy prognozy i METAR bez treści z serwera (tam bywa nazwa dostawcy)
     aero = _code((FRONTEND / "tabs/aerodrome.js").read_text("utf-8"))
-    assert 'aw.model_error && "Forecast unavailable"' in aero and 'aw.metar_error && "METAR unavailable"' in aero
+    assert 'aw.model_error && "Wind forecast unavailable"' in aero and 'aw.metar_error && "METAR unavailable"' in aero
+    # te same etykiety co w panelu pasów AWALON › lotnisko ("10 m FCST", "Wind forecast unavailable"), bez słowa "model"
+    assert "<i>10 m FCST</i>" in aero and "model 10 m" not in aero
     assert "[aw.model_error, aw.metar_error]" not in aero
 
 
