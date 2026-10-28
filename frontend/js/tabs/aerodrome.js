@@ -1,5 +1,6 @@
 import { api, atisHtml, esc, fmt, h, hhmm, lvpState, lvpTip, positionTip, remember, stash, stashed, textWidth, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
-import { colorize, wxLines, windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "./meteo.js";
+import { colorize, wxLines } from "./meteo.js";
+import { windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "../wind.js";
 import { FIR_KEYS, FIR_LABELS, aeroArg, firOf, mountAeroCard, mountFirList, obsInfo, splitArg } from "../aerolist.js";
 import { mountAwos } from "../awos.js";
 import { notamState } from "../notamstate.js";

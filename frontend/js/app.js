@@ -2,6 +2,7 @@ import { api, clearNavPath, esc, hashOf, navPath, parseHash, presetNavPath, sele
 import { mountTopbar, reloadTarget, takeReload } from "./topbar.js";
 import home from "./tabs/home.js";
 import meteo from "./tabs/meteo.js";
+import awalon from "./tabs/awalon.js";
 import { adciv, admil, advfr } from "./tabs/aip.js";
 import inop from "./tabs/inop.js";
 import about from "./tabs/about.js";
@@ -19,8 +20,8 @@ import squawk from "./tabs/squawk.js";
 import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
-const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
-  sytop, aup, squawk, other, emergency, admin };
+const TABS = { home, about, radio, meteo, awalon, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination,
+  conversion, sytop, aup, squawk, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
 // bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
 // #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista;

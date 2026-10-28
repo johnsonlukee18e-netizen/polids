@@ -8,7 +8,10 @@ Pasy: tylko kierunki z procedurą podejścia albo z twardą nawierzchnią, wspó
 (bez trawiastych i pasów awaryjnych, np. EPRZ 08L/26R, 09ES/27ES); lądowisko bez takiego pasa ma wszystkie kierunki.
 
 Wiatr: prognoza Open-Meteo (bez klucza) na bieżącą godzinę: 10 m oraz poziomy ciśnienia 1000–850 hPa z wysokością
-geopotencjalną, interpolowane (składowe u/v) do 914 m AMSL. Wszystkie punkty lotniska w jednym zapytaniu."""
+geopotencjalną, interpolowane (składowe u/v) do 914 m AMSL. Wszystkie punkty lotniska w jednym zapytaniu.
+
+AWALON (services/awalon.py): ta sama prognoza na poziomach 1000–600 hPa nad punktami lotnisk, jednym zapytaniem dla
+wszystkich lotnisk (model_profiles), godzina po godzinie z całej doby UTC."""
 
 import json
 import math
@@ -28,6 +31,12 @@ CACHE_SECONDS = 600
 ALT_FT = 3000
 ALT_M = ALT_FT * 0.3048
 LEVELS = (1000, 975, 950, 925, 900, 850)
+# AWALON: profil 0–10 000 ft AMSL; 10 000 ft (3048 m) leży zwykle tuż nad 700 hPa (ok. 9900 ft ISA), więc 600 hPa
+# (ok. 13 800 ft) domyka górny wiersz. Między 800 a 700 hPa ok. 3500 ft bez poziomu pośredniego (wiersze 7K–9K liniowo).
+PROFILE_LEVELS = (1000, 975, 950, 925, 900, 850, 800, 700, 600)
+# odpowiedź obejmuje całą dobę UTC (forecast_days=1), prognoza zmienia się co godzinę: 30 min wystarcza, a 15 lotnisk
+# po 30 zmiennych to dużo zapytań ważonych w limicie dziennym serwera prognoz
+PROFILE_CACHE_SECONDS = 1800
 GLIDE_DEG = 3.0
 FT_PER_NM = 6076.12 * math.tan(math.radians(GLIDE_DEG))  # ok. 318 ft/NM na ścieżce 3°
 # FAF bywa tuż przed 3 NM (EPZG RWY 06: ZG463 2,99 NM), stąd dolna granica 2,5 NM
@@ -194,8 +203,9 @@ def _from_uv(u: float, v: float) -> tuple[int, int]:
 
 def interpolate_wind(levels: list[tuple], target_m: float = ALT_M) -> dict | None:
     """Wiatr na wysokości target_m AMSL z poziomów ciśnienia [(hPa, wysokość m, prędkość kt, kierunek °)].
-    Liniowo w wysokości po składowych u/v; poza zakresem najbliższy poziom."""
-    lv = sorted((x for x in levels if None not in x), key=lambda x: x[1])
+    Liniowo w wysokości po składowych u/v; poza zakresem najbliższy poziom. Poziom z hPa None to wiatr przy ziemi
+    (AWALON: 10 m nad lotniskiem), bez numeru w levels_hpa."""
+    lv = sorted((x for x in levels if None not in x[1:]), key=lambda x: x[1])
     if not lv:
         return None
     lo = max((x for x in lv if x[1] <= target_m), default=lv[0], key=lambda x: x[1])
@@ -205,39 +215,69 @@ def interpolate_wind(levels: list[tuple], target_m: float = ALT_M) -> dict | Non
     k = 0.0 if hi[1] == lo[1] else (target_m - lo[1]) / (hi[1] - lo[1])
     k = min(1.0, max(0.0, k))
     d, s = _from_uv(u1 + (u2 - u1) * k, v1 + (v2 - v1) * k)
-    return {"dir": d, "speed": s, "levels_hpa": sorted({lo[0], hi[0]}, reverse=True)}
+    return {"dir": d, "speed": s, "levels_hpa": sorted({lo[0], hi[0]} - {None}, reverse=True)}
 
 
-def hourly_variables() -> list[str]:
+def hourly_variables(levels: tuple = LEVELS) -> list[str]:
     return ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"] + [
-        f"{v}_{p}hPa" for p in LEVELS for v in ("wind_speed", "wind_direction", "geopotential_height")]
+        f"{v}_{p}hPa" for p in levels for v in ("wind_speed", "wind_direction", "geopotential_height")]
+
+
+def _items(text: str) -> list[dict]:
+    """Odpowiedź Open-Meteo jako lista punktów (obiekt dla jednego punktu, lista dla kilku); błąd w JSON -> wyjątek."""
+    data = json.loads(text)
+    if isinstance(data, dict) and data.get("error"):
+        raise UpstreamError(data.get("reason") or "error")
+    return data if isinstance(data, list) else [data]
+
+
+def hour_index(times: list[str], now: datetime | None = None) -> int:
+    """Indeks bieżącej godziny UTC (ostatnia pełna godzina nie późniejsza niż teraz, przed początkiem doby pierwsza)."""
+    stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:00")
+    return max((j for j, t in enumerate(times) if t <= stamp), default=0)
+
+
+def hour_wind(hr: dict, i: int, levels: tuple = LEVELS) -> tuple[dict | None, list[tuple]]:
+    """Godzina i z "hourly" odpowiedzi: wiatr 10 m {dir, speed, gust} (albo None) i poziomy ciśnienia
+    [(hPa, wysokość m, prędkość kt, kierunek °)] z None tam, gdzie brak wartości."""
+    n = len(hr.get("time") or [])
+    at = lambda k: (hr.get(k) or [None] * n)[i]  # noqa: E731
+    sfc = None
+    if at("wind_speed_10m") is not None and at("wind_direction_10m") is not None:
+        d, s = _from_uv(*_uv(at("wind_direction_10m"), at("wind_speed_10m")))
+        gust = at("wind_gusts_10m")
+        sfc = {"dir": d, "speed": s, "gust": round(gust) if gust is not None else None}
+    return sfc, [(p, at(f"geopotential_height_{p}hPa"), at(f"wind_speed_{p}hPa"), at(f"wind_direction_{p}hPa"))
+                 for p in levels]
 
 
 def parse_forecast(text: str, now: datetime | None = None) -> list[dict]:
     """Odpowiedź Open-Meteo (obiekt dla jednego punktu, lista dla kilku) -> wiatr 10 m i na 3000 ft dla bieżącej
     godziny UTC w każdym punkcie, w kolejności zapytania."""
-    data = json.loads(text)
-    if isinstance(data, dict) and data.get("error"):
-        raise UpstreamError(data.get("reason") or "error")
-    now = now or datetime.now(timezone.utc)
-    stamp = now.strftime("%Y-%m-%dT%H:00")
     out = []
-    for item in data if isinstance(data, list) else [data]:
+    for item in _items(text):
         hr = item.get("hourly") or {}
         times = hr.get("time") or []
         if not times:
             out.append({"valid": None, "surface": None, "w3000": None})
             continue
-        i = max((j for j, t in enumerate(times) if t <= stamp), default=0)
-        at = lambda k: (hr.get(k) or [None] * len(times))[i]  # noqa: E731
-        sfc = None
-        if at("wind_speed_10m") is not None and at("wind_direction_10m") is not None:
-            d, s = _from_uv(*_uv(at("wind_direction_10m"), at("wind_speed_10m")))
-            gust = at("wind_gusts_10m")
-            sfc = {"dir": d, "speed": s, "gust": round(gust) if gust is not None else None}
-        levels = [(p, at(f"geopotential_height_{p}hPa"), at(f"wind_speed_{p}hPa"), at(f"wind_direction_{p}hPa"))
-                  for p in LEVELS]
+        i = hour_index(times, now)
+        sfc, levels = hour_wind(hr, i)
         out.append({"valid": times[i] + "Z", "surface": sfc, "w3000": interpolate_wind(levels)})
+    return out
+
+
+def parse_profiles(text: str) -> list[list[dict]]:
+    """Odpowiedź Open-Meteo z poziomami PROFILE_LEVELS -> dla każdego punktu (w kolejności zapytania) lista godzin
+    doby [{time: "2026-10-28T12:00", surface: {...} | None, levels: [(hPa, m, kt, °), ...]}]."""
+    out = []
+    for item in _items(text):
+        hr = item.get("hourly") or {}
+        hours = []
+        for i, t in enumerate(hr.get("time") or []):
+            sfc, levels = hour_wind(hr, i, PROFILE_LEVELS)
+            hours.append({"time": t, "surface": sfc, "levels": levels})
+        out.append(hours)
     return out
 
 
@@ -254,22 +294,46 @@ def upstream_reason(exc: UpstreamError) -> str:
     return describe(exc)
 
 
-async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
-    """Wiatr z modelu dla punktów [(lat, lon)] jednym zapytaniem (cache 10 min)."""
-    if not points:
-        return []
-    params = {"latitude": ",".join(f"{la:.4f}" for la, _ in points),
-              "longitude": ",".join(f"{lo:.4f}" for _, lo in points),
-              "hourly": ",".join(hourly_variables()), "wind_speed_unit": "kn", "timezone": "GMT",
-              "forecast_days": "1"}
+def _params(points: list[tuple[float, float]], levels: tuple) -> dict:
+    return {"latitude": ",".join(f"{la:.4f}" for la, _ in points),
+            "longitude": ",".join(f"{lo:.4f}" for _, lo in points),
+            "hourly": ",".join(hourly_variables(levels)), "wind_speed_unit": "kn", "timezone": "GMT",
+            "forecast_days": "1"}
+
+
+async def _fetch(points: list[tuple[float, float]], levels: tuple, ttl: int, parse) -> list:
+    """Jedno zapytanie dla wszystkich punktów; błąd pobrania albo nieczytelna odpowiedź -> UpstreamError z krótkim
+    powodem (pełny komunikat z adresem w __cause__)."""
     try:
-        text = await fetch_text(OPEN_METEO_URL, CACHE_SECONDS, params)
+        text = await fetch_text(OPEN_METEO_URL, ttl, _params(points, levels))
     except UpstreamError as exc:
         raise UpstreamError(upstream_reason(exc)) from exc
     try:
-        res = parse_forecast(text)
+        res = parse(text)
     except (ValueError, KeyError, TypeError, IndexError) as exc:
         raise UpstreamError(f"unreadable response ({exc})") from exc
     if len(res) != len(points):
         raise UpstreamError(f"{len(res)} points in the response instead of {len(points)}")
     return res
+
+
+async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
+    """Wiatr z modelu dla punktów [(lat, lon)] jednym zapytaniem (cache 10 min)."""
+    if not points:
+        return []
+    return await _fetch(points, LEVELS, CACHE_SECONDS, parse_forecast)
+
+
+def profile_ttl(now: datetime | None = None) -> int:
+    """Ważność odpowiedzi AWALON w cache: PROFILE_CACHE_SECONDS, ale nie dłużej niż od północy UTC (odpowiedź
+    z forecast_days=1 obejmuje tylko swoją dobę, więc kopia sprzed północy jest od razu nieaktualna)."""
+    now = now or datetime.now(timezone.utc)
+    return max(1, min(PROFILE_CACHE_SECONDS, now.hour * 3600 + now.minute * 60 + now.second))
+
+
+async def model_profiles(points: list[tuple[float, float]], now: datetime | None = None) -> list[list[dict]]:
+    """AWALON: godziny doby z wiatrem 10 m i poziomami PROFILE_LEVELS dla punktów [(lat, lon)] jednym zapytaniem
+    (cache 30 min, bez przechodzenia przez północ UTC)."""
+    if not points:
+        return []
+    return await _fetch(points, PROFILE_LEVELS, profile_ttl(now), parse_profiles)

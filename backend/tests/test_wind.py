@@ -1,5 +1,6 @@
 """Wiatr na podejściu: punkty FAF/IF z procedur .ese albo na przedłużeniu osi (3°), interpolacja wiatru Open-Meteo
-do 3000 ft AMSL i endpointy /api/meteo/approach-points, /api/meteo/approach-wind/{icao}."""
+do 3000 ft AMSL i endpoint /api/meteo/approach-wind/{icao} (AERODROME › INFO, AWALON › lotnisko). 0.13.0: bez
+/api/meteo/approach-points (lista wyboru dawnego METEO › WIND), punkty podejścia z upperwind.approach_points()."""
 import json
 import os
 import tempfile
@@ -211,10 +212,12 @@ def test_model_winds_one_request(fake_meteo):
 
 # --- endpointy
 
-def test_approach_points_endpoint(client):
-    d = client.get("/api/meteo/approach-points").json()
-    assert d["alt_ft"] == 3000 and len(d["aerodromes"]) > 10
-    ads = {a["icao"]: a for a in d["aerodromes"]}
+def test_approach_points(client):
+    from backend.app.database import SessionLocal
+    with SessionLocal() as db:
+        found = uw.approach_points(db)
+    assert len(found) > 10 and client.get("/api/meteo/approach-points").status_code == 404
+    ads = {a["icao"]: a for a in found}
     for a in ads.values():
         for r in a["runways"]:
             assert r["method"] in ("procedure", "centreline")

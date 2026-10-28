@@ -14,10 +14,10 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 
 # INOP pod AD VFR, DOCS w OTHER (runda 11); 0.12.3 (issue #13): COORDINATION i CONVERSION po MAP, SQUAWK po STRIP,
-# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER; 0.13.0 (issue #23): bez STRIP
-MENU = ["home", "radio", "meteo", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
+# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER; 0.13.0 (issue #23): bez STRIP, AWALON po METEO
+MENU = ["home", "radio", "meteo", "awalon", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
         "coordination", "conversion", "sytop", "aup", "squawk", "other", "about", "emergency", "admin"]
-LABELS = ["?", "RADIO", "METEO", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
+LABELS = ["?", "RADIO", "METEO", "AWALON", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
           "COORDINATION", "CONVERSION", "SYT OP", "AUP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
@@ -335,7 +335,7 @@ def test_menu_fits_low_windows():
     assert ".menu nav { flex: 1; overflow-y: auto; }" in css
     # budżet 600 px (pomiary Playwright przy 1366x600): pasek u góry 18 px, logo z paddingiem menu 45,5 px, zegar
     # z AIRAC 49,8 px, użytkownik z wylogowaniem 66 px; przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie,
-    # liczone z index.html, i zapas na jeszcze jeden (22: AWALON)
+    # liczone z index.html, i zapas na jeszcze jeden (22)
     topbar = float(re.search(r"--topbar-h: ([\d.]+)px;", css).group(1))
     n = len(_menu_buttons())
     assert 20 <= n <= 22
