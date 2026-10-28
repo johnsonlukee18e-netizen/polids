@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{NAME}}</title>
+  <!-- jasność ekranu z paska u góry (Brighter / Darker, topbar.js) przed pierwszym rysowaniem: bez błysku 100 % przy F5
+       i Reload; te same wartości co brightOf i brightFilter w topbar.js (test_shell_look) -->
+  <script>try { const b = Number(localStorage.getItem("shell.bright")); if (Number.isInteger(b) && b && b >= -4 && b <= 4) document.documentElement.style.filter = "brightness(" + (1 + b * 0.12).toFixed(2) + ")"; } catch (e) { /* no storage */ }</script>
   <meta name="theme-color" content="#000000">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
@@ -32,7 +35,7 @@
   <link rel="stylesheet" href="/static/css/fmp.css">
 </head>
 <body>
-  <header id="topbar" class="topbar" role="toolbar" aria-label="Screen">
+  <header id="topbar" class="topbar" aria-label="Screen">
     <button type="button" data-act="reload" title="Reload the application and come back to this screen">Reload</button>
     <button type="button" data-act="brighter" title="Brighter screen">Brighter</button>
     <button type="button" data-act="darker" title="Darker screen">Darker</button>
@@ -71,6 +74,7 @@
   <main id="views"></main>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/vendor/polygon-clipping/polygon-clipping.umd.min.js"></script>
+  <script type="module" src="/static/js/topbar.js"></script>
   <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>

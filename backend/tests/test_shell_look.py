@@ -53,7 +53,8 @@ def test_topbar_markup():
     """Pasek jest pierwszym dzieckiem <body>, przed menu i zakładkami: trzy przyciski od lewej Reload, Brighter, Darker
     (wielką literą tylko na początku jak w PANDORZE), dymki po angielsku, bez nazw źródeł danych."""
     body = INDEX[INDEX.index("<body>") + len("<body>"):]
-    assert body.lstrip().startswith('<header id="topbar" class="topbar" role="toolbar" aria-label="Screen">')
+    # bez role="toolbar": pasek nie ma nawigacji strzałkami, której czytnik ekranu oczekuje od paska narzędzi
+    assert body.lstrip().startswith('<header id="topbar" class="topbar" aria-label="Screen">')
     bar = body[:body.index("</header>")]
     assert body.index("</header>") < body.index('<aside class="menu">') < body.index('<main id="views">')
     buttons = re.findall(r'<button type="button" data-act="([a-z]+)" title="([^"]+)">([^<]+)</button>', bar)
@@ -94,10 +95,14 @@ def test_brightness_filter_only_on_root():
 
 
 def test_app_wires_topbar_and_reload_marker():
-    """app.js: pasek od razu przy wczytaniu modułu (jasność przed konfiguracją); po starcie zawsze HOME (n = 0), a tylko
-    jednorazowy znacznik Reload otwiera potem tamten ekran jako krok po HOME (← wraca do HOME)."""
-    assert 'import { mountTopbar, reloadTarget, takeReload } from "./topbar.js";' in APP
-    assert 'mountTopbar(document.getElementById("topbar"));' in APP
+    """Pasek uruchamia sam topbar.js, osobny moduł w index.html przed app.js: Reload, Brighter i Darker działają też
+    wtedy, gdy nie wczyta się któraś zakładka (moduł z błędem zatrzymuje cały app.js). app.js tylko czyta znacznik
+    Reload: po starcie zawsze HOME (n = 0), a jednorazowy znacznik otwiera potem tamten ekran jako krok po HOME."""
+    assert 'import { reloadTarget, takeReload } from "./topbar.js";' in APP and "mountTopbar(" not in APP
+    assert 'if (typeof document !== "undefined") mountTopbar(document.getElementById("topbar"));' in TOPBAR
+    assert TOPBAR.count('from "./api.js"') == 1 and len(re.findall(r"^import ", TOPBAR, re.M)) == 1
+    mods = re.findall(r'<script type="module" src="([^"]+)"></script>', INDEX)
+    assert mods == ["/static/js/topbar.js", "/static/js/app.js"]
     boot = APP[APP.index("depth = 0;\n  open(\"home\");"):APP.index("ready = true;")]
     assert boot.index('open("home");') < boot.index("const again = reloadTarget(takeReload());")
     assert "if (again) open(again.tab, again.arg, true);" in boot
@@ -105,6 +110,50 @@ def test_app_wires_topbar_and_reload_marker():
     assert "store?.removeItem(RELOAD_KEY);" in TOPBAR and "markReload(here()," in TOPBAR and "reload();" in TOPBAR
     assert 'export const RELOAD_KEY = "shell.reload";' in TOPBAR and 'export const BRIGHT_KEY = "shell.bright";' in TOPBAR
     assert "window.sessionStorage" in TOPBAR and "lsSet(BRIGHT_KEY, String(bright));" in TOPBAR
+
+
+EARLY_SCRIPT = r"""
+const store = new Map();
+const out = [];
+const vals = ["-4", "-3", "-1", "0", "1", "2", "4", "5", "-5", "2.5", "abc", "", " 3 ", null];
+const src = process.argv[3];
+const tb = await import(process.argv[2]);
+for (const v of vals) {
+  const doc = { documentElement: { style: { filter: "" } } };
+  const ls = { getItem: () => v };
+  new Function("document", "localStorage", src)(doc, ls);
+  out.push([v, doc.documentElement.style.filter, tb.brightFilter(tb.brightOf(v))]);
+}
+const blocked = { documentElement: { style: { filter: "" } } };
+new Function("document", "localStorage", src)(blocked, { getItem() { throw new Error("blocked"); } });
+console.log(JSON.stringify({ out, blocked: blocked.documentElement.style.filter }));
+"""
+
+
+def test_saved_brightness_before_first_paint(tmp_path):
+    """Zapisana jasność już w <head> (klasyczny skrypt przed arkuszami i przed <body>): F5 i Reload bez błysku 100 %
+    przed wczytaniem modułów (Playwright przed poprawką: 8-10 klatek menu bez filtra przy -4). Skrypt daje dokładnie
+    ten sam filtr co brightFilter(brightOf()) z topbar.js, a zablokowany localStorage nie zatrzymuje strony."""
+    head = INDEX[:INDEX.index("</head>")]
+    m = re.search(r"\n  <script>(.*?)</script>\n", head)
+    assert m and head.index("<script>") < head.index('<link rel="stylesheet"')
+    early = m.group(1)
+    assert not re.search(r"[^\x00-\x7f]", early) and '"shell.bright"' in early and "document.documentElement.style.filter" in early
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
+    (tmp_path / "topbar.mjs").write_text(TOPBAR.replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    (tmp_path / "run.mjs").write_text(EARLY_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "topbar.mjs").as_uri(), early],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    res = json.loads(r.stdout)
+    for v, got, want in res["out"]:
+        assert got == want, v
+    assert [x[1] for x in res["out"]][:7] == ["brightness(0.52)", "brightness(0.64)", "brightness(0.88)", "",
+                                             "brightness(1.12)", "brightness(1.24)", "brightness(1.48)"]
+    assert res["blocked"] == ""
 
 
 def test_topbar_js_english_and_ascii_code():
@@ -158,6 +207,43 @@ out.min = click("darker", 12);
 out.zero = click("brighter", 4);
 out.reload = [click("reload").level, reloads, sess.m.get(tb.RELOAD_KEY)];
 out.none = tb.mountTopbar(null);
+// drugie wywołanie dla tego samego paska: ten sam obiekt, bez drugiego nasłuchu kliknięć
+out.again = tb.mountTopbar(bar, { root }) === api;
+// fokus z klawiatury na przycisku, który na granicy zakresu się wyłącza: przechodzi na drugi przycisk jasności;
+// atrapa jak Chromium: wyłączenie przycisku z fokusem od razu zdejmuje z niego fokus
+const doc = { activeElement: null };
+const mk2 = (act) => {
+  const o = { dataset: { act }, title: "", ownerDocument: doc, closest() { return this; }, focus() { doc.activeElement = this; } };
+  let dis = null;
+  Object.defineProperty(o, "disabled", { get: () => dis, set: (v) => { dis = v; if (v && doc.activeElement === o) doc.activeElement = null; } });
+  return o;
+};
+const b2 = { reload: mk2("reload"), brighter: mk2("brighter"), darker: mk2("darker") };
+let h2 = null, onStorage = null;
+const bar2 = { querySelector: (sel) => b2[/data-act="(\w+)"/.exec(sel)[1]], addEventListener: (t, fn) => { if (t === "click") h2 = fn; } };
+const win = { addEventListener: (t, fn) => { if (t === "storage") onStorage = fn; } };
+const root2 = { style: { filter: "" } };
+store.set(tb.BRIGHT_KEY, "3");
+const api2 = tb.mountTopbar(bar2, { root: root2, win });
+doc.activeElement = b2.brighter;
+h2({ target: b2.brighter });
+out.focusMax = [api2.level(), b2.brighter.disabled, doc.activeElement.dataset.act];
+doc.activeElement = b2.darker;
+for (let i = 0; i < 8; i++) h2({ target: b2.darker });
+out.focusMin = [api2.level(), b2.darker.disabled, doc.activeElement.dataset.act];
+// mysz (fokus gdzie indziej): fokus zostaje, gdzie był
+doc.activeElement = null;
+h2({ target: b2.brighter });
+out.mouse = doc.activeElement;
+// inne okno zmieniło jasność (zdarzenie storage): filtr i przyciski od razu; inne klucze bez zmian
+store.set(tb.BRIGHT_KEY, "-2");
+onStorage({ key: "other.key" });
+out.foreign = [api2.level(), root2.style.filter];
+onStorage({ key: tb.BRIGHT_KEY, newValue: "-2" });
+out.synced = [api2.level(), root2.style.filter, b2.darker.disabled, b2.brighter.title];
+store.delete(tb.BRIGHT_KEY);
+onStorage({ key: null });
+out.cleared = [api2.level(), root2.style.filter];
 console.log(JSON.stringify(out));
 """
 
@@ -211,7 +297,18 @@ def test_topbar_buttons_clamp_and_storage(js):
     assert z["upTitle"] == "Brighter screen (now 100%)"
     # Reload: adres bieżącego ekranu w sessionStorage, potem wczytanie strony; jasność bez zmian
     assert js["reload"] == [0, 1, "#radio"]
-    assert js["none"] is None
+    assert js["none"] is None and js["again"] is True
+
+
+def test_topbar_focus_and_other_windows(js):
+    # Enter na Brighter przy +3 daje +4 i wyłącza przycisk: fokus na Darker (nie na <body>); tak samo przy -4
+    assert js["focusMax"] == [4, True, "darker"]
+    assert js["focusMin"] == [-4, True, "brighter"]
+    assert js["mouse"] is None
+    # drugie okno PolIDS: zmiana jasności od razu, bez F5
+    assert js["foreign"] == [-3, "brightness(0.64)"]
+    assert js["synced"] == [-2, "brightness(0.76)", False, "Brighter screen (now 76%)"]
+    assert js["cleared"] == [0, ""]
 
 
 # --- czcionka i grubość ---------------------------------------------------------------------------------------------

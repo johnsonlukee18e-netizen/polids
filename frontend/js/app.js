@@ -1,5 +1,5 @@
 import { api, clearNavPath, esc, hashOf, navPath, parseHash, presetNavPath, selectNavPath, setRouter } from "./api.js";
-import { mountTopbar, reloadTarget, takeReload } from "./topbar.js";
+import { reloadTarget, takeReload } from "./topbar.js";
 import home from "./tabs/home.js";
 import meteo from "./tabs/meteo.js";
 import awalon from "./tabs/awalon.js";
@@ -37,8 +37,8 @@ const views = document.getElementById("views");
 const back = document.getElementById("nav-back");
 const mounted = {};
 const ctx = { config: null, open: (tab, arg) => open(tab, arg, true) };
-// pasek u góry (Reload | Brighter | Darker): jasność od razu, przed wczytaniem konfiguracji; Reload działa zawsze
-mountTopbar(document.getElementById("topbar"));
+// pasek u góry (Reload | Brighter | Darker) uruchamia sam topbar.js, osobny moduł w index.html przed app.js: Reload
+// działa także wtedy, gdy nie wczyta się któraś zakładka; zapisaną jasność ustawia skrypt w <head> przed rysowaniem
 
 // --- Historia ekranów (przycisk ← i Wstecz przeglądarki). Każdy wpis historii tej sesji ma stan {n: głębokość};
 // n = 0 to pierwszy ekran po uruchomieniu (HOME), więc ← nigdy nie wychodzi z aplikacji (np. do strony logowania).

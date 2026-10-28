@@ -7,6 +7,10 @@
 // (localStorage); na granicy zakresu przycisk jest wyłączony, a dymek podaje bieżącą jasność. Filtr CSS na <html>, nigdy
 // na main ani #views: filtr na przodku robi z niego blok zawierający dla position: fixed, więc dymki RADIO (.rb-tip)
 // i pasek offline przesuwałyby się o szerokość menu i wysokość paska (pomiar w mapie rundy 16); <html> tego nie robi.
+// Zapisaną jasność ustawia już skrypt w <head> index.html przed pierwszym rysowaniem (bez błysku 100 % przy F5
+// i Reload); ten moduł ładuje index.html osobno, przed app.js, więc pasek działa, nawet gdy nie wczyta się któraś
+// zakładka (moduł wykonuje się raz, także gdy importuje go app.js). Inne okna PolIDS w tej przeglądarce (drugi
+// monitor) dostają zmianę jasności od razu przez zdarzenie "storage".
 import { lsGet, lsSet, parseHash } from "./api.js";
 
 // sessionStorage: adres ekranu sprzed Reload (jednorazowo); localStorage: poziom jasności -4..4
@@ -44,9 +48,13 @@ export function reloadTarget(hash) {
   return tab && tab !== "home" ? { tab, arg } : null;
 }
 
-// bar: header#topbar; root: element z filtrem (<html>); here/reload/store: do testów w Node
-export function mountTopbar(bar, { root, here = () => location.hash, reload = () => location.reload(), store } = {}) {
+// bar: header#topbar; root: element z filtrem (<html>); here/reload/store/win: do testów w Node.
+// Drugie wywołanie dla tego samego paska oddaje ten sam obiekt (bez drugiego zestawu nasłuchów).
+const MOUNTED = new WeakMap();
+export function mountTopbar(bar, { root, here = () => location.hash, reload = () => location.reload(), store,
+  win = typeof window === "undefined" ? null : window } = {}) {
   if (!bar) return null;
+  if (MOUNTED.has(bar)) return MOUNTED.get(bar);
   // domyślny <html> dopiero po sprawdzeniu bar: w Node (testy) nie ma document
   root ??= document.documentElement;
   const btn = (act) => bar.querySelector(`button[data-act="${act}"]`);
@@ -65,11 +73,26 @@ export function mountTopbar(bar, { root, here = () => location.hash, reload = ()
       markReload(here(), store === undefined ? session() : store);
       reload();
     } else if (act === "brighter" || act === "darker") {
+      // przycisk wyłączony na granicy zakresu gubi fokus (przeglądarka przenosi go od razu na <body>, następny Tab od
+      // początku strony): fokus sprawdzony przed apply(), potem na drugi przycisk jasności
+      const b = btn(act), focused = b.ownerDocument?.activeElement === b;
       bright = clampBright(bright + (act === "brighter" ? 1 : -1));
       lsSet(BRIGHT_KEY, String(bright));
       apply();
+      if (focused && b.disabled) btn(act === "brighter" ? "darker" : "brighter").focus();
     }
   });
+  // zmiana w innym oknie tej przeglądarki (key null: wyczyszczone dane strony)
+  win?.addEventListener("storage", (e) => {
+    if (e.key !== BRIGHT_KEY && e.key !== null) return;
+    bright = brightOf(lsGet(BRIGHT_KEY));
+    apply();
+  });
   apply();
-  return { level: () => bright };
+  const api = { level: () => bright };
+  MOUNTED.set(bar, api);
+  return api;
 }
+
+// w przeglądarce pasek od razu przy wczytaniu modułu (index.html: <script type="module" src=".../topbar.js">)
+if (typeof document !== "undefined") mountTopbar(document.getElementById("topbar"));
