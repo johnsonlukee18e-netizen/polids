@@ -66,7 +66,9 @@ export default {
     ];
     const byId = new Map(PAGES.map((p) => [p.id, p]));
     const argOf = (id = sub?.current()) => { const s = byId.get(id)?.arg?.() || ""; return s ? `${id}/${s}` : id; };
-    sub = subtabs(root, PAGES.map((p) => ({ id: p.id, label: p.label, fill: true,
+    // dwa słowa zawsze w dwóch linijkach jak w podmenu PANDORY (BOMB / PHONE, FLIGHT / PLAN), nie tylko te, które nie
+    // mieszczą się w 140 px (style.css: white-space: pre-line w .submenu button)
+    sub = subtabs(root, PAGES.map((p) => ({ id: p.id, label: p.label.replace(" ", "\n"), fill: true,
       render: (pane) => (live = (p.render || future)(pane) || null) })), { arg: argOf, first: DEFAULT });
     return {
       // arg undefined (przycisk menu): zostaje otwarta podzakładka i jej stan; "docs/LOA/plik.pdf" → COORDINATION

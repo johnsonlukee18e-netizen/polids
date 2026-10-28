@@ -322,7 +322,11 @@ def test_other_submenu_order_and_default(js):
     """0.13.0 (issue #23): 18 podzakładek alfabetycznie jak w PANDORZE (BRAKING, nie BREAKING), każda na całą
     wysokość; OTHER bez adresu otwiera się na DOCS (jak do 0.12.6), nie na pierwszej w kolumnie (4P)."""
     tabs = js["initial"]["tabs"]
-    assert [label for _, label, _ in tabs] == OTHER_LABELS == sorted(OTHER_LABELS)
+    assert OTHER_LABELS == sorted(OTHER_LABELS)
+    # dwa słowa w dwóch linijkach jak w podmenu PANDORY (przycisk z white-space: pre-line), jedno słowo bez zmian
+    assert [label for _, label, _ in tabs] == [x.replace(" ", "\n") for x in OTHER_LABELS]
+    assert [label for _, label, _ in tabs if "\n" in label] == ["BOMB\nPHONE", "BRAKING\nACTION", "FLIGHT\nPLAN",
+                                                                "LIGHT\nGUN", "NATO\nWEATHER", "VFR\nMINIMA"]
     assert [i for i, _, _ in tabs] == ["4p", "aftn", "bomb-phone", "braking-action", "checklist", "docs", "flight-plan",
                                         "fmp", "holding", "ia", "light-gun", "meteo", "nato-weather", "phraseology",
                                         "position", "regcause", "squawk", "vfr-minima"]

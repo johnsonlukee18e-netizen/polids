@@ -120,7 +120,8 @@ main { flex: 1; min-width: 0; position: relative; }
 .view { position: absolute; inset: 0; display: none; }
 .view.active { display: flex; }
 /* podmenu 140 px (0.13.0: w Arialu PHRASEOLOGY nie mieścił się w 130 px): napis, który się nie mieści, schodzi do drugiej
-   linijki jak w PANDORZE (BRAKING / ACTION); "\n" w nazwie podzakładki łamie ją w tym miejscu (pre-line). Przyciski
+   linijki jak w PANDORZE; "\n" w nazwie podzakładki łamie ją w tym miejscu (pre-line), tak OTHER ma każde dwa słowa
+   w dwóch linijkach (BOMB / PHONE, BRAKING / ACTION). Przyciski
    równej wysokości jak dotąd (34,9 px), tekst na środku, dwie linijki po 15 px mieszczą się w tej samej wysokości */
 .submenu { width: 140px; flex: none; padding: 6px; background: #050605; border-right: 1px solid var(--line); overflow-y: auto; }
 .submenu button { height: 34.9px; padding: 0 4px; line-height: 15px; white-space: pre-line; text-overflow: clip; }
