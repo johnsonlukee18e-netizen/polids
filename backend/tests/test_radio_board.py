@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app import main  # noqa: E402
 from backend.app.config import ROOT_DIR  # noqa: E402
+from backend.app.routers import radio as radio_router  # noqa: E402
 from backend.app.routers import vatsim as vatsim_api  # noqa: E402
 from backend.app.services import radioboard as rb  # noqa: E402
 from backend.app.services.http_cache import UpstreamError  # noqa: E402
@@ -45,7 +46,15 @@ def client(monkeypatch_module):
     async def feed():
         return FEED
 
+    async def no_metar(icaos):  # BERLIN bez ATIS: METAR z sieci (testy bez sieci)
+        return {}
+
+    async def no_tvs(prefix=None, now=None):  # czerwone tło: sektory vIFF z sieci
+        return {"sectors": []}
+
     monkeypatch_module.setattr(vatsim_api, "get_feed", feed)
+    monkeypatch_module.setattr(radio_router, "get_metars", no_metar)
+    monkeypatch_module.setattr(radio_router, "viff_sectors", no_tvs)
     with TestClient(main.app) as c:
         yield c
 
@@ -188,7 +197,8 @@ def test_board_atis(board):
 
 def test_board_stacks(board):
     """Stosy sąsiadów (runda 11): kafelki VACS profilu ACC_EPWW (sektory graniczące z EPWW) bez FMP; właściciel
-    kafelka = pierwsze stanowisko online z controlled_by, nikt → null (strona: bez częstotliwości, ADVISORY)."""
+    kafelka = pierwsze stanowisko online z controlled_by, nikt → null (strona: bez częstotliwości, ADVISORY).
+    0.13.0: stosy zostają dla dotychczasowej strony; okienka wg szkicu to `firs` (test_radio_layout.py)."""
     st = {s["fir"]: s for s in board["stacks"]}
     assert [s["fir"] for s in board["stacks"]] == [s["fir"] for s in rb.STACKS]
     assert {s["fir"] for s in board["stacks"] if s["map"] == "left"} == {"ESAA", "EDWW", "EDUU", "EDMM", "LKAA"}

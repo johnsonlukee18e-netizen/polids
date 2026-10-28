@@ -1,7 +1,10 @@
+import asyncio
 import hashlib
 import json
 import logging
 import threading
+import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.encoders import jsonable_encoder
@@ -14,6 +17,8 @@ from ..database import get_db
 from ..importers.sectors_geojson import NO_SECTORS
 from ..models import Aerodrome, AtcPosition, ImportLog, NavPoint, NbSector, Sector
 from ..services import radioboard
+from ..services.viff import sectors as viff_sectors
+from ..services.weather import get_metars
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
 from ..services.positions import all_positions
@@ -192,7 +197,7 @@ def _board_stamp(db: Session, positions: dict) -> tuple:
     """Stan danych tablicy (ok. 2 ms): import plików (ImportLog), zawartość tabel sektorów (liczba, granice pionowe,
     długość list OWNER i geometrii – import kasuje tabelę i wstawia ją od nowa z tymi samymi id; sektory sąsiadów
     tylko z listami OWNER, do kolejności kafelków), stanowiska, ownership.json, kafelki sąsiadów z VACS
-    (vacs_epww.json) i granice VATSpy. Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
+    (vacs_epww.json), granice VATSpy i układ strony (radio_layout.json). Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
     pobiera wtedy geometrię jeszcze raz)."""
     def tbl(*cols):  # liczba wierszy i sumy kolumn jednej tabeli
         return tuple(db.execute(select(func.count(), *[func.total(c) for c in cols])).one())
@@ -204,7 +209,7 @@ def _board_stamp(db: Session, positions: dict) -> tuple:
         tbl(func.length(AtcPosition.callsign) + func.length(AtcPosition.position_id)),
         db.scalar(select(func.count(Aerodrome.icao))), len(positions),
         _file_stamp(settings.seed_dir / "ownership.json"), _file_stamp(settings.seed_dir / "vacs_epww.json"),
-        _file_stamp(settings.seed_dir / "vatspy_firs.geojson"))
+        _file_stamp(settings.seed_dir / "vatspy_firs.geojson"), _file_stamp(settings.seed_dir / "radio_layout.json"))
 
 
 def _board_static(db: Session, positions: dict) -> dict:
@@ -256,15 +261,55 @@ def _build_static(db: Session, positions: dict) -> dict:
     # same FIR-y (bez sektorów VATSpy typu ESMM-7), żeby tło było lekkie
     frame = [{"id": f["properties"]["id"], "geometry": f["geometry"]} for f in firs.get("features", [])
              if "-" not in f["properties"]["id"] and f["properties"]["id"] != "EPWW" and _in_frame(f["geometry"])]
+    # układ strony wg szkicu (okienka FIR-ów, wskaźniki, BERLIN); brak pliku = strona bez okienek
+    layout = _seed_or_empty("radio_layout.json")
     return radioboard.build_static(own=own, epww_slices=epww, vacs_tiles=vacs if isinstance(vacs, list) else [],
                                    positions=positions, coords=coords, border_geom=border, firs_geo=frame,
-                                   nb_chains=nb_chains, nb_slices=nb_slices)
+                                   nb_chains=nb_chains, nb_slices=nb_slices, layout=layout)
 
 
 def _board_data(db: Session) -> tuple[list[dict], dict, dict, set]:
     merged = all_positions(db)
     positions = {p["callsign"]: p for p in merged}
     return merged, positions, _board_static(db, positions), nb_owners(db)
+
+
+# Dodatki tablicy z innych serwisów: METAR Berlina (BERLIN bez ATIS) i sektory vIFF (czerwone tło). Każdy czeka
+# najwyżej SIDE_WAIT_S, a po błędzie nie pytamy go przez SIDE_MISS_S: awaria nie wydłuża odświeżania RADIO.
+SIDE_WAIT_S = 4.0
+SIDE_MISS_S = 120
+_SIDE_FAILED: dict[str, float] = {}
+
+
+async def _side(key: str, make):
+    """Wynik make() albo None (błąd, za długo, niedawny błąd); tablica działa bez niego."""
+    if time.monotonic() - _SIDE_FAILED.get(key, -1e9) < SIDE_MISS_S:
+        return None
+    try:
+        return await asyncio.wait_for(make(), SIDE_WAIT_S)
+    except Exception as exc:  # noqa: BLE001 - dodatek: każdy błąd to brak danych
+        log.warning("RADIO: %s niedostępne (%s)", key, exc)
+        _SIDE_FAILED[key] = time.monotonic()
+        return None
+
+
+async def _berlin_metar(stations: list[dict]) -> str | None:
+    """METAR EDDB tylko wtedy, gdy ATIS Berlina nie podaje pasa."""
+    if radioboard.berlin_config(stations)["source"] == "ATIS":
+        return None
+
+    async def get():
+        return (await get_metars(["EDDB"])).get("EDDB")
+
+    return await _side("metar", get)
+
+
+async def _flow_tvs(now: datetime) -> list[dict] | None:
+    async def get():
+        data = await viff_sectors(settings.viff_sector_prefix, now)
+        return data.get("sectors") if isinstance(data, dict) else None
+
+    return await _side("viff", get)
 
 
 @router.get("/board")
@@ -279,11 +324,16 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     `ver`: wersja danych z importu. `geo=1` albo `have=<ver>` inne niż bieżąca: także geometria podglądów (granica
     EPWW, FIR-y w tle, wycinki ACC, TMA, CTR, FIS) – strona trzyma ją, dopóki `ver` się nie zmieni (np. po imporcie).
     Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (EPWW: same ID; stosy sąsiadów bez
-    częstotliwości i bez ADVISORY, bo nie wiadomo, czy ktoś tam jest)."""
+    częstotliwości i bez ADVISORY, bo nie wiadomo, czy ktoś tam jest).
+    Od 0.13.0 (układ wg szkicu Marka, data/seed/radio_layout.json): `grid` (siatka 13 × 21, przyciski, podglądy),
+    `firs` (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu okienek jednego stanowiska), `indicators`
+    (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST z ATIS EDDB, bez ATIS wg wiatru z METAR),
+    `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %; `ok=false` = brak danych vIFF) i `plates`
+    (plakietki APP i TWR tylko dla zalogowanych). `stacks` zostają dla dotychczasowej strony."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
     merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}
-    online, feed_atis = {}, []
+    online, feed_atis, ctrls = {}, [], []
     try:
         data = await vatsim_api.get_feed()
         ctrls = data.get("controllers", []) + data.get("atis", [])
@@ -294,7 +344,21 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
         net.update(ok=False, error=ONLINE_UNAVAILABLE)
-    out = radioboard.board(static, online, positions, feed_atis)
+    # BERLIN (ATIS albo wiatr z METAR) i czerwone tło sektorów (vIFF): równolegle, błąd = bez dodatku
+    now = datetime.now(timezone.utc)
+    metar, tvs = await asyncio.gather(_berlin_metar(ctrls), _flow_tvs(now))
+    try:
+        berlin = radioboard.berlin_config(ctrls, metar)
+    except Exception as exc:  # noqa: BLE001 - BERLIN nie może zepsuć tablicy
+        log.warning("RADIO: BERLIN (%s)", exc)
+        berlin = None
+    flow = None
+    if tvs is not None:
+        try:
+            flow = {"ok": True, **radioboard.flow_alerts(tvs, now, [s["id"] for s in static["sectors"]], static["tma"])}
+        except Exception as exc:  # noqa: BLE001 - dane vIFF bez opisu: każdy błąd to brak czerwonego tła
+            log.warning("RADIO: ograniczenia przepływu (%s)", exc)
+    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
     out["net"] = net
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego
