@@ -14,11 +14,18 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 
 # INOP pod AD VFR, DOCS w OTHER (runda 11); 0.12.3 (issue #13): COORDINATION i CONVERSION po MAP, SQUAWK po STRIP,
-# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER; 0.13.0 (issue #23): bez STRIP, AWALON po METEO
+# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER; 0.13.0 (issue #23): bez STRIP, AWALON po METEO,
+# SQUAWK w OTHER
 MENU = ["home", "radio", "meteo", "awalon", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
-        "coordination", "conversion", "sytop", "aup", "squawk", "other", "about", "emergency", "admin"]
+        "coordination", "conversion", "sytop", "aup", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AWALON", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
-          "COORDINATION", "CONVERSION", "SYT OP", "AUP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+          "COORDINATION", "CONVERSION", "SYT OP", "AUP", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+# 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>)
+OTHER_SUBS = [("4p", "4P"), ("aftn", "AFTN"), ("bomb-phone", "BOMB PHONE"), ("braking-action", "BRAKING ACTION"),
+              ("checklist", "CHECKLIST"), ("docs", "DOCS"), ("flight-plan", "FLIGHT PLAN"), ("fmp", "FMP"),
+              ("holding", "HOLDING"), ("ia", "IA"), ("light-gun", "LIGHT GUN"), ("meteo", "METEO"),
+              ("nato-weather", "NATO WEATHER"), ("phraseology", "PHRASEOLOGY"), ("position", "POSITION"),
+              ("regcause", "REGCAUSE"), ("squawk", "SQUAWK"), ("vfr-minima", "VFR MINIMA")]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
 
@@ -53,9 +60,10 @@ def test_every_tab_has_module():
 
 
 def test_docs_moved_to_other():
-    """DOCS nie ma już w menu: to pierwsza podzakładka OTHER (#other/docs/<plik>); stare adresy #docs i #docs/<plik>
-    app.js przekierowuje na OTHER › DOCS (link #docs bez arg zostawia otwarty dokument), a przycisk COORDINATION ›
-    w panelu LOA w RADIO otwiera LOA w COORDINATION › DOKUMENTY."""
+    """DOCS nie ma już w menu: to domyślna podzakładka OTHER (#other/docs/<plik>; 0.13.0: w podmenu alfabetycznie, ale
+    OTHER dalej otwiera się na DOCS); stare adresy #docs i #docs/<plik> app.js przekierowuje na OTHER › DOCS (link #docs
+    bez arg zostawia otwarty dokument), a przycisk COORDINATION › w panelu LOA w RADIO otwiera LOA w COORDINATION ›
+    DOKUMENTY."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
     assert '  docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],' in MOVED_SRC
     assert '  phraseology: () => ["other", "phraseology"],' in MOVED_SRC
@@ -63,8 +71,12 @@ def test_docs_moved_to_other():
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { isCoordFile, mountDocs } from "../docs.js";' in other and "soon(" not in other
     subs = re.findall(r'\{ id: "([^"]+)", label: "([^"]+)"', other)
-    assert subs == [("docs", "DOCS"), ("phraseology", "PHRASEOLOGY"), ("checklist", "CHECKLIST")]
+    assert subs == OTHER_SUBS
     assert 'remember("other", argOf())' in other and "activate(arg)" in other and "SUBS" not in other
+    # tabela stron zamiast łańcucha if/else; domyślna podzakładka przez ogólną opcję first w subtabs()
+    assert "const PAGES = [" in other and 'const DEFAULT = "docs";' in other and "first: DEFAULT" in other
+    api_src = (FRONTEND / "js" / "api.js").read_text("utf-8")
+    assert "tabs.find((x) => !x.sep && x.id === opts.first)" in api_src
     docs = (FRONTEND / "js" / "docs.js").read_text("utf-8")
     assert "export function mountDocs(" in docs and "remember(" not in docs and "frameGo(" in docs
     # plik spoza listy (wpisany ręcznie, stary odnośnik) = pierwszy dokument, nigdy pusty podgląd
@@ -131,6 +143,27 @@ def test_strip_removed():
     assert '<s class="lg dep"></s>' in aero and 'class="card aero-ruch"' in aero
 
 
+def test_squawk_moved_to_other():
+    """0.13.0 (issue #23): SQUAWK nie jest już w menu, tylko podzakładką OTHER (#other/squawk/<kod>). Stare adresy
+    #squawk i #squawk/<kod> przekierowuje app.js (jedna linijka w MOVED), kafelek w ABOUT (ctx.open("squawk")) też.
+    Moduł poza tabs/ (jak checklist.js i phraseology.js), arkusz squawk.css zaczepiony o panel, nie o zakładkę."""
+    assert "squawk" not in MENU and not (FRONTEND / "js" / "tabs" / "squawk.js").exists()
+    assert 'data-tab="squawk"' not in INDEX and "squawk" not in re.search(r"const TABS = \{([^}]+)\}", APP).group(1)
+    assert "squawk" not in re.findall(r"^import (\w+) from", APP, re.M)
+    assert '  squawk: (arg) => ["other", arg ? "squawk/" + arg : "squawk"],' in MOVED_SRC
+    sq = (FRONTEND / "js" / "squawk.js").read_text("utf-8")
+    assert "export function mountSquawk(pane, { start = \"\", onCode = () => {} } = {})" in sq
+    assert 'import { api, esc, h, ONLINE_EVENT } from "./api.js";' in sq and "remember(" not in sq
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert 'import { mountSquawk } from "../squawk.js";' in other
+    css = (FRONTEND / "css" / "squawk.css").read_text("utf-8")
+    assert 'data-tab="squawk"' not in css and ".sq-pane :is(.btn, .field, .card, .card h3, input, .tag) { border-radius: 0; }" in css
+    # żaden odnośnik w aplikacji nie prowadzi już wprost do zakładki squawk (poza przekierowaniem)
+    for path in (FRONTEND / "js").rglob("*.js"):
+        src = path.read_text("utf-8")
+        assert not re.search(r"""navigate\(\s*["']squawk["']|href=["']#squawk""", src), path.name
+
+
 def test_hidden_menu_button_takes_no_space():
     """display:block przycisków menu przykrywał [hidden]: ADMIN był widoczny dla każdego."""
     css = (FRONTEND / "css" / "style.css").read_text("utf-8")
@@ -169,6 +202,8 @@ console.log(JSON.stringify({
   checklist: [undefined, "", "close-position"].map((a) => moved.MOVED.checklist(a)),
   // 0.13.0: stare #strip, #strip/<ICAO> (także małymi literami) i adres, który nie jest kodem lotniska
   strip: [undefined, "", "EPWA", "epkk", "x", "EPWA/1"].map((a) => moved.MOVED.strip(a)),
+  // kafelek ABOUT / link #squawk bez arg, "#squawk", "#squawk/7700"
+  squawk: [undefined, "", "7700"].map((a) => moved.MOVED.squawk(a)),
 }));
 """
 
@@ -218,6 +253,8 @@ def test_moved_docs(js):
     # jak wpisany adres AERODROME (zły kod: OVERVIEW)
     assert js["strip"] == [["aerodrome", None], ["aerodrome", ""], ["aerodrome", "EPWA/dman"], ["aerodrome", "EPKK/dman"],
                            ["aerodrome", "x"], ["aerodrome", "EPWA/1"]]
+    # SQUAWK: bez arg i "" = OTHER › SQUAWK, kod = ten kod w polu
+    assert js["squawk"] == [["other", "squawk"], ["other", "squawk"], ["other", "squawk/7700"]]
 
 
 def test_home_greeting(js):
@@ -315,8 +352,8 @@ def test_menu_fits_low_windows():
     zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
     przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
     zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
-    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej. 0.13.0: pasek
-    u góry (18 px) w budżecie, EMERGENCY i ADMIN bez dodatkowego odstępu; Playwright 1366x600 z użytkownikiem:
+    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej. 0.13.0: bez STRIP
+    i SQUAWK (w OTHER), z AWALON; pasek u góry (18 px) w budżecie, EMERGENCY i ADMIN bez dodatkowego odstępu; Playwright 1366x600 z użytkownikiem:
     21 przycisków po 19 px, 22 po 18,1 px, bez przewijania menu."""
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
     low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")

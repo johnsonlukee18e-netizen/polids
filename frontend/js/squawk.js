@@ -1,10 +1,11 @@
-import { api, esc, h, ONLINE_EVENT, remember } from "../api.js";
+import { api, esc, h, ONLINE_EVENT } from "./api.js";
 
-// SQUAWK: jedna lista kodów SSR posortowana po kodzie: pule (EPWW, CCAMS, NATO, EUR-E; importer
-// backend/app/importers/squawk_cal.py → data/seed/squawk.json, GET /api/squawk) i kody specjalne (sam tytuł).
-// 0.12.6 (issue #21): bez przełącznika grup pul; jedno pole na górze: pełny kod (4 cyfry 0–7) zaznacza kod specjalny
-// i pule, w których leży, i przewija listę do pierwszej, tekst filtruje listę (każde słowo musi pasować).
-// Adres: "#squawk" albo "#squawk/7700" (szukany kod); każdy wpisany pełny kod to krok do cofnięcia (← i Wstecz).
+// OTHER › SQUAWK (do 0.12.6 osobna zakładka menu): jedna lista kodów SSR posortowana po kodzie: pule (EPWW, CCAMS,
+// NATO, EUR-E; importer backend/app/importers/squawk_cal.py → data/seed/squawk.json, GET /api/squawk) i kody specjalne
+// (sam tytuł). Jedno pole na górze: pełny kod (4 cyfry 0–7) zaznacza kod specjalny i pule, w których leży, i przewija
+// listę do pierwszej, tekst filtruje listę (każde słowo musi pasować).
+// Adres składa OTHER: "#other/squawk" albo "#other/squawk/7700" (szukany kod); każdy wpisany pełny kod to krok do
+// cofnięcia (onCode). Stare "#squawk" i "#squawk/<kod>" przekierowuje app.js.
 
 const EMERGENCY = new Set(["7500", "7600", "7700"]);
 // po powrocie na zakładkę dane z serwera najwyżej minutowe (nowy import bez F5)
@@ -157,7 +158,7 @@ export function countText(shown, all) {
 // --- widok
 // lista prefiksów ICAO z wyróżnionym EP (Polska)
 const units = (text) => (text ? String(text).split(/\s+/).filter(Boolean)
-  .map((t) => (t === "EP" ? `<b class="sq-ep">EP</b>` : esc(t))).join(" ") : "–");
+  .map((t) => (t === "EP" ? `<span class="sq-ep">EP</span>` : esc(t))).join(" ") : "–");
 const FIELDS = [["pa", "PA"], ["unit", "Unit"], ["civ_mil", "CIV/MIL"], ["app", "APP"], ["assigned_by", "Unit which assigned"],
   ["ar", "A/R"], ["destination", "Destination"], ["via", "Via"], ["protection", "Protection"], ["remarks", "Remarks"], ["type", "purpose"]];
 const poolTip = (p) => [catTag(p.category), ...FIELDS.filter(([k]) => p[k]).map(([k, n]) => `${n}: ${p[k]}`),
@@ -182,7 +183,7 @@ function poolRow(r, code, areas) {
 // kod specjalny: sam kod i tytuł (kontrolerzy znają znaczenie)
 const specialRow = (r, code) => `<tr class="sq-special${rowHas(r, code) ? " selected" : ""}">
   <td class="sq-range sq-scode${EMERGENCY.has(r.s.code) ? " emerg" : ""}">${esc(r.s.code)}</td><td></td>
-  <td colspan="${COLS - 2}"><b class="sq-label">${esc(r.s.label || "")}</b></td></tr>`;
+  <td colspan="${COLS - 2}"><span class="sq-label">${esc(r.s.label || "")}</span></td></tr>`;
 
 // activate(arg): nowy tekst pola albo null (pole zostaje). arg undefined = przycisk menu; arg równy addr (kod w adresie
 // przy ostatnim wejściu albo wpisaniu) = Wstecz na wpis, w którym potem wpisano tekst filtra: tekst zostaje
@@ -195,98 +196,107 @@ export function answerHtml(data, text) {
   if (!q.code) return "";
   if (!data) return `<p class="hint">Loading…</p>`;
   const r = lookup(data, q.code);
-  const big = (c) => `<b class="sq-big${EMERGENCY.has(c) ? " emerg" : ""}">${esc(c)}</b>`;
-  const lines = r.special.map((s) => `<p>${big(s.code)} <b class="sq-label">${esc(s.label || "")}</b></p>`);
+  const big = (c) => `<span class="sq-big${EMERGENCY.has(c) ? " emerg" : ""}">${esc(c)}</span>`;
+  const lines = r.special.map((s) => `<p>${big(s.code)} <span class="sq-label">${esc(s.label || "")}</span></p>`);
   const pools = hitsText(r, data.meta?.participating_areas), miss = missText(r);
   if (pools) lines.push(`<p>${r.special.length ? "" : `${big(q.code)} `}<span class="sq-hit">${esc(pools)}</span></p>`);
   if (miss) lines.push(`<p class="hint">${r.special.length ? "" : `${big(q.code)} `}${esc(miss)}</p>`);
   return lines.join("");
 }
 
-export default {
-  mount(root) {
-    const pane = h(`<div class="pane sq-pane">
-      <h2 class="title">SQUAWK – SSR codes FIR EPWW</h2>
-      <div class="card sq-card">
-        <div class="sq-top">
-          <input class="field sq-q" type="text" autocomplete="off" spellcheck="false" placeholder="Code or text: 7700, EPWW, LR…"
-            title="A code highlights its pools, text filters the list; EPWW, CCAMS, NATO or EUR-E shows that group"
-            aria-label="Search SSR codes">
-          <div class="sq-answer"></div>
-          <span class="hint sq-count"></span>
-        </div>
-        <div class="sq-scroll">
-          <table class="data sq-table"><thead><tr><th>Code</th><th class="num">Count</th><th>Area</th><th>CIV/MIL</th>
-            <th title="${esc(`${arInfo("A").tip}\n${arInfo("R").tip}`)}">A/R</th><th>Unit</th><th>Assigned by</th>
-            <th>Dest</th><th>Protection</th><th>Remarks</th></tr></thead>
-            <tbody><tr><td colspan="${COLS}" class="hint">Loading…</td></tr></tbody></table>
-        </div>
+// OTHER › SQUAWK w panelu podzakładki. start = kod (albo tekst) z adresu; onCode(kod) po wpisaniu pełnego kodu (OTHER
+// zapisuje krok historii). destroy() przy przejściu do innej podzakładki: zdejmuje nasłuch ONLINE_EVENT, a spóźniona
+// odpowiedź /api/squawk nic już nie rysuje (seq).
+export function mountSquawk(pane, { start = "", onCode = () => {} } = {}) {
+  const box = h(`<div class="pane sq-pane">
+    <h2 class="title">SQUAWK – SSR codes FIR EPWW</h2>
+    <div class="card sq-card">
+      <div class="sq-top">
+        <input class="field sq-q" type="text" autocomplete="off" spellcheck="false" placeholder="Code or text: 7700, EPWW, LR…"
+          title="A code highlights its pools, text filters the list; EPWW, CCAMS, NATO or EUR-E shows that group"
+          aria-label="Search SSR codes">
+        <div class="sq-answer"></div>
+        <span class="hint sq-count"></span>
       </div>
-    </div>`);
-    root.append(pane);
-    const input = pane.querySelector(".sq-q");
-    const answer = pane.querySelector(".sq-answer");
-    const count = pane.querySelector(".sq-count");
-    const scroller = pane.querySelector(".sq-scroll");
-    const body = pane.querySelector(".sq-table tbody");
-    // addr = kod w adresie tej zakładki (ostatni zapisany albo z adresu); wpisany tekst go nie zmienia
-    let data = null, rows = [], loadedAt = 0, seq = 0, addr = "";
+      <div class="sq-scroll">
+        <table class="data sq-table"><thead><tr><th>Code</th><th class="num">Count</th><th>Area</th><th>CIV/MIL</th>
+          <th title="${esc(`${arInfo("A").tip}\n${arInfo("R").tip}`)}">A/R</th><th>Unit</th><th>Assigned by</th>
+          <th>Dest</th><th>Protection</th><th>Remarks</th></tr></thead>
+          <tbody><tr><td colspan="${COLS}" class="hint">Loading…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>`);
+  pane.append(box);
+  const input = box.querySelector(".sq-q");
+  const answer = box.querySelector(".sq-answer");
+  const count = box.querySelector(".sq-count");
+  const scroller = box.querySelector(".sq-scroll");
+  const body = box.querySelector(".sq-table tbody");
+  // addr = kod w adresie (ostatni zapisany albo z adresu); wpisany tekst go nie zmienia
+  let data = null, rows = [], loadedAt = 0, seq = 0, addr = "", dead = false;
 
-    const drawList = (scroll) => {
-      if (!data) return;
-      const q = parseQuery(input.value);
-      const list = filterRows(rows, q.words);
-      count.textContent = rows.length ? countText(list, rows) : "";
-      const areas = data.meta?.participating_areas;
-      body.innerHTML = !rows.length ? `<tr><td colspan="${COLS}" class="hint sq-empty">No data.</td></tr>`
-        : list.length ? list.map((r) => (r.kind === "special" ? specialRow(r, q.code) : poolRow(r, q.code, areas))).join("")
-          : `<tr><td colspan="${COLS}" class="hint sq-empty">Nothing matches the filter.</td></tr>`;
-      // nowy kod: pierwszy zaznaczony wiersz na środek listy; bez kodu lista od góry
-      if (scroll) {
-        const hit = body.querySelector("tr.selected");
-        if (hit) hit.scrollIntoView({ block: "center" });
-        else scroller.scrollTop = 0;
-      }
-    };
-    const update = (scroll) => {
-      const q = parseQuery(input.value);
-      input.classList.toggle("bad", !!q.error);
-      answer.innerHTML = answerHtml(data, input.value);
-      drawList(scroll);
-    };
-    const load = async () => {
-      const my = ++seq;
-      try {
-        const d = await api("/api/squawk");
-        if (my !== seq) return;
-        const first = !data;
-        data = d;
-        rows = listRows(d);
-        loadedAt = Date.now();
-        update(first);
-      } catch (e) {
-        if (my !== seq || data) return;
-        body.innerHTML = `<tr><td colspan="${COLS}" class="error">${esc(e.message)}</td></tr>`;
-        if (parseQuery(input.value).code) answer.innerHTML = `<p class="error">${esc(e.message)}</p>`;
-      }
-    };
+  const drawList = (scroll) => {
+    if (!data) return;
+    const q = parseQuery(input.value);
+    const list = filterRows(rows, q.words);
+    count.textContent = rows.length ? countText(list, rows) : "";
+    const areas = data.meta?.participating_areas;
+    body.innerHTML = !rows.length ? `<tr><td colspan="${COLS}" class="hint sq-empty">No data.</td></tr>`
+      : list.length ? list.map((r) => (r.kind === "special" ? specialRow(r, q.code) : poolRow(r, q.code, areas))).join("")
+        : `<tr><td colspan="${COLS}" class="hint sq-empty">Nothing matches the filter.</td></tr>`;
+    // nowy kod: pierwszy zaznaczony wiersz na środek listy; bez kodu lista od góry
+    if (scroll) {
+      const hit = body.querySelector("tr.selected");
+      if (hit) hit.scrollIntoView({ block: "center" });
+      else scroller.scrollTop = 0;
+    }
+  };
+  const update = (scroll) => {
+    const q = parseQuery(input.value);
+    input.classList.toggle("bad", !!q.error);
+    answer.innerHTML = answerHtml(data, input.value);
+    drawList(scroll);
+  };
+  const load = async () => {
+    const my = ++seq;
+    try {
+      const d = await api("/api/squawk");
+      if (my !== seq) return;
+      const first = !data;
+      data = d;
+      rows = listRows(d);
+      loadedAt = Date.now();
+      update(first);
+    } catch (e) {
+      if (my !== seq || data) return;
+      body.innerHTML = `<tr><td colspan="${COLS}" class="error">${esc(e.message)}</td></tr>`;
+      if (parseQuery(input.value).code) answer.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    }
+  };
+  const online = () => { if (!data) load(); };
 
-    input.addEventListener("input", () => {
-      update(true);
-      const q = parseQuery(input.value);
-      // sam pełny kod = krok do cofnięcia; tekst, puste albo niepełne pole nie zmienia adresu
-      if (q.code && !q.words.length) { addr = q.code; remember("squawk", addr); }
-    });
-    input.addEventListener("keydown", (e) => { if (e.key === "Escape" && input.value) { input.value = ""; input.dispatchEvent(new Event("input")); } });
-    window.addEventListener(ONLINE_EVENT, () => { if (!data) load(); });
-    update(false);
-    load();
-    // #squawk/7700: kod z adresu (← i Wstecz) trafia do pola tylko, gdy adres wskazuje inny kod niż ostatnio
-    return { activate: (arg) => {
+  input.addEventListener("input", () => {
+    update(true);
+    const q = parseQuery(input.value);
+    // sam pełny kod = krok do cofnięcia; tekst, puste albo niepełne pole nie zmienia adresu
+    if (q.code && !q.words.length) { addr = q.code; onCode(addr); }
+  });
+  input.addEventListener("keydown", (e) => { if (e.key === "Escape" && input.value) { input.value = ""; input.dispatchEvent(new Event("input")); } });
+  window.addEventListener(ONLINE_EVENT, online);
+  if (start) { addr = String(start); input.value = addr; }
+  update(false);
+  load();
+  input.focus();
+  // "#other/squawk/7700": kod z adresu (← i Wstecz) trafia do pola tylko, gdy adres wskazuje inny kod niż ostatnio
+  return {
+    activate: (arg) => {
+      if (dead) return;
       const text = textFromAddress(arg, addr);
       if (text !== null) { addr = text; input.value = text; update(true); }
       if (data && Date.now() - loadedAt > RELOAD_MS) load();
       input.focus();
-    } };
-  },
-};
+    },
+    focus: () => { if (!dead) input.focus(); },
+    destroy: () => { dead = true; seq++; window.removeEventListener(ONLINE_EVENT, online); },
+  };
+}

@@ -1,6 +1,7 @@
 """OTHER (0.12.6, issue #21): CHECKLIST jako podzakładka OTHER (adresy, przekierowania, checklisty w drugim podmenu),
 nowa checklista TIPS FOR CONTROLLERS (punkty bez "...AKCJA", numerowane) i napisy bez źródeł danych w OTHER,
-EMERGENCY i na stronie offline."""
+EMERGENCY i na stronie offline. 0.13.0 (issue #23): 18 podzakładek alfabetycznie (tabela stron w other.js), domyślnie
+DOCS, zaślepki, SQUAWK, FLIGHT PLAN i FMP w OTHER z adresami #other/<id>[/<stan>]."""
 import json
 import re
 import shutil
@@ -62,6 +63,7 @@ PROVENANCE = re.compile(r"Source:|source:|vatiris|minsulander|data/seed|Learning
 
 
 @pytest.mark.parametrize("name", ["js/tabs/other.js", "js/checklist.js", "js/phraseology.js", "js/tabs/emergency.js",
+                                  "js/squawk.js", "js/regcause.js", "js/vfrminima.js",
                                   "offline.html", "index.html", "login.html"])
 def test_no_provenance_in_ui(name):
     path = FRONTEND / name
@@ -81,7 +83,8 @@ def test_lvp_tip_without_source():
 def test_other_files_in_english():
     """Napisy po angielsku; polskie znaki tylko w komentarzach w osobnych linijkach (nie po kodzie)."""
     polish = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
-    for name in ("js/tabs/other.js", "js/checklist.js", "js/phraseology.js", "js/tabs/emergency.js", "sw.js"):
+    for name in ("js/tabs/other.js", "js/checklist.js", "js/phraseology.js", "js/tabs/emergency.js", "sw.js",
+                 "js/squawk.js", "js/regcause.js", "js/vfrminima.js"):
         src = (FRONTEND / name).read_text("utf-8")
         bad = [line.strip() for line in src.splitlines() if polish.search(line) and not line.strip().startswith("//")]
         assert not bad, (name, bad)
@@ -110,13 +113,21 @@ const html = {
   proc: chk.checklistHtml(proc, { n1: "DLH1 \"x\"" }),
 };
 
-// --- OTHER: podzakładki i adresy (podmenu, DOCS, PHRASEOLOGY i CHECKLIST zastąpione atrapami)
+// --- OTHER: podzakładki i adresy (podmenu, DOCS, PHRASEOLOGY, CHECKLIST, SQUAWK, FLIGHT PLAN, FMP, REGCAUSE i
+// VFR MINIMA zastąpione atrapami)
 const root = {};
 const view = other.mount(root, { config: { links: {} } });
 const sub = globalThis.__sub;
+const initial = { sub: sub.current(), tabs: globalThis.__tabs, docs: globalThis.__docs.map((d) => d.start) };
 const steps = [];
+const page = (kind) => globalThis.__pages.filter((x) => x.kind === kind)
+  .map((x) => ({ start: x.opts?.start ?? null, calls: [...x.calls], dead: x.dead }));
 const step = (name, fn) => { log.length = 0; fn(); steps.push({ name, sub: sub.current(), log: [...log],
-  mounts: globalThis.__chk.map((c) => ({ start: c.opts.start, picks: c.picks, dead: c.dead })) }); };
+  mounts: globalThis.__chk.map((c) => ({ start: c.opts.start, picks: [...c.picks], dead: c.dead })),
+  docs: globalThis.__docs.map((d) => ({ start: d.start, picks: [...d.picks] })),
+  squawk: page("squawk"), fp: page("fp"), fmp: page("fmp"), regcause: page("regcause"), vfr: page("vfr"),
+  pane: globalThis.__pane.items.join("") }); };
+const last = (kind) => globalThis.__pages.filter((x) => x.kind === kind).at(-1);
 step("first", () => view.activate("checklist/close-position"));
 step("again", () => view.activate("checklist/rwy-change"));
 step("click", () => globalThis.__chk.at(-1).opts.onPick("handover-takeover"));
@@ -127,20 +138,52 @@ step("subtab", () => sub.click("checklist"));
 step("bare", () => view.activate("checklist"));
 step("phraseology", () => view.activate("phraseology"));
 step("loa", () => view.activate("docs/LOA/x.pdf"));
-console.log(JSON.stringify({ html, steps }));
+step("squawk", () => view.activate("squawk/7700"));
+step("squawk-again", () => view.activate("squawk/7600"));
+step("squawk-code", () => last("squawk").opts.onCode("7500"));
+step("squawk-menu", () => view.activate(undefined));
+step("fp", () => view.activate("flight-plan/lot1"));
+step("fp-lookup", () => last("fp").opts.onLookup("dlh2"));
+step("fp-again", () => view.activate("flight-plan/LOT1"));
+step("fp-menu", () => view.activate(undefined));
+step("squawk-return", () => sub.click("squawk"));
+step("squawk-bare", () => view.activate("squawk"));
+step("fmp", () => view.activate("fmp"));
+step("fmp-menu", () => view.activate(undefined));
+step("fp-return", () => sub.click("flight-plan"));
+step("regcause", () => view.activate("regcause"));
+step("vfr", () => view.activate("vfr-minima"));
+step("4p", () => view.activate("4p"));
+step("click-bomb", () => sub.click("bomb-phone"));
+step("aftn", () => view.activate("aftn"));
+step("unknown", () => view.activate("nope/x"));
+step("vfr-again", () => view.activate("vfr-minima"));
+step("vfr-same", () => view.activate("vfr-minima"));
+step("empty", () => view.activate(""));
+console.log(JSON.stringify({ html, initial, steps, future: globalThis.__future }));
 """
 
 API_STUB = r"""
 globalThis.__log = [];
+export const h = (html) => ({ html });
 export const navigate = (tab, arg) => globalThis.__log.push(["navigate", tab, arg]);
 export const remember = (tab, arg, opts = {}) => globalThis.__log.push(["remember", tab, arg, !!opts.replace]);
-// podmenu jak subtabs w api.js: pierwsza podzakładka od razu, show() niszczy poprzednią (destroy), klik = show + remember(arg)
+// podmenu jak subtabs w api.js: podzakładka domyślna (opts.first, inaczej pierwsza) od razu, show() niszczy poprzednią
+// (destroy), klik = show + remember(arg); panel zapisuje wstawione napisy HTML
 export function subtabs(root, tabs, opts = {}) {
   let cur = null, id = null;
-  const show = (x) => { cur?.destroy?.(); const t = tabs.find((y) => y.id === x) || tabs[0]; id = t.id; cur = t.render({}) || null; };
+  const first = (tabs.find((y) => y.id === opts.first) || tabs[0]).id;
+  globalThis.__tabs = tabs.map((t) => [t.id, t.label, !!t.fill]);
+  const show = (x) => {
+    cur?.destroy?.();
+    const t = tabs.find((y) => y.id === x) || tabs.find((y) => y.id === first);
+    id = t.id;
+    globalThis.__pane = { items: [], append(...xs) { this.items.push(...xs.map((v) => v.html)); } };
+    cur = t.render(globalThis.__pane) || null;
+  };
   const ctl = { show, current: () => id, click: (x) => { show(x); remember("other", opts.arg(id)); } };
   globalThis.__sub = ctl;
-  show(tabs[0].id);
+  show(first);
   return ctl;
 }
 """
@@ -153,9 +196,27 @@ export function mountChecklists(pane, opts) {
 }
 """
 DOCS_STUB = r"""
+globalThis.__docs = [];
 export const isCoordFile = (f) => /^(LOA|LOP)\//i.test(f);
-export function mountDocs() { return { pick() {} }; }
+export function mountDocs(pane, ctx, opts) {
+  const o = { start: opts.start, picks: [], pick(f) { this.picks.push(f); } };
+  globalThis.__docs.push(o);
+  return o;
+}
 """
+# atrapy stron: zapis montowania (opts), wywołań (activate/focus; undefined = "<menu>") i destroy
+PAGE_STUB = r"""
+globalThis.__pages ||= [];
+const arg = (a) => (a === undefined ? "<menu>" : a);
+export function %(fn)s(pane, opts) {
+  const o = { kind: "%(kind)s", opts, calls: [], dead: false, activate(a) { this.calls.push(["activate", arg(a)]); },
+    focus() { this.calls.push(["focus"]); }, destroy() { this.dead = true; } };
+  globalThis.__pages.push(o);
+  return o;
+}
+"""
+PAGES = {"squawk": ("mountSquawk", "squawk"), "flightplan": ("mountFlightPlan", "fp"), "fmp": ("mountFmp", "fmp"),
+         "regcause": ("mountRegcause", "regcause"), "vfrminima": ("mountVfrMinima", "vfr")}
 
 
 @pytest.fixture(scope="module")
@@ -173,10 +234,13 @@ def js(tmp_path_factory):
     (stubs / "checklist.mjs").write_text(CHK_STUB, "utf-8")
     (stubs / "docs.mjs").write_text(DOCS_STUB, "utf-8")
     (stubs / "phraseology.mjs").write_text("export function mountPhraseology() {}\n", "utf-8")
+    for mod, (fn, kind) in PAGES.items():
+        (stubs / f"{mod}.mjs").write_text(PAGE_STUB % {"fn": fn, "kind": kind}, "utf-8")
     src = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
-    for mod in ("api", "checklist", "docs", "phraseology"):
+    for mod in ("api", "checklist", "docs", "phraseology", *PAGES):
+        assert f'"../{mod}.js"' in src, mod
         src = src.replace(f'"../{mod}.js"', f'"./stubs/{mod}.mjs"')
-    (d / "other.mjs").write_text(src, "utf-8")
+    (d / "other.mjs").write_text(src + '\nglobalThis.__future = FUTURE;\n', "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "checklist.mjs").as_uri(), (d / "other.mjs").as_uri()],
@@ -245,6 +309,101 @@ def test_other_subtab_switching(js):
     assert phr["log"] == [["remember", "other", "phraseology", False]]
     # LOA z dawnego adresu DOCS dalej do COORDINATION
     assert _step(js, "loa")["log"] == [["navigate", "coordination", "docs/LOA/x.pdf"]]
+
+
+OTHER_LABELS = ["4P", "AFTN", "BOMB PHONE", "BRAKING ACTION", "CHECKLIST", "DOCS", "FLIGHT PLAN", "FMP", "HOLDING", "IA",
+                "LIGHT GUN", "METEO", "NATO WEATHER", "PHRASEOLOGY", "POSITION", "REGCAUSE", "SQUAWK", "VFR MINIMA"]
+PLACEHOLDERS = ["4p", "aftn", "bomb-phone", "braking-action", "holding", "ia", "light-gun", "meteo", "nato-weather",
+                "position"]
+FUTURE = "This function will be available in the future."
+
+
+def test_other_submenu_order_and_default(js):
+    """0.13.0 (issue #23): 18 podzakładek alfabetycznie jak w PANDORZE (BRAKING, nie BREAKING), każda na całą
+    wysokość; OTHER bez adresu otwiera się na DOCS (jak do 0.12.6), nie na pierwszej w kolumnie (4P)."""
+    tabs = js["initial"]["tabs"]
+    assert [label for _, label, _ in tabs] == OTHER_LABELS == sorted(OTHER_LABELS)
+    assert [i for i, _, _ in tabs] == ["4p", "aftn", "bomb-phone", "braking-action", "checklist", "docs", "flight-plan",
+                                        "fmp", "holding", "ia", "light-gun", "meteo", "nato-weather", "phraseology",
+                                        "position", "regcause", "squawk", "vfr-minima"]
+    assert all(fill for _, _, fill in tabs)
+    assert js["initial"]["sub"] == "docs" and js["initial"]["docs"] == [""]
+
+
+def test_other_placeholders(js):
+    assert js["future"] == FUTURE
+    four = _step(js, "4p")
+    assert four["sub"] == "4p" and four["log"] == [["remember", "other", "4p", False]]
+    assert four["pane"] == f'<div class="pane ot-future"><p>{FUTURE}</p></div>'
+    # klik w podmenu: krok historii z id zaślepki; adres #other/aftn
+    bomb = _step(js, "click-bomb")
+    assert bomb["sub"] == "bomb-phone" and bomb["log"] == [["remember", "other", "bomb-phone", False]] and FUTURE in bomb["pane"]
+    assert _step(js, "aftn")["log"] == [["remember", "other", "aftn", False]] and FUTURE in _step(js, "aftn")["pane"]
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    pages = re.findall(r'\{ id: "([^"]+)", label: "[^"]+" \}', other)
+    assert pages == PLACEHOLDERS
+
+
+def test_other_squawk_addresses(js):
+    sq = _step(js, "squawk")
+    # "#other/squawk/7700" (także po przekierowaniu z #squawk/7700): SQUAWK od razu z tym kodem
+    assert sq["sub"] == "squawk" and sq["squawk"][-1]["start"] == "7700" and sq["mounts"][-1]["dead"] is True
+    assert sq["log"] == [["remember", "other", "squawk/7700", False]]
+    # inny kod przy otwartym SQUAWK: kod do pola, bez ponownego rysowania
+    again = _step(js, "squawk-again")
+    assert len(again["squawk"]) == 1 and again["squawk"][0]["calls"] == [["activate", "7600"]]
+    assert again["log"] == [["remember", "other", "squawk/7600", False]]
+    # wpisany pełny kod = krok historii (remember bez replace)
+    assert _step(js, "squawk-code")["log"] == [["remember", "other", "squawk/7500", False]]
+    # przycisk menu: fokus i świeże dane (activate bez adresu), adres bez zmian
+    menu = _step(js, "squawk-menu")
+    assert menu["squawk"][0]["calls"][-1] == ["activate", "<menu>"] and menu["log"] == [["remember", "other", "squawk/7500", False]]
+    # przejście do FLIGHT PLAN niszczy SQUAWK (nasłuch i spóźnione dane), powrót: ostatni kod
+    assert _step(js, "fp")["squawk"][0]["dead"] is True
+    ret = _step(js, "squawk-return")
+    assert ret["squawk"][-1]["start"] == "7500" and ret["log"] == [["remember", "other", "squawk/7500", False]]
+    bare = _step(js, "squawk-bare")
+    assert bare["squawk"][-1]["calls"] == [["activate", ""]] and bare["log"] == [["remember", "other", "squawk", False]]
+
+
+def test_other_flight_plan_and_fmp_addresses(js):
+    fp = _step(js, "fp")
+    # znak z adresu wielkimi literami; każde wyszukanie (onLookup) to krok historii #other/flight-plan/<ZNAK>
+    assert fp["sub"] == "flight-plan" and fp["fp"][-1]["start"] == "LOT1"
+    assert fp["log"] == [["remember", "other", "flight-plan/LOT1", False]]
+    assert _step(js, "fp-lookup")["log"] == [["remember", "other", "flight-plan/DLH2", False]]
+    again = _step(js, "fp-again")
+    assert len(again["fp"]) == 1 and again["fp"][0]["calls"] == [["activate", "LOT1"]]
+    assert again["log"] == [["remember", "other", "flight-plan/LOT1", False]]
+    assert _step(js, "fp-menu")["fp"][0]["calls"][-1] == ["focus"]
+    fmp = _step(js, "fmp")
+    assert fmp["sub"] == "fmp" and len(fmp["fmp"]) == 1 and fmp["log"] == [["remember", "other", "fmp", False]]
+    menu = _step(js, "fmp-menu")
+    assert menu["fmp"][0]["calls"] == [["activate", "<menu>"]] and menu["log"] == [["remember", "other", "fmp", False]]
+    # powrót do FLIGHT PLAN: FMP zniszczone, ostatni znak
+    ret = _step(js, "fp-return")
+    assert ret["fmp"][0]["dead"] is True and ret["fp"][-1]["start"] == "LOT1"
+    assert ret["log"] == [["remember", "other", "flight-plan/LOT1", False]]
+
+
+def test_other_static_pages_and_unknown(js):
+    reg = _step(js, "regcause")
+    assert reg["sub"] == "regcause" and len(reg["regcause"]) == 1 and reg["log"] == [["remember", "other", "regcause", False]]
+    assert reg["fp"][-1]["dead"] is True
+    vfr = _step(js, "vfr")
+    assert vfr["sub"] == "vfr-minima" and vfr["log"] == [["remember", "other", "vfr-minima", False]]
+    assert vfr["regcause"][0]["dead"] is True
+    # nieznane id i pusty adres: DOCS (pierwszy dokument)
+    unknown = _step(js, "unknown")
+    assert unknown["sub"] == "docs" and unknown["log"] == [["remember", "other", "docs", False]]
+    assert unknown["docs"][-1]["start"] == ""
+    # VFR MINIMA z innej podzakładki rysuje się od nowa; przy otwartej ten sam adres nie rysuje jej drugi raz
+    n = len(_step(js, "vfr-again")["vfr"])
+    assert n == len(_step(js, "unknown")["vfr"]) + 1 and _step(js, "vfr-again")["sub"] == "vfr-minima"
+    same = _step(js, "vfr-same")
+    assert len(same["vfr"]) == n and same["log"] == [["remember", "other", "vfr-minima", False]]
+    empty = _step(js, "empty")
+    assert empty["sub"] == "docs" and empty["log"] == [["remember", "other", "docs", False]]
 
 
 FRAME_SCRIPT = r"""
