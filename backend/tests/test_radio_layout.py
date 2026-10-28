@@ -294,7 +294,10 @@ def test_net_error_no_advisory(client):
     assert d["net"]["ok"] is False
     assert all(not f["advisory"] and not f["staffed"] for f in d["firs"])
     assert all(i["value"] == "0" for i in d["indicators"]) and d["plates"] == {"app": [], "twr": []}
-    assert d["berlin"]["config"] == "WEST"
+    # BERLIN: bez danych o zalogowanych nie wiadomo, czy jest ATIS – bez konfiguracji (strona: kreska), nie czerwone
+    # „No ATIS” (dawniej WEST domyślny)
+    assert (d["berlin"]["config"], d["berlin"]["source"], d["berlin"]["preferred"]) == (None, "UNKNOWN", False)
+    assert d["berlin"]["tip"] == "ATIS unknown: no network data"
 
 
 # --- wskaźniki u góry
@@ -364,6 +367,16 @@ def test_berlin_pure():
     assert (b["config"], b["source"], b["tip"]) == ("EAST", "WIND", "ATIS A without runway: preferred by wind 090/12")
     # inne lotniska nie mylą Berlina
     assert rb.berlin_config([atis("EDDT_ATIS", "B", ["RWY 08L"])])["source"] == "DEFAULT"
+    # pas zamknięty z uwag ATIS nie trafia do dymku jako pas w użyciu
+    b = rb.berlin_config(st("BERLIN INFORMATION C", "RUNWAY IN USE 25R. RUNWAY 25L CLOSED DUE TO WORK IN PROGRESS"))
+    assert (b["config"], b["runways"], b["tip"]) == ("WEST", ["25R"], "ATIS C: 25R")
+    # nieczytelny ATIS (w tekście nie napis): jak ATIS bez pasa, bez błędu
+    b = rb.berlin_config([atis("EDDB_ATIS", "C", ["INFO C", 5])], "EDDB 281220Z 09012KT 9999 12/05 Q1012")
+    assert (b["config"], b["source"], b["tip"]) == ("EAST", "WIND", "ATIS unreadable: preferred by wind 090/12")
+    # bez danych o zalogowanych: nie wiadomo, czy ATIS jest – bez konfiguracji, wiatr tylko w dymku
+    b = rb.berlin_config([], "EDDB 281220Z 09012KT 9999 12/05 Q1012", net_ok=False)
+    assert (b["config"], b["source"], b["preferred"], b["wind"], b["tip"]) == (
+        None, "UNKNOWN", False, "090/12", "ATIS unknown: no network data; preferred by wind 090/12: EAST")
 
 
 def test_berlin_board(client):
@@ -375,6 +388,32 @@ def test_berlin_board(client):
     d = get(client, metar={"EDDB": "EDDB 281220Z 09012KT 9999 FEW030 12/05 Q1012"})
     assert (d["berlin"]["config"], d["berlin"]["source"]) == ("EAST", "WIND") and SIDE["metar_calls"] == 1
     assert get(client)["berlin"]["source"] == "DEFAULT"
+
+
+def test_berlin_error_safe(client, monkeypatch):
+    """Błąd przy liczeniu BERLIN psuje tylko BERLIN (kreska), nie całą tablicę (dawniej HTTP 500 i pusta strona)."""
+    d = get(client, atis_=[atis("EDDB_ATIS", "C", ["INFO C", 5])])
+    assert (d["berlin"]["config"], d["berlin"]["source"]) == ("WEST", "DEFAULT") and SIDE["metar_calls"] == 1
+
+    def boom(*a, **k):
+        raise ValueError("bad atis")
+
+    monkeypatch.setattr(rb, "berlin_config", boom)
+    d = get(client, atis_=[atis("EDDB_ATIS", "C", ["RWY 25R"])])
+    assert {k: d["berlin"][k] for k in ("config", "source", "preferred", "col", "row")} == {
+        "config": None, "source": "UNKNOWN", "preferred": False, "col": 1, "row": 6}
+    assert len(d["firs"]) == 10 and len(d["indicators"]) == 5
+
+
+def test_berlin_net_error_unknown(client):
+    """Błąd danych o zalogowanych: BERLIN nie twierdzi „No ATIS”; wiatr z METAR tylko w dymku."""
+    SIDE["feed"] = UpstreamError("timeout")
+    SIDE["metar"] = {"EDDB": "EDDB 281220Z 09012KT 9999 FEW030 12/05 Q1012"}
+    d = client.get("/api/radio/board").json()
+    assert d["net"]["ok"] is False
+    assert {k: d["berlin"][k] for k in ("config", "source", "preferred", "wind", "tip")} == {
+        "config": None, "source": "UNKNOWN", "preferred": False, "wind": "090/12",
+        "tip": "ATIS unknown: no network data; preferred by wind 090/12: EAST"}
 
 
 def test_berlin_upstream_failure_safe(client, monkeypatch):

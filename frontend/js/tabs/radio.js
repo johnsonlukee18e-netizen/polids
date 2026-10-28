@@ -170,14 +170,16 @@ export function indicatorHtml(i, x) {
   return `<div class="rb-ind" style="grid-area: ${gridArea({ ...i, rows: 1 })}" data-rt="${esc(rt)}">${esc(i.id)}</div>`
     + `<div class="rb-indv" style="grid-area: ${gridArea({ ...i, row: (Number(i.row) || 1) + 1, rows: 1 })}" data-rt="${esc(rt)}">${esc(v)}</div>`;
 }
-// BERLIN: konfiguracja pasów Berlina w szarym polu jak w PANDORZE; bez pasa z ATIS (preferred) czerwony napis
-export function berlinHtml(b) {
-  const pref = !!b?.preferred;
-  const rt = ["BERLIN: runway configuration of Berlin Brandenburg, WEST (runways 24) or EAST (runways 06)", b?.tip || "",
+// BERLIN: konfiguracja pasów Berlina w szarym polu jak w PANDORZE; bez pasa z ATIS (preferred) czerwony napis. Bez
+// danych o zalogowanych (x.net === false) albo bez konfiguracji: kreska jak we wskaźnikach – nie wiadomo, czy jest ATIS
+export function berlinHtml(b, x = {}) {
+  const cfg = x.net === false ? "" : b?.config || "", pref = !!cfg && !!b?.preferred;
+  const tip = b?.tip || (x.net === false ? "ATIS unknown: no network data" : "");
+  const rt = ["BERLIN: runway configuration of Berlin Brandenburg, WEST (runways 24) or EAST (runways 06)", tip,
     ...(pref ? ["Red text: preferred configuration, no runway in use from ATIS"] : [])].filter(Boolean).join("\n");
   const box = b?.box?.col ? b.box : { col: b?.col, row: (Number(b?.row) || 1) + 1, cols: 2 };
   return `<div class="rb-blbl" style="grid-area: ${gridArea(b)}" data-rt="${esc(rt)}">BERLIN</div>`
-    + `<div class="rb-bln${pref ? " pref" : ""}" style="grid-area: ${gridArea(box)}" data-rt="${esc(rt)}">${esc(b?.config || "\u2013")}</div>`;
+    + `<div class="rb-bln${pref ? " pref" : ""}" style="grid-area: ${gridArea(box)}" data-rt="${esc(rt)}">${esc(cfg || "\u2013")}</div>`;
 }
 // nazwa nad okienkami (okienko FIR-u tuż pod nią) albo obok nich (side: EYVL, UMMV, UKLV w kolumnie po prawej)
 export function nameSide(f) {
@@ -442,7 +444,7 @@ export default {
       if (!d?.grid?.cols) return;
       const x = cx();
       $(".rb-cells").innerHTML = arr(d.indicators).map((i) => indicatorHtml(i, x)).join("")
-        + (d.berlin?.col ? berlinHtml(d.berlin) : "") + arr(d.firs).map((f) => firHtml(f, x)).join("");
+        + (d.berlin?.col ? berlinHtml(d.berlin, x) : "") + arr(d.firs).map((f) => firHtml(f, x)).join("");
     }
 
     // --- podglądy

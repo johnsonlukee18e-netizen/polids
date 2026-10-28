@@ -293,9 +293,18 @@ async def _side(key: str, make):
         return None
 
 
-async def _berlin_metar(stations: list[dict]) -> str | None:
-    """METAR EDDB tylko wtedy, gdy ATIS Berlina nie podaje pasa."""
-    if radioboard.berlin_config(stations)["source"] == "ATIS":
+def _berlin_atis(stations: list[dict], net_ok: bool) -> dict | None:
+    """BERLIN z samego ATIS (bez METAR); błąd = None (wtedy METAR i drugie podejście, a po nim BERLIN_UNKNOWN)."""
+    try:
+        return radioboard.berlin_config(stations, net_ok=net_ok)
+    except Exception as exc:  # noqa: BLE001 - BERLIN nie może zepsuć tablicy
+        log.warning("RADIO: BERLIN (%s)", exc)
+        return None
+
+
+async def _berlin_metar(need: bool) -> str | None:
+    """METAR EDDB tylko wtedy, gdy ATIS Berlina nie podaje pasa (need)."""
+    if not need:
         return None
 
     async def get():
@@ -343,14 +352,18 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
         net.update(ok=False, error=ONLINE_UNAVAILABLE)
-    # BERLIN (ATIS albo wiatr z METAR) i czerwone tło sektorów (vIFF): równolegle, błąd = bez dodatku
+    # BERLIN (ATIS albo wiatr z METAR) i czerwone tło sektorów (vIFF): równolegle, błąd = bez dodatku; każdy błąd
+    # przy liczeniu BERLIN to tylko BERLIN bez konfiguracji (kreska), nigdy błąd całej tablicy
     now = datetime.now(timezone.utc)
-    metar, tvs = await asyncio.gather(_berlin_metar(ctrls), _flow_tvs(now))
-    try:
-        berlin = radioboard.berlin_config(ctrls, metar)
-    except Exception as exc:  # noqa: BLE001 - BERLIN nie może zepsuć tablicy
-        log.warning("RADIO: BERLIN (%s)", exc)
-        berlin = None
+    berlin = _berlin_atis(ctrls, net["ok"])
+    need_metar = not berlin or berlin["source"] != "ATIS"
+    metar, tvs = await asyncio.gather(_berlin_metar(need_metar), _flow_tvs(now))
+    if need_metar:
+        try:
+            berlin = radioboard.berlin_config(ctrls, metar, net_ok=net["ok"])
+        except Exception as exc:  # noqa: BLE001 - BERLIN nie może zepsuć tablicy
+            log.warning("RADIO: BERLIN (%s)", exc)
+            berlin = dict(radioboard.BERLIN_UNKNOWN)
     flow = None
     if tvs is not None:
         try:

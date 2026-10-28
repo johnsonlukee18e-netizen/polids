@@ -976,6 +976,8 @@ console.log(JSON.stringify({
   indNet: radio.indicatorHtml({ ...ind, value: "0", positions: [] }, { ...x, net: false }),
   ber: radio.berlinHtml(ber), berPref: radio.berlinHtml({ ...ber, config: "WEST", preferred: true, tip: "" }),
   berNone: radio.berlinHtml({ col: 1, row: 6 }),
+  berNet: radio.berlinHtml({ ...ber, config: "EAST", preferred: true, tip: "" }, { ...x, net: false }),
+  berUnknown: radio.berlinHtml({ ...ber, config: null, source: "UNKNOWN", preferred: false, tip: "ATIS unknown: no network data" }),
   evil: radio.firHtml(evil, { ...x, sel: null }) + radio.indicatorHtml({ id: "<b>", tip: "<i>", col: 1, row: 1, value: "<s>",
     positions: [] }, x) + radio.berlinHtml({ col: 1, row: 6, config: "<b>", tip: "<i>" }),
 }));
@@ -1054,6 +1056,10 @@ def test_js_neighbour_boxes(tmp_path):
     assert "ATIS EDDB: RWY 06L/06R" in ber and "Red text" not in ber
     assert 'class="rb-bln pref"' in pref and ">WEST</div>" in pref and "Red text: preferred configuration" in pref
     assert 'class="rb-bln" style="grid-area: 7 / 1 / span 1 / span 2"' in out["berNone"] and ">–</div>" in out["berNone"]
+    # bez danych o zalogowanych: kreska jak we wskaźnikach, nie czerwona konfiguracja z wiatru
+    for k in ("berNet", "berUnknown"):
+        assert 'class="rb-bln" style=' in out[k] and ">–</div>" in out[k] and "Red text" not in out[k], k
+        assert "ATIS unknown: no network data" in out[k], k
     # dymki mówią, co to jest, nie skąd są dane
     for key, h in out.items():
         assert not re.search(r"Coverage order|coverage order|VACS|VATSIM|VATSpy|\.ese|›", str(h)), key

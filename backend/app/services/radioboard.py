@@ -21,6 +21,7 @@ from itertools import combinations
 from .metar import parse_metar
 from .radio import facility, sector_group, sector_kind
 from .runways import atis_state, wind_components
+from .vatsim import _CLOSED as RWY_CLOSED
 from .viff import restriction_active
 
 LAYERS = ("LOW", "MID", "HIGH")
@@ -844,34 +845,62 @@ def wind_text(m) -> str:
     return f"{'VRB' if m.wind_variable or m.wind_dir is None else f'{m.wind_dir:03d}'}/{m.wind_speed:02d}{gust}"
 
 
-def berlin_config(stations: list[dict], metar_raw: str | None = None) -> dict:
-    """Konfiguracja BERLIN: {config: WEST|EAST, source: ATIS|WIND|DEFAULT, preferred (bez ATIS: strona czerwonym
-    tekstem), letter, runways (pasy z ATIS tego kierunku), wind, tip}. stations: data feed (controllers + atis)."""
-    atis = atis_state(stations, "EDDB", list(EDDB_RWYS))
-    letter = (atis or {}).get("letter")
-    if atis and (rwy := atis.get("arr") or atis.get("dep")):
-        cfg = _side(rwy)
-        text = " ".join(str(x) for x in atis.get("lines") or ()).upper()
-        rws = []
-        for r in [atis.get("arr"), atis.get("dep"), *("".join(m) for m in _RWY_TOKEN.findall(text))]:
-            if r and _side(r) == cfg and r not in rws:
-                rws.append(r)
-        return {"config": cfg, "source": "ATIS", "preferred": False, "letter": letter, "runways": rws, "wind": None,
-                "tip": f"ATIS{f' {letter}' if letter else ''}: {' '.join(rws)}"}
-    head = f"ATIS{f' {letter}' if letter else ''} without runway" if atis else "No ATIS"
-    m = None
+def _atis_runways(atis: dict, cfg: str) -> list[str]:
+    """Pasy kierunku cfg do dymku: pas do lądowania i startu z ATIS, potem inne pasy z tekstu, bez zamkniętych
+    ("RUNWAY 25L CLOSED": 25L nie jest w użyciu)."""
+    text = re.sub(r"\s+", " ", " ".join(str(x) for x in atis.get("lines") or ())).upper()
+    rws = []
+    for r in [atis.get("arr"), atis.get("dep"),
+              *("".join(m.groups()) for m in _RWY_TOKEN.finditer(text) if not RWY_CLOSED.match(text[m.end():]))]:
+        if r and _side(r) == cfg and r not in rws:
+            rws.append(r)
+    return rws
+
+
+def _wind_config(metar_raw: str | None) -> tuple[str, str] | None:
+    """Konfiguracja preferowana wg wiatru z METAR EDDB: (WEST|EAST, wiatr do dymku); bez wiatru albo METAR – None."""
     try:
         m = parse_metar(metar_raw) if metar_raw else None
     except Exception:  # noqa: BLE001 - nieczytelny METAR = jak brak METAR
         m = None
     if m is None or m.wind_speed is None:
+        return None
+    head_kt, _ = wind_components(m.wind_dir, m.wind_speed, EDDB_WEST_HDG) if not m.wind_variable else (None, None)
+    return ("EAST" if head_kt is not None and -head_kt > BERLIN_TAIL_KT else "WEST"), wind_text(m)
+
+
+# BERLIN, gdy nie da się go policzyć (błąd w danych): bez konfiguracji, strona pokazuje kreskę jak przy błędzie sieci
+BERLIN_UNKNOWN = {"config": None, "source": "UNKNOWN", "preferred": False, "letter": None, "runways": [], "wind": None,
+                  "tip": "Runway configuration unavailable"}
+
+
+def berlin_config(stations: list[dict], metar_raw: str | None = None, net_ok: bool = True) -> dict:
+    """Konfiguracja BERLIN: {config: WEST|EAST, source: ATIS|WIND|DEFAULT, preferred (bez ATIS: strona czerwonym
+    tekstem), letter, runways (pasy z ATIS tego kierunku), wind, tip}. stations: data feed (controllers + atis).
+    net_ok=False (błąd danych o zalogowanych): nie wiadomo, czy ATIS jest – config None (strona: kreska, jak wskaźniki),
+    source UNKNOWN, wiatr tylko w dymku. Nieczytelny ATIS (np. dziwny tekst) jak ATIS bez pasa."""
+    if not net_ok:
+        w = _wind_config(metar_raw)
+        return {**BERLIN_UNKNOWN, "wind": w[1] if w else None,
+                "tip": "ATIS unknown: no network data" + (f"; preferred by wind {w[1]}: {w[0]}" if w else "")}
+    try:
+        atis = atis_state(stations, "EDDB", list(EDDB_RWYS))
+    except (TypeError, ValueError, AttributeError):
+        atis = {"letter": None, "arr": None, "dep": None, "unreadable": True}
+    letter = (atis or {}).get("letter")
+    if atis and (rwy := atis.get("arr") or atis.get("dep")):
+        cfg = _side(rwy)
+        rws = _atis_runways(atis, cfg)
+        return {"config": cfg, "source": "ATIS", "preferred": False, "letter": letter, "runways": rws, "wind": None,
+                "tip": f"ATIS{f' {letter}' if letter else ''}: {' '.join(rws)}"}
+    head = ("ATIS unreadable" if atis.get("unreadable") else f"ATIS{f' {letter}' if letter else ''} without runway") \
+        if atis else "No ATIS"
+    w = _wind_config(metar_raw)
+    if w is None:
         return {"config": "WEST", "source": "DEFAULT", "preferred": True, "letter": letter, "runways": [],
                 "wind": None, "tip": f"{head}: default"}
-    wind = wind_text(m)
-    head_kt, _ = wind_components(m.wind_dir, m.wind_speed, EDDB_WEST_HDG) if not m.wind_variable else (None, None)
-    cfg = "EAST" if head_kt is not None and -head_kt > BERLIN_TAIL_KT else "WEST"
-    return {"config": cfg, "source": "WIND", "preferred": True, "letter": letter, "runways": [], "wind": wind,
-            "tip": f"{head}: preferred by wind {wind}"}
+    return {"config": w[0], "source": "WIND", "preferred": True, "letter": letter, "runways": [], "wind": w[1],
+            "tip": f"{head}: preferred by wind {w[1]}"}
 
 
 # Czerwone tło (Marek): ograniczenie przepływu teraz albo ruch ponad 80 % dopuszczalnej zajętości. Traffic volumes:
@@ -1171,5 +1200,5 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
             "grid": grid, "firs": fir_blocks(lay, online, positions, net_ok),
             "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),
             "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions)},
-            "berlin": {**(lay.get("berlin") or {}), **(berlin or berlin_config([]))},
+            "berlin": {**(lay.get("berlin") or {}), **(berlin or berlin_config([], net_ok=net_ok))},
             "flow": {"ok": bool(flow.get("ok")), "sectors": flow.get("sectors") or {}, "tma": flow.get("tma") or {}}}
