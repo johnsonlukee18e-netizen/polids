@@ -16,7 +16,7 @@ export function regcauseHtml(data) {
 
 // panel podzakładki; destroy(): spóźniona odpowiedź nic nie rysuje, nasłuch ONLINE_EVENT zdjęty
 export function mountRegcause(pane) {
-  const list = h(`<div class="rc-list"><p class="hint rc-empty">Loading…</p></div>`);
+  const list = h(`<div class="rc-list"><p class="hint rc-empty">Loading\u2026</p></div>`);
   pane.append(list);
   let dead = false, done = false;
   const load = () => api("/api/regcause").then((d) => {

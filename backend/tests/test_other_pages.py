@@ -49,7 +49,10 @@ def test_regcause_seed_shape():
     cats = SEED["categories"]
     assert set(SEED) == {"_uwaga", "categories"} and len(cats) == 14 and len(_rows()) == 35
     assert [c["rows"][0]["code"][0] for c in cats] == LETTERS
-    assert [c["name"] for c in cats[:3]] == ["Accident / Incident", "ATC Capacity", "Aerodrome Services"]
+    # "Accident / incident" jak na zdjęciu PANDORY, "ATC Capacity" jak w zgłoszeniu
+    assert [c["name"] for c in cats[:3]] == ["Accident / incident", "ATC Capacity", "Aerodrome Services"]
+    # każdy opis kończy się kropką (jak na zdjęciu)
+    assert all(r["description"].endswith(".") for r in _rows()), [r["code"] for r in _rows() if not r["description"].endswith(".")]
     for c in cats:
         assert set(c) == {"name", "rows"} and c["name"] and c["rows"], c
         # jedna litera przyczyny w kategorii; miejsce w kolejności D (odlot), E (trasa), A (przylot) jak na zdjęciu
@@ -207,3 +210,79 @@ def test_other_pages_style():
         code = "\n".join(line for line in src.splitlines() if not line.strip().startswith("//"))
         assert not re.search(r"<(b|strong)[\s>]", code), name
     assert 'href="/static/css/other.css"' in (FRONTEND / "index.html").read_text("utf-8")
+
+
+RC_STUB = r"""
+const makeEl = () => ({ innerHTML: "" });
+export const ONLINE_EVENT = "polids:online";
+export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const h = (html) => Object.assign(makeEl(), { innerHTML: html });
+export const api = (url) => new Promise((res, rej) => globalThis.__pending.push({ url, res, rej }));
+"""
+RC_MOUNT = r"""
+globalThis.__pending = [];
+globalThis.__l = [];
+globalThis.window = { addEventListener(t, f) { globalThis.__l.push([t, f]); },
+  removeEventListener(t, f) { globalThis.__l = globalThis.__l.filter(([a, b]) => !(a === t && b === f)); } };
+const rc = await import(process.argv[2]);
+const tick = () => new Promise((r) => setImmediate(r));
+const count = () => globalThis.__l.filter(([t]) => t === "polids:online").length;
+const online = () => globalThis.__l.forEach(([t, f]) => t === "polids:online" && f());
+const data = { categories: [{ name: "ATC Capacity", rows: [{ code: "CD 89", description: "Demand.", iata: "X" }] }] };
+const pane = { append(x) { this.list = x; } };
+// A: błąd, potem serwer wraca (ONLINE_EVENT) i lista się rysuje; po narysowaniu ONLINE_EVENT nic nie pyta
+const a = rc.mountRegcause(pane);
+const listA = pane.list;
+const o = { loading: listA.innerHTML, afterMount: count(), requests: globalThis.__pending.map((p) => p.url) };
+globalThis.__pending.shift().rej(new Error("no connection to the PolIDS server"));
+await tick();
+o.error = listA.innerHTML;
+online();
+globalThis.__pending.shift().res(data);
+await tick();
+o.drawn = listA.innerHTML.includes('<h3 class="rc-bar">ATC Capacity</h3>');
+online();
+o.afterDone = globalThis.__pending.length;
+// B: zniszczona przed odpowiedzią: nasłuch zdjęty, spóźniona odpowiedź nic nie rysuje
+const b = rc.mountRegcause(pane);
+const listB = pane.list;
+o.twoMounted = count();
+b.destroy();
+o.afterDestroy = count();
+globalThis.__pending.shift().res(data);
+await tick();
+o.lateB = listB.innerHTML;
+a.destroy();
+o.allGone = count();
+console.log(JSON.stringify(o));
+"""
+
+
+def test_regcause_mount_and_destroy(tmp_path):
+    """REGCAUSE rysuje się od nowa przy każdym kliknięciu w podmenu: destroy() zdejmuje nasłuch ONLINE_EVENT, spóźniona
+    odpowiedź nic nie rysuje; po błędzie lista wczytuje się sama, gdy serwer wraca, a narysowana nie pyta ponownie."""
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text(RC_STUB, "utf-8")
+    src = (FRONTEND / "js" / "regcause.js").read_text("utf-8")
+    (tmp_path / "regcause.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    (tmp_path / "run.mjs").write_text(RC_MOUNT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "regcause.mjs").as_uri()], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    assert o["loading"] == '<div class="rc-list"><p class="hint rc-empty">Loading…</p></div>'
+    assert o["afterMount"] == 1 and o["requests"] == ["/api/regcause"]
+    assert o["error"] == '<p class="error rc-empty">no connection to the PolIDS server</p>'
+    assert o["drawn"] is True and o["afterDone"] == 0
+    assert o["twoMounted"] == 2 and o["afterDestroy"] == 1 and o["allGone"] == 0
+    assert o["lateB"].startswith('<div class="rc-list">') and "rc-bar" not in o["lateB"]
+
+
+def test_other_area_js_ascii_code():
+    """W kodzie (poza komentarzami w osobnych linijkach) tylko ASCII: znaki typograficzne jako \\u2013, \\u2026 itd."""
+    for name in ("tabs/other.js", "squawk.js", "regcause.js", "vfrminima.js", "flightplan.js", "fmp.js"):
+        src = (FRONTEND / "js" / name).read_text("utf-8")
+        bad = [line.strip() for line in src.splitlines() if re.search(r"[^\x00-\x7F]", line) and not line.strip().startswith("//")]
+        assert not bad, (name, bad)

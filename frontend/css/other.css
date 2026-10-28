@@ -17,7 +17,8 @@
 .rc-row > span { padding: 6px 10px 12px; }
 .rc-row > span + span { border-left: 1px solid #454545; }
 .rc-code { color: #fff; font-size: 17px; white-space: nowrap; }
-.rc-text { color: var(--text); }
+/* opis jak na zdjęciu PANDORY: kapitaliki, jak pasek i kolumna IATA */
+.rc-text { color: var(--text); font-variant: small-caps; letter-spacing: .2px; }
 .rc-iata { color: #fff; font-variant: small-caps; letter-spacing: .3px; }
 /* koniec listy: zielona linia */
 .rc-cat:last-child { border-bottom: 3px solid var(--green); }

@@ -2,7 +2,7 @@
  "_uwaga": "Kody przyczyn regulacji ATFM (REGCAUSE) z OTHER › REGCAUSE, kolejność = kolejność na ekranie: kategorie po literze przyczyny (A, C, E, G, I, M, N, O, P, R, S, T, V, W; jak na zdjęciu PANDORY A, C, E), w kategorii D (lotnisko odlotu), E (trasa), A (lotnisko przylotu). Kod = litera przyczyny + litera miejsca + numer opóźnienia IATA; iata = opis tego numeru IATA. Tabela z ATFCM Users Manual (aneks 'Correlation between IATA Delay Codes and NM Regulation Causes'); wydania 27.0 nie udało się odczytać (PDF niedostępny z piaskownicy). Sprawdzone ze zdjęciem PANDORY (dane wg ATFCM Users Manual z 2017-10-18): AD 89, AA 83, CD 89, CE 81, CA 83, ED 99, EA 99. Pozostałe wiersze niesprawdzone z podręcznikiem: opisy z ATFCM Operating Procedures for FMPs 18.1.1 (2014), numery IATA z CODA Digest 2012 (aneks H) i kodu jetway (github.com/adamf/jetway, pkg/atfm/atfm.go); GD 89, GA 83 i WE 81 tylko z jetway (CODA 2012: GD 87, GA 87, WE 73). Opisy IATA 82, 84 i 98 z listy IATA w ICAO APAC ATFM/SG/15 WP/06. Do sprawdzenia z PDF 27.0: numery GD, GA, WE, istnienie PE i VE, brzmienie opisów. Szczegóły: notatki rundy 16 (regcause.md). Interfejs pokazuje tylko categories (name, rows: code, description, iata); ta uwaga nie trafia do /api/regcause.",
  "categories": [
   {
-   "name": "Accident / Incident",
+   "name": "Accident / incident",
    "rows": [
     {
      "code": "AD 89",
@@ -71,17 +71,17 @@
    "rows": [
     {
      "code": "ID 89",
-     "description": "Reduction in any capacity due to industrial action by ATC staff",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
      "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
     },
     {
      "code": "IE 82",
-     "description": "Reduction in any capacity due to industrial action by ATC staff",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
      "iata": "ATFM due to ATC STAFF/EQUIPMENT EN-ROUTE"
     },
     {
      "code": "IA 83",
-     "description": "Reduction in any capacity due to industrial action by ATC staff",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
      "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
     }
    ]
@@ -166,7 +166,7 @@
    "rows": [
     {
      "code": "RE 81",
-     "description": "Network solutions/scenarios used to balance demand and capacity",
+     "description": "Network solutions/scenarios used to balance demand and capacity.",
      "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
     }
    ]
