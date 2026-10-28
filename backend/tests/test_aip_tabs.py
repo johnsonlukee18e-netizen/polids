@@ -17,8 +17,7 @@ BASE = "https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-
 
 NODE_SCRIPT = r"""
 const aip = await import(process.argv[2]);
-const strip = await import(process.argv[3]);
-const base = process.argv[4];
+const base = process.argv[3];
 const pdf = (id) => `https://x.test/AD_2_EPZG_${id}.pdf`;
 const charts = [
   { id: "2-1", page: "AD 2 EPZG 2-1", title: "AERODROME", full: "AERODROME CHART - ICAO", kind: "ADC", url: pdf("2-1") },
@@ -28,7 +27,6 @@ const charts = [
 ];
 console.log(JSON.stringify({
   ad2: aip.AD2,
-  strip: strip.STRIP_AIRPORTS,
   urls: aip.AD2.map(([icao]) => aip.aeroPageUrl(base, icao)),
   dir: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2011-26_2026_10_29", "EPKK"),
   slash: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2011-26_2026_10_29/", "EPKK"),
@@ -60,14 +58,11 @@ def js(tmp_path_factory):
         pytest.skip("brak Node.js")
     d = tmp_path_factory.mktemp("js")
     (d / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
-    for name in ("aip", "strip"):
-        src = (FRONTEND / "js" / "tabs" / f"{name}.js").read_text("utf-8")
-        (d / f"{name}.mjs").write_text(src.replace('"../api.js"', '"./api.mjs"').replace('"../strips.js"', '"./strips.mjs"'),
-                                       "utf-8")
-    (d / "strips.mjs").write_text("export const mountStrips = () => null;\n", "utf-8")
+    src = (FRONTEND / "js" / "tabs" / "aip.js").read_text("utf-8")
+    (d / "aip.mjs").write_text(src.replace('"../api.js"', '"./api.mjs"'), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
-    r = subprocess.run([node, str(script), (d / "aip.mjs").as_uri(), (d / "strip.mjs").as_uri(), BASE],
+    r = subprocess.run([node, str(script), (d / "aip.mjs").as_uri(), BASE],
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
@@ -77,8 +72,8 @@ def test_aerodrome_list(js):
     icaos = [i for i, _ in js["ad2"]]
     assert icaos == ["EPBY", "EPGD", "EPKK", "EPKT", "EPLB", "EPLL", "EPMO", "EPPO", "EPRA", "EPRZ", "EPSC", "EPSY", "EPWA",
                      "EPWR", "EPZG"]
-    # te same 15 lotnisk AD 2 co w STRIP; każde z nazwą do dymka
-    assert icaos == js["strip"] and all(name for _, name in js["ad2"])
+    # 15 lotnisk AD 2 (do 0.12.6 te same co w zakładce STRIP, usuniętej w 0.13.0); każde z nazwą do dymka
+    assert all(name for _, name in js["ad2"])
     assert dict(js["ad2"])["EPWA"] == "LOTNISKO CHOPINA W WARSZAWIE"
 
 

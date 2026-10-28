@@ -1,8 +1,9 @@
 // AERODROME › RUCH: DMAN/AMAN na wzór ekranu z EPWA (lista odlotów wg TSAT, drabina TSAT, szczegóły lotu, drabiny TTOT
-// i ELDT, lista przylotów wg ETA) oraz okno AMAN (aman.js). Paski EFES są w zakładce STRIP (strips.js).
+// i ELDT, lista przylotów wg ETA) oraz okno AMAN (aman.js). 0.13.0: bez zakładki STRIP (paski EFES) i bez własnych
+// BRIGHTER/DARKER (jasność całego ekranu w pasku u góry, topbar.js); RELOAD zostaje: pobiera dane DMAN od razu.
 // Lotnisko bez A-CDM (data.cdm false): wszędzie EOBT zamiast TSAT i ETOT zamiast TTOT (depLabels, depTimes w dmancore.js);
 // zanim pierwsza odpowiedź powie, czy lotnisko ma A-CDM, nazwy tych czasów są puste.
-// mountDman(el, icao, { onUpdate, view, onView }) → { resume(), setView(v), destroy() } (jak mountStrips plus widok).
+// mountDman(el, icao, { onUpdate, view, onView }) → { resume(), setView(v), destroy() }.
 // Widok "dman" (DMAN/AMAN) albo "aman": opts.view wybiera go z adresu (#aerodrome/EPWA/aman), inaczej ostatnio używany
 // (lsGet). onView(v, { replace }) zgłasza widok gospodarzowi, który zapisuje go w adresie: kliknięcie przycisku widoku
 // to krok do cofnięcia (←), a przy montowaniu i resume() widok tylko uzupełnia bieżący wpis (replace).
@@ -11,7 +12,6 @@
 import { api, esc, lsGet, lsSet, navigate } from "./api.js";
 import { SPANS, clock, depLabels, depTimes, hm, hmAt, overflow, relSec, stack } from "./dmancore.js";
 import { amanSequence, createAman } from "./aman.js";
-import { STRIP_AIRPORTS } from "./tabs/strip.js";
 
 const REFRESH_MS = 30000;
 const LADDER_MS = 2000;
@@ -119,8 +119,6 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
       <button data-view="dman" title="Departures and arrivals: TSAT, TTOT and ELDT ladders (aerodrome without A-CDM: EOBT and ETOT)">DMAN/AMAN</button>
       <button data-view="aman" title="Arrival sequence to the runway (AMAN)">AMAN</button>
       <button data-act="reload" title="Download data now (it refreshes by itself every 30 s)">RELOAD</button>
-      <button data-act="brighter" title="Brighter screen">BRIGHTER</button>
-      <button data-act="darker" title="Darker screen">DARKER</button>
       <span class="dm-msg">Loading…</span>
     </div>
     <div class="dm-body"></div>
@@ -136,7 +134,6 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
     sel: null,
     span: { dep: intOr(lsGet("dman.span.dep"), 30, (v) => SPANS.includes(v)), arr: intOr(lsGet("dman.span.arr"), 30, (v) => SPANS.includes(v)) },
     sort: { dep: lsGet("dman.sort.dep") || "t:1", arr: lsGet("dman.sort.arr") || "t:1" },
-    bright: intOr(lsGet("dman.bright"), 0, (v) => Number.isInteger(v) && v >= -4 && v <= 4),
   };
   let data = null, offset = 0, byKey = new Map(), timer = null, clockTimer = null, dead = false, seq = 0, ticks = 0, aman = null;
   let firstList = { dep: true, arr: true }, lastClick = { k: null, t: 0 };
@@ -162,9 +159,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
       <section class="dm-lad dm-l1"><svg class="dm-svg"></svg></section>
       <section class="dm-mid">
         <table class="dm-info"></table>
-        <div class="dm-acts"><button data-act="map" title="Show the flight on the map (MAP)">MAP</button>
-          ${STRIP_AIRPORTS.includes(icao) ? `<button data-act="strip" title="EFES strips of this aerodrome (STRIP tab)">STRIPS</button>`
-    : `<button data-act="strip" disabled title="Strips only for the 15 main aerodromes (STRIP tab)">STRIPS</button>`}</div>
+        <div class="dm-acts"><button data-act="map" title="Show the flight on the map (MAP)">MAP</button></div>
         <div class="dm-spans"><div class="sp l" data-g="dep">${SPANS.map((m) => `<button data-span="${m}">${m}'</button>`).join("")}</div>
           <div class="sp r" data-g="arr">${SPANS.map((m) => `<button data-span="${m}">${m}'</button>`).join("")}</div></div>
         <div class="dm-rwys"></div>
@@ -394,7 +389,6 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
 
   const render = () => {
     root.querySelectorAll(".dm-top [data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === st.view));
-    body.style.filter = st.bright ? `brightness(${1 + st.bright * 0.12})` : "";
     if (!data) return;
     renderMsg();
     const now = nowMs();
@@ -503,13 +497,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
       if (!data) { note.className = "dm-note"; note.hidden = false; note.firstElementChild.textContent = "Loading…"; }
       return refresh();
     }
-    if (act === "brighter" || act === "darker") {
-      st.bright = Math.max(-4, Math.min(4, st.bright + (act === "brighter" ? 1 : -1)));
-      lsSet("dman.bright", String(st.bright));
-      return render();
-    }
     if (act === "map") return st.sel && openMap(st.sel);
-    if (act === "strip") return navigate("strip", icao);
     const sp = t.closest(".dm-spans button[data-span]");
     if (sp) {
       const g = sp.parentElement.dataset.g;

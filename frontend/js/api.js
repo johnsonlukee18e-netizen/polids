@@ -306,6 +306,18 @@ export function splitTaf(raw) {
   return lines.map((l) => l.join(" "));
 }
 
+// Szerokość (px) najdłuższego z napisów w czcionce elementu el: kolumna "na najdłuższą nazwę listy" bez liczenia znaków
+// (0.13.0: Arial zamiast Consolas, wielka litera jest szersza niż 1ch). Bez kontekstu canvas zgrubnie 0.75em na znak.
+let measurer;
+export function textWidth(texts, el) {
+  const cs = getComputedStyle(el);
+  measurer ??= document.createElement("canvas").getContext("2d");
+  const list = texts.map((t) => String(t ?? ""));
+  if (!measurer) return Math.ceil(Math.max(0, ...list.map((t) => t.length * 0.75 * parseFloat(cs.fontSize))));
+  measurer.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return Math.ceil(Math.max(0, ...list.map((t) => measurer.measureText(t).width)));
+}
+
 // localStorage bywa niedostępny (tryb prywatny, zablokowane dane witryny): odczyt i zapis zawsze w try
 export function lsGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
