@@ -957,7 +957,7 @@ const ummv = { fir: "UMMV", title: "MINSK", name: { col: 13, row: 9, cols: 1, ro
   advisory: false, online: [{ callsign: "UMBB_TWR", position: "UMBB_TWR", frequency: "118.500", name: "Ivan" },
     { callsign: "UMMV_W_CTR", position: "UMMV_W_CTR", frequency: "135.700", name: "Olga" }],
   boxes: [box("ACC", 660, 75, 12, 9, "UMMV_CTR", "UMMV_W_CTR", { label: "ACC" })] };
-const ind = { id: "APP WA", tip: "Warszawa APP online: H = radar positions, L = director", col: 3, row: 1, value: "2H+L",
+const ind = { id: "APP WA", tip: "Warszawa APP configuration: HL = one APP, H+L = two (with N APP), 2H+L = three (with S APP), +D = director (F APP)", col: 3, row: 1, value: "2H+L",
   positions: [{ callsign: "EPWA_APP", position: "EPWA_APP", frequency: "128.805", name: "Ala" }] };
 const ber = { col: 1, row: 6, box: { col: 1, row: 7, cols: 2 }, config: "EAST", preferred: false, tip: "ATIS EDDB: RWY 06L/06R" };
 const evil = { fir: "<b>", title: "<i>t</i>", name: { col: 1, row: 1 }, advisory: false, online: [{ callsign: "<u>", frequency: "1", name: "<s>x</s>" }],
@@ -1046,7 +1046,7 @@ def test_js_neighbour_boxes(tmp_path):
     assert '<div class="rb-ind" style="grid-area: 1 / 3 / span 1 / span 1"' in ind and ">APP WA</div>" in ind
     # wartość w rb-indt: za długa (ACC GAT) od początku z wielokropkiem na końcu, nie ucięta z obu stron
     assert '<div class="rb-indv" style="grid-area: 2 / 3 / span 1 / span 1"' in ind and '<span class="rb-indt">2H+L</span></div>' in ind
-    assert "APP WA: Warszawa APP online: H = radar positions, L = director\nEPWA_APP 128.805 – Ala" in ind
+    assert "APP WA: Warszawa APP configuration: HL = one APP, H+L = two (with N APP), 2H+L = three (with S APP), +D = director (F APP)\nEPWA_APP 128.805 – Ala" in ind
     assert ">0</span></div>" in out["indNone"] and "Nobody online" in out["indNone"]
     assert ">–</span></div>" in out["indNet"] and ">0</span></div>" not in out["indNet"] and "Now: no data" in out["indNet"]
     # BERLIN: szare pole z konfiguracją; czerwony napis (pref), gdy z ATIS nie wiadomo, który pas

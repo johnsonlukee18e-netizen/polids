@@ -115,7 +115,7 @@ def test_app_wires_topbar_and_reload_marker():
 EARLY_SCRIPT = r"""
 const store = new Map();
 const out = [];
-const vals = ["-4", "-3", "-1", "0", "1", "2", "4", "5", "-5", "2.5", "abc", "", " 3 ", null];
+const vals = ["-2", "-1", "0", "1", "2", "-3", "3", "-4", "4", "5", "-5", "2.5", "abc", "", " 3 ", null];
 const src = process.argv[3];
 const tb = await import(process.argv[2]);
 for (const v of vals) {
@@ -151,8 +151,9 @@ def test_saved_brightness_before_first_paint(tmp_path):
     res = json.loads(r.stdout)
     for v, got, want in res["out"]:
         assert got == want, v
-    assert [x[1] for x in res["out"]][:7] == ["brightness(0.52)", "brightness(0.64)", "brightness(0.88)", "",
-                                             "brightness(1.12)", "brightness(1.24)", "brightness(1.48)"]
+    # zakres -2..+2 (Marek 28.10.2026): -3, +3, -4, +4 (zapisane przy dawnym zakresie -4..+4) = bez filtra
+    assert [x[1] for x in res["out"]][:9] == ["brightness(0.76)", "brightness(0.88)", "", "brightness(1.12)",
+                                             "brightness(1.24)", "", "", "", ""]
     assert res["blocked"] == ""
 
 
@@ -174,10 +175,10 @@ const fakeStore = () => { const m = new Map(); return { m, getItem: (k) => (m.ha
   removeItem: (k) => m.delete(k) }; };
 const broken = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); }, removeItem() { throw new Error("x"); } };
 const out = {};
-out.of = ["2", "-4", "4", "0", "5", "-5", "2.5", "abc", "", " 3 ", null, undefined].map(tb.brightOf);
-out.clamp = [-9, -4, -1, 0, 3, 4, 9, NaN].map(tb.clampBright);
-out.filter = [-4, -1, 0, 1, 4].map(tb.brightFilter);
-out.pct = [-4, 0, 1, 4].map(tb.brightPct);
+out.of = ["2", "-2", "-1", "0", "3", "-3", "2.5", "abc", "", " 1 ", null, undefined].map(tb.brightOf);
+out.clamp = [-9, -2, -1, 0, 1, 2, 9, NaN].map(tb.clampBright);
+out.filter = [-2, -1, 0, 1, 2].map(tb.brightFilter);
+out.pct = [-2, 0, 1, 2].map(tb.brightPct);
 // znacznik Reload: zapis, jednorazowy odczyt, zablokowany i brakujący sessionStorage
 const s = fakeStore();
 tb.markReload("#aerodrome/EPWA/dman", s);
@@ -188,8 +189,8 @@ tb.markReload("#meteo", broken);
 tb.markReload("#meteo", null);
 out.broken = [tb.takeReload(broken), tb.takeReload(null)];
 out.target = ["#aerodrome/EPWA/dman", "#home", "#home/x", "", null, "#", "#meteo", "#other/checklist/a"].map(tb.reloadTarget);
-// pasek z atrapą DOM: zapisana jasność 2, kliknięcia, granice zakresu, Reload
-store.set(tb.BRIGHT_KEY, "2");
+// pasek z atrapą DOM: zapisana jasność 1, kliknięcia, granice zakresu, Reload
+store.set(tb.BRIGHT_KEY, "1");
 const mk = (act) => ({ dataset: { act }, disabled: null, title: "", closest() { return this; } });
 const btns = { reload: mk("reload"), brighter: mk("brighter"), darker: mk("darker") };
 let handler = null;
@@ -204,7 +205,7 @@ const click = (act, n = 1) => { for (let i = 0; i < n; i++) handler({ target: bt
 out.start = snap();
 out.max = click("brighter", 5);
 out.min = click("darker", 12);
-out.zero = click("brighter", 4);
+out.zero = click("brighter", 2);
 out.reload = [click("reload").level, reloads, sess.m.get(tb.RELOAD_KEY)];
 out.none = tb.mountTopbar(null);
 // drugie wywołanie dla tego samego paska: ten sam obiekt, bez drugiego nasłuchu kliknięć
@@ -223,7 +224,7 @@ let h2 = null, onStorage = null;
 const bar2 = { querySelector: (sel) => b2[/data-act="(\w+)"/.exec(sel)[1]], addEventListener: (t, fn) => { if (t === "click") h2 = fn; } };
 const win = { addEventListener: (t, fn) => { if (t === "storage") onStorage = fn; } };
 const root2 = { style: { filter: "" } };
-store.set(tb.BRIGHT_KEY, "3");
+store.set(tb.BRIGHT_KEY, "1");
 const api2 = tb.mountTopbar(bar2, { root: root2, win });
 doc.activeElement = b2.brighter;
 h2({ target: b2.brighter });
@@ -264,11 +265,12 @@ def js(tmp_path_factory):
 
 
 def test_brightness_values(js):
-    # zapisana wartość tylko jako liczba całkowita -4..4 (inaczej 0 = bez filtra); krok 12 %, 52-148 %
-    assert js["of"] == [2, -4, 4, 0, 0, 0, 0, 0, 0, 3, 0, 0]
-    assert js["clamp"] == [-4, -4, -1, 0, 3, 4, 4, 0]
-    assert js["filter"] == ["brightness(0.52)", "brightness(0.88)", "", "brightness(1.12)", "brightness(1.48)"]
-    assert js["pct"] == [52, 100, 112, 148]
+    # zapisana wartość tylko jako liczba całkowita -2..2 (Marek 28.10.2026; inaczej 0 = bez filtra, także -4..+4
+    # z dawnego zakresu); krok 12 %, 76-124 %
+    assert js["of"] == [2, -2, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+    assert js["clamp"] == [-2, -2, -1, 0, 1, 2, 2, 0]
+    assert js["filter"] == ["brightness(0.76)", "brightness(0.88)", "", "brightness(1.12)", "brightness(1.24)"]
+    assert js["pct"] == [76, 100, 112, 124]
 
 
 def test_reload_marker(js):
@@ -282,16 +284,16 @@ def test_reload_marker(js):
 
 def test_topbar_buttons_clamp_and_storage(js):
     s = js["start"]
-    assert s["level"] == 2 and s["filter"] == "brightness(1.24)" and s["saved"] == "2"
+    assert s["level"] == 1 and s["filter"] == "brightness(1.12)" and s["saved"] == "1"
     assert s["up"] is False and s["down"] is False
-    assert s["upTitle"] == "Brighter screen (now 124%)" and s["downTitle"] == "Darker screen (now 124%)"
+    assert s["upTitle"] == "Brighter screen (now 112%)" and s["downTitle"] == "Darker screen (now 112%)"
     # na granicy zakresu przycisk wyłączony, kolejne kliknięcia nic nie zmieniają; wartość zapisana w localStorage
     m = js["max"]
-    assert m["level"] == 4 and m["filter"] == "brightness(1.48)" and m["saved"] == "4" and m["up"] is True and m["down"] is False
-    assert m["upTitle"] == "Brighter screen (now 148%, the brightest)"
+    assert m["level"] == 2 and m["filter"] == "brightness(1.24)" and m["saved"] == "2" and m["up"] is True and m["down"] is False
+    assert m["upTitle"] == "Brighter screen (now 124%, the brightest)"
     n = js["min"]
-    assert n["level"] == -4 and n["filter"] == "brightness(0.52)" and n["saved"] == "-4" and n["down"] is True and n["up"] is False
-    assert n["downTitle"] == "Darker screen (now 52%, the darkest)"
+    assert n["level"] == -2 and n["filter"] == "brightness(0.76)" and n["saved"] == "-2" and n["down"] is True and n["up"] is False
+    assert n["downTitle"] == "Darker screen (now 76%, the darkest)"
     z = js["zero"]
     assert z["level"] == 0 and z["filter"] == "" and z["saved"] == "0"
     assert z["upTitle"] == "Brighter screen (now 100%)"
@@ -301,13 +303,13 @@ def test_topbar_buttons_clamp_and_storage(js):
 
 
 def test_topbar_focus_and_other_windows(js):
-    # Enter na Brighter przy +3 daje +4 i wyłącza przycisk: fokus na Darker (nie na <body>); tak samo przy -4
-    assert js["focusMax"] == [4, True, "darker"]
-    assert js["focusMin"] == [-4, True, "brighter"]
+    # Enter na Brighter przy +1 daje +2 i wyłącza przycisk: fokus na Darker (nie na <body>); tak samo przy -2
+    assert js["focusMax"] == [2, True, "darker"]
+    assert js["focusMin"] == [-2, True, "brighter"]
     assert js["mouse"] is None
-    # drugie okno PolIDS: zmiana jasności od razu, bez F5
-    assert js["foreign"] == [-3, "brightness(0.64)"]
-    assert js["synced"] == [-2, "brightness(0.76)", False, "Brighter screen (now 76%)"]
+    # drugie okno PolIDS: zmiana jasności od razu, bez F5 (-2 to dół zakresu: Darker wyłączony)
+    assert js["foreign"] == [-1, "brightness(0.88)"]
+    assert js["synced"] == [-2, "brightness(0.76)", True, "Brighter screen (now 76%)"]
     assert js["cleared"] == [0, ""]
 
 

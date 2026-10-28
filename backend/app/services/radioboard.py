@@ -797,26 +797,34 @@ def online_matching(patterns, online: dict) -> list[str]:
     return out
 
 
+def frequencies_on(callsigns: list[str], online: dict) -> int:
+    """Liczba aktywnych częstotliwości tych stanowisk: dwa znaki na jednej częstotliwości (EPKK_T_APP i EPKK_X_APP,
+    uczeń i instruktor) to jedna; bez poprawnej częstotliwości – znak w sieci (merge_key)."""
+    return len({merge_key(cs, online) for cs in callsigns} - {None})
+
+
+def wa_config(radar: int, director: bool) -> str:
+    """Konfiguracja APP WA (Marek): jedno stanowisko APP (zwykle EPWA_APP) = HL, dwa (z EPWA_N_APP) = H+L, trzy
+    (jeszcze EPWA_S_APP) = 2H+L; dyrektor (EPWA_F_APP) dopisuje +D; nikt = 0."""
+    head = "" if not radar else "HL" if radar == 1 else "H+L" if radar == 2 else f"{radar - 1}H+L"
+    return "+".join(x for x in (head, "D" if director else "") if x) or "0"
+
+
 def indicator_value(rule: dict, online: dict, sectors: list[dict], acc_short: dict[str, str]) -> tuple[str, list[str]]:
-    """Wartość wskaźnika u góry strony i liczone stanowiska; nikt → "0".
-    acc: skróty zalogowanych ACC EPWW, od tego, który ma najwięcej sektorów (szkic: ALL+S);
-    count: liczba zalogowanych (APP GD, APP PO); hl: H = APP radar, L = dyrektor (APP WA: H, 2H, 2H+L, L);
-    ab: a-b, a = APP, b = dyrektorzy (APP KK: 1-0)."""
+    """Wartość wskaźnika u góry strony (konfiguracja, Marek 28.10.2026) i liczone stanowiska; nikt → "0".
+    acc: litery sektorów zalogowanych ACC EPWW (skrót stanowiska: S, DBF; ALL i ALH w całości), od tego, który ma
+    najwięcej sektorów (ALL+S); wa: konfiguracja APP WA (wa_config: HL, H+L, 2H+L, +D) z aktywnych częstotliwości
+    stanowisk h i dyrektora d; count: liczba aktywnych częstotliwości APP (APP GD, KK, PO)."""
     kind = rule.get("rule")
     if kind == "acc":
         cnt = Counter(s["owner"] for s in sectors if s.get("owner"))
         on = sorted((cs for cs in acc_short if is_on(cs, online)), key=lambda cs: (-cnt[cs], acc_short[cs]))
         return "+".join(acc_short[cs] for cs in on) or "0", on
-    if kind == "hl":
-        h, lo = online_matching(rule.get("h"), online), online_matching(rule.get("l"), online)
-        hp = ("H" if len(h) == 1 else f"{len(h)}H") if h else ""
-        lp = ("L" if len(lo) == 1 else f"{len(lo)}L") if lo else ""
-        return ("+".join(x for x in (hp, lp) if x) or "0"), h + lo
-    if kind == "ab":
-        a, b = online_matching(rule.get("a"), online), online_matching(rule.get("b"), online)
-        return (f"{len(a)}-{len(b)}" if a or b else "0"), a + b
+    if kind == "wa":
+        h, d = online_matching(rule.get("h"), online), online_matching(rule.get("d"), online)
+        return wa_config(frequencies_on(h, online), bool(d)), h + d
     n = online_matching(rule.get("count"), online)
-    return str(len(n)), n
+    return str(frequencies_on(n, online)), n
 
 
 def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str, str]) -> list[dict]:

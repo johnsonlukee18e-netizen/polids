@@ -6,7 +6,7 @@
   <title>{{NAME}}</title>
   <!-- jasność ekranu z paska u góry (Brighter / Darker, topbar.js) przed pierwszym rysowaniem: bez błysku 100 % przy F5
        i Reload; te same wartości co brightOf i brightFilter w topbar.js (test_shell_look) -->
-  <script>try { const b = Number(localStorage.getItem("shell.bright")); if (Number.isInteger(b) && b && b >= -4 && b <= 4) document.documentElement.style.filter = "brightness(" + (1 + b * 0.12).toFixed(2) + ")"; } catch (e) { /* no storage */ }</script>
+  <script>try { const b = Number(localStorage.getItem("shell.bright")); if (Number.isInteger(b) && b && b >= -2 && b <= 2) document.documentElement.style.filter = "brightness(" + (1 + b * 0.12).toFixed(2) + ")"; } catch (e) { /* no storage */ }</script>
   <meta name="theme-color" content="#000000">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">

@@ -3,8 +3,8 @@
 // Reload: wczytuje całą stronę od nowa (po aktualizacji serwera nowa wersja aplikacji; zainstalowane okno PWA nie ma
 // przycisku przeglądarki) i wraca do tego samego ekranu. Adres ekranu czeka w sessionStorage tej karty na jedno
 // uruchomienie (takeReload w app.js, po otwarciu HOME); każde inne uruchomienie (F5, nowe okno) otwiera HOME jak dotąd.
-// Brighter / Darker: jasność całego ekranu, krok 12 % od -4 do +4 (52-148 %), zapamiętana w tej przeglądarce
-// (localStorage); na granicy zakresu przycisk jest wyłączony, a dymek podaje bieżącą jasność. Filtr CSS na <html>, nigdy
+// Brighter / Darker: jasność całego ekranu, krok 12 % od -2 do +2 (76-124 %, Marek 28.10.2026), zapamiętana w tej
+// przeglądarce (localStorage); na granicy zakresu przycisk jest wyłączony, a dymek podaje bieżącą jasność. Filtr CSS na <html>, nigdy
 // na main ani #views: filtr na przodku robi z niego blok zawierający dla position: fixed, więc dymki RADIO (.rb-tip)
 // i pasek offline przesuwałyby się o szerokość menu i wysokość paska (pomiar w mapie rundy 16); <html> tego nie robi.
 // Zapisaną jasność ustawia już skrypt w <head> index.html przed pierwszym rysowaniem (bez błysku 100 % przy F5
@@ -13,12 +13,12 @@
 // monitor) dostają zmianę jasności od razu przez zdarzenie "storage".
 import { lsGet, lsSet, parseHash } from "./api.js";
 
-// sessionStorage: adres ekranu sprzed Reload (jednorazowo); localStorage: poziom jasności -4..4
+// sessionStorage: adres ekranu sprzed Reload (jednorazowo); localStorage: poziom jasności -2..2
 export const RELOAD_KEY = "shell.reload";
 export const BRIGHT_KEY = "shell.bright";
 export const BRIGHT_STEP = 0.12;
-export const BRIGHT_MIN = -4;
-export const BRIGHT_MAX = 4;
+export const BRIGHT_MIN = -2;
+export const BRIGHT_MAX = 2;
 
 export const clampBright = (v) => Math.max(BRIGHT_MIN, Math.min(BRIGHT_MAX, Math.round(Number(v)) || 0));
 // zapisana wartość: tylko liczba całkowita z zakresu, wszystko inne (brak, śmieć, 2.5, 9) = 0, czyli bez filtra

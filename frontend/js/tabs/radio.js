@@ -165,7 +165,7 @@ export function groupTip(g, title, x, extra = [], now = null) {
 // stałe miejsce w siatce (gridArea z komórek grid); x: {who(cs), pos(cs), freq(cs), net, sel} – zalogowany i opis
 // stanowiska z tablicy, false = brak danych o zalogowanych (bez ADVISORY i bez zer we wskaźnikach), FIR otwartego LOA
 const onlineLine = (o) => `${o.callsign} ${o.frequency || ""} \u2013 ${o.name || "?"}`.replace(/  +/g, " ");
-// wskaźnik u góry: żółta nazwa, pod nią szare pole z wartością (ALL+S, 2H+L, 1-0); w dymku znaczenie i liczone stanowiska.
+// wskaźnik u góry: żółta nazwa, pod nią szare pole z wartością (ALL+S, 2H+L+D, 2); w dymku znaczenie i liczone stanowiska.
 // Wartość dłuższa niż pole (ACC GAT przy 4 i więcej stanowiskach ACC) od początku, z wielokropkiem na końcu (rb-indt)
 export function indicatorHtml(i, x) {
   const ps = arr(i.positions);

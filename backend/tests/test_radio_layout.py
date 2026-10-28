@@ -102,7 +102,8 @@ def test_layout_seed_matches_sketch():
         "LKAA": [("NU", 660, 305, 5, 19), ("SU", 660, 305, 6, 19), ("NL", 305, 125, 5, 20), ("SL", 305, 125, 6, 20),
                  ("MT", 125, 0, 6, 21)],
         "UMKK": [("ACC", 999, 0, 10, 5)], "LZBB": [("U", 660, 305, 10, 19), ("BB", 305, 80, 10, 20)],
-        "EYVL": [("U", 660, 365, 12, 3), ("M", 365, 335, 12, 4), ("L", 335, 225, 12, 5), ("E", 225, 95, 12, 6)],
+        # EYVL L/E: FL255 jak w pliku sektorów, nie 225 ze szkicu (Marek 28.10.2026)
+        "EYVL": [("U", 660, 365, 12, 3), ("M", 365, 335, 12, 4), ("L", 335, 255, 12, 5), ("E", 255, 95, 12, 6)],
         "UMMV": [("ACC", 660, 75, 12, 9)], "UKLV": [("RLV", 660, 55, 12, 15)]}
     # łączenie tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW
     assert {f["fir"] for f in lay["firs"] if f["merge"]} == rb.MERGE_FIRS == {"EDUU", "EDMM", "ESAA", "EYVL", "LZBB", "LKAA"}
@@ -354,8 +355,8 @@ def test_indicators_sketch_example(client):
                      ctl("EPGD_APP", "127.280"), ctl("EPWA_APP", "128.805"), ctl("EPWA_N_APP", "125.055"),
                      ctl("EPWA_F_APP", "129.380"), ctl("EPKK_APP", "121.075"), ctl("EPPO_I_APP", "126.300")])
     ind = {i["id"]: i for i in d["indicators"]}
-    assert {k: i["value"] for k, i in ind.items()} == {"ACC GAT": "ALL+S", "APP GD": "1", "APP WA": "2H+L",
-                                                       "APP KK": "1-0", "APP PO": "0"}  # informacja się nie liczy
+    assert {k: i["value"] for k, i in ind.items()} == {"ACC GAT": "ALL+S", "APP GD": "1", "APP WA": "H+L+D",
+                                                       "APP KK": "1", "APP PO": "0"}  # informacja się nie liczy
     assert ind["ACC GAT"]["positions"] == [
         {"callsign": "EPWW_ALL_CTR", "position": "EPWW_ALL_CTR", "frequency": "125.450", "name": "Anna"},
         {"callsign": "EPWW_S_CTR", "position": "EPWW_S_CTR", "frequency": "123.625", "name": "Bartek"}]
@@ -378,28 +379,59 @@ def test_indicators_cover_app_parts(client):
 
 
 def test_indicator_rules_pure():
-    on = lambda *cs: {c: {"callsign": c, "frequency": "1", "name": None} for c in cs}  # noqa: E731
-    hl = {"rule": "hl", "h": ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], "l": ["EPWA_F_APP"]}
-    assert rb.indicator_value(hl, on("EPWA_APP", "EPWA_F_APP"), [], {})[0] == "H+L"  # PANDORA
-    assert rb.indicator_value(hl, on("EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"), [], {})[0] == "3H"
-    assert rb.indicator_value(hl, on("EPWA_F_APP"), [], {})[0] == "L"
-    assert rb.indicator_value(hl, on("EPWA_ATIS"), [], {})[0] == "0"
-    ab = {"rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]}
-    assert rb.indicator_value(ab, on("EPKK_APP", "EPKK_E_APP"), [], {})[0] == "2-0"
-    assert rb.indicator_value(ab, on("EPKK_KT_APP"), [], {})[0] == "0-1"
-    kk = next(i for i in json.loads(SEED.read_text("utf-8"))["indicators"] if i["id"] == "APP KK")
-    assert rb.indicator_value(kk, on("EPKK_RZ_APP"), [], {})[0] == "1-0"  # Rzeszów: KK RZ APP (dawniej 0)
-    po = {"rule": "count", "count": ["EPPO_*_APP"]}
+    """Wskaźniki to konfiguracje (Marek 28.10.2026): APP WA HL / H+L / 2H+L, dyrektor +D; pozostałe APP = liczba
+    aktywnych częstotliwości APP; ACC GAT = litery sektorów online (ALL i ALH w całości)."""
+    def on(*cs, fq=None):
+        return {c: {"callsign": c, "frequency": fq or f"12{i}.000", "name": None} for i, c in enumerate(cs)}
+    seed = {i["id"]: i for i in json.loads(SEED.read_text("utf-8"))["indicators"]}
+    wa = seed["APP WA"]
+    assert (wa["rule"], wa["h"], wa["d"]) == ("wa", ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], ["EPWA_F_APP"])
+    val = lambda rule, online: rb.indicator_value(rule, online, [], {})[0]  # noqa: E731
+    assert val(wa, on("EPWA_APP")) == "HL"  # samo EPWA APP
+    assert val(wa, on("EPWA_APP", "EPWA_N_APP")) == "H+L"
+    assert val(wa, on("EPWA_APP", "EPWA_N_APP", "EPWA_S_APP")) == "2H+L"
+    assert val(wa, on("EPWA_APP", "EPWA_N_APP", "EPWA_S_APP", "EPWA_F_APP")) == "2H+L+D"
+    assert val(wa, on("EPWA_APP", "EPWA_F_APP")) == "HL+D"
+    assert val(wa, on("EPWA_N_APP")) == "HL"  # jedno stanowisko APP obsługuje całość
+    assert val(wa, on("EPWA_F_APP")) == "D"
+    assert val(wa, on("EPWA_ATIS", "EPWA_I_APP")) == "0"
+    assert rb.indicator_value(wa, on("EPWA_APP", "EPWA_F_APP"), [], {})[1] == ["EPWA_APP", "EPWA_F_APP"]
+    assert [rb.wa_config(n, d) for n, d in ((0, False), (1, False), (2, False), (3, False), (4, True), (0, True))] == [
+        "0", "HL", "H+L", "2H+L", "3H+L+D", "D"]
+    # APP GD, KK, PO: liczba aktywnych częstotliwości APP (wszystkie stanowiska APP lotniska, bez informacji)
+    for k, pats in (("APP GD", ["EPGD_APP", "EPGD_*_APP"]), ("APP KK", ["EPKK_APP", "EPKK_*_APP"]),
+                    ("APP PO", ["EPPO_APP", "EPPO_*_APP"])):
+        assert (seed[k]["rule"], seed[k]["count"]) == ("count", pats), k
+    kk, po = seed["APP KK"], seed["APP PO"]
+    assert val(kk, on("EPKK_RZ_APP")) == "1"  # Rzeszów: KK RZ APP
+    assert val(kk, on("EPKK_APP", "EPKK_E_APP", "EPKK_KK_APP", "EPKK_KT_APP", "EPKK_I_APP")) == "4"
+    # dwa stanowiska na jednej częstotliwości (np. uczeń i instruktor) to jedna częstotliwość
+    assert val(kk, on("EPKK_APP", "EPKK_KK_APP", fq="121.075")) == "1"
     assert rb.indicator_value(po, on("EPPO_N_APP", "EPPO_S_APP", "EPPO_I_APP", "EPPO_IS_APP"), [], {}) == (
         "2", ["EPPO_N_APP", "EPPO_S_APP"])
+    assert val(po, on("EPPO_APP")) == "1"
     # ten sam kontroler pod dwoma stanowiskami liczy się raz
     twin = {"EPPO_N_APP": {"callsign": "EPPO_APP"}, "EPPO_S_APP": {"callsign": "EPPO_APP"}}
-    assert rb.indicator_value(po, twin, [], {})[0] == "1"
+    assert val(po, twin) == "1"
+    # bez poprawnej częstotliwości (obserwator 199.998) liczy się znak w sieci
+    assert rb.frequencies_on(["EPPO_N_APP", "EPPO_S_APP"], on("EPPO_N_APP", "EPPO_S_APP", fq="199.998")) == 2
     acc = {"rule": "acc"}
     sec = [{"owner": "EPWW_S_CTR"}, {"owner": "EPWW_N_CTR"}, {"owner": "EPWW_N_CTR"}]
     short_ = {"EPWW_N_CTR": "N", "EPWW_S_CTR": "S", "EPWW_E_CTR": "E"}
     assert rb.indicator_value(acc, on("EPWW_S_CTR", "EPWW_N_CTR", "EPWW_E_CTR"), sec, short_)[0] == "N+S+E"
     assert rb.indicator_value(acc, {}, sec, short_) == ("0", [])
+
+
+def test_indicators_relief_callsigns(client):
+    """Uczeń i instruktor (EPKK_T_APP, EPKK_X_APP) na częstotliwości EPKK APP: jedno stanowisko i jedna częstotliwość,
+    APP KK = 1; tak samo EPWA_X_APP przy EPWA_APP (HL, nie H+L)."""
+    d = get(client, [ctl("EPKK_T_APP", "121.075"), ctl("EPKK_X_APP", "121.075"), ctl("EPWA_APP", "128.805"),
+                     ctl("EPWA_X_APP", "128.805")])
+    ind = {i["id"]: i["value"] for i in d["indicators"]}
+    assert (ind["APP KK"], ind["APP WA"]) == ("1", "HL")
+    # ACC: skróty sektorów (ALL i ALH w całości), od stanowiska z największą liczbą sektorów
+    d = get(client, [ctl("EPWW_ALH_CTR", "132.700"), ctl("EPWW_DBF_CTR", "133.180"), ctl("EPWW_S_CTR", "123.625")])
+    assert sorted({i["id"]: i["value"] for i in d["indicators"]}["ACC GAT"].split("+")) == ["ALH", "DBF", "S"]
 
 
 # --- BERLIN
