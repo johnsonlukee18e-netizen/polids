@@ -172,23 +172,18 @@ function distSeg(px, py, [x0, y0, x1, y1]) {
   const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
   return Math.hypot(px - x0 - t * dx, py - y0 - t * dy);
 }
-// zasięg etykiety kształtu (część TMA, CTR): pół przekątnej ramki box [lon0, lat0, lon1, lat1] w pikselach + 20 px,
-// w granicach lo–hi; bez ramki null
-export function boxReach(box, P, lo, hi) {
-  if (box?.length !== 4) return null;
-  const [a, b] = [P([box[0], box[3]]), P([box[2], box[1]])];
-  return Math.max(lo, Math.min(hi, Math.hypot(b[0] - a[0], b[1] - a[1]) / 2 + 20));
-}
-// Parametry etykiety warstwy do placeLabels (wspólne dla strony i testu): kind acc / app / twr / fis; box = ramka
-// kształtu (część TMA, CTR), on = obsadzona, fq = z częstotliwością, shapes = obrysy na podglądzie ("twr": CTR,
-// "app": TMA, "" = żadne). ACC: do 70 px od punktu, schodzi z CTR i małych TMA, gdy jest miejsce; część TMA: do pół
-// przekątnej swojej ramki (50–160 px); CTR: 60–90 px (CTR na 1366 px ma kilkanaście px, a w środku kraju leży pięć
-// lotnisk), obrys najważniejszy – mały CTR nie znika pod etykietą; punkt TMA i lotniska zostaje widoczny (pin);
-// częstotliwość obsadzonych i podanych ważniejsza niż odległość (wv)
-export function labelOpts(kind, { box = null, on = false, fq = false, shapes = "" } = {}, P = null) {
+// Plakietki APP i TWR (0.13.0, Marek): tylko zalogowani, plakietka w środku swojej przestrzeni (części TMA, CTR), bez
+// linii do punktu – wolno ją tylko lekko odsunąć od innej etykiety: krawędź pełnej plakietki najwyżej PLATE_NEAR px od
+// punktu, skróconej PLATE_MAX px (w tłoku × STRETCH)
+export const PLATE_NEAR = 12, PLATE_MAX = 20;
+// Parametry etykiety warstwy do placeLabels (wspólne dla strony i testu): kind acc / app / twr / fis; on = obsadzona,
+// fq = z częstotliwością, shapes = obrysy na podglądzie ("twr": CTR, "app": TMA, "" = żadne). ACC: do 70 px od punktu,
+// schodzi z CTR i małych TMA, gdy jest miejsce; plakietki APP i TWR: w środku, obrysy pod nimi bez kary (plakietka
+// stoi na swoim CTR), bez kropki; FIS jak dotąd; częstotliwość obsadzonych ważniejsza niż odległość (wv)
+export function labelOpts(kind, { on = false, fq = false, shapes = "" } = {}) {
   if (kind === "acc") return { max: 70, wc: { twr: 1, app: 0.5 }[shapes] ?? 0.15 };
-  const r = P ? (kind === "twr" ? boxReach(box, P, 60, 90) : boxReach(box, P, 50, 160)) : null;
-  return { ...(r ? { max: r, near: r } : {}), wc: kind === "twr" ? 6 : 1.5, wv: on || fq ? 4 : 2, pin: kind !== "fis" };
+  if (kind === "app" || kind === "twr") return { near: PLATE_NEAR, max: PLATE_MAX, wc: 0, wv: 4 };
+  return { wc: 1.5, wv: on || fq ? 4 : 2 };
 }
 
 // Etykiety bez nakładania się. items [{x, y, w, h, alts?: [{w, h}], near?, max?, wc?, wv?, pin?}] w kolejności priorytetu
@@ -306,13 +301,6 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
 // UNICOM: FIR sąsiada bez nikogo online w sektorach przy granicy (linia pod nazwą FIR-u)
 export const ADVISORY_FQ = "122.800";
 
-// Skrót stanowiska, które przejmuje wieżę (↑APP) albo pole sąsiada: bez pierwszego członu (EDWW FLG → FLG,
-// ESMM 6 → 6), chyba że to cała nazwa (LKAA, UKLV)
-export const byShort = (name) => {
-  const w = String(name || "").split(" ");
-  return w.length > 1 ? w.slice(1).join(" ") : w[0];
-};
-
 // --- siatka strony wg szkicu Marka (0.13.0, data/seed/radio_layout.json; komórki col/row od 1, jak linie siatki CSS)
 // Kolumny o stałej szerokości, żeby zmiana danych (łączenie okienek, dłuższy wskaźnik, ATIS) nigdy nie przesuwała
 // strony: rodzaj kolumny z części stałej (grid.tracks): box = okienka, wskaźniki, BERLIN; btn = przyciski warstw
@@ -343,3 +331,14 @@ export const boxText = (b) => `${b?.label ?? b?.id ?? ""} ${limText(b)}`;
 // granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
 const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
 export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "GND"}\u2013${Number(b?.upper) >= 999 ? "UNL" : flOf(Number(b?.upper) || 0)}`;
+
+// --- dymek przy kursorze (0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość (radio.css), na prawo
+// od kursora, a gdy podszedłby bliżej niż TIP_GAP px do prawej krawędzi okna – na lewo od niego; pod kursorem, przy
+// dolnej krawędzi nad nim; nigdy bliżej brzegu okna niż TIP_GAP. cx, cy = kursor, w, h = rozmiar dymku (szerokość
+// stała, więc mierzona przed ustawieniem miejsca jest ta sama), vw, vh = okno. Wynik {left, top, flipX, flipY} (px)
+export const TIP_GAP = 12;
+export function tipPos(cx, cy, w, h, vw, vh) {
+  const flipX = cx + 14 + w > vw - TIP_GAP, flipY = cy + 16 + h > vh - TIP_GAP;
+  return { left: Math.round(Math.max(TIP_GAP, flipX ? cx - 14 - w : cx + 14)),
+    top: Math.round(Math.max(TIP_GAP, flipY ? cy - 10 - h : cy + 16)), flipX, flipY };
+}

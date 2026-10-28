@@ -7,10 +7,11 @@
 // LOW MID HIGH / APP / TWR / TWR/A / FIS, podgląd LOW na lewo od niej, HIGH na prawo, mały MID na dole.
 // Sektory ACC na podglądach (runda 12, Marek): wycinki obsługiwane przez to samo stanowisko (kolejność przejmowania,
 // ownership.json) jako jeden obszar z jedną etykietą (stanowisko i częstotliwość), granica tylko tam, gdzie zmienia
-// się obsługujący; sektorów bez nikogo nie rysujemy (ramą zostaje granica FIR EPWW). APP, TWR, ATIS i FIS bez nikogo:
-// samo ID (runda 11, Marek: częstotliwość dopiero, gdy ktoś obsługuje).
-// Runda 11 (Marek): warstwa APP w częściach TMA wg stanowiska APP (WA APP, WA N APP, WA S APP) i z TMA proceduralnymi
-// (SC/LB/SY TWR); etykiety APP i TWR obok kształtów TMA/CTR z linią do punktu; LOW z suwakiem wysokości (FL095–FL330).
+// się obsługujący; sektorów bez nikogo nie rysujemy (ramą zostaje granica FIR EPWW). FIS bez nikogo: samo ID (runda 11).
+// Plakietki APP i TWR (0.13.0, Marek) tylko dla zalogowanych: jedna na stanowisko APP w środku części TMA, które
+// obsługuje (WA APP, WA N APP i WA S APP – trzy), wieża w środku CTR (TWR/A także sam ATIS), bez linii do punktu;
+// czerwone tło sektora ACC i TMA z ograniczeniem przepływu albo zajętością ponad 80 %; dymki stałej szerokości.
+// LOW z suwakiem wysokości (FL095–FL330).
 // Dane: GET /api/radio/board co 30 s (geometria raz, potem tylko po zmianie wersji danych `ver`, np. po imporcie nowych
 // danych sektorów). Kliknięcie nazwy FIR-u sąsiada (np. EDWW): panel z wyciągiem z LOA EPWW z tym FIR-em
 // (GET /api/radio/loa), z przyciskiem do dokumentu w COORDINATION › DOKUMENTY i PDF-em w nowej karcie.
@@ -18,9 +19,9 @@ import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
 import { dissolve, pointIn } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
-import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, argOf, bboxOf, bboxOrDefault, buttonRows, byShort,
+import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, argOf, bboxOf, bboxOrDefault, buttonRows,
   controllersOn, coverGrid, cutAt, cutBand, cutBounds, cutRange, flText, gridArea, gridTracks, labelOpts, limText, limTip, parseArg,
-  pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, utcHhmm } from "../radioboard.js";
+  pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
 
 const LS_LAYERS = "radio.layers", LS_CUT = "radio.cut";
 const REFRESH_MS = 30000;
@@ -143,8 +144,13 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
 // o zalogowanych
 export const nowText = (owners, x) => (owners.length ? owners.map((o) => `Now: ${x.who(o) || o}`).join("\n")
   : x.net === false ? "Now: no data" : "Now: unstaffed");
-// obszar stanowiska ACC na podglądzie: head (stanowisko i warstwa), kto, sektory warstwy w tym obszarze
-export const accTip = (g, head, x) => [head, nowText([g.owner], x), `Sectors: ${g.sectors.map((s) => s.id).join(", ")}`].join("\n");
+// linie dymku alarmów przepływu (flow z /api/radio/board: ograniczenie albo zajętość ponad 80 % dopuszczalnej);
+// pre: przestrzeń, gdy dymek mówi o kilku (sektor HB, TMA Radom)
+export const flowLines = (alerts, pre = "") => arr(alerts).flatMap((a) => arr(a?.tip)).map((t) => (pre ? `${pre}: ${t}` : t));
+// obszar stanowiska ACC na podglądzie: head (stanowisko i warstwa), kto, sektory warstwy w tym obszarze; flow – alarmy
+// przepływu jego sektorów (sektor podany przy każdej linii)
+export const accTip = (g, head, x, flow = null) => [head, nowText([g.owner], x), `Sectors: ${g.sectors.map((s) => s.id).join(", ")}`,
+  ...g.sectors.flatMap((s) => flowLines(flow?.sectors?.[s.id], s.id))].join("\n");
 // etykieta APP, TWR, FIS: tytuł, stanowisko, kto teraz (bez nikogo z tej przestrzeni: ACC, który przejmuje top-down),
 // dodatki (extra); now zastępuje linijkę "kto teraz" (wieża przejmowana przez inne stanowisko)
 export function groupTip(g, title, x, extra = [], now = null) {
@@ -211,19 +217,18 @@ export function boxHtml(b, f, x) {
 }
 export const firHtml = (f, x) => firNameHtml(f, x) + arr(f.boxes).map((b) => boxHtml(b, f, x)).join("");
 
-// --- etykieta podglądu (sektor ACC, APP, TWR, FIS) w odmianach: 0 pełna (ID nad częstotliwością), 1 skrócona (ID
-// i częstotliwość w jednej linii, gdy pełna nie mieści się przy swoim punkcie) i 2 samo ID; szczegóły zawsze w dymku.
-// lb: {cls, state, id, ls: [{fq, by}], more?, extra?, k?, icao?, rt}.
-// Samo ID tylko bez nikogo (runda 11, Marek): ls bez częstotliwości i stanowiska, bez linii ATIS. Obsadzona
-// nigdy nie traci częstotliwości (albo nazwy stanowiska, które ją ma w innej etykiecie): samo ID czytałoby się jak „nikt”.
+// --- etykieta podglądu (sektor ACC, plakietka APP i TWR, FIS) w odmianach: 0 pełna (ID nad częstotliwością),
+// 1 skrócona (ID i częstotliwość w jednej linii, gdy pełna nie mieści się przy swoim punkcie) i 2 samo ID; szczegóły
+// zawsze w dymku. lb: {cls, state, id, ls: [{fq, by}], more?, extra?, code?, k?, icao?, rt}.
+// Samo ID tylko bez nikogo (FIS; runda 11, Marek): ls bez częstotliwości i stanowiska, bez linii ATIS. Obsadzona
+// nigdy nie traci częstotliwości: samo ID czytałoby się jak „nikt”.
 const bare = (lb) => !lb.extra && !lb.ls.some((l) => l.fq || l.by);
 // odmiany do ułożenia (placeLabels): APP/TWR/FIS pełna i skrócona, sektor ACC (small = false) tylko pełna, bez nikogo
-// samo ID
-export const lblVariants = (lb, small = true) => (bare(lb) ? [2] : small ? [0, 1] : [0]);
-// kolejność układania (najpierw mniejsza): sektory ACC, potem etykiety z częstotliwością (APP, TWR – też sam ATIS
-// online, FIS), na końcu samo ID bez nikogo – w tłoku (Warszawa–Modlin–Łódź–Radom) miejsce przy punkcie dostaje
-// częstotliwość
-const PRIO = { acc: [0, 0], app: [1, 4], twr: [2, 4.5], fis: [3, 5] };
+// samo ID; plakietka z samym ATIS (TWR/A, wieża offline) tylko pełna – skrócona zgubiłaby częstotliwość ATIS
+export const lblVariants = (lb, small = true) => (bare(lb) ? [2] : small && lb.ls.some((l) => l.fq || l.by) ? [0, 1] : [0]);
+// kolejność układania (najpierw mniejsza): plakietki APP i TWR (stoją w środku swojej przestrzeni, wolno je tylko
+// lekko odsunąć), potem sektory ACC (schodzą z plakietek), FIS z częstotliwością, na końcu samo ID bez nikogo
+const PRIO = { app: [0, 3], twr: [0.5, 3.5], acc: [1, 1], fis: [2, 4] };
 export const lblPrio = (kind, lb) => PRIO[kind][bare(lb) ? 1 : 0];
 export function lblHtml(lb, v = 0) {
   const attrs = `${lb.k ? ` data-k="${esc(lb.k)}"` : ""}${lb.icao ? ` data-icao="${esc(lb.icao)}" tabindex="0" role="button"` : ""} data-rt="${esc(lb.rt)}"`;
@@ -233,51 +238,125 @@ export function lblHtml(lb, v = 0) {
   const cid = lb.ls[0]?.fq ? shortId(lb.id) : lb.id;
   if (v === 2) return `<div class="${cls}"${attrs}><b class="rb-id">${esc(cid)}</b></div>`;
   const fq = lb.ls[0]?.fq ? `<span class="rb-fq">${esc(lb.ls[0].fq)}</span>` : "";
-  // skrócona: kto przejmuje (inny niż stanowisko etykiety) przed częstotliwością – skrótem (WA S ↑LL 124.230: TMA
-  // Łódź u wieży Łódź), a bez częstotliwości (podana w innej etykiecie) pełną nazwą zamiast pustej linii
-  const b0 = String(lb.ls[0]?.by || "").replace(/^↑/, "");
-  const by = b0 ? `<i class="rb-by">↑${esc(fq ? shortId(b0) : b0)}</i>` : "";
-  if (v === 1) return `<div class="${cls}"${attrs}><b class="rb-id">${esc(cid)}</b>${by}${fq}</div>`;
+  // skrócona: kto obsługuje (inny niż stanowisko etykiety) przed częstotliwością – skrótem, a bez częstotliwości pełną
+  // nazwą zamiast pustej linii
+  const b0 = String(lb.ls[0]?.by || "").replace(/^\u2191/, "");
+  const by = b0 ? `<i class="rb-by">\u2191${esc(fq ? shortId(b0) : b0)}</i>` : "";
+  // skrócona plakietka TWR/A: litera ATIS-u za częstotliwością wieży (pełna ma całą linię ATIS)
+  const code = lb.code ? `<b class="rb-code">${esc(lb.code)}</b>` : "";
+  if (v === 1) return `<div class="${cls}"${attrs}><b class="rb-id">${esc(cid)}</b>${by}${fq}${code}</div>`;
   const more = lb.more ? `<i class="rb-more">+${lb.more}</i>` : "";
   return `<div class="${cls}"${attrs}><b class="rb-id">${esc(lb.id)}</b>${lb.ls.filter((l) => l.fq || l.by).map((l) => `<span class="rb-ln">${l.by ? `<i class="rb-by">${esc(l.by)}</i>` : ""}`
     + `${l.fq ? `<span class="rb-fq">${esc(l.fq)}</span>` : ""}</span>`).join("")}${more}${lb.extra || ""}</div>`;
 }
 
-// --- linijki etykiet ({fq, by}); x = {freq, nm, pos, on}: częstotliwość (online albo z pliku), nazwa stanowiska,
-// stanowiska z tablicy (pos), kontroler online. Właściciele (najwyżej dwaj) z częstotliwością, by = właściciel inny
-// niż stanowisko etykiety; nikt → żadnej linijki (samo ID; stanowisko i jego częstotliwość w dymku)
+// --- linijki etykiet ({fq, by}); x = {freq, nm}: częstotliwość (online albo z tablicy) i nazwa stanowiska. Właściciele
+// (najwyżej dwaj) z częstotliwością, by = właściciel inny niż stanowisko etykiety; nikt → żadnej linijki (samo ID)
 export const lblLines = (nominal, owners, x) => owners.slice(0, 2).map((o) => ({ fq: x.freq(o), by: o === nominal ? "" : x.nm(o) }));
-// części TMA (warstwa APP) → Map id → {ls, more}. Częstotliwość stanowiska, które przejmuje cudze części (WA APP: WA N
-// i WA S, TMA Łódź i Radom), tylko w jednej etykiecie: w jego części (najpierw przy jego lotnisku), potem w TMA jego
-// lotniska, potem w pierwszej; w pozostałych sama nazwa (↑WA APP), reszta w dymku. Część obsługiwana przez własne
-// stanowisko zawsze z częstotliwością (WA S APP w TMA Warszawa, Łódź i Radom), jak sektory ACC
-export function tmaLines(parts, x) {
-  // znak → id części, w której etykieta ma jego częstotliwość
-  const keeper = new Map();
-  [(g, cs) => cs === g.nominal && cs.slice(0, 4) === g.icao, (g, cs) => cs === g.nominal, (g, cs) => cs.slice(0, 4) === g.icao]
-    .forEach((ok) => parts.forEach((g) => { const cs = g.owners[0]; if (cs && ok(g, cs) && !keeper.has(cs)) keeper.set(cs, g.id); }));
-  return new Map(parts.map((g) => {
-    const ls = lblLines(g.nominal, g.owners, x);
-    ls.forEach((l, i) => {
-      const cs = g.owners[i];
-      if (!keeper.has(cs)) keeper.set(cs, g.id);
-      if (keeper.get(cs) !== g.id && cs !== g.nominal) l.fq = "";
-    });
-    return [g.id, { ls, more: Math.max(0, g.owners.length - 2) }];
-  }));
+
+// --- plakietki APP i TWR (0.13.0, Marek: „jak nikt nie siedzi, nie pokazuj tysiąca plakietek”): tylko zalogowani
+// (plates z /api/radio/board), plakietka w środku obsługiwanych części TMA albo w środku CTR, bez linii do punktu i bez
+// kropki. x = {freq, nm, on, who, pos, net}: częstotliwość, nazwa stanowiska, kontroler online, kto (dymek), opis
+// stanowiska z tablicy, false = brak danych o zalogowanych
+const range = (lo, hi) => `${lo ? flText(lo) : "GND"}\u2013${flText(hi)}`;
+// APP: jedna plakietka na zalogowane stanowisko APP (dyrektor bez plakietki); tma = grupy TMA (części) z tablicy,
+// flow = alarmy przepływu. Dymek: TMA (i części, gdy TMA ma kilka), stanowisko, kto, inne TMA, które obsługuje, alarmy
+export function appPlate(p, x, tma = [], flow = null) {
+  const byId = new Map(arr(tma).map((g) => [g.id, g]));
+  const cov = arr(p.covers).map((id) => byId.get(id)).filter(Boolean);
+  const mine = cov.filter((g) => g.tma === p.tma), all = arr(tma).filter((g) => g.tma === p.tma);
+  const others = [...new Set(cov.filter((g) => g.tma !== p.tma).map((g) => g.tma))];
+  const part = all.length > 1 ? (mine.length === all.length ? " \u2013 all parts" : ` \u2013 part ${mine.map((g) => x.nm(g.nominal)).join(", ")}`) : "";
+  const lims = mine.length ? ` (${range(Math.min(...mine.map((g) => g.lo || 0)), Math.max(...mine.map((g) => g.hi || 0)))})` : "";
+  const rt = [`${p.tma}${part}${lims}`, `Position: ${x.pos(p.owner)}`, nowText([p.owner], x),
+    ...(others.length ? [`Also covers: ${others.join(", ")}`] : []),
+    ...flowLines(flow?.tma?.[p.tma]), ...others.flatMap((t) => flowLines(flow?.tma?.[t], t))].join("\n");
+  return { at: p.at, kind: "app", name: p.owner, lb: { cls: "app", state: "on", id: x.nm(p.owner),
+    ls: [{ fq: p.frequency || x.freq(p.owner), by: "" }], rt } };
 }
-// wieża (TWR, TWR/ATIS): online → jej częstotliwość; przejmuje inne stanowisko (np. APP) → częstotliwość tego, kto
-// przejmuje, z ↑APP (jak sektory ACC; na częstotliwości wieży nikt nie siedzi); nikt → żadnej linijki (samo ID).
-// Linia ATIS (twra) tylko z ATIS online. Wynik {tw, cover, ls, atl}
-export function twrLines(g, x, twra = false) {
-  const tw = g.owners.find((o) => /_TWR$/.test(o)) || null, cover = tw ? null : g.owners[0] || null;
-  const ls = tw ? [{ fq: x.freq(tw), by: tw === g.nominal ? "" : x.nm(tw) }]
-    : cover ? [{ fq: x.freq(cover), by: `↑${byShort(x.nm(cover))}` }] : [];
-  const a = twra && g.atis ? x.on(g.atis) : null;
-  const atl = a ? `<span class="rb-ln rb-atl"><i class="rb-by">ATIS</i><span class="rb-fq">${esc(x.freq(g.atis))}</span>`
+// TWR: wieża lotniska online (TWR i TWR/A) albo na TWR/A sam ATIS lotniska; ctr = grupa CTR z tablicy (stanowisko
+// wieży, ATIS, kto ją przejmuje). Linia ATIS z literą tylko na TWR/A i tylko z ATIS online
+export function twrPlate(p, ctr, x, twra = false) {
+  const tw = arr(p.twr)[0] || null, nominal = ctr?.nominal || tw || `${p.icao}_TWR`;
+  const ls = tw ? [{ fq: p.frequency || x.freq(tw), by: tw === nominal ? "" : x.nm(tw) }] : [];
+  const acs = arr(p.atis)[0] || ctr?.atis || null, a = twra && acs ? x.on(acs) : null;
+  const atl = a ? `<span class="rb-ln rb-atl"><i class="rb-by">ATIS</i><span class="rb-fq">${esc(x.freq(acs))}</span>`
     + `${a.atis_code ? `<b class="rb-code">${esc(a.atis_code)}</b>` : ""}</span>` : "";
-  return { tw, cover, ls, atl };
+  const cover = arr(ctr?.owners);
+  const now = tw ? null : cover.length ? `Tower offline \u2013 covered by ${cover.map((o) => x.who(o) || o).join(", ")}` : "Tower offline";
+  const atisLine = acs ? [`ATIS: ${x.pos(acs)}${x.on(acs) ? ` \u2013 online${x.on(acs).atis_code ? `, information ${x.on(acs).atis_code}` : ""}` : " \u2013 offline"}`] : [];
+  const rt = groupTip({ nominal, owners: arr(p.twr), topdown: null }, `${p.id} \u00b7 ${p.icao}`, x, [...atisLine, "Click: AERODROME"], now);
+  return { at: p.at, kind: "twr", name: p.icao, lb: { cls: "twr", state: tw ? "on" : "off", id: x.nm(nominal), ls, extra: atl,
+    code: a?.atis_code || "", icao: p.icao, k: p.icao, rt } };
 }
+// Etykiety podglądu key (LOW, MID, HIGH): [{at: [lat, lon], kind, name, lb, dot?}]. Sektory ACC: jedna etykieta na
+// stanowisko (groups z accGroups), gdy warstwa podglądu jest włączona; na LOW plakietki APP (warstwa APP), TWR (TWR:
+// wieże online, TWR/A: także sam ATIS) i FIS. bd = /api/radio/board, x = jak w appPlate oraz dn (nazwa stanowiska ACC)
+export function previewItems(bd, key, layers, groups, x) {
+  const out = [], ly = bd?.layers?.[key];
+  if (layers.has(key.toLowerCase())) {
+    arr(groups).forEach((g) => { if (g.at) out.push({ at: g.at, kind: "acc", name: g.owner, lb: { ...accLabel(g, x.dn(g.owner), x),
+      rt: accTip(g, `${x.dn(g.owner)} \u00b7 ${key}${ly?.label ? ` ${ly.label}` : ""}`, x, bd.flow) } }); });
+  }
+  if (key !== "LOW") return out;
+  if (layers.has("app")) arr(bd.plates?.app).forEach((p) => { if (p.at) out.push(appPlate(p, x, bd.tma, bd.flow)); });
+  const twra = layers.has("twra");
+  if (twra || layers.has("twr")) {
+    const ctr = new Map(arr(bd.twr).map((g) => [g.id, g]));
+    arr(bd.plates?.twr).forEach((p) => { if (p.at && arr(p.layers).includes(twra ? "twra" : "twr")) out.push(twrPlate(p, ctr.get(p.id), x, twra)); });
+  }
+  if (layers.has("fis")) {
+    arr(bd.fis).forEach((g) => {
+      if (!g.at) return;
+      out.push({ at: g.at, kind: "fis", name: g.nominal, dot: "fis", lb: { cls: "fis", state: g.owners.length ? "on" : "off", id: x.nm(g.nominal),
+        ls: lblLines(g.nominal, g.owners, x), more: Math.max(0, g.owners.length - 2), rt: groupTip(g, `${g.id} (up to ${flText(g.hi)})`, x) } });
+    });
+  }
+  return out;
+}
+// znaczniki pod etykietami (SVG): etykieta ACC albo FIS odsunięta dalej niż o pół swojego rozmiaru – cienka linia do
+// punktu; FIS z kropką w punkcie; plakietki APP i TWR bez linii i bez kropki. moves z placeLabels, sizes = rozmiar
+// wybranej odmiany {w, h}, pts = punkty w pikselach
+export function marksSvg(items, moves, sizes, pts) {
+  return items.map((it, i) => {
+    if (it.kind === "app" || it.kind === "twr") return "";
+    const { dx, dy } = moves[i], { w, h } = sizes[i], [x, y] = pts[i];
+    let m = it.dot ? `<circle class="rb-dot ${it.dot}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2"/>` : "";
+    if (Math.abs(dx) > w / 2 + 2 || Math.abs(dy) > h / 2 + 2) {
+      const ex = Math.max(x + dx - w / 2, Math.min(x, x + dx + w / 2)), ey = Math.max(y + dy - h / 2, Math.min(y, y + dy + h / 2));
+      m += `<path class="rb-lead" d="M${x.toFixed(1)},${y.toFixed(1)}L${ex.toFixed(1)},${ey.toFixed(1)}"/>`;
+    }
+    return m;
+  }).join("");
+}
+// Czerwone tło (0.13.0, Marek): przestrzeń z ograniczeniem przepływu albo z zajętością ponad 80 % dopuszczalnej –
+// sektor ACC na podglądzie swojej warstwy (wycinki jego litery na wysokości podglądu: slices = sliceAt) i TMA na LOW
+// (kształty z kluczem TMA: tmaGeo), także bez nikogo. Kształty jednej przestrzeni sumowane (dissolve.js, w pamięci wg
+// wersji danych i wycinków): jedna czerwona granica wokół całej TMA, bez granic jej wycinków; błąd sumy – same
+// wypełnienia (fb). Wynik [{id, kind: "acc" | "tma", geom: MultiPolygon | null, shapes: [geometria], rt}]
+export function flowAreas(bd, key, slices, tmaGeo, x, ver = "") {
+  const fl = bd?.flow || {}, out = [];
+  const add = (id, kind, k, shapes, rt) => {
+    const u = dissolve(`rbflow|${ver}|${k}`, shapes);
+    out.push({ id, kind, geom: u?.geometry || null, shapes, rt });
+  };
+  arr(bd?.sectors).forEach((s) => {
+    const al = arr(fl.sectors?.[s.id]), sl = s.layer === key && al.length ? arr(slices).filter((a) => a.letter === s.letter) : [];
+    if (sl.length) add(s.id, "acc", `${s.id}|${sl.map((a) => `${a.name}:${a.lo}`).sort().join(",")}`, sl.map((a) => a.geometry),
+      [`Sector ${s.id} \u00b7 ${key}`, nowText(s.owner ? [s.owner] : [], x), ...flowLines(al)].join("\n"));
+  });
+  if (key !== "LOW") return out;
+  Object.entries(fl.tma || {}).forEach(([t, al]) => {
+    const sh = arr(tmaGeo).filter((g) => g.tma === t);
+    const own = [...new Set(arr(bd.tma).filter((g) => g.tma === t && g.owners?.length).map((g) => g.owners[0]))];
+    if (sh.length && arr(al).length) add(t, "tma", `tma|${t}|${sh.length}`, sh.map((g) => g.geometry), [t, nowText(own, x), ...flowLines(al)].join("\n"));
+  });
+  return out;
+}
+// warstwa SVG czerwonego tła: jedna ścieżka na przestrzeń (klasa flow, dymek z powodem); po błędzie sumy wycinki bez
+// granic (fb)
+export const flowSvg = (areas, P) => (areas.length ? `<g class="rb-flow">${areas.map((a) => `<path class="flow ${a.kind}${a.geom ? "" : " fb"}"`
+  + ` data-rt="${esc(a.rt)}" d="${a.geom ? pathAll(a.geom, P) : a.shapes.map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>` : "");
 
 export default {
   mount(root) {
@@ -290,7 +369,7 @@ export default {
         <div class="rb-btns"></div>
         <div class="rb-cells"></div>
         <div class="rb-status"></div>
-        <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes. Neighbour box: white with the frequency of the controller covering it."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour box: dark grey, ID and limits only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} under its name"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>\u2191 covered by (TWR)</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
+        <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes. Neighbour box: white with the frequency of the controller covering it."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. APP and TWR plates only for stations online; FIS without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour box: dark grey, ID and limits only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} under its name"><i class="rb-sw off"></i>unstaffed</span><span title="Flow alert: red area \u2013 flow restriction now or occupancy over 80 % of capacity (ACC sector on its level preview, TMA on LOW)"><i class="rb-sw flow"></i>flow alert</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
       </div>
       <div class="rb-tip" hidden></div>
@@ -319,8 +398,6 @@ export default {
       return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
     };
     const posLine = (cs) => `${cs}${d?.pos?.[cs]?.name ? ` · ${d.pos[cs].name}` : ""} ${d?.pos?.[cs]?.frequency || ""}`.trim();
-    // linijki etykiet (lblLines, tmaLines, twrLines): częstotliwości i nazwy z tablicy
-    const lx = () => ({ freq: freqOf, nm, on, pos: d?.pos });
 
     // --- pasek ATIS: zawsze na miejscu i tej samej wysokości (jedna linia); przycisk ATIS chowa tylko treść
     // (visibility), więc podglądy pod nim nie zmieniają rozmiaru ani przy przełączaniu, ani gdy ATIS-y się logują
@@ -369,60 +446,8 @@ export default {
     }
 
     // --- podglądy
-    // dymek obszaru stanowiska: kto i które sektory warstwy (accTip); etykiety APP, TWR i FIS: groupTip
-    const tx = () => ({ who, pos: posLine, net: d?.net?.ok !== false });
-    const accTipOf = (g, layer) => {
-      const ly = d.layers?.[layer];
-      return accTip(g, `${displayName(g.owner)} · ${layer}${ly?.label ? ` ${ly.label}` : ""}`, tx());
-    };
-
-    // etykiety podglądu: {lb (model etykiety), at: [lat, lon], kind, box?, dot?}; APP, TWR i FIS tylko na LOW;
-    // kolejność układania: lblPrio. Sektory ACC: jedna etykieta na stanowisko (accGroups)
-    function labelsFor(m, groups) {
-      const out = [], x = lx();
-      if (layers.has(m.layer)) {
-        groups.forEach((g) => { if (g.at) out.push({ at: g.at, kind: "acc", lb: { ...accLabel(g, displayName(g.owner), x), rt: accTipOf(g, m.key) } }); });
-      }
-      // APP, TWR i FIS to przestrzeń dolna: na podglądzie LOW
-      if (m.key !== "LOW") return out;
-      if (layers.has("app")) {
-        // etykieta na część TMA (stanowisko części: WA APP, WA N APP, WA S APP; TMA proceduralna: wieża, np. SC TWR);
-        // linijki i jedna częstotliwość przejmującego na kilka części: tmaLines
-        const tma = d.tma.filter((g) => g.at), parts = tmaLines(tma, x);
-        tma.forEach((g) => {
-          const { ls, more } = parts.get(g.id);
-          const id = nm(g.nominal), proc = /_TWR$/.test(g.nominal);
-          const title = `${g.tma}${g.id !== g.tma ? ` – part ${id}` : ""} (${g.lo ? flText(g.lo) : "GND"}–${flText(g.hi)})`;
-          const extra = proc ? [`Procedural TMA (no APP): tower frequency ${id}`] : [];
-          out.push({ at: g.at, box: g.box, kind: "app", dot: "app", lb: { cls: "app",
-            state: g.owners.length ? "on" : "off", id, ls, more, rt: groupTip(g, title, tx(), extra) } });
-        });
-      }
-      const twra = layers.has("twra");
-      if (twra || layers.has("twr")) {
-        d.twr.forEach((g) => {
-          if (!g.at) return;
-          const { tw, cover, ls, atl } = twrLines(g, x, twra);
-          const a = g.atis ? on(g.atis) : null;
-          const extra = g.atis ? [`ATIS: ${posLine(g.atis)}${a ? ` – online${a.atis_code ? `, information ${a.atis_code}` : ""}` : " – offline"}`] : [];
-          const id = nm(g.nominal);
-          out.push({ at: g.at, box: g.box, kind: "twr", dot: "twr", lb: { cls: "twr", state: tw ? "on" : cover ? "cov" : "off", id,
-            ls, extra: atl,
-            icao: g.icao, k: g.icao, rt: groupTip(g, `${g.id} · ${g.icao}`, tx(), [...extra, "Click: AERODROME"],
-              cover ? `Tower offline – covered by ${g.owners.map((o) => who(o) || o).join(", ")}` : null) } });
-        });
-      }
-      if (layers.has("fis")) {
-        d.fis.forEach((g) => {
-          if (!g.at) return;
-          const ls = lblLines(g.nominal, g.owners, x), id = nm(g.nominal);
-          out.push({ at: g.at, kind: "fis", dot: "fis", lb: { cls: "fis", state: g.owners.length ? "on" : "off", id,
-            ls, more: Math.max(0, g.owners.length - 2),
-            rt: groupTip(g, `${g.id} (up to ${flText(g.hi)})`, tx()) } });
-        });
-      }
-      return out;
-    }
+    // etykiety, plakietki i dymki podglądu (previewItems, flowAreas): częstotliwości, nazwy i kto z tablicy
+    const px = () => ({ freq: freqOf, nm, on, who, pos: posLine, net: d?.net?.ok !== false, dn: displayName });
 
     function renderMap(m) {
       const p = m.el, W = p.clientWidth, H = p.clientHeight;
@@ -431,8 +456,8 @@ export default {
       const { P } = projection(border, { x: fr.left - pr.left, y: fr.top - pr.top, w: fr.width, h: fr.height }, 0.03,
         m.key === "MID" ? "bottom" : "middle");
       const ft = m.key === "LOW" ? lowCut() * 100 : LEVEL_FT[m.key];
-      const groups = accGroups(sliceAt(geo.acc, ft), d.sectors, m.key, geoVer);
-      const low = m.key === "LOW";
+      const accs = sliceAt(geo.acc, ft), groups = accGroups(accs, d.sectors, m.key, geoVer);
+      const low = m.key === "LOW", x = px();
       const g = (cls, list) => `<g class="${cls}">${list.map((x) => `<path d="${pathOf(x.geometry, P)}"/>`).join("")}</g>`;
       const twrOn = layers.has("twr") || layers.has("twra");
       // sąsiedzi (0.12.5, Marek): sektory ACC na wysokości podglądu (jak EPWW: jasnoszare nieobsadzone, ciemne obsadzone –
@@ -445,13 +470,15 @@ export default {
       m.svg.setAttribute("width", W);
       m.svg.setAttribute("height", H);
       // kolejność (kolory z pliku sektora, radio.css): tło FIR-ów, sąsiedzi, FIR EPWW nieobsadzony, obszary stanowisk
-      // ACC (obsadzone: ciemne, pełne – pod nimi nic nie ginie), granice TMA/CTR/FIS EPWW i sąsiadów, granica FIR EPWW
+      // ACC (obsadzone: ciemne, pełne – pod nimi nic nie ginie), czerwone tło alarmów przepływu (sektory ACC warstwy,
+      // na LOW także TMA – zawsze, bez względu na warstwy i obsadę), granice TMA/CTR/FIS EPWW i sąsiadów, granica FIR EPWW
       m.svg.innerHTML = g("rb-firs", geo.firs)
         + `<g class="rb-nbacc">${nbAcc.map((a) => `<path class="${nbOn[a.id] ? "on" : "off"}" d="${pathOf(a.geometry, P)}"/>`).join("")}</g>`
         + `<path class="rb-land" d="${pathOf(geo.border, P)}"/>`
         // obszar stanowiska (bez granic między jego sektorami); po błędzie sumy same wypełnienia wycinków
-        + `<g class="rb-accg">${groups.map((x) => (x.geom ? `<path data-k="${esc(x.owner)}" class="st" d="${pathAll(x.geom, P)}"/>`
-          : x.slices.map((sl) => `<path data-k="${esc(x.owner)}" class="st fb" d="${pathOf(sl.geometry, P)}"/>`).join(""))).join("")}</g>`
+        + `<g class="rb-accg">${groups.map((a) => (a.geom ? `<path data-k="${esc(a.owner)}" class="st" d="${pathAll(a.geom, P)}"/>`
+          : a.slices.map((sl) => `<path data-k="${esc(a.owner)}" class="st fb" d="${pathOf(sl.geometry, P)}"/>`).join(""))).join("")}</g>`
+        + flowSvg(flowAreas(d, m.key, accs, geo.tma, x, geoVer), P)
         + (low && layers.has("fis") ? g("rb-fisg", geo.fis) : "")
         + g("rb-tmag nb", nbTma) + g("rb-ctrg nb", nbCtr)
         + (low && layers.has("app") ? g("rb-tmag", geo.tma) : "")
@@ -459,45 +486,37 @@ export default {
         + `<path class="rb-border" d="${pathOf(geo.border, P)}"/>`;
       renderTitle(m);
       // etykiety: wstawiamy wszystkie odmiany, mierzymy, układamy (ważniejsze pierwsze), zostawiamy wybraną odmianę
-      const items = labelsFor(m, groups).map((it) => ({ ...it, prio: lblPrio(it.kind, it.lb) })).sort((a, b) => a.prio - b.prio);
+      const items = previewItems(d, m.key, layers, groups, x).map((it) => ({ ...it, prio: lblPrio(it.kind, it.lb) }))
+        .sort((a, b) => a.prio - b.prio);
       const vs = items.map((it) => lblVariants(it.lb, it.kind !== "acc"));
       m.lbls.innerHTML = items.map((it, i) => vs[i].map((v) => lblHtml(it.lb, v)).join("")).join("");
       const els = [...m.lbls.children];
       let ei = 0;
-      const vars = vs.map((x) => els.slice(ei, (ei += x.length)));
+      const vars = vs.map((v) => els.slice(ei, (ei += v.length)));
       const sz = (e) => ({ w: e.offsetWidth, h: e.offsetHeight });
       const pts = items.map((it) => P([it.at[1], it.at[0]]));
       // przeszkoda: tytuł podglądu (współrzędne w panelu)
       const rel = (e) => { const r = e.getBoundingClientRect(); return { x0: r.left - pr.left - 2, y0: r.top - pr.top - 2, x1: r.right - pr.left + 2, y1: r.bottom - pr.top + 2 }; };
       const obstacles = [...p.querySelectorAll(".rb-title")].filter((e) => e.offsetWidth && e.offsetHeight).map(rel);
-      // kształty, których etykiety nie zasłaniają (runda 11, Marek): TMA na warstwie APP, CTR na TWR i TWR/ATIS, kropki
-      // lotnisk i punktów TMA; etykieta APP/TWR staje obok nich z linią do punktu, sektora ACC przesuwa się mniej
+      // obrysy, których etykiety ACC i FIS nie zasłaniają (runda 11, Marek): TMA na warstwie APP, CTR na TWR i TWR/A;
+      // plakietki APP i TWR stoją na nich w środku (labelOpts)
       const shapes = low ? [...(layers.has("app") ? geo.tma : []), ...(twrOn ? geo.ctr : []), ...nbTma, ...nbCtr] : [];
       const shapeKind = !shapes.length ? "" : twrOn ? "twr" : "app";
-      const cover = shapes.length ? coverGrid(shapes.flatMap((x) => ringsOf(x.geometry).map((r) => r.map(P))), W, H,
-        { points: pts.filter((_, i) => items[i].dot && items[i].dot !== "fis") }) : null;
-      // zasięg (część TMA, CTR: od ramki kształtu), waga obrysów, kara za mniejszą odmianę i kropka pod etykietą: labelOpts
+      const cover = shapes.length ? coverGrid(shapes.flatMap((a) => ringsOf(a.geometry).map((r) => r.map(P))), W, H) : null;
       const moves = placeLabels(items.map((it, i) => {
         const [full, ...alts] = vars[i].map(sz);
-        return { x: pts[i][0], y: pts[i][1], ...full, alts, ...labelOpts(it.kind, { box: it.box, on: it.lb.state !== "off",
-          fq: !!it.lb.ls?.[0]?.fq, shapes: shapeKind }, P) };
+        return { x: pts[i][0], y: pts[i][1], ...full, alts, ...labelOpts(it.kind, { on: it.lb.state !== "off", fq: !!it.lb.ls?.[0]?.fq, shapes: shapeKind }) };
       }), { x: 2, y: 2, w: W - 4, h: H - 4 }, { obstacles, cover, near: cover ? 40 : 26 });
-      // przesunięta etykieta: cienka linia do jej punktu; lotniska (TWR), TMA (APP) i FIS z kropką w punkcie
-      let marks = "";
-      items.forEach((it, i) => {
+      // wybrana odmiana na swoim miejscu; ACC i FIS odsunięte daleko z cienką linią do punktu, FIS z kropką (marksSvg)
+      const sizes = items.map((it, i) => {
         const { dx, dy, v } = moves[i];
         vars[i].forEach((e, j) => { if (j !== v) e.remove(); });
-        const e = vars[i][v], w = e.offsetWidth, hh = e.offsetHeight, [x, y] = pts[i];
-        e.style.left = `${Math.round(x + dx - w / 2)}px`;
-        e.style.top = `${Math.round(y + dy - hh / 2)}px`;
-        // lotnisko (TWR): trójkąt jak w pliku sektora; punkt TMA (APP) i FIS: kropka
-        if (it.dot === "twr") marks += `<path class="rb-dot twr" d="M${x.toFixed(1)},${(y - 3.2).toFixed(1)}l2.8,4.8h-5.6z"/>`;
-        else if (it.dot) marks += `<circle class="rb-dot ${it.dot}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2"/>`;
-        if (Math.abs(dx) > w / 2 + 2 || Math.abs(dy) > hh / 2 + 2) {
-          const ex = Math.max(x + dx - w / 2, Math.min(x, x + dx + w / 2)), ey = Math.max(y + dy - hh / 2, Math.min(y, y + dy + hh / 2));
-          marks += `<path class="rb-lead" d="M${x.toFixed(1)},${y.toFixed(1)}L${ex.toFixed(1)},${ey.toFixed(1)}"/>`;
-        }
+        const e = vars[i][v], w = e.offsetWidth, hh = e.offsetHeight, [x0, y0] = pts[i];
+        e.style.left = `${Math.round(x0 + dx - w / 2)}px`;
+        e.style.top = `${Math.round(y0 + dy - hh / 2)}px`;
+        return { w, h: hh };
       });
+      const marks = marksSvg(items, moves, sizes, pts);
       if (marks) m.svg.insertAdjacentHTML("beforeend", `<g class="rb-marks">${marks}</g>`);
     }
     // tytuł w lewym górnym rogu podglądu (LOW: nad mapą, z suwakiem wysokości; radio.css)
@@ -707,12 +726,14 @@ export default {
       loaBox.querySelector(".rb-loa-cnt").textContent = t ? `${items.filter((x) => !x.hidden).length} of ${items.length}` : "";
     });
 
-    // --- dymki (jeden pływający, przycięty do okna) i podświetlenie sektora pod etykietą
+    // --- dymek (jeden pływający, stałej szerokości – radio.css) i podświetlenie sektora pod etykietą. Miejsce: tipPos
+    // (na prawo i pod kursorem, przy prawej i dolnej krawędzi okna po drugiej stronie kursora, zawsze 12 px od brzegu);
+    // wysokość z treści, nic nie jest ucinane
     let tipFor = null;
     const moveTip = (e) => {
-      const r = tip.getBoundingClientRect();
-      tip.style.left = `${Math.max(4, Math.min(window.innerWidth - r.width - 4, e.clientX + 14))}px`;
-      tip.style.top = `${Math.max(4, e.clientY + 16 + r.height > window.innerHeight ? e.clientY - r.height - 10 : e.clientY + 16)}px`;
+      const { left, top } = tipPos(e.clientX, e.clientY, tip.offsetWidth, tip.offsetHeight, window.innerWidth, window.innerHeight);
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
     };
     const hl = (lbl, onOff) => {
       const k = lbl?.dataset.k;
@@ -725,6 +746,8 @@ export default {
       hl(tipFor, false);
       tipFor = t;
       if (!t) { tip.hidden = true; return; }
+      // miejsce przed pomiarem: dymek w lewym górnym rogu okna ma swoją pełną szerokość, wysokość z nowej treści
+      tip.style.left = tip.style.top = "0px";
       tip.textContent = t.dataset.rt;
       tip.hidden = false;
       moveTip(e);

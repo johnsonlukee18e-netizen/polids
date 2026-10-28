@@ -913,13 +913,14 @@ def tv_targets(tv: dict, sector_ids, tma_by_icao: dict[str, list[str]]) -> tuple
 
 
 def _restriction_tip(r: dict) -> str:
-    kind, value = str(r.get("type") or "").upper(), r.get("value")
-    when = f"{r.get('start')}–{r.get('end')}"
+    """Linia dymku aktywnego teraz ograniczenia: wartość i do kiedy (koniec okna HHMM jako HH:MM)."""
+    kind, value, end = str(r.get("type") or "").upper(), r.get("value"), str(r.get("end") or "")
+    until = f" until {end[:2]}:{end[2:4]}" if re.fullmatch(r"\d{4}", end) else ""
     if kind == "ENR-OCCUPANCY":
-        return f"Flow restriction: max occupancy {value}, {when}"
+        return f"Flow restriction: max occupancy {value}{until}"
     if kind == "ENR-ENTRIES":
-        return f"Flow restriction: max {value} entries per hour, {when}"
-    return f"Flow restriction: {value}, {when}"
+        return f"Flow restriction: max {value} entries per hour{until}"
+    return f"Flow restriction: {value}{until}"
 
 
 def flow_alerts(tvs, now, sector_ids, tma_groups_: list[dict]) -> dict:
@@ -1062,16 +1063,26 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
                             "geometry": simplify(s["geom"], 0.002, 4)})
 
     def outlines(sl, **extra):
-        out = []
+        out, mine = [], {}
         for s in sl:
             g = simplify(s["geom"])
             key = json.dumps(g["coordinates"])
             if key not in seen:
                 seen.add(key)
-                out.append({"name": s["name"], "geometry": g, **{k: f(s) for k, f in extra.items()}})
+                mine[key] = {"name": s["name"], "geometry": g, **{k: f(s) for k, f in extra.items()}}
+                out.append(mine[key])
+            elif key in mine:
+                # ten sam kształt drugi raz (inna wysokość): brakujące dodatki z kolejnego wycinka (np. klucz TMA)
+                for k, f in extra.items():
+                    if mine[key][k] is None:
+                        mine[key][k] = f(s)
         return out
 
     fis_sl = [s for s in kinds["fis"] if FIS_NAME.match(s["name"])]
+    # kształt TMA → klucz TMA (jak tma[].tma i flow.tma): czerwone tło TMA z alarmem przepływu na podglądzie LOW;
+    # wspólne części kilku TMA i CTA bez klucza (tylko obrys)
+    tma_key = {s["name"]: key for key, (_, parts) in tma_parts(kinds["tma"], own)[0].items()
+               for sl in parts.values() for s in sl}
     # sąsiedzi: ten sam kształt na tej samej wysokości (kopie z dwóch plików) raz
     nb, nb_seen = [], set()
     for a in nb_areas(list(nb_slices), border_geom):
@@ -1082,7 +1093,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
             nb.append({**{k: v for k, v in a.items() if k != "geom"}, "geometry": g})
     geo = {"border": simplify(border_geom, 0.002), "firs": [{"id": f["id"], "geometry": simplify(f["geometry"], 0.02, 2)}
                                                            for f in firs_geo],
-           "acc": acc_geo, "tma": outlines(kinds["tma"]), "ctr": outlines(kinds["ctr"]),
+           "acc": acc_geo, "tma": outlines(kinds["tma"], tma=lambda s: tma_key.get(s["name"])), "ctr": outlines(kinds["ctr"]),
            "fis": outlines(fis_sl, owner=lambda s: s["owners"][0] if s["owners"] else None),
            "nb": [{k: a[k] for k in ("id", "fir", "name", "kind", "lo", "hi", "geometry")} for a in nb]}
     atis = sorted(cs for cs in positions if cs.startswith("EP") and facility(cs) == "ATIS")

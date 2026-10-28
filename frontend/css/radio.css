@@ -5,19 +5,20 @@
    tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP). Układ nie zależy od czcionki o stałej szerokości.
    0.12.5 (Marek): kolory podglądów z pliku sektora EuroScope (#define COLOR_… w EPWW-Sector.sct i zrzut od Marka):
    jasnoszare = nieobsadzone, ciemne = obsadzone – na LOW, MID, HIGH i u sąsiadów tak samo; granice sektorów, FIR i TMA
-   COLOR_FIRBorder/COLOR_TMA (70,70,70), CTR COLOR_TWR-CTR (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9),
-   lotniska turkusowe trójkąty (144,237,229). Przyciski, okienka i pasek ATIS jak na zdjęciu PANDORY: jasne prostokąty
+   COLOR_FIRBorder/COLOR_TMA (70,70,70), CTR COLOR_TWR-CTR (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9).
+   Przyciski, okienka i pasek ATIS jak na zdjęciu PANDORY: jasne prostokąty
    z ciemnym tekstem, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
    Rozmiary od wielkości strony RADIO (container: cqw/cqh), nie od treści: --rb-f = częstotliwość w okienku (ok. 13 px
    na 1366×768, 16 px na 1600×900, 18 px na 1920×1080, mniej na niskim oknie), --rb-bw = kolumna okienek, --rb-hw =
    kolumna przycisków i podglądu MID, --rb-nw = kolumna samych nazw FIR-ów (z linią ADVISORY 122.800). */
 .rb { --rb-f: clamp(10px, min(1.1cqw, 1.8cqh), 18px);
   --rb-bw: calc(var(--rb-f) * 5 + 14px); --rb-hw: clamp(150px, 13cqw, 250px); --rb-nw: calc(var(--rb-f) * 6.4 + 8px);
-  --rb-unst: #1e1e1e; --rb-st: #020202; --rb-line: #464646; --rb-ctr: #612e36; --rb-act: #787b09; --rb-ad: #90ede5;
+  --rb-unst: #1e1e1e; --rb-st: #020202; --rb-line: #464646; --rb-ctr: #612e36; --rb-act: #787b09;
   --rb-lbl: #c8d4ee; --rb-lbl2: #c8b686;
   --rb-tile: #dcdace; --rb-tile-hi: #f4f2e6; --rb-tile-tx: #15191d; --rb-tile-id: #3d4247;
   --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
   --rb-box: #f1f0ea; --rb-grey: #595959; --rb-grey-line: #8a8a8a; --rb-name: var(--yellow); --rb-pref: #ff5245;
+  --rb-flow: #7a1414; --rb-flow-line: #ff5245;
   --rb-btn-on: #ecebe2; --rb-btn-off: #7b7b74; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
   container-type: size; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 3px;
   padding: 3px 6px 5px; overflow: hidden; background: #000; font-family: var(--sans); font-weight: 400; }
@@ -79,9 +80,14 @@
 .rb-ctrg path { stroke: var(--rb-ctr); stroke-width: 1.2; }
 .rb-tmag.nb path, .rb-ctrg.nb path { stroke-width: 1; }
 .rb-fisg path { stroke: var(--rb-line); stroke-width: 1; stroke-dasharray: 2 3; }
+/* czerwone tło (0.13.0, Marek): sektor ACC albo TMA z ograniczeniem przepływu teraz lub zajętością ponad 80 %
+   dopuszczalnej – pełne wypełnienie z jasnoczerwoną granicą, pod obrysami TMA/CTR i etykietami; w dymku powód */
+.rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
+.rb-flow path.fb { stroke: none; fill-rule: nonzero; }
+.rb-flow path:hover { fill: #8e1a1a; }
+/* linia od odsuniętej etykiety ACC albo FIS do jej punktu, kropka FIS; plakietki APP i TWR bez linii i bez kropki */
+.rb-marks { pointer-events: none; }
 .rb-marks .rb-lead { stroke: #9a9a9a; stroke-width: 1; }
-.rb-dot { fill: var(--rb-lbl); }
-.rb-dot.twr { fill: none; stroke: var(--rb-ad); stroke-width: 1.1; }
 .rb-dot.fis { fill: var(--rb-lbl2); }
 
 /* --- etykiety (sektory, APP, TWR, FIS) i pola stosów jak na zdjęciu PANDORY: jasne pole, małe ID w prawym górnym
@@ -106,18 +112,15 @@
 /* skrócona etykieta (brak miejsca przy punkcie, bez nikogo): ID i częstotliwość w jednej linii albo samo ID */
 .rb-lbl.cmp { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 3px; }
 .rb-lbl.cmp .rb-id { font-size: max(9px, calc(var(--rb-f) - 2px)); }
-/* wieża offline, którą przejmuje inne stanowisko (np. APP): częstotliwość przejmującego, ↑APP, kto – w dymku */
-.rb-lbl.cov { background: #b9b7aa; border: 1px dashed #15191d; }
-.rb-lbl.cov .rb-id { color: var(--rb-tile-id); }
 .rb-lbl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 /* rodzaj etykiety: pasek z lewej w kolorach pliku sektora (TMA szary, CTR czerwony; FIS oliwkowy), rozjaśnionych na polu */
 .rb-lbl.app { border-left: 3px solid #7c8a99; }
 .rb-lbl.twr { border-left: 3px solid #a04656; cursor: pointer; }
 .rb-lbl.fis { border-left: 3px solid #a3a62a; }
-/* linia ATIS (TWR/ATIS) tylko z ATIS online: czytelna także przy wieży offline albo przejmowanej */
+/* linia ATIS (TWR/A) tylko z ATIS online: czytelna także na plakietce z samym ATIS (wieża offline) */
 .rb-lbl .rb-atl .rb-by { color: #1f4f86; }
 .rb-lbl.off .rb-atl .rb-by, .rb-lbl.off .rb-atl .rb-fq { color: var(--rb-atis); }
-.rb-lbl .rb-atl .rb-code { font-size: max(8px, calc(var(--rb-f) - 4px)); }
+.rb-lbl .rb-atl .rb-code, .rb-lbl.cmp .rb-code { margin-left: 0; font-size: max(8px, calc(var(--rb-f) - 4px)); }
 .rb-lbl:hover { outline: 1px solid #fff; }
 
 /* --- okienka FIR-ów sąsiednich wg szkicu i zdjęcia PANDORY: w okienku ID i granice jak na szkicu ("OSE2 660-365"),
@@ -192,7 +195,7 @@
 .rb-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .rb-sw { display: inline-block; width: 11px; height: 9px; border: 1px solid var(--rb-line); background: var(--rb-unst); }
 .rb-sw.on { border-color: var(--rb-act); background: var(--rb-st); }
-.rb-sw.cov { border: 1px dashed #c4c4ba; background: #b9b7aa; }
+.rb-sw.flow { border-color: var(--rb-flow-line); background: var(--rb-flow); }
 .rb-ln-sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--rb-line); }
 .rb-ln-sw.ctr { border-color: var(--rb-ctr); }
 
@@ -243,6 +246,8 @@
 .rb-loa li { margin: 0 0 3px; }
 .rb-loa li::marker { color: var(--green-text); }
 
-/* --- dymek (jeden, przy kursorze) */
-.rb-tip { position: fixed; z-index: 3000; max-width: 480px; padding: 5px 8px; background: #0d110d; border: 1px solid var(--green);
-  border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans); white-space: pre-wrap; pointer-events: none; }
+/* --- dymek (jeden, przy kursorze; 0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
+   maleje przy krawędzi okna (radio.js tipPos odwraca go na drugą stronę kursora, 12 px od brzegu), wysokość z treści */
+.rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px); padding: 5px 8px;
+  background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
+  white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }

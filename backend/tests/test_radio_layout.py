@@ -432,9 +432,9 @@ def test_flow_alerts_pure():
                                                                              "TMA Poznań S"}
     hb = {a["tv"]: a for a in out["sectors"]["HB"]}
     assert set(hb) == {"EP-BH", "EP-XYZ"}
-    assert hb["EP-BH"]["tip"] == ["Flow restriction: max 30 entries per hour, 2300–2359"] and not hb["EP-BH"]["busy"]
+    assert hb["EP-BH"]["tip"] == ["Flow restriction: max 30 entries per hour until 23:59"] and not hb["EP-BH"]["busy"]
     assert hb["EP-XYZ"]["tip"] == ["EP-XYZ: Occupancy 9 of 10"]
-    assert out["sectors"]["HC"][0]["tip"][0] == "Flow restriction: max occupancy 20, 2200–0200"
+    assert out["sectors"]["HC"][0]["tip"][0] == "Flow restriction: max occupancy 20 until 02:00"
     lb = out["sectors"]["LB"][0]
     assert (lb["busy"], lb["occupancy"], lb["capacity"], lb["tip"]) == (True, 12, 14, ["Occupancy 12 of 14"])
     assert out["tma"]["TMA Warszawa"][0]["tv"] == "EP-WATMAD"
@@ -451,6 +451,17 @@ def test_flow_board(client):
     assert d["flow"]["sectors"]["HB"][0]["tip"] == ["Occupancy 12 of 14"]
     assert set(d["flow"]["tma"]) == {"TMA Warszawa"}
     assert get(client)["flow"] == {"ok": True, "sectors": {}, "tma": {}}
+
+
+def test_flow_tma_shapes_keyed(client):
+    """Czerwone tło TMA na podglądzie LOW (0.13.0): kształty TMA w geo mają klucz TMA jak tma[].tma i flow.tma;
+    wspólne części kilku TMA bez własnego kształtu – bez klucza (tylko obrys)."""
+    d = client.get("/api/radio/board?geo=1").json()
+    keys = {t["tma"] for t in d["geo"]["tma"]}
+    assert {g["tma"] for g in d["tma"]} <= keys and None in keys
+    assert all(set(t) == {"name", "geometry", "tma"} for t in d["geo"]["tma"])
+    wa = [t["name"] for t in d["geo"]["tma"] if t["tma"] == "TMA Warszawa"]
+    assert wa and all(n.startswith("EPWA_") for n in wa)
 
 
 def test_flow_viff_failure_safe(client):
