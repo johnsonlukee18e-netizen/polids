@@ -119,6 +119,36 @@ def test_split_name(name, cid, expected):
     assert flightplan.split_name(name, cid) == expected
 
 
+KNOWN = {"EPKK", "EPWA", "EPGD", "EGLL", "KANE"}
+
+
+@pytest.mark.parametrize("name, cid, expected", [
+    ("Jan Kowalski EPKK", 1, ("Jan", "Kowalski")),
+    ("John KING", 1, ("John", "KING")),                 # KING nie jest lotniskiem: nazwisko zostaje
+    ("Jean ROUX", 1, ("Jean", "ROUX")),
+    ("Anna Maria ROSS", 1, ("Anna", "Maria ROSS")),
+    ("Adam ROSS EGLL", 1, ("Adam", "ROSS")),
+    ("Jan Kowalski [EPKK]", 1, ("Jan", "Kowalski")),
+    ("Jan Kowalski -EPKK", 1, ("Jan", "Kowalski")),
+    ("Jan Kowalski EPKK.", 1, ("Jan", "Kowalski")),
+    ("Nowak Jan EPKK/EPWA", 1, ("Nowak", "Jan")),
+    ("jan kowalski epkk", 1, ("jan", "kowalski")),      # znane lotnisko także małymi literami
+    ("JAN NOWA", 1, ("JAN", "NOWA")),
+    ("JAN KOWALSKI EPKK", 1, ("JAN", "KOWALSKI")),
+    ("1234567 EPKK", 1234567, (None, None)),            # sam CID z lotniskiem macierzystym
+    ("1234567 (EPKK)", 1, (None, None)),
+    ("Kowalski, Jan", 1, ("Kowalski", "Jan")),          # bez przecinka w imieniu
+    ("Jan EPWA", 1, ("Jan", None)),
+])
+def test_split_name_known_aerodromes(name, cid, expected):
+    """Router podaje known(kod) z bazy punktów AD: odpada tylko końcówka, która jest lotniskiem."""
+    assert flightplan.split_name(name, cid, KNOWN.__contains__) == expected
+    # find_flight_plan przekazuje known do split_name
+    f = feed([PILOT | {"name": name, "cid": cid}])
+    d = flightplan.find_flight_plan(f, "LOT3827", KNOWN.__contains__)
+    assert (d["first_name"], d["last_name"]) == expected
+
+
 def test_rating_fallback():
     assert flightplan.rating(3) == {"id": 3, "short": "IR", "long": "Instrument Rating"}
     assert flightplan.rating(0, {"pilot_ratings": []})["short"] == "NEW"
@@ -140,15 +170,18 @@ def test_parse_member_hours():
 
 @pytest.fixture
 def members(monkeypatch):
-    """Prawdziwy fetch_text (z cache) z podstawionym serwerem: stan["mode"] = "ok" | 404 | 500 | "slow" | "text"."""
+    """Prawdziwy fetch_text (z cache) z podstawionym serwerem: stan["mode"] = "ok" | 404 | 500 | "slow" | "text"
+    | "timeout" (po `delay` s brak odpowiedzi)."""
     state = {"mode": "ok", "calls": [], "delay": 0.4}
     real = httpx.AsyncClient
 
     async def handler(request):
         state["calls"].append(request.url.path)
         mode = state["mode"]
-        if mode == "slow":
+        if mode in ("slow", "timeout"):
             await asyncio.sleep(state["delay"])
+        if mode == "timeout":
+            raise httpx.ReadTimeout("timeout", request=request)
         if isinstance(mode, int):
             return httpx.Response(mode, text="error", request=request)
         if mode == "text":
@@ -207,14 +240,42 @@ def test_member_hours_bounded_wait(members):
     assert len(members["calls"]) == 1 and 1234567 not in flightplan._miss
 
 
-def test_member_hours_stale_on_error(members):
-    """Po TTL i awarii API: starsze godziny z cache zamiast błędu (fetch_text), bez przerwy po błędzie."""
-    assert asyncio.run(flightplan.member_hours(1234567)) == {"pilot": 812.4, "atc": 50.2}
+def _age_cache():
     for key, (t0, text) in list(http_cache._cache.items()):
         http_cache._cache[key] = (t0 - flightplan.HOURS_TTL_S - 60, text)
+
+
+def test_member_hours_stale_on_error(members):
+    """Po TTL i awarii API: starsze godziny z cache zamiast błędu (fetch_text), potem krótka przerwa, w której
+    godziny nadal są (z cache), a API nie jest pytane przy każdym wyszukaniu."""
+    assert asyncio.run(flightplan.member_hours(1234567)) == {"pilot": 812.4, "atc": 50.2}
+    _age_cache()
     members["mode"] = 503
     assert asyncio.run(flightplan.member_hours(1234567)) == {"pilot": 812.4, "atc": 50.2}
-    assert len(members["calls"]) == 2 and not flightplan._miss
+    assert len(members["calls"]) == 2
+    until = flightplan._miss[1234567] - time.monotonic()
+    assert flightplan.HOURS_FAIL_S - 5 < until <= flightplan.HOURS_FAIL_S
+    assert asyncio.run(flightplan.member_hours(1234567)) == {"pilot": 812.4, "atc": 50.2}   # w przerwie z cache
+    assert len(members["calls"]) == 2
+
+
+def test_member_hours_stale_slow_failure(members):
+    """Po TTL API odpowiada wolniej niż `wait` i w końcu nie odpowiada: od razu starsze godziny z cache (nie
+    "brak godzin"), a po nieudanym zapytaniu w tle przerwa, więc kolejne wyszukania nie pytają API."""
+    assert asyncio.run(flightplan.member_hours(1234567)) == {"pilot": 812.4, "atc": 50.2}
+    _age_cache()
+    members["mode"], members["delay"] = "timeout", 0.3
+
+    async def run():
+        first = await flightplan.member_hours(1234567, wait=0.05)
+        pending = flightplan.hours_pending(1234567)
+        await asyncio.sleep(members["delay"] + 0.2)
+        later = [await flightplan.member_hours(1234567, wait=0.05) for _ in range(3)]
+        return first, pending, later
+    first, pending, later = asyncio.run(run())
+    assert first == {"pilot": 812.4, "atc": 50.2} and pending
+    assert later == [{"pilot": 812.4, "atc": 50.2}] * 3
+    assert len(members["calls"]) == 2 and 1234567 in flightplan._miss       # jedno zapytanie po TTL, potem przerwa
 
 
 # --- endpoint
@@ -231,7 +292,7 @@ SOURCES = re.compile(r"vatsim|vIFF|api\.|https?:|member|stats|source", re.I)
 def test_endpoint(client, monkeypatch):
     async def fake_feed():
         return feed([PILOT, PILOT | {"callsign": "SPKAT", "flight_plan": None, "cid": 99}],
-                    [prefile("LOT45", "2026-10-28T10:00:00Z")])
+                    [prefile("LOT45", "2026-10-28T10:00:00Z"), prefile("SPKING", "2026-10-28T10:00:00Z", name="John KING")])
     asked = []
 
     async def fake_hours(cid, wait=None):
@@ -249,12 +310,16 @@ def test_endpoint(client, monkeypatch):
     assert not SOURCES.search(d["hours_error"])
     d = client.get("/api/vatsim/flightplan/SPKAT").json()
     assert d["flight_plan"] is None and d["status"] == "online"
+    assert (d["first_name"], d["last_name"]) == ("Jan", "Kowalski")      # EPKK z bazy lotnisk odpada
     assert asked == [1234567, 7654321, 99]                     # jedno zapytanie o godziny na jedno wyszukanie
+    d = client.get("/api/vatsim/flightplan/SPKING").json()
+    assert (d["first_name"], d["last_name"]) == ("John", "KING")         # KING to nie lotnisko
+    asked.pop()
     r = client.get("/api/vatsim/flightplan/XYZ123")
     assert r.status_code == 404 and r.json()["detail"] == "No flight plan for XYZ123"
     for bad in ("A", "LOT-1", "LOT_1", "ABCDEFGHIJKLM", "%C5%81OT1"):
         r = client.get(f"/api/vatsim/flightplan/{bad}")
-        assert r.status_code == 400 and r.json()["detail"] == "Callsign = 2–12 letters and digits", bad
+        assert r.status_code == 400 and r.json()["detail"] == "Callsign must be 2–12 letters or digits", bad
     assert len(asked) == 3
 
 
@@ -269,7 +334,7 @@ def test_endpoint_feed_down(client, monkeypatch):
 
 
 def test_endpoint_slow_member_api(client, monkeypatch, members):
-    """Wolne API członków nie opóźnia planu lotu: hours null i krótki komunikat, plan jest."""
+    """Wolne API członków nie opóźnia planu lotu: hours null, hours_pending bez komunikatu o błędzie, plan jest."""
     async def fake_feed():
         return feed([PILOT])
 
@@ -281,8 +346,9 @@ def test_endpoint_slow_member_api(client, monkeypatch, members):
     took = time.monotonic() - t0
     assert r.status_code == 200 and took < 0.45
     d = r.json()
-    assert d["hours"] is None and d["hours_error"] == "Hours unavailable" and d["flight_plan"]["route"] == "OLILA L621 RILAB"
-    assert d["hours_pending"] is True                           # zapytanie trwa: FLIGHT PLAN zapyta wcześniej
+    assert d["hours"] is None and d["flight_plan"]["route"] == "OLILA L621 RILAB"
+    # zapytanie trwa: FLIGHT PLAN zapyta wcześniej; bez "Hours unavailable", godziny są dopiero w drodze
+    assert d["hours_pending"] is True and d["hours_error"] is None
     time.sleep(0.7)                                             # zapytanie kończy się w tle (pętla TestClient)
     d = client.get("/api/vatsim/flightplan/LOT3827").json()
     assert d["hours"] == {"pilot": 812.4, "atc": 50.2} and d["hours_error"] is None and d["hours_pending"] is False

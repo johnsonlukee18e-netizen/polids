@@ -18,13 +18,15 @@ from datetime import datetime, timezone
 import httpx
 
 from ..config import settings
-from .http_cache import UpstreamError, describe, fetch_text, forget
+from .http_cache import UpstreamError, describe, fetch_text, forget, peek
 from .vatsim import assigned_squawk, fp_wake, parse_time
 
 log = logging.getLogger("polids.flightplan")
 
 # komunikat w interfejsie, gdy godzin nie ma (bez nazwy źródła; szczegóły błędu tylko w logu)
 HOURS_DOWN = "Hours unavailable"
+# zły znak w adresie (ten sam tekst co w polu FLIGHT PLAN)
+CALLSIGN_BAD = "Callsign must be 2–12 letters or digits"
 HOURS_TTL_S = 12 * 3600
 HOURS_WAIT_S = 1.5
 HOURS_MISS_S = 3600     # 404 albo odpowiedź bez godzin: członek bez statystyk
@@ -36,8 +38,10 @@ PILOT_RATINGS = {0: ("NEW", "Basic Member"), 1: ("PPL", "Private Pilot License")
                  31: ("FI", "Flight Instructor"), 63: ("FE", "Flight Examiner")}
 
 _EPOCH = datetime.min.replace(tzinfo=timezone.utc)
-# końcówka nazwy jak kod ICAO lotniska macierzystego ("Jan Kowalski EPKK", "Jan Kowalski (EPKK)")
-_HOME_BASE = re.compile(r"\(?[A-Z]{4}\)?")
+# końcówka nazwy jak kod ICAO lotniska macierzystego ("Jan Kowalski EPKK", "Jan Kowalski (EPKK)", "[EPKK]",
+# "-EPKK", "EPKK.", "EPKK/EPWA"): kody bez nawiasów i znaków przestankowych wokół
+_CODE = re.compile(r"[A-Za-z]{4}")
+_WRAP = "()[]{}<>-–|,.;:"
 _PUNCT = re.compile(r"[-–|/,.]+")
 
 
@@ -47,23 +51,42 @@ def _s(value) -> str | None:
     return s or None
 
 
-def split_name(name, cid=None) -> tuple[str | None, str | None]:
+def _home_base(word: str, known) -> list[str] | None:
+    """Kody lotnisk z ostatniego słowa nazwy ("(EPKK)" → ["EPKK"], "EPKK/EPWA" → ["EPKK", "EPWA"]) albo None.
+    known(kod) → czy to lotnisko (baza punktów AD); bez known każde 4 wielkie litery (bez bazy, np. testy)."""
+    core = word.strip(_WRAP)
+    codes = core.split("/") if core else []
+    if not codes or not all(_CODE.fullmatch(c) for c in codes):
+        return None
+    if known is None:
+        return codes if all(c.isupper() for c in codes) else None
+    return codes if all(known(c.upper()) for c in codes) else None
+
+
+def split_name(name, cid=None, known=None) -> tuple[str | None, str | None]:
     """Imię i nazwisko z nazwy pilota w sieci (heurystyka: to nazwa wyświetlana, nie dane weryfikowane).
 
-    Pusta nazwa, same cyfry albo CID (członek ukrywa nazwisko) → (None, None). Jedna końcowa część jak kod ICAO
-    lotniska macierzystego ("EPKK") jest odrzucana, jeśli zostaje więcej niż jedno słowo albo nazwa ma małe litery
-    (w "JAN NOWA" NOWA to raczej nazwisko). Imię = pierwsze słowo, nazwisko = reszta ("Anna Maria Nowak" →
-    "Anna" / "Maria Nowak", "Jan van der Berg" → "Jan" / "van der Berg")."""
+    Najpierw odpada jedna końcowa część jak kod ICAO lotniska macierzystego ("EPKK", "(EPKK)", "[EPKK]", "-EPKK"),
+    jeśli to znane lotnisko (known(kod), router pyta bazę punktów AD; bez known: 4 wielkie litery) i zostaje więcej
+    niż jedno słowo, nazwa ma małe litery, kod jest w nawiasach albo reszta to sam CID (w "JAN NOWA" NOWA to raczej
+    nazwisko, w "John KING" KING nie jest lotniskiem). Potem: pusta nazwa, same cyfry albo CID (członek ukrywa
+    nazwisko) → (None, None). Imię = pierwsze słowo (bez przecinka z "Kowalski, Jan"), nazwisko = reszta
+    ("Anna Maria Nowak" → "Anna" / "Maria Nowak", "Jan van der Berg" → "Jan" / "van der Berg")."""
     s = " ".join(str(name or "").split())
+    words = s.split(" ") if s else []
+    if len(words) > 1 and _home_base(words[-1], known):
+        rest = words[:-1]
+        while len(rest) > 1 and _PUNCT.fullmatch(rest[-1]):   # "Jan Kowalski - EPKK"
+            rest = rest[:-1]
+        text = " ".join(rest)
+        marked = words[-1].strip(_WRAP) != words[-1]
+        if len(rest) > 1 or text != text.upper() or marked or text.isdigit():
+            words = rest
+    s = " ".join(words)
     if not s or s.replace(" ", "").isdigit() or (cid is not None and s == str(cid)):
         return None, None
-    words = s.split(" ")
-    if len(words) > 1 and _HOME_BASE.fullmatch(words[-1]) and (len(words) > 2 or s != s.upper()):
-        words = words[:-1]
-        while len(words) > 1 and _PUNCT.fullmatch(words[-1]):   # "Jan Kowalski - EPKK"
-            words = words[:-1]
-    first, last = words[0], " ".join(words[1:])
-    return first, last or None
+    first, last = words[0].rstrip(","), " ".join(words[1:])
+    return first or None, last or None
 
 
 def rating(value, feed: dict | None = None) -> dict | None:
@@ -99,10 +122,10 @@ def _same(p, cs: str) -> bool:
     return isinstance(p, dict) and str(p.get("callsign") or "").strip().upper() == cs
 
 
-def find_flight_plan(feed: dict, callsign: str) -> dict | None:
+def find_flight_plan(feed: dict, callsign: str, known=None) -> dict | None:
     """Plan lotu po znaku (dokładnie, bez względu na wielkość liter): najpierw pilot online, potem prefile
     (kilka prefile z tym samym znakiem: najnowszy last_updated). None = nie ma ani pilota, ani prefile.
-    Pilot online bez planu: flight_plan = None. Godziny (hours) dokłada router."""
+    Pilot online bez planu: flight_plan = None. Godziny (hours) dokłada router. known: jak w split_name."""
     cs = str(callsign or "").strip().upper()
     if not cs:
         return None
@@ -114,7 +137,7 @@ def find_flight_plan(feed: dict, callsign: str) -> dict | None:
         if not pre:
             return None
         status, p = "prefiled", max(pre, key=lambda x: parse_time(x.get("last_updated")) or _EPOCH)
-    first, last = split_name(p.get("name"), p.get("cid"))
+    first, last = split_name(p.get("name"), p.get("cid"), known)
     cid = p.get("cid") if isinstance(p.get("cid"), int) and not isinstance(p.get("cid"), bool) else None
     pos = None
     if status == "online":
@@ -164,27 +187,49 @@ def _not_found(exc: UpstreamError) -> bool:
 
 
 async def _load_hours(cid: int) -> dict | None:
+    url = stats_url(cid)
+    drop = False
     try:
-        hours = parse_member_hours(json.loads(await fetch_text(stats_url(cid), HOURS_TTL_S)))
-        miss = HOURS_MISS_S if hours is None else 0
+        hours = parse_member_hours(json.loads(await fetch_text(url, HOURS_TTL_S)))
+        hit = peek(url)
+        if hours is None:
+            miss, drop = HOURS_MISS_S, True
+        elif hit and hit[0] >= HOURS_TTL_S:
+            # serwer nie odpowiedział, fetch_text oddał starsze godziny: krótka przerwa (w niej godziny z cache),
+            # inaczej każde wyszukanie znowu czekałoby na niedziałające API
+            miss = HOURS_FAIL_S
+        else:
+            miss = 0
     except UpstreamError as exc:
         log.warning("member stats: %s", describe(exc))
-        hours, miss = None, HOURS_MISS_S if _not_found(exc) else HOURS_FAIL_S
+        hours, miss, drop = None, HOURS_MISS_S if _not_found(exc) else HOURS_FAIL_S, True
     except Exception as exc:  # noqa: BLE001 - odpowiedź nie-JSON albo nieoczekiwany kształt
         log.warning("member stats: %s", type(exc).__name__)
-        hours, miss = None, HOURS_FAIL_S
+        hours, miss, drop = None, HOURS_FAIL_S, True
     if miss:
         _miss[cid] = time.monotonic() + miss
-        forget(stats_url(cid))   # po przerwie pytamy serwer, nie cache z nieczytelną odpowiedzią
     else:
         _miss.pop(cid, None)
+    if drop:
+        forget(url)   # po przerwie pytamy serwer, nie cache z nieczytelną odpowiedzią
     return hours
 
 
+def _cached_hours(cid: int) -> dict | None:
+    """Godziny z ostatniej odpowiedzi w cache, także starszej niż HOURS_TTL_S (None = brak albo nieczytelna)."""
+    hit = peek(stats_url(cid))
+    if not hit:
+        return None
+    try:
+        return parse_member_hours(json.loads(hit[1]))
+    except ValueError:
+        return None
+
+
 async def member_hours(cid, wait: float | None = None) -> dict | None:
-    """Godziny członka albo None (brak statystyk, błąd, przerwa po błędzie albo brak odpowiedzi w `wait` s,
+    """Godziny członka albo None (brak statystyk, błąd bez starszych danych albo brak odpowiedzi w `wait` s,
     domyślnie HOURS_WAIT_S). Zapytanie, które nie zdążyło, kończy się w tle i trafia do cache: następne
-    odświeżenie pokaże godziny."""
+    odświeżenie pokaże godziny. W przerwie po błędzie i gdy odpowiedź nie zdążyła: starsze godziny z cache."""
     if isinstance(cid, bool):
         return None
     try:
@@ -197,13 +242,13 @@ async def member_hours(cid, wait: float | None = None) -> dict | None:
     for k in [k for k, until in _miss.items() if until <= now]:
         del _miss[k]
     if cid in _miss:
-        return None
+        return _cached_hours(cid)
     task = _tasks.get(cid)
     if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
         task = _tasks[cid] = asyncio.ensure_future(_load_hours(cid))
         task.add_done_callback(lambda t, c=cid: _tasks.pop(c) if _tasks.get(c) is t else None)
     done, _pending = await asyncio.wait({task}, timeout=HOURS_WAIT_S if wait is None else wait)
-    return task.result() if done else None
+    return task.result() if done else _cached_hours(cid)
 
 
 def hours_pending(cid) -> bool:

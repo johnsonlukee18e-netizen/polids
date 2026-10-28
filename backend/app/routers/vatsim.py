@@ -13,7 +13,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.eptraffic import ep_traffic
-from ..services.flightplan import HOURS_DOWN, find_flight_plan, hours_pending, member_hours
+from ..services.flightplan import CALLSIGN_BAD, HOURS_DOWN, find_flight_plan, hours_pending, member_hours
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import online_stations
@@ -175,21 +175,34 @@ async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db:
     return out
 
 
+def _aerodromes(db: Session):
+    """known(kod) dla split_name: lotnisko z bazy punktów AD (cały świat) albo z tabeli lotnisk (EP)."""
+    seen: dict[str, bool] = {}
+
+    def known(code: str) -> bool:
+        if code not in seen:
+            seen[code] = db.execute(select(NavPoint.id).where(NavPoint.kind == "AD", NavPoint.ident == code).limit(1)) \
+                .first() is not None or db.get(Aerodrome, code) is not None
+        return seen[code]
+    return known
+
+
 @router.get("/flightplan/{callsign}")
-async def flight_plan(callsign: str):
+async def flight_plan(callsign: str, db: Session = Depends(get_db)):
     """OTHER › FLIGHT PLAN: plan lotu po znaku (pilot online, potem najnowszy prefile) z imieniem i nazwiskiem
     z nazwy w sieci, PID (= CID), ratingiem i godzinami pilota i ATC (services/flightplan.py). Pilot online bez planu:
-    flight_plan = null. Godziny nie opóźniają planu: bez odpowiedzi w HOURS_WAIT_S hours = null i hours_error,
-    a hours_pending = true, gdy zapytanie jeszcze trwa (kończy się w tle; FLIGHT PLAN pyta wtedy ponownie po chwili)."""
+    flight_plan = null. Godziny nie opóźniają planu: bez odpowiedzi w HOURS_WAIT_S hours = null i hours_pending = true,
+    gdy zapytanie jeszcze trwa (kończy się w tle; FLIGHT PLAN pyta wtedy ponownie po chwili), a hours_error tylko
+    wtedy, gdy godzin nie ma i nic już nie trwa. Końcówka nazwy jak kod lotniska odpada tylko dla znanego lotniska."""
     if not re.fullmatch(r"[A-Za-z0-9]{2,12}", callsign):
-        raise HTTPException(400, "Callsign = 2–12 letters and digits")
+        raise HTTPException(400, CALLSIGN_BAD)
     cs = callsign.upper()
-    found = find_flight_plan(await _feed(), cs)
+    found = find_flight_plan(await _feed(), cs, _aerodromes(db))
     if found is None:
         raise HTTPException(404, f"No flight plan for {cs}")
     hours = await member_hours(found["pid"]) if found["pid"] else None
-    return found | {"hours": hours, "hours_error": None if hours else HOURS_DOWN,
-                    "hours_pending": not hours and bool(found["pid"]) and hours_pending(found["pid"])}
+    pending = not hours and bool(found["pid"]) and hours_pending(found["pid"])
+    return found | {"hours": hours, "hours_error": None if hours or pending else HOURS_DOWN, "hours_pending": pending}
 
 
 @router.get("/pilots/{callsign}/route")
