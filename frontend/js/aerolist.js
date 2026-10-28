@@ -274,7 +274,7 @@ Enter = SHOW (exact ICAO, otherwise the highlighted match: the main aerodrome of
       <b>${esc(a.icao)}</b><span class="alist-nm">${esc(a.name || "–")}</span>${a.kind ? `<i class="alist-kind">${esc(a.kind)}</i>` : ""}<span class="alist-atc"></span></div>`).join("");
     // kolumna nazw na najdłuższą nazwę tej listy (zmierzoną w czcionce wiersza): MIL i plakietki stanowisk równo pod sobą
     const nm = rows.querySelector(".alist-nm");
-    if (nm) rows.style.setProperty("--nmw", `${Math.max(textWidth(["00000000"], nm), textWidth(d.map((a) => a.name || "–"), nm)) + 2}px`);
+    if (nm) rows.style.setProperty("--nmw", `${Math.max(textWidth(["00000000"], nm), textWidth(d.map((a) => a.name || "\u2013"), nm)) + 2}px`);
     items = d.map((a, i) => ({ i, icao: a.icao, name: a.name, rank: a.rank ?? 2, keys: searchKeys(a.name, a.alias), el: rows.children[i] }));
     byIcao = new Map(items.map((it) => [it.icao, it]));
     filter();

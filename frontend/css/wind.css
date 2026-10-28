@@ -1,14 +1,14 @@
 /* wind: styl dodany w rundzie 8. AERODROME › INFO: karta wiatru 0 / 3000 ft na podejściu oraz kolory pasów ARR / DEP
-   jak na paskach postępu lotu (strips.css: odlot niebieski, przylot żółty) w różnych miejscach AERODROME i w AWALON.
+   (odlot niebieski, przylot żółty, jak próbki .lg pasków lotów w style.css) w różnych miejscach AERODROME i w AWALON.
    0.13.0 (issue #23): METEO › WIND to sam Windy, panel wiatru pasów przeniesiony do AWALON (awalon.css); karta
    .wnd-card i uwaga .wnd-note zostają dla METEO › SUN. Bez poświaty i bez pogrubień. */
 :root {
-  --rw-arr: #ffd84a;      /* .sx-bar b.arr, pasek przylotu */
-  --rw-dep: #6db8ff;      /* .sx-bar b.dep, pasek odlotu */
+  --rw-arr: #ffd84a;      /* pas do lądowania (ARR): numer pasa, plakietka */
+  --rw-dep: #6db8ff;      /* pas do startu (DEP) */
   --rw-arr-bg: #262006;
   --rw-dep-bg: #0b1c2e;
-  --rw-arr-line: #e8b800; /* .sx-bay.arr */
-  --rw-dep-line: #3d8fe0; /* .sx-bay.dep */
+  --rw-arr-line: #e8b800; /* pasek z lewej wiersza ARR */
+  --rw-dep-line: #3d8fe0; /* pasek z lewej wiersza DEP */
 }
 
 /* --- karta i uwaga (METEO › SUN) --- */
@@ -103,10 +103,6 @@ table.data.rwy-table tr.inuse.arr.dep td.rwy { color: var(--rw-arr); box-shadow:
 .aw-col[data-k="arr"] .aw-dial .rl.sel rect { stroke: var(--rw-arr); }
 .aw-col[data-k="dep"] .aw-dial .rl.sel text { fill: var(--rw-dep); }
 .aw-col[data-k="arr"] .aw-dial .rl.sel text { fill: var(--rw-arr); }
-
-/* RUCH: opisy DEP / ARR na pasku informacji w kolorze pasków (same numery pasów koloruje strips.css) */
-.sx-bar .kv:has(> b.dep) > i { color: var(--rw-dep); }
-.sx-bar .kv:has(> b.arr) > i { color: var(--rw-arr); }
 
 /* pas do lądowania i (sugerowany) do startu jednocześnie: tło jak ARR, pasek obu kolorów */
 .apw-tab tr.arr.dep td, table.data.rwy-table tr.inuse.arr.dep td { background: var(--rw-arr-bg) !important; }

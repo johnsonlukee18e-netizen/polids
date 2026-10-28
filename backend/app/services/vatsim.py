@@ -230,7 +230,7 @@ def pilot_info(p: dict) -> dict:
             # paski postępu lotu (AERODROME › RUCH)
             "deptime": fp.get("deptime"), "aircraft_icao": fp.get("aircraft"), "wake": fp_wake(fp.get("aircraft")),
             "assigned_squawk": assigned_squawk(fp), "remarks": fp.get("remarks"),
-            # okno lotu w STRIP (Extended Label SDD): lotnisko zapasowe
+            # lotnisko zapasowe (dawne okno lotu STRIP; zostaje w danych paska)
             "alternate": fp.get("alternate") or None}
 
 

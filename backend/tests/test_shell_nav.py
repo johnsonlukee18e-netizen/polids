@@ -137,6 +137,9 @@ def test_strip_removed():
         src = path.read_text("utf-8")
         assert not re.search(r"""navigate\(\s*["']strip["']|href=["']#strip|tabs/strip\.js|strips\.js|mountStrips\(|"""
                              r"""open\(\s*["']strip["']|data-open=["']strip""", src), path.name
+    # bez martwych reguł pasków (.sx-bar, .sx-bay ze strips.js) w pozostałych arkuszach
+    for path in (FRONTEND / "css").glob("*.css"):
+        assert not re.search(r"\.sx-(bar|bay)\b", path.read_text("utf-8")), path.name
     css = (FRONTEND / "css" / "style.css").read_text("utf-8")
     for rule in (".lg.dep {", ".lg.arr {", ".lg.loc {", ".lg.plan {", ".aero-col > .card.aero-ruch {", ".aero-ruch .ruch-line {"):
         assert rule in css, rule

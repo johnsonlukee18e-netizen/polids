@@ -325,7 +325,7 @@ def test_strips_dman_not_slower_when_viff_down(client, monkeypatch):
 
 def test_strips_dman_without_offline_flights(client, monkeypatch):
     """RUCH (DMAN/AMAN, ?dman=1) bez lotów OFFLINE: planowany odlot znany tylko z vIFF (pilot niepołączony, bez planu
-    w sieci VATSIM) zostaje w STRIP (zwykłe /strips), prefile (plan złożony w sieci) RUCH pokazuje dalej."""
+    w sieci VATSIM) zostaje tylko w zwykłym /strips (bez ?dman=1), prefile (plan złożony w sieci) RUCH pokazuje dalej."""
     async def feed():
         return {**FEED, "prefiles": [{"callsign": "PRE1", "name": "Jan", "cid": 1, "flight_plan": {
             "aircraft_short": "B738", "departure": "EPWA", "arrival": "EGLL", "deptime": "1300", "altitude": "36000",

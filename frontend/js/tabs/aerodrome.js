@@ -183,7 +183,7 @@ function runwayTable(st) {
   </tbody></table><div class="hint">TW = tailwind · ARR? / DEP? = preferred runway · hover a runway: width, surface, approaches</div>`;
 }
 
-// Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak METEO › WIND, bez mapy): METAR i model 10 m
+// Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak panel pasów w AWALON › lotnisko): METAR i model 10 m
 // (Open-Meteo) w punkcie lotniska, 3000 ft AMSL w punkcie FAF/IF z procedury albo na przedłużeniu osi (3°)
 function approachWind(aw, st, err) {
   // lotnisko bez pasów w bazie (część lądowisk z listy EPWW, np. EPGM): nie ma czego liczyć, to nie błąd
