@@ -336,9 +336,24 @@ export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "
 // od kursora, a gdy podszedłby bliżej niż TIP_GAP px do prawej krawędzi okna – na lewo od niego; pod kursorem, przy
 // dolnej krawędzi nad nim; nigdy bliżej brzegu okna niż TIP_GAP. cx, cy = kursor, w, h = rozmiar dymku (szerokość
 // stała, więc mierzona przed ustawieniem miejsca jest ta sama), vw, vh = okno. Wynik {left, top, flipX, flipY} (px)
+// Dymek wyższy niż miejsce nad i pod kursorem: dosunięty do dolnej krawędzi (12 px od niej), a gdy wyższy niż okno,
+// od góry – radio.css ogranicza wysokość dymku do okna bez dwóch odstępów, więc nic nie wychodzi poza okno
 export const TIP_GAP = 12;
 export function tipPos(cx, cy, w, h, vw, vh) {
   const flipX = cx + 14 + w > vw - TIP_GAP, flipY = cy + 16 + h > vh - TIP_GAP;
-  return { left: Math.round(Math.max(TIP_GAP, flipX ? cx - 14 - w : cx + 14)),
-    top: Math.round(Math.max(TIP_GAP, flipY ? cy - 10 - h : cy + 16)), flipX, flipY };
+  const left = flipX ? cx - 14 - w : cx + 14, top = flipY ? cy - 10 - h : cy + 16;
+  return { left: Math.round(Math.max(TIP_GAP, Math.min(left, vw - TIP_GAP - w))),
+    top: Math.round(Math.max(TIP_GAP, Math.min(top, vh - TIP_GAP - h))), flipX, flipY };
+}
+
+// Panel LOA (kliknięcie nazwy FIR-u): po tej stronie klikniętego FIR-u, gdzie jest więcej miejsca, i nie szerszy niż
+// to miejsce, żeby nazwa i okienka tego FIR-u zostały widoczne (drugie kliknięcie nazwy zamyka panel; ESAA, LKAA, LZBB
+// i UMKK stoją blisko środka strony). x0, x1 = lewa i prawa krawędź nazwy i okienek FIR-u w siatce, W = szerokość
+// siatki (px). Najwyżej LOA_MAX px i LOA_FRAC siatki, nie węższy niż LOA_MIN px (wtedy może zasłonić część FIR-u).
+// Wynik {left: panel przy lewej krawędzi siatki, width}
+export const LOA_MAX = 1120, LOA_FRAC = 0.72, LOA_MIN = 420, LOA_GAP = 8;
+export function loaPlace(x0, x1, W) {
+  const want = Math.min(LOA_MAX, W * LOA_FRAC), roomL = x0 - LOA_GAP, roomR = W - x1 - LOA_GAP;
+  const room = Math.max(roomL, roomR);
+  return { left: roomL > roomR, width: Math.round(Math.max(Math.min(want, room), Math.min(want, LOA_MIN))) };
 }

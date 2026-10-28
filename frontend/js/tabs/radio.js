@@ -20,8 +20,8 @@ import { labelPoint } from "../coverage.js";
 import { dissolve, pointIn } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
 import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, argOf, bboxOf, bboxOrDefault, buttonRows,
-  controllersOn, coverGrid, cutAt, cutBand, cutBounds, cutRange, flText, gridArea, gridTracks, labelOpts, limText, limTip, parseArg,
-  pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
+  controllersOn, coverGrid, cutAt, cutBand, cutBounds, cutRange, flText, gridArea, gridTracks, labelOpts, limText, limTip, loaPlace,
+  parseArg, pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
 
 const LS_LAYERS = "radio.layers", LS_CUT = "radio.cut";
 const REFRESH_MS = 30000;
@@ -33,6 +33,9 @@ const MAPS = [
   { key: "MID", layer: "mid", cls: "rb-midmap" },
   { key: "HIGH", layer: "high", cls: "rb-high" },
 ];
+// legenda czerwonego tła; bez danych o ograniczeniach przepływu (flow.ok false) przygaszona, z innym dymkiem
+const FLOW_TIP = "Flow alert: red area \u2013 flow restriction now or occupancy over 80 % of capacity (ACC sector on its level preview, TMA on LOW)";
+const FLOW_NA = "Flow data unavailable: red areas cannot be shown now";
 // etykiety warstw APP/TWR/FIS: krótkie ID bez rodzaju (kolor paska z lewej mówi, co to jest): WA S APP → WA S
 const shortId = (id) => String(id).replace(/ (?:APP|DEP|TWR|FIS)$/, "");
 
@@ -115,11 +118,11 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
   const pdf = pdfPath(f?.pdf);
   // tytuł LOA podaje już FIR sąsiada (LOA EPWW – EDWW (Bremen)); bez LOA: FIR i nazwa ze stosu
   const head = `<div class="rb-loa-h"><b class="rb-loa-tag">LOA</b>${f ? "" : `<span class="rb-loa-fir"><b>${esc(fir)}</b> ${esc(title)}</span>`}`
-    + (f ? `<span class="rb-loa-t" title="${esc(f.title)}">${esc(f.title)}</span>` : "")
+    + (f ? `<span class="rb-loa-t" data-rt="${esc(f.title)}">${esc(f.title)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
-    + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" title="Open the LOA in COORDINATION › DOCUMENTS (← returns to RADIO)">COORDINATION ›</button>`
-      + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" title="Open the LOA PDF">PDF ↗</a>` : "")
-    + `<button type="button" class="rb-loa-x" title="Close (Esc)">✕</button></div>`;
+    + (pdf ? `<button type="button" class="rb-loa-a" data-coord="${esc(fir)}" data-rt="Open the LOA in COORDINATION \u203a DOCUMENTS (\u2190 returns to RADIO)">COORDINATION \u203a</button>`
+      + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" data-rt="Open the LOA PDF">PDF \u2197</a>` : "")
+    + `<button type="button" class="rb-loa-x" aria-label="Close" data-rt="Close (Esc)">\u2715</button></div>`;
   if (!f) {
     return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Loading LOA…"
       : `No EPWW LOA with ${esc(fir)} in PolIDS. All LOAs: COORDINATION › DOCUMENTS.`}</p></div>`;
@@ -162,13 +165,14 @@ export function groupTip(g, title, x, extra = [], now = null) {
 // stałe miejsce w siatce (gridArea z komórek grid); x: {who(cs), pos(cs), freq(cs), net, sel} – zalogowany i opis
 // stanowiska z tablicy, false = brak danych o zalogowanych (bez ADVISORY i bez zer we wskaźnikach), FIR otwartego LOA
 const onlineLine = (o) => `${o.callsign} ${o.frequency || ""} \u2013 ${o.name || "?"}`.replace(/  +/g, " ");
-// wskaźnik u góry: żółta nazwa, pod nią szare pole z wartością (ALL+S, 2H+L, 1-0); w dymku znaczenie i liczone stanowiska
+// wskaźnik u góry: żółta nazwa, pod nią szare pole z wartością (ALL+S, 2H+L, 1-0); w dymku znaczenie i liczone stanowiska.
+// Wartość dłuższa niż pole (ACC GAT przy 4 i więcej stanowiskach ACC) od początku, z wielokropkiem na końcu (rb-indt)
 export function indicatorHtml(i, x) {
   const ps = arr(i.positions);
   const rt = [`${i.id}${i.tip ? `: ${i.tip}` : ""}`, ...(x.net === false ? ["Now: no data"] : ps.length ? ps.map(onlineLine) : ["Nobody online"])].join("\n");
   const v = x.net === false ? "\u2013" : String(i.value ?? "0");
   return `<div class="rb-ind" style="grid-area: ${gridArea({ ...i, rows: 1 })}" data-rt="${esc(rt)}">${esc(i.id)}</div>`
-    + `<div class="rb-indv" style="grid-area: ${gridArea({ ...i, row: (Number(i.row) || 1) + 1, rows: 1 })}" data-rt="${esc(rt)}">${esc(v)}</div>`;
+    + `<div class="rb-indv" style="grid-area: ${gridArea({ ...i, row: (Number(i.row) || 1) + 1, rows: 1 })}" data-rt="${esc(rt)}"><span class="rb-indt">${esc(v)}</span></div>`;
 }
 // BERLIN: konfiguracja pasów Berlina w szarym polu jak w PANDORZE; bez pasa z ATIS (preferred) czerwony napis. Bez
 // danych o zalogowanych (x.net === false) albo bez konfiguracji: kreska jak we wskaźnikach – nie wiadomo, czy jest ATIS
@@ -187,13 +191,14 @@ export function nameSide(f) {
   const c0 = Number(n.col) || 1, c1 = c0 + (Number(n.cols) || 1) - 1, below = (Number(n.row) || 1) + (Number(n.rows) || 1);
   return !arr(f?.boxes).some((b) => Number(b.row) === below && Number(b.col) <= c1 && Number(b.col) + (Number(b.cols) || 1) - 1 >= c0);
 }
-// nazwa FIR-u sąsiada (żółta; kliknięcie: LOA EPWW z tym FIR-em); cały FIR bez nikogo – pod nazwą ADVISORY 122.800
+// nazwa FIR-u sąsiada (żółta; kliknięcie: LOA EPWW z tym FIR-em); cały FIR bez nikogo – pod nazwą ADVISORY 122.800;
+// nazwa na dwie kolumny (ESAA, LKAA) na środku nad okienkami, jak na szkicu (wide)
 export function firNameHtml(f, x) {
   const on = arr(f.online);
   const rt = [`${f.fir} ${f.title || ""}`.trim(),
     ...(x.net === false ? ["Online: no data"] : on.length ? on.map((o) => `Online: ${onlineLine(o)}`) : [`Nobody online \u2013 ADVISORY ${ADVISORY_FQ}`]),
     `Click: LOA EPWW \u2013 ${f.fir}`].join("\n");
-  return `<div class="rb-fir${nameSide(f) ? " side" : ""}${x.sel === f.fir ? " sel" : ""}" role="button" tabindex="0" data-fir="${esc(f.fir)}" data-title="${esc(f.title || "")}"`
+  return `<div class="rb-fir${nameSide(f) ? " side" : ""}${Number(f.name?.cols) > 1 ? " wide" : ""}${x.sel === f.fir ? " sel" : ""}" role="button" tabindex="0" data-fir="${esc(f.fir)}" data-title="${esc(f.title || "")}"`
     + ` style="grid-area: ${gridArea(f.name)}" data-rt="${esc(rt)}"><span class="rb-firn">${esc(f.fir)}</span>`
     + `${f.advisory && x.net !== false ? `<span class="rb-unfq">ADVISORY ${ADVISORY_FQ}</span>` : ""}</div>`;
 }
@@ -286,7 +291,9 @@ export function twrPlate(p, ctr, x, twra = false) {
     + `${a.atis_code ? `<b class="rb-code">${esc(a.atis_code)}</b>` : ""}</span>` : "";
   const cover = arr(ctr?.owners);
   const now = tw ? null : cover.length ? `Tower offline \u2013 covered by ${cover.map((o) => x.who(o) || o).join(", ")}` : "Tower offline";
-  const atisLine = acs ? [`ATIS: ${x.pos(acs)}${x.on(acs) ? ` \u2013 online${x.on(acs).atis_code ? `, information ${x.on(acs).atis_code}` : ""}` : " \u2013 offline"}`] : [];
+  // ATIS online: częstotliwość z sieci (jak na plakietce), offline: z listy stanowisk
+  const ao = acs ? x.on(acs) : null;
+  const atisLine = acs ? [`ATIS: ${x.pos(acs, ao ? x.freq(acs) : "")}${ao ? ` \u2013 online${ao.atis_code ? `, information ${ao.atis_code}` : ""}` : " \u2013 offline"}`] : [];
   const rt = groupTip({ nominal, owners: arr(p.twr), topdown: null }, `${p.id} \u00b7 ${p.icao}`, x, [...atisLine, "Click: AERODROME"], now);
   return { at: p.at, kind: "twr", name: p.icao, lb: { cls: "twr", state: tw ? "on" : "off", id: x.nm(nominal), ls, extra: atl,
     code: a?.atis_code || "", icao: p.icao, k: p.icao, rt } };
@@ -371,7 +378,7 @@ export default {
         <div class="rb-btns"></div>
         <div class="rb-cells"></div>
         <div class="rb-status"></div>
-        <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes. Neighbour box: white with the frequency of the controller covering it."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. APP and TWR plates only for stations online; FIS without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour box: dark grey, ID and limits only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} under its name"><i class="rb-sw off"></i>unstaffed</span><span title="Flow alert: red area \u2013 flow restriction now or occupancy over 80 % of capacity (ACC sector on its level preview, TMA on LOW)"><i class="rb-sw flow"></i>flow alert</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
+        <div class="rb-legend"><span data-rt="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes. Neighbour box: white with the frequency of the controller covering it."><i class="rb-sw on"></i>staffed</span><span data-rt="Unstaffed airspace: light grey area. APP and TWR plates only for stations online; FIS without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour box: dark grey, ID and limits only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} under its name"><i class="rb-sw off"></i>unstaffed</span><span class="rb-lg-flow" data-rt="${esc(FLOW_TIP)}"><i class="rb-sw flow"></i>flow alert</span><span data-rt="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span data-rt="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
       </div>
       <div class="rb-tip" hidden></div>
@@ -399,23 +406,43 @@ export default {
       const o = on(cs);
       return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
     };
-    const posLine = (cs) => `${cs}${d?.pos?.[cs]?.name ? ` · ${d.pos[cs].name}` : ""} ${d?.pos?.[cs]?.frequency || ""}`.trim();
+    // opis stanowiska: znak, nazwa i częstotliwość z listy stanowisk albo podana (fq: z sieci, gdy stanowisko jest online)
+    const posLine = (cs, fq = "") => `${cs}${d?.pos?.[cs]?.name ? ` \u00b7 ${d.pos[cs].name}` : ""} ${fq || d?.pos?.[cs]?.frequency || ""}`.trim();
 
     // --- pasek ATIS: zawsze na miejscu i tej samej wysokości (jedna linia); przycisk ATIS chowa tylko treść
-    // (visibility), więc podglądy pod nim nie zmieniają rozmiaru ani przy przełączaniu, ani gdy ATIS-y się logują
+    // (visibility), więc podglądy pod nim nie zmieniają rozmiaru ani przy przełączaniu, ani gdy ATIS-y się logują.
+    // Gdy pozycje się nie mieszczą (wszystkie ATIS-y online z literami, ATIS-y dzielone): najpierw ciaśniej (tight),
+    // potem ostatnie pozycje w jednej "+N" z listą w dymku – nic nie znika bez śladu
     function renderAtis() {
-      const box = $(".rb-atis"), off = !layers.has("atis");
+      const box = $(".rb-atis"), inn = box.firstElementChild, off = !layers.has("atis");
       box.classList.toggle("off", off);
-      box.firstElementChild.setAttribute("aria-hidden", String(off));
+      inn.setAttribute("aria-hidden", String(off));
       if (!d) return;
-      box.firstElementChild.innerHTML = d.atis.map((a) => {
-        const o = on(a.callsign), fq = freqOf(a.callsign) || "—";
-        const rt = [posLine(a.callsign), o ? `Online: ${who(a.callsign)}${o.atis_code ? `\nInformation ${o.atis_code}` : ""}` : "ATIS offline",
+      const items = d.atis.map((a) => {
+        const o = on(a.callsign), fq = freqOf(a.callsign) || "\u2014", id = a.callsign.replace(/_ATIS$/, "").replace(/_/g, " ");
+        const rt = [posLine(a.callsign, o ? fq : ""), o ? `Online: ${who(a.callsign)}${o.atis_code ? `\nInformation ${o.atis_code}` : ""}` : "ATIS offline",
           ...(o?.text_atis || []).slice(0, 6), "Click: AERODROME"].join("\n");
-        return `<button type="button" class="rb-at ${o ? "on" : "off"}" data-icao="${esc(a.icao)}" data-rt="${esc(rt)}">`
-          + `<span class="rb-ati">${esc(a.callsign.replace(/_ATIS$/, "").replace(/_/g, " "))}</span><span class="rb-fq">${esc(fq)}</span>`
-          + `${o?.atis_code ? `<span class="rb-code">${esc(o.atis_code)}</span>` : ""}</button>`;
-      }).join("") || `<span class="rb-none">No ATIS positions.</span>`;
+        return { line: `${id} ${fq}${o ? (o.atis_code ? ` \u2013 information ${o.atis_code}` : " \u2013 online") : " \u2013 offline"}`,
+          html: `<button type="button" class="rb-at ${o ? "on" : "off"}" data-icao="${esc(a.icao)}" data-rt="${esc(rt)}">`
+            + `<span class="rb-ati">${esc(id)}</span><span class="rb-fq">${esc(fq)}</span>`
+            + `${o?.atis_code ? `<span class="rb-code">${esc(o.atis_code)}</span>` : ""}</button>` };
+      });
+      inn.classList.remove("tight");
+      inn.innerHTML = items.map((it) => it.html).join("") || `<span class="rb-none">No ATIS positions.</span>`;
+      const over = () => inn.scrollWidth > inn.clientWidth + 1;
+      if (!inn.clientWidth || !over()) return;
+      inn.classList.add("tight");
+      if (!over()) return;
+      const btns = [...inn.querySelectorAll(".rb-at")], more = document.createElement("span");
+      more.className = "rb-at-more";
+      inn.append(more);
+      let n = 0;
+      while (btns.length > 1 && (n === 0 || over())) {
+        btns.pop().remove();
+        n += 1;
+        more.textContent = `+${n}`;
+        more.dataset.rt = ["More ATIS:", ...items.slice(items.length - n).map((it) => it.line)].join("\n");
+      }
     }
 
     // --- siatka strony (część stała grid): szerokości kolumn, miejsca podglądów, przycisków, stanu i legendy. Tylko gdy
@@ -434,7 +461,7 @@ export default {
       if (g.status) $(".rb-status").style.gridArea = gridArea(g.status);
       if (g.legend) $(".rb-legend").style.gridArea = gridArea(g.legend);
       $(".rb-btns").innerHTML = buttonRows(g.buttons).map((r) => `<div class="rb-brow" style="grid-area: ${gridArea(r)}">`
-        + r.ids.map((id) => LAYERS.find((l) => l.id === id)).map((l) => `<button type="button" data-ly="${l.id}" title="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")
+        + r.ids.map((id) => LAYERS.find((l) => l.id === id)).map((l) => `<button type="button" data-ly="${l.id}" data-rt="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")
         + "</div>").join("");
       grid.classList.add("laid");
     }
@@ -540,7 +567,7 @@ export default {
       Object.assign(inp, { min: r.min, max: r.max, step: r.step });
       if (Number(inp.value) !== v) inp.value = v;
       inp.setAttribute("aria-valuetext", flText(v * 100));
-      inp.title = `LOW cross-section at ${flText(v * 100)}: sector shapes of the band ${flText(c.lo)}–${flText(c.hi)}`
+      inp.dataset.rt = `LOW cross-section at ${flText(v * 100)}: sector shapes of the band ${flText(c.lo)}\u2013${flText(c.hi)}`
         + `\nTicks: ACC slice limits (shapes change there); arrow keys: 500 ft steps`;
       t.querySelector(".rb-cutv").textContent = flText(v * 100);
       t.querySelector(".rb-ticks").innerHTML = b.filter((x) => x / 100 > r.min && x / 100 <= r.max)
@@ -553,14 +580,20 @@ export default {
         b.setAttribute("aria-pressed", String(layers.has(b.dataset.ly)));
       });
     }
+    // stan danych: sieć, brak granicy FIR-u, błąd strony i brak danych o ograniczeniach przepływu (wtedy legenda czerwonego
+    // tła przygaszona: brak czerwieni nie znaczy „bez ograniczeń”)
     function renderStatus() {
       const s = $(".rb-status");
       const n = d ? controllersOn(d.online) : 0;
-      const net = d?.net;
-      s.innerHTML = !d ? (err ? `<span class="error">${esc(err)}</span>` : "Loading…")
-        : `${net?.ok ? `Updated ${esc(utcHhmm(net.updated))} · ${n} on the board` : `<span class="error">${esc(net?.error || "No data")}</span>`}`
+      const net = d?.net, noFlow = !!d && d.flow?.ok === false;
+      s.innerHTML = !d ? (err ? `<span class="error">${esc(err)}</span>` : "Loading\u2026")
+        : `${net?.ok ? `Updated ${esc(utcHhmm(net.updated))} \u00b7 ${n} on the board` : `<span class="error">${esc(net?.error || "No data")}</span>`}`
+          + (noFlow ? ` <span class="error">Flow data unavailable</span>` : "")
           + (noBorder ? ` <span class="error">No FIR EPWW boundary: previews without the FIR outline.</span>` : "")
           + (err ? ` <span class="error">${esc(err)}</span>` : "");
+      const lg = $(".rb-lg-flow");
+      lg.classList.toggle("na", noFlow);
+      lg.dataset.rt = noFlow ? `${FLOW_TIP}\n${FLOW_NA}` : FLOW_TIP;
     }
     let raf = 0;
     // jeden błąd (np. dziwne dane) nie zatrzymuje reszty strony
@@ -573,6 +606,8 @@ export default {
       safe(renderAtis);
       if (d) {
         safe(renderCells);
+        // panel LOA na nowo po zmianie rozmiaru strony (okienka FIR-u przesuwają się z siatką)
+        safe(placeLoa);
         Object.values(maps).forEach((m) => safe(renderMap, m));
       }
       safe(renderStatus);
@@ -673,24 +708,30 @@ export default {
     // --- LOA: nazwa FIR-u sąsiada otwiera panel (drugie kliknięcie, ✕ albo Esc zamyka); bez kroku w historii
     const markLoa = () => el.querySelectorAll(".rb-fir[data-fir]").forEach((x) => x.classList.toggle("sel", x.dataset.fir === loaFir));
     const radioOf = (cs) => d?.pos?.[cs]?.name || "";
-    // strona strony, po której leży FIR (kolumna jego nazwy w siatce)
-    const sideOf = (fir) => {
-      const f = arr(d?.firs).find((x) => x.fir === fir);
-      return f && Number(f.name?.col) > (Number(d?.grid?.cols) || 13) / 2 ? "right" : "left";
-    };
+    // panel po tej stronie FIR-u, gdzie jest więcej miejsca, i nie szerszy niż to miejsce (loaPlace): nazwa i okienka
+    // klikniętego FIR-u zostają widoczne, a z nimi inne FIR-y tej strony (inny FIR jednym kliknięciem)
+    function placeLoa() {
+      if (!loaFir || loaBox.hidden) return;
+      const gr = $(".rb-grid").getBoundingClientRect();
+      const rs = [...el.querySelectorAll(".rb-cells [data-fir]")].filter((e) => e.dataset.fir === loaFir)
+        .map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+      if (!rs.length || !gr.width) return;
+      const p = loaPlace(Math.min(...rs.map((r) => r.left)) - gr.left, Math.max(...rs.map((r) => r.right)) - gr.left, gr.width);
+      loaBox.classList.toggle("at-left", p.left);
+      loaBox.style.width = `${p.width}px`;
+    }
     function closeLoa() {
       loaFir = null;
       loaBox.hidden = true;
       loaBox.innerHTML = "";
       markLoa();
     }
-    // panel po przeciwnej stronie niż kliknięty FIR (okienka tej strony zostają widoczne: inny FIR jednym kliknięciem)
-    async function openLoa(fir, title, side) {
+    async function openLoa(fir, title) {
       if (loaFir === fir) return closeLoa();
       loaFir = fir;
       markLoa();
-      loaBox.classList.toggle("at-left", side === "right");
       loaBox.hidden = false;
+      placeLoa();
       loaBox.innerHTML = loaHtml(fir, title, null, radioOf, { loading: true });
       let html;
       try {
@@ -706,11 +747,11 @@ export default {
     }
     el.addEventListener("click", (e) => {
       const hd = e.target.closest(".rb-fir[data-fir]");
-      if (hd) openLoa(hd.dataset.fir, hd.dataset.title || "", sideOf(hd.dataset.fir));
+      if (hd) openLoa(hd.dataset.fir, hd.dataset.title || "");
     });
     el.addEventListener("keydown", (e) => {
       const hd = e.target.closest?.(".rb-fir[data-fir]");
-      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || "", sideOf(hd.dataset.fir)); }
+      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || ""); }
       if (e.key === "Escape" && !loaBox.hidden) { e.preventDefault(); closeLoa(); }
     });
     loaBox.addEventListener("click", (e) => {
@@ -730,7 +771,7 @@ export default {
 
     // --- dymek (jeden pływający, stałej szerokości – radio.css) i podświetlenie sektora pod etykietą. Miejsce: tipPos
     // (na prawo i pod kursorem, przy prawej i dolnej krawędzi okna po drugiej stronie kursora, zawsze 12 px od brzegu);
-    // wysokość z treści, nic nie jest ucinane
+    // wysokość z treści, najwyżej okno bez dwóch odstępów (radio.css)
     let tipFor = null;
     const moveTip = (e) => {
       const { left, top } = tipPos(e.clientX, e.clientY, tip.offsetWidth, tip.offsetHeight, window.innerWidth, window.innerHeight);

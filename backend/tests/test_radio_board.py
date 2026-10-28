@@ -1045,10 +1045,11 @@ def test_js_neighbour_boxes(tmp_path):
     # wskaźnik: żółta nazwa w swojej komórce, szare pole z wartością pod nią; w dymku znaczenie i zalogowani
     ind = out["ind"]
     assert '<div class="rb-ind" style="grid-area: 1 / 3 / span 1 / span 1"' in ind and ">APP WA</div>" in ind
-    assert '<div class="rb-indv" style="grid-area: 2 / 3 / span 1 / span 1"' in ind and ">2H+L</div>" in ind
+    # wartość w rb-indt: za długa (ACC GAT) od początku z wielokropkiem na końcu, nie ucięta z obu stron
+    assert '<div class="rb-indv" style="grid-area: 2 / 3 / span 1 / span 1"' in ind and '<span class="rb-indt">2H+L</span></div>' in ind
     assert "APP WA: Warszawa APP online: H = radar positions, L = director\nEPWA_APP 128.805 – Ala" in ind
-    assert ">0</div>" in out["indNone"] and "Nobody online" in out["indNone"]
-    assert ">–</div>" in out["indNet"] and ">0</div>" not in out["indNet"] and "Now: no data" in out["indNet"]
+    assert ">0</span></div>" in out["indNone"] and "Nobody online" in out["indNone"]
+    assert ">–</span></div>" in out["indNet"] and ">0</span></div>" not in out["indNet"] and "Now: no data" in out["indNet"]
     # BERLIN: szare pole z konfiguracją; czerwony napis (pref), gdy z ATIS nie wiadomo, który pas
     ber, pref = out["ber"], out["berPref"]
     assert '<div class="rb-blbl" style="grid-area: 6 / 1 / span 1 / span 1"' in ber and ">BERLIN</div>" in ber
@@ -1076,7 +1077,8 @@ const html = (x, small = true) => ({ v: radio.lblVariants(x, small), prio: radio
 // linijki i plakietki z tablicy: częstotliwość online albo z tablicy, nazwa stanowiska, kontroler online, kto, opis
 const FQ = { EPWA_APP: "128.805", EPWA_S_APP: "135.930", EPWA_N_APP: "125.055", EPWA_TWR: "118.305", EPWA_ATIS: "120.455" };
 const ctx = (online) => ({ freq: (cs) => online[cs]?.frequency || FQ[cs] || "", nm: (cs) => cs.replace(/^EP/, "").replace(/_/g, " "),
-  on: (cs) => online[cs] || null, who: (cs) => (online[cs] ? `${cs} ${online[cs].frequency} – Jan` : ""), pos: (cs) => `${cs} · pos`, net: true });
+  on: (cs) => online[cs] || null, who: (cs) => (online[cs] ? `${cs} ${online[cs].frequency} – Jan` : ""),
+  pos: (cs, fq = "") => `${cs} · pos${fq ? ` ${fq}` : ""}`, net: true });
 const ON = (...cs) => Object.fromEntries(cs.map((c) => [c, { callsign: c, frequency: FQ[c], atis_code: /_ATIS$/.test(c) ? "K" : null }]));
 const TMA = [["TMA Warszawa · EPWA_APP", "EPWA_APP", 0, 9500], ["TMA Warszawa · EPWA_N_APP", "EPWA_N_APP", 2500, 9500],
   ["TMA Warszawa · EPWA_S_APP", "EPWA_S_APP", 2500, 9500], ["TMA Radom", "EPWA_S_APP", 3500, 9500]]
@@ -1102,6 +1104,10 @@ out.push(JSON.stringify({
   // plakietki TWR: wieża online (TWR i TWR/A z ATIS), sam ATIS na TWR/A
   twrOn: [false, true].map((twra) => radio.twrPlate(twrP(["EPWA_TWR"], ["EPWA_ATIS"]), ctr, ctx(ON("EPWA_TWR", "EPWA_ATIS")), twra)),
   atisOnly: radio.twrPlate(twrP([], ["EPWA_ATIS"]), { ...ctr, owners: ["EPWA_APP"] }, ctx(ON("EPWA_ATIS", "EPWA_APP")), true),
+  // ATIS online na innej częstotliwości niż z listy stanowisk: w dymku ta z sieci, jak na plakietce
+  atisFq: radio.twrPlate(twrP(["EPWA_TWR"], ["EPWA_ATIS"]), ctr,
+    ctx({ ...ON("EPWA_TWR"), EPWA_ATIS: { callsign: "EPWA_ATIS", frequency: "121.080", atis_code: "K" } }), true),
+  atisOff: radio.twrPlate(twrP(["EPWA_TWR"], []), ctr, ctx(ON("EPWA_TWR")), true),
 }));
 const o = JSON.parse(out.pop());
 o.atisV = radio.lblVariants(o.atisOnly.lb);
@@ -1166,7 +1172,10 @@ def test_js_label_variants(tmp_path):
     assert t0["lb"]["state"] == "on" and t0["lb"]["ls"] == [{"fq": "118.305", "by": ""}] and t0["lb"]["extra"] == ""
     assert '<span class="rb-fq">120.455</span><b class="rb-code">K</b>' in t1["lb"]["extra"] and t1["lb"]["code"] == "K"
     assert t1["lb"]["icao"] == "EPWA" and t1["lb"]["rt"].split("\n")[-1] == "Click: AERODROME"
-    assert "ATIS: EPWA_ATIS · pos – online, information K" in t1["lb"]["rt"]
+    assert "ATIS: EPWA_ATIS · pos 120.455 – online, information K" in t1["lb"]["rt"]
+    af = out["atisFq"]["lb"]
+    assert '<span class="rb-fq">121.080</span>' in af["extra"] and "ATIS: EPWA_ATIS · pos 121.080 – online, information K" in af["rt"]
+    assert "ATIS: EPWA_ATIS · pos – offline" in out["atisOff"]["lb"]["rt"]  # offline: opis z listy stanowisk
     # sam ATIS (wieża offline, TWR/A): ID wieży i linia ATIS, tylko pełna odmiana; w dymku, kto przejmuje wieżę
     ao = out["atisOnly"]["lb"]
     assert ao["state"] == "off" and ao["ls"] == [] and "120.455" in ao["extra"]
@@ -1263,7 +1272,15 @@ out.tip = {
   edge: [rb.tipPos(V[0] - 12 - 14 - W, 300, W, 120, ...V), rb.tipPos(V[0] - 12 - 14 - W + 1, 300, W, 120, ...V)],
   bottom: rb.tipPos(600, 700, W, 200, ...V), corner: rb.tipPos(1350, 760, W, 200, ...V),
   narrow: rb.tipPos(150, 300, W, 120, 300, 768), tall: rb.tipPos(600, 100, W, 900, ...V), gap: rb.TIP_GAP,
+  // dymek, który mieści się w oknie (radio.css: najwyżej okno bez dwóch odstępów), nigdy nie wychodzi poza dolną krawędź
+  fits: [120, 300, 700, V[1] - 24].flatMap((h) => [0, 10, 100, 384, 600, 760, V[1] - 1].map((cy) => {
+    const p = rb.tipPos(600, cy, W, h, ...V);
+    return p.top >= 12 && p.top + h <= V[1] - 12;
+  })),
 };
+// panel LOA: po stronie FIR-u z większym miejscem i nie szerszy niż ono (siatka 1210 px; FIR przy lewej krawędzi, blisko
+// środka z lewej i z prawej, wąska strona)
+out.loa = [rb.loaPlace(80, 240, 1210), rb.loaPlace(500, 660, 1210), rb.loaPlace(850, 930, 1210), rb.loaPlace(300, 500, 700)];
 console.log(JSON.stringify(out));
 """
 
@@ -1313,9 +1330,15 @@ def test_js_flow_and_tip_position(tmp_path):
     assert t["bottom"]["flipY"] and t["bottom"]["top"] == 700 - 10 - 200 and not t["bottom"]["flipX"]
     assert t["corner"]["flipX"] and t["corner"]["flipY"] and t["corner"]["top"] + 200 <= 768 - g
     assert t["narrow"]["left"] == g and t["tall"]["top"] == g
+    assert all(t["fits"]), t["fits"]
+    # LOA: FIR z lewej – panel z prawej w pełnej szerokości; ESAA/LKAA blisko środka – z prawej, nie dalej niż do ich
+    # okienek; LZBB/UMKK – z lewej; za mało miejsca – co najmniej LOA_MIN
+    assert out["loa"] == [{"left": False, "width": 871}, {"left": False, "width": 542}, {"left": True, "width": 842},
+                          {"left": True, "width": 420}]
     css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
     tip = re.search(r"\.rb-tip \{([^}]*)\}", css).group(1)
     assert "width: 360px" in tip and "box-sizing: border-box" in tip and "max-width: 480px" not in tip and "white-space: pre-wrap" in tip
+    assert "max-height: calc(100vh - 24px)" in tip and "overflow: hidden" in tip  # wysoki dymek nie wychodzi poza okno
     flow = re.search(r"\.rb-flow path \{([^}]*)\}", css).group(1)
     assert "fill: var(--rb-flow)" in flow and re.search(r"--rb-flow: #[0-9a-f]{6}", css)
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
