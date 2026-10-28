@@ -597,10 +597,13 @@ def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
         occupied.update(dict.fromkeys(_cells_of(name), f"name:{fir}"))
         boxes = []
         for b in f.get("boxes") or ():
-            # kilka kafelków (ACC UMMV): najpierw ich stanowiska po kolei, potem reszta ich kolejności
-            found = [t for label in b.get("tiles") or () if (t := _tile_for(mine, label, b.get("callsign")))]
+            # kilka kafelków (ACC UMMV): najpierw ich stanowiska po kolei, potem reszta ich kolejności; kafelek innego
+            # FIR-u (EDUU SPE w bloku EDMM, jak na szkicu) z jego stosu; chain z seeda (kolejność z plików sektorów,
+            # gdy kafelki mówią inaczej) przed tym wszystkim
+            found = [t for label in b.get("tiles") or ()
+                     if (t := _tile_for(tiles.get(stack_key(label) or fir, mine), label, b.get("callsign")))]
             chain: list[str] = []
-            for cs in [t["callsign"] for t in found] + [cs for t in found for cs in t["chain"]]:
+            for cs in [*(b.get("chain") or ()), *(t["callsign"] for t in found), *(cs for t in found for cs in t["chain"])]:
                 if cs not in chain:
                     chain.append(cs)
             box = {"id": str(b["id"]), **_cell(b), "upper": b["upper"], "lower": b["lower"],

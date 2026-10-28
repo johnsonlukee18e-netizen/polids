@@ -95,9 +95,9 @@ def test_layout_seed_matches_sketch():
     got = {f["fir"]: [(b["id"], b["upper"], b["lower"], b["col"], b["row"]) for b in f["boxes"]] for f in lay["firs"]}
     assert got == {
         "EDWW": [("MRZ", 285, 0, 2, 5), ("MAR", 285, 0, 2, 9), ("FLG", 285, 0, 2, 11)],
-        "EDUU": [("OSE2", 660, 365, 3, 7), ("OSE1", 365, 285, 3, 8), ("HVL2", 660, 365, 3, 11), ("HVL1", 365, 285, 3, 12),
-                 ("SPE1", 660, 315, 3, 15)],
-        "EDMM": [("MEI", 315, 165, 2, 15), ("SAS", 165, 0, 2, 16)],
+        "EDUU": [("OSE2", 660, 365, 3, 7), ("OSE1", 365, 285, 3, 8), ("HVL2", 660, 365, 3, 11), ("HVL1", 365, 285, 3, 12)],
+        # SPE1 (Spree, kafelek EDUU SPE) na szkicu obok MEI pod nazwą EDMM, jak na zdjęciu PANDORY i w LOA
+        "EDMM": [("MEI", 315, 165, 2, 15), ("SPE1", 660, 315, 3, 15), ("SAS", 165, 0, 2, 16)],
         "ESAA": [("9", 660, 365, 5, 5), ("6", 660, 365, 6, 5), ("8", 365, 195, 5, 6), ("7", 365, 0, 6, 6), ("L", 195, 0, 5, 7)],
         "LKAA": [("NU", 660, 305, 5, 19), ("SU", 660, 305, 6, 19), ("NL", 305, 125, 5, 20), ("SL", 305, 125, 6, 20),
                  ("MT", 125, 0, 6, 21)],
@@ -232,12 +232,53 @@ def test_merge_never_edww(client):
 def test_merge_eduu_runs(client):
     # OSE2 i HVL2 to jedno stanowisko (EDUU_O22_CTR), ale między nimi OSE1 (nieobsadzone): osobno
     ed = {b["label"]: b for b in boxes(get(client, [ctl("EDUU_O22_CTR", "126.785")]), "EDUU")}
-    assert set(ed) == {"OSE2", "OSE1", "HVL2", "HVL1", "SPE1"}
+    assert set(ed) == {"OSE2", "OSE1", "HVL2", "HVL1"}
     assert ed["OSE2"]["owner"] == ed["HVL2"]["owner"] == "EDUU_O22_CTR" and ed["OSE1"]["owner"] is None
     assert not any(b["merged"] for b in ed.values())
-    # EDUU_H12_CTR obsługuje całe EDUU: jedno okienko na kolumnę C (puste komórki między nimi)
-    (b,) = boxes(get(client, [ctl("EDUU_H12_CTR", "128.235")]), "EDUU")
-    assert short(b) == ("HVL1", 660, 285, 3, 7, 1, 9, "EDUU_H12_CTR")
+    # EDUU_H12_CTR obsługuje całe EDUU: jedno okienko na kolumnę C (puste komórki między nimi) – do HVL1 (wiersz 12),
+    # nie przez nazwę EDMM do SPE1 (dawniej 9 wierszy do wiersza 15: SPE1 było w bloku EDUU); SPE1 w bloku EDMM osobno
+    d = get(client, [ctl("EDUU_H12_CTR", "128.235")])
+    (b,) = boxes(d, "EDUU")
+    assert short(b) == ("HVL1", 660, 285, 3, 7, 1, 6, "EDUU_H12_CTR")
+    em = {b["label"]: b for b in boxes(d, "EDMM")}
+    assert (em["SPE1"]["owner"], em["SPE1"]["frequency"], em["SPE1"]["merged"]) == ("EDUU_H12_CTR", "128.235", False)
+    assert em["MEI"]["owner"] is None and em["SAS"]["owner"] is None
+
+
+def test_merge_edmm_with_spree(client):
+    """EDMM_MEI_CTR sam: MEI, SAS i SPE1 (Spree za MEI w kolejności) to jedno okienko jak na szkicu (dawniej SPE1
+    w bloku EDUU obok MEI z tą samą częstotliwością, bez łączenia)."""
+    d = get(client, [ctl("EDMM_MEI_CTR", "124.960")])
+    (b,) = boxes(d, "EDMM")
+    assert short(b) == ("MEI", 660, 0, 2, 15, 2, 2, "EDMM_MEI_CTR") and b["frequency"] == "124.960"
+    assert sorted(m["id"] for m in b["members"]) == ["MEI", "SAS", "SPE1"]
+    assert all(x["owner"] is None for x in boxes(d, "EDUU"))
+    f = next(f for f in d["firs"] if f["fir"] == "EDMM")
+    assert f["staffed"] and not f["advisory"]
+    # sam Spree: EDMM obsadzone (okienko SPE1), EDUU bez nikogo – ADVISORY pod EDUU
+    d = get(client, [ctl("EDUU_SPE_CTR", "133.840")])
+    em = {b["label"]: b for b in boxes(d, "EDMM")}
+    assert em["SPE1"]["owner"] == "EDUU_SPE_CTR" and em["MEI"]["owner"] is None
+    assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDUU"] is True
+    assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDMM"] is False
+
+
+def test_box_chains_follow_sector_files(client):
+    """Kolejność okienek jak listy OWNER w plikach sektorów, gdy kafelki mówią inaczej: EDWW MAR – BOR przed MRZ;
+    UMMV – sektory przy granicy (W, N) przed UMMV_CTR; kafelki APP spoza szkicu (UMKK APP, UKLL APP) nie obsadzają
+    okienek ACC."""
+    d = get(client)
+    ch = {(f["fir"], b["id"]): b["chain"] for f in d["firs"] for b in f["boxes"]}
+    assert ch[("EDWW", "MAR")] == ["EDWW_MAR_CTR", "EDWW_BOR_CTR", "EDWW_MRZ_CTR", "EDWW_CTR"]
+    assert ch[("UMMV", "ACC")][:3] == ["UMMV_W_CTR", "UMMV_N_CTR", "UMMV_CTR"] and "RU-WRC_FSS" in ch[("UMMV", "ACC")]
+    assert "UMKK_APP" not in ch[("UMKK", "ACC")] and ch[("UMKK", "ACC")][0] == "UMKK_CTR"
+    assert "UKLL_APP" not in ch[("UKLV", "RLV")] and ch[("UKLV", "RLV")][:2] == ["UKLV_CTR", "UKR_CTR"]
+    ed = {b["id"]: b for b in boxes(get(client, [ctl("EDWW_BOR_CTR", "131.330"), ctl("EDWW_MRZ_CTR", "124.175")]), "EDWW")}
+    assert ed["MAR"]["owner"] == "EDWW_BOR_CTR" and ed["MRZ"]["owner"] == "EDWW_MRZ_CTR"
+    (b,) = boxes(get(client, [ctl("UMMV_N_CTR", "119.125"), ctl("UMMV_CTR", "135.700")]), "UMMV")
+    assert (b["owner"], b["frequency"]) == ("UMMV_N_CTR", "119.125")
+    (b,) = boxes(get(client, [ctl("UMMV_CTR", "135.700")]), "UMMV")
+    assert b["owner"] == "UMMV_CTR"
 
 
 def test_merge_same_frequency(client):
@@ -284,8 +325,15 @@ def test_fir_box_owner_and_tooltip(client):
     f = next(f for f in d["firs"] if f["fir"] == "UMMV")
     assert (b["label"], b["owner"], b["frequency"]) == ("ACC", "UMMV_W_CTR", "135.700") and not f["advisory"]
     assert [w["callsign"] for w in f["online"]] == ["UMBB_TWR", "UMMV_W_CTR"]
-    (b,) = boxes(get(client, [ctl("UMKK_APP", "126.000")]), "UMKK")
-    assert (b["label"], b["upper"], b["lower"], b["owner"]) == ("ACC", 999, 0, "UMKK_APP")
+    # APP Kaliningradu (tylko TMA, do FL265) nie obsadza okienka ACC 999-0 (dawniej obsadzał), ale jest w dymku FIR-u
+    d = get(client, [ctl("UMKK_APP", "126.000")])
+    (b,) = boxes(d, "UMKK")
+    assert (b["label"], b["upper"], b["lower"], b["owner"]) == ("ACC", 999, 0, None)
+    assert [w["callsign"] for w in next(f for f in d["firs"] if f["fir"] == "UMKK")["online"]] == ["UMKK_APP"]
+    (b,) = boxes(get(client, [ctl("UMKK_CTR", "123.700")]), "UMKK")
+    assert (b["owner"], b["frequency"]) == ("UMKK_CTR", "123.700")
+    (b,) = boxes(get(client, [ctl("UKLL_APP", "120.525")]), "UKLV")
+    assert b["owner"] is None
 
 
 def test_net_error_no_advisory(client):
@@ -317,6 +365,18 @@ def test_indicators_sketch_example(client):
     assert [i["value"] for i in nobody["indicators"]] == ["0"] * 5 and all(not i["positions"] for i in nobody["indicators"])
 
 
+def test_indicators_cover_app_parts(client):
+    """Każde stanowisko APP, które ma część TMA (i plakietkę APP), liczy się we wskaźniku swojego lotniska (APP GD, WA,
+    KK, PO; np. EPKK_RZ_APP w APP KK – dawniej plakietka na mapie, a wskaźnik 0)."""
+    d = get(client)
+    rules = {"EP" + i["id"].split()[1]: i for i in json.loads(SEED.read_text("utf-8"))["indicators"] if i["id"] != "ACC GAT"}
+    noms = {g["nominal"] for g in d["tma"] if g["nominal"].endswith("_APP") and g["nominal"][:4] in rules}
+    assert {"EPKK_RZ_APP", "EPWA_S_APP", "EPGD_L_APP", "EPPO_N_APP"} <= noms
+    for cs in sorted(noms):
+        on = {cs: {"callsign": cs, "frequency": "1", "name": None}}
+        assert rb.indicator_value(rules[cs[:4]], on, [], {})[0] != "0", cs
+
+
 def test_indicator_rules_pure():
     on = lambda *cs: {c: {"callsign": c, "frequency": "1", "name": None} for c in cs}  # noqa: E731
     hl = {"rule": "hl", "h": ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], "l": ["EPWA_F_APP"]}
@@ -327,6 +387,8 @@ def test_indicator_rules_pure():
     ab = {"rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]}
     assert rb.indicator_value(ab, on("EPKK_APP", "EPKK_E_APP"), [], {})[0] == "2-0"
     assert rb.indicator_value(ab, on("EPKK_KT_APP"), [], {})[0] == "0-1"
+    kk = next(i for i in json.loads(SEED.read_text("utf-8"))["indicators"] if i["id"] == "APP KK")
+    assert rb.indicator_value(kk, on("EPKK_RZ_APP"), [], {})[0] == "1-0"  # Rzeszów: KK RZ APP (dawniej 0)
     po = {"rule": "count", "count": ["EPPO_*_APP"]}
     assert rb.indicator_value(po, on("EPPO_N_APP", "EPPO_S_APP", "EPPO_I_APP", "EPPO_IS_APP"), [], {}) == (
         "2", ["EPPO_N_APP", "EPPO_S_APP"])

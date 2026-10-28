@@ -1,11 +1,11 @@
 {
-  "note": "Układ strony RADIO wg szkicu Marka (issue #23, img/i4-radio-layout-sketch.png, siatka Excela A..M) i zdjęcia PANDORY: kolumna col 1..13 (A..M), wiersz row 1..21. Okienka FIR-ów sąsiednich: id i granice pionowe (upper/lower, FL) jak na szkicu, nie z kafelków; tiles = etykiety kafelków sąsiadów z vacs_epww.json (neighbours), callsign = stanowisko okienka (wybiera kafelek, gdy dwa mają tę samą etykietę). Okienko z kilkoma kafelkami (ACC UMMV, RLV UKLV, ACC UMKK) obsługuje pierwsze stanowisko online z ich kolejności po kolei. merge = łączenie okienek jednego stanowiska (tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW). Wskaźniki u góry: reguły w jednym miejscu (count = liczba stanowisk online, hl = H/L jak APP WA, ab = a-b jak APP KK, acc = skróty ACC EPWW), tip = opis wskaźnika w dymku. maps = prostokąty podglądów LOW, HIGH i MID (col, row, cols, rows), status = stan danych, legend = legenda; wszystkie miejsca stałe, żeby strona nie zmieniała układu przy zmianie danych.",
+  "note": "Układ strony RADIO wg szkicu Marka (issue #23, img/i4-radio-layout-sketch.png, siatka Excela A..M) i zdjęcia PANDORY: kolumna col 1..13 (A..M), wiersz row 1..21. Okienka FIR-ów sąsiednich: id i granice pionowe (upper/lower, FL) jak na szkicu, nie z kafelków (szkic nie podaje granic ESAA: te są ze zdjęcia PANDORY); tiles = etykiety kafelków sąsiadów z vacs_epww.json (neighbours; kafelek innego FIR-u też, np. EDUU SPE pod EDMM jak na szkicu), callsign = stanowisko okienka (wybiera kafelek, gdy dwa mają tę samą etykietę). Okienko z kilkoma kafelkami (ACC UMMV, RLV UKLV) obsługuje pierwsze stanowisko online z ich kolejności po kolei; kafelki APP, których szkic nie ma (UMKK APP, UKLL APP), nie obsadzają okienka ACC. chain = kolejność przejmowania jak listy OWNER w plikach sektorów, gdy kafelki mówią inaczej (EDWW MAR: BOR przed MRZ; UMMV: sektory przy granicy W i N przed UMMV_CTR), dalej reszta kolejności kafelków. merge = łączenie okienek jednego stanowiska (tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW). Wskaźniki u góry: reguły w jednym miejscu (count = liczba stanowisk online, hl = H/L jak APP WA, ab = a-b jak APP KK, acc = skróty ACC EPWW), tip = opis wskaźnika w dymku. maps = prostokąty podglądów LOW, HIGH i MID (col, row, cols, rows), status = stan danych, legend = legenda; wszystkie miejsca stałe, żeby strona nie zmieniała układu przy zmianie danych.",
   "grid": {"cols": 13, "rows": 21},
   "indicators": [
     {"id": "ACC GAT", "col": 1, "row": 1, "tip": "EPWW ACC positions online, the one with the most sectors first", "rule": "acc"},
     {"id": "APP GD", "col": 2, "row": 1, "tip": "Gdańsk APP positions online", "rule": "count", "count": ["EPGD_APP", "EPGD_L_APP"]},
     {"id": "APP WA", "col": 3, "row": 1, "tip": "Warszawa APP online: H = radar positions, L = director", "rule": "hl", "h": ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], "l": ["EPWA_F_APP"]},
-    {"id": "APP KK", "col": 4, "row": 1, "tip": "Kraków APP online: radar positions - directors", "rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]},
+    {"id": "APP KK", "col": 4, "row": 1, "tip": "Kraków APP online: radar positions - directors", "rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP", "EPKK_RZ_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]},
     {"id": "APP PO", "col": 5, "row": 1, "tip": "Poznań APP positions online", "rule": "count", "count": ["EPPO_*_APP"]}
   ],
   "berlin": {"col": 1, "row": 6, "box": {"col": 1, "row": 7, "cols": 2}},
@@ -17,16 +17,17 @@
   "firs": [
     {"fir": "EDWW", "name": {"col": 2, "row": 4}, "merge": false, "boxes": [
       {"id": "MRZ", "col": 2, "row": 5, "upper": 285, "lower": 0, "callsign": "EDWW_MRZ_CTR", "tiles": ["EDWW MRZ"]},
-      {"id": "MAR", "col": 2, "row": 9, "upper": 285, "lower": 0, "callsign": "EDWW_MAR_CTR", "tiles": ["EDWW MAR"]},
+      {"id": "MAR", "col": 2, "row": 9, "upper": 285, "lower": 0, "callsign": "EDWW_MAR_CTR", "tiles": ["EDWW MAR"],
+       "chain": ["EDWW_MAR_CTR", "EDWW_BOR_CTR", "EDWW_MRZ_CTR", "EDWW_CTR"]},
       {"id": "FLG", "col": 2, "row": 11, "upper": 285, "lower": 0, "callsign": "EDWW_FLG_CTR", "tiles": ["EDWW FLG"]}]},
     {"fir": "EDUU", "name": {"col": 3, "row": 6}, "merge": true, "boxes": [
       {"id": "OSE2", "col": 3, "row": 7, "upper": 660, "lower": 365, "callsign": "EDUU_O22_CTR", "tiles": ["EDUU OSE22"]},
       {"id": "OSE1", "col": 3, "row": 8, "upper": 365, "lower": 285, "callsign": "EDUU_O12_CTR", "tiles": ["EDUU OSE12"]},
       {"id": "HVL2", "col": 3, "row": 11, "upper": 660, "lower": 365, "callsign": "EDUU_O22_CTR", "tiles": ["EDUU HVL22"]},
-      {"id": "HVL1", "col": 3, "row": 12, "upper": 365, "lower": 285, "callsign": "EDUU_H12_CTR", "tiles": ["EDUU HVL12"]},
-      {"id": "SPE1", "col": 3, "row": 15, "upper": 660, "lower": 315, "callsign": "EDUU_SPE_CTR", "tiles": ["EDUU SPE"]}]},
+      {"id": "HVL1", "col": 3, "row": 12, "upper": 365, "lower": 285, "callsign": "EDUU_H12_CTR", "tiles": ["EDUU HVL12"]}]},
     {"fir": "EDMM", "name": {"col": 2, "row": 14}, "merge": true, "boxes": [
       {"id": "MEI", "col": 2, "row": 15, "upper": 315, "lower": 165, "callsign": "EDMM_MEI_CTR", "tiles": ["EDMM MEI"]},
+      {"id": "SPE1", "col": 3, "row": 15, "upper": 660, "lower": 315, "callsign": "EDUU_SPE_CTR", "tiles": ["EDUU SPE"]},
       {"id": "SAS", "col": 2, "row": 16, "upper": 165, "lower": 0, "callsign": "EDDC_SAS_APP", "tiles": ["EDMM SAS"]}]},
     {"fir": "ESAA", "name": {"col": 5, "row": 4, "cols": 2}, "merge": true, "boxes": [
       {"id": "9", "col": 5, "row": 5, "upper": 660, "lower": 365, "callsign": "ESMM_9_CTR", "tiles": ["ESMM 9"]},
@@ -41,7 +42,7 @@
       {"id": "SL", "col": 6, "row": 20, "upper": 305, "lower": 125, "callsign": "LKAA_S_CTR", "tiles": ["LKAA S"]},
       {"id": "MT", "col": 6, "row": 21, "upper": 125, "lower": 0, "callsign": "LKMT_APP", "tiles": ["LKMT APP"]}]},
     {"fir": "UMKK", "name": {"col": 10, "row": 4}, "merge": false, "boxes": [
-      {"id": "ACC", "col": 10, "row": 5, "upper": 999, "lower": 0, "callsign": "UMKK_CTR", "tiles": ["UMKK", "UMKK APP"]}]},
+      {"id": "ACC", "col": 10, "row": 5, "upper": 999, "lower": 0, "callsign": "UMKK_CTR", "tiles": ["UMKK"]}]},
     {"fir": "LZBB", "name": {"col": 10, "row": 18}, "merge": true, "boxes": [
       {"id": "U", "col": 10, "row": 19, "upper": 660, "lower": 305, "callsign": "LZBB_U_CTR", "tiles": ["LZBB U"]},
       {"id": "BB", "col": 10, "row": 20, "upper": 305, "lower": 80, "callsign": "LZBB_CTR", "tiles": ["LZBB"]}]},
@@ -51,8 +52,9 @@
       {"id": "L", "col": 12, "row": 5, "upper": 335, "lower": 225, "callsign": "EYVL_CTR", "tiles": ["EYVL"]},
       {"id": "E", "col": 12, "row": 6, "upper": 225, "lower": 95, "callsign": "EYVL_E_CTR", "tiles": ["EYVL E"]}]},
     {"fir": "UMMV", "name": {"col": 13, "row": 9}, "merge": false, "boxes": [
-      {"id": "ACC", "col": 12, "row": 9, "upper": 660, "lower": 75, "callsign": "UMMV_CTR", "tiles": ["UMMV", "UMMV N", "UMMV W"]}]},
+      {"id": "ACC", "col": 12, "row": 9, "upper": 660, "lower": 75, "callsign": "UMMV_CTR", "tiles": ["UMMV", "UMMV N", "UMMV W"],
+       "chain": ["UMMV_W_CTR", "UMMV_N_CTR", "UMMV_CTR"]}]},
     {"fir": "UKLV", "name": {"col": 13, "row": 15}, "merge": false, "boxes": [
-      {"id": "RLV", "col": 12, "row": 15, "upper": 660, "lower": 55, "callsign": "UKLV_CTR", "tiles": ["UKLV", "UKR CTR", "UKLL APP"]}]}
+      {"id": "RLV", "col": 12, "row": 15, "upper": 660, "lower": 55, "callsign": "UKLV_CTR", "tiles": ["UKLV", "UKR CTR"]}]}
   ]
 }
