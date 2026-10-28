@@ -25,7 +25,7 @@ const TABS = { home, about, radio, meteo, awalon, aerodrome, adciv, admil, advfr
 // bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
 // #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista;
 // 0.13.0: zakładki STRIP nie ma, #strip/<ICAO> → AERODROME › <ICAO> › TRAFFIC (DMAN/AMAN), samo #strip → AERODROME;
-// #squawk/<kod> → OTHER › SQUAWK z tym kodem, #squawk i kafelek w ABOUT (bez arg) → OTHER › SQUAWK
+// #squawk/<kod> → OTHER › SQUAWK z tym kodem, samo #squawk → OTHER › SQUAWK
 const MOVED = {
   docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],
   phraseology: () => ["other", "phraseology"],

@@ -73,17 +73,16 @@ const CHANGES = [
 
 const TILES = [
   ["aerodrome", "AERODROME", "FIR EPWW overview, aerodrome lists of EPWW and neighbours, the aerodrome on one screen: METAR, wind, runways, ATIS, NOTAM, AWOS, TRAFFIC (DMAN/AMAN)."],
-  ["meteo", "METEO", "METAR and TAF of aerodromes, surface and approach wind, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
+  ["meteo", "METEO", "METAR and TAF of aerodromes, wind map, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
+  ["awalon", "AWALON", "Wind from the surface to 10 000 ft every 1000 ft over the 15 AD 2 aerodromes: all in one table, a profile chart and runway winds for each aerodrome."],
   ["map", "MAP", "Traffic with labels on hover, airspace at the selected level, TMA/CTR, sector capacity and flight details."],
   ["radio", "RADIO", "One page: EPWW ACC sectors on LOW/MID/HIGH previews with frequencies, APP/TWR/FIS layers, ATIS and neighbour positions; a neighbour FIR name opens its LOA."],
   ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents as PDF."],
   ["sytop", "SYT OP", "Active NOTAMs of FIR EPWW and the main aerodromes."],
-  ["strip", "STRIP", "EFES flight progress strips for the 15 main aerodromes; a click opens the extended label window."],
   ["callsign", "CALLSIGN", "Airline radiotelephony callsigns."],
   ["aircraft", "AIRCRAFT", "ICAO aircraft types by manufacturer with their values in boxes: wake turbulence categories, performance, dimensions, photos."],
-  ["squawk", "SQUAWK", "SSR code pools of FIR EPWW and special codes in one list with search."],
   ["conversion", "CONVERSION", "Unit conversion: pressure, height, FL at QNH, speed, Mach; UTC and Poland LT clocks."],
-  ["other", "OTHER", "Documents, phraseology and checklists: position opening and closing, handover, runway change, tips for controllers."],
+  ["other", "OTHER", "Flight plan by callsign, FMP traffic volumes, delay codes (REGCAUSE), SSR codes (SQUAWK), VFR minima, documents, phraseology and checklists."],
   ["emergency", "EMERGENCY", "ASSIST and emergency checklists."],
 ];
 

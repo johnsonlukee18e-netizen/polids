@@ -135,7 +135,8 @@ def test_strip_removed():
     assert '  strip: (arg) => ["aerodrome", /^[A-Za-z]{4}$/.test(arg || "") ? arg.toUpperCase() + "/dman" : arg],' in MOVED_SRC
     for path in (FRONTEND / "js").rglob("*.js"):
         src = path.read_text("utf-8")
-        assert not re.search(r"""navigate\(\s*["']strip["']|href=["']#strip|tabs/strip\.js|strips\.js|mountStrips\(""", src), path.name
+        assert not re.search(r"""navigate\(\s*["']strip["']|href=["']#strip|tabs/strip\.js|strips\.js|mountStrips\(|"""
+                             r"""open\(\s*["']strip["']|data-open=["']strip""", src), path.name
     css = (FRONTEND / "css" / "style.css").read_text("utf-8")
     for rule in (".lg.dep {", ".lg.arr {", ".lg.loc {", ".lg.plan {", ".aero-col > .card.aero-ruch {", ".aero-ruch .ruch-line {"):
         assert rule in css, rule
@@ -145,7 +146,7 @@ def test_strip_removed():
 
 def test_squawk_moved_to_other():
     """0.13.0 (issue #23): SQUAWK nie jest już w menu, tylko podzakładką OTHER (#other/squawk/<kod>). Stare adresy
-    #squawk i #squawk/<kod> przekierowuje app.js (jedna linijka w MOVED), kafelek w ABOUT (ctx.open("squawk")) też.
+    #squawk i #squawk/<kod> przekierowuje app.js (jedna linijka w MOVED); ABOUT opisuje SQUAWK w kafelku OTHER.
     Moduł poza tabs/ (jak checklist.js i phraseology.js), arkusz squawk.css zaczepiony o panel, nie o zakładkę."""
     assert "squawk" not in MENU and not (FRONTEND / "js" / "tabs" / "squawk.js").exists()
     assert 'data-tab="squawk"' not in INDEX and "squawk" not in re.search(r"const TABS = \{([^}]+)\}", APP).group(1)
@@ -162,6 +163,28 @@ def test_squawk_moved_to_other():
     for path in (FRONTEND / "js").rglob("*.js"):
         src = path.read_text("utf-8")
         assert not re.search(r"""navigate\(\s*["']squawk["']|href=["']#squawk""", src), path.name
+
+
+def test_about_tiles_open_current_tabs():
+    """Kafelki ABOUT (ctx.open(<zakładka>) bez arg) prowadzą tylko do zakładek z menu, nigdy przez przekierowanie MOVED:
+    0.13.0 bez kafelka STRIP (prowadził do AERODROME w dowolnym stanie, pasków już nie ma) i SQUAWK (podzakładka OTHER,
+    opisana w kafelku OTHER), z kafelkiem AWALON po METEO."""
+    about = (FRONTEND / "js" / "tabs" / "about.js").read_text("utf-8")
+    block = about[about.index("const TILES = ["):]
+    block = block[:block.index("];") + 2]
+    tiles = re.findall(r'^  \["([a-z]+)", "([^"]+)", "([^"]+)"\],$', block, re.M)
+    assert len(tiles) == block.count("\n  [")
+    ids = [t[0] for t in tiles]
+    tabs = [k.strip() for k in re.search(r"const TABS = \{([^}]+)\}", APP).group(1).split(",")]
+    moved = re.findall(r"^  (\w+): ", MOVED_SRC, re.M)
+    assert "strip" in moved and "squawk" in moved
+    for tab in ids:
+        assert tab in tabs and tab in MENU and tab not in moved, tab
+    assert "strip" not in ids and "squawk" not in ids and ids.index("awalon") == ids.index("meteo") + 1
+    text = {t[0]: t[2] for t in tiles}
+    assert "SQUAWK" in text["other"] and "REGCAUSE" in text["other"] and "FMP" in text["other"]
+    assert "10 000 ft" in text["awalon"] and "approach wind" not in text["meteo"]
+    assert not re.search(r"strip|EFES|extended label", block, re.I)
 
 
 def test_hidden_menu_button_takes_no_space():
