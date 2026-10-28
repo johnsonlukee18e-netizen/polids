@@ -940,9 +940,9 @@ def tv_targets(tv: dict, sector_ids, tma_by_icao: dict[str, list[str]]) -> tuple
 
 
 def _restriction_tip(r: dict) -> str:
-    """Linia dymku aktywnego teraz ograniczenia: wartość i do kiedy (koniec okna HHMM jako HH:MM)."""
+    """Linia dymku aktywnego teraz ograniczenia: wartość i do kiedy (koniec okna HHMM jako HH:MMZ, UTC jak w reszcie RADIO)."""
     kind, value, end = str(r.get("type") or "").upper(), r.get("value"), str(r.get("end") or "")
-    until = f" until {end[:2]}:{end[2:4]}" if re.fullmatch(r"\d{4}", end) else ""
+    until = f" until {end[:2]}:{end[2:4]}Z" if re.fullmatch(r"\d{4}", end) else ""
     if kind == "ENR-OCCUPANCY":
         return f"Flow restriction: max occupancy {value}{until}"
     if kind == "ENR-ENTRIES":

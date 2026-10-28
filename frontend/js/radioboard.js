@@ -84,7 +84,7 @@ export const bboxOrDefault = (b) => (b && b.length === 4 && b.every(Number.isFin
 // czas z sieci (np. "2026-10-12T12:00:43.0000000Z": 7 cyfr ułamka) jako "HH:MMZ"; nieczytelny → "–"
 export function utcHhmm(iso) {
   const t = Date.parse(String(iso || "").replace(/(\.\d{3})\d+/, "$1"));
-  return Number.isNaN(t) ? "–" : new Date(t).toISOString().slice(11, 16) + "Z";
+  return Number.isNaN(t) ? "\u2013" : new Date(t).toISOString().slice(11, 16) + "Z";
 }
 // liczba kontrolerów na tablicy: online = stanowisko → kontroler; ten sam kontroler pod znakiem sąsiada (alias_of)
 // i ATIS-y nie liczą się osobno
@@ -190,7 +190,7 @@ export function labelOpts(kind, { on = false, fq = false, shapes = "" } = {}) {
 // (najpierw ważniejsze); x, y = punkt zakotwiczenia, w, h = rozmiar pełnej etykiety, alts = mniejsze odmiany (np.
 // skrócona w jednej linii), pin = punkt to kropka na mapie (lotnisko, TMA), której żadna etykieta nie zasłania.
 // Kandydaci leżą na pierścieniach coraz dalej od punktu (coraz więcej kierunków); dozwolony jest tylko kandydat bez
-// kolizji z już ułożonymi etykietami i przeszkodami (obstacles: stosy sąsiadów, tytuł podglądu; {x0, y0, x1, y1}),
+// kolizji z już ułożonymi etykietami i przeszkodami (obstacles: tytuł podglądu; {x0, y0, x1, y1}),
 // w obrębie bounds {x, y, w, h} i bez kropki z pin (swojej i cudzej) pod sobą. Spośród nich wygrywa najtańszy:
 // odległość etykiety od punktu (px) + pole zasłoniętych obrysów warstwy (cover z coverGrid, waga wc etykiety,
 // domyślnie 1) × WC + kara za mniejszą odmianę (× wv) + kara WX za linię prowadzącą przez inną etykietę, przez inną
@@ -326,8 +326,6 @@ export function buttonRows(buttons) {
 }
 // granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0"
 export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round(Number(b?.lower) || 0)}`;
-// napis okienka: ID i granice, "OSE2 660-365"; połączone – nazwa połączonego i suma granic ("L 660-95")
-export const boxText = (b) => `${b?.label ?? b?.id ?? ""} ${limText(b)}`;
 // granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
 const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
 export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "GND"}\u2013${Number(b?.upper) >= 999 ? "UNL" : flOf(Number(b?.upper) || 0)}`;

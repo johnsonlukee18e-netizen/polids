@@ -105,18 +105,18 @@ function loaTransfers(rows, from, to) {
   const body = rows.map((t) => `<tr data-f="${esc(Object.entries(t).filter(([k]) => k !== "dir").map(([, v]) => v).join(" ").toLowerCase())}">`
     + `<td class="trf">${esc(t.traffic)}</td><td class="cop">${esc(t.cop)}</td><td class="lvl">${esc(t.level)}</td>`
     + `${sec ? `<td class="sec">${esc(t.from)}</td><td class="sec">${esc(t.to)}</td>` : ""}<td class="cond">${esc(t.conditions)}</td></tr>`).join("");
-  return `<div class="rb-loa-sec"><h4>${esc(from)} → ${esc(to)} <small>${rows.length}</small></h4>
+  return `<div class="rb-loa-sec"><h4>${esc(from)} \u2192 ${esc(to)} <small>${rows.length}</small></h4>
     <table class="rb-loa-tab"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 const loaList = (title, items) => (arr(items).length ? `<div class="rb-loa-sec"><h4>${esc(title)} <small>${items.length}</small></h4>
   <ul>${items.map((x) => `<li data-f="${esc(String(x).toLowerCase())}">${esc(x)}</li>`).join("")}</ul></div>` : "");
 
-// fir, title: stos sąsiada z /api/radio/board; f: wpis z loa.json albo null (brak LOA z tym FIR-em, błąd: msg,
+// fir, title: FIR sąsiada i jego nazwa z /api/radio/board; f: wpis z loa.json albo null (brak LOA z tym FIR-em, błąd: msg,
 // jeszcze się wczytuje: loading); radio(cs): znak radiowy stanowiska, gdy LOA go nie podaje
 export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}) {
   const tr = arr(f?.transfers), out = tr.filter((t) => t.dir === "out"), inn = tr.filter((t) => t.dir === "in");
   const pdf = pdfPath(f?.pdf);
-  // tytuł LOA podaje już FIR sąsiada (LOA EPWW – EDWW (Bremen)); bez LOA: FIR i nazwa ze stosu
+  // tytuł LOA podaje już FIR sąsiada (LOA EPWW – EDWW (Bremen)); bez LOA: FIR i jego nazwa z tablicy
   const head = `<div class="rb-loa-h"><b class="rb-loa-tag">LOA</b>${f ? "" : `<span class="rb-loa-fir"><b>${esc(fir)}</b> ${esc(title)}</span>`}`
     + (f ? `<span class="rb-loa-t" data-rt="${esc(f.title)}">${esc(f.title)}</span>` : "")
     + `<span class="rb-loa-sp"></span>`
@@ -124,16 +124,16 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
       + `<a class="rb-loa-a" href="${esc(encodeURI(pdf))}" target="_blank" rel="noopener" data-rt="Open the LOA PDF">PDF \u2197</a>` : "")
     + `<button type="button" class="rb-loa-x" aria-label="Close" data-rt="Close (Esc)">\u2715</button></div>`;
   if (!f) {
-    return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Loading LOA…"
-      : `No EPWW LOA with ${esc(fir)} in PolIDS. All LOAs: COORDINATION › DOCUMENTS.`}</p></div>`;
+    return head + `<div class="rb-loa-b"><p class="${msg ? "error" : "hint"}">${msg ? esc(msg) : loading ? "Loading LOA\u2026"
+      : `No EPWW LOA with ${esc(fir)} in PolIDS. All LOAs: COORDINATION \u203a DOCUMENTS.`}</p></div>`;
   }
   const pos = arr(f.positions).map((p) => `<tr data-f="${esc(Object.values(p).join(" ").toLowerCase())}">`
     + `<td class="${p.side === "EP" ? "ep" : "nb"}">${p.side === "EP" ? "EPWW" : esc(fir)}</td><td class="pcs">${esc(p.callsign)}</td>`
     + `<td>${esc(p.radio || radio(p.callsign))}</td><td class="cop">${esc(p.sector)}</td><td class="lvl">${esc(p.frequency)}</td>`
     + `<td class="cond">${esc(p.note)}</td></tr>`).join("");
   return head + `<div class="rb-loa-b">
-    <div class="rb-loa-tools"><input type="search" class="rb-loa-q" placeholder="filter: COP, aerodrome, FL, sector…" aria-label="LOA filter">
-      <span class="rb-loa-cnt"></span><span class="rb-loa-n">transfers: ${out.length} from EPWW · ${inn.length} to EPWW</span></div>
+    <div class="rb-loa-tools"><input type="search" class="rb-loa-q" placeholder="filter: COP, aerodrome, FL, sector\u2026" aria-label="LOA filter">
+      <span class="rb-loa-cnt"></span><span class="rb-loa-n">transfers: ${out.length} from EPWW \u00b7 ${inn.length} to EPWW</span></div>
     ${loaTransfers(out, "EPWW", fir)}${loaTransfers(inn, fir, "EPWW")}
     <div class="rb-loa-rules">${loaList("Transfer of control and communication", f.silent)}${loaList("VFR", f.vfr)}${loaList("Other rules", f.other)}</div>
     ${pos ? `<div class="rb-loa-sec"><h4>Positions and sectors <small>${arr(f.positions).length}</small></h4>
@@ -404,7 +404,7 @@ export default {
     const freqOf = (cs) => on(cs)?.frequency || d?.pos?.[cs]?.frequency || "";
     const who = (cs) => {
       const o = on(cs);
-      return o ? `${o.callsign} ${o.frequency} – ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
+      return o ? `${o.callsign} ${o.frequency} \u2013 ${o.name || "?"} (CID ${o.cid ?? "?"})${o.logon_time ? `, since ${utcHhmm(o.logon_time)}` : ""}` : "";
     };
     // opis stanowiska: znak, nazwa i częstotliwość z listy stanowisk albo podana (fq: z sieci, gdy stanowisko jest online)
     const posLine = (cs, fq = "") => `${cs}${d?.pos?.[cs]?.name ? ` \u00b7 ${d.pos[cs].name}` : ""} ${fq || d?.pos?.[cs]?.frequency || ""}`.trim();
@@ -498,7 +498,7 @@ export default {
       m.svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
       m.svg.setAttribute("width", W);
       m.svg.setAttribute("height", H);
-      // kolejność (kolory z pliku sektora, radio.css): tło FIR-ów, sąsiedzi, FIR EPWW nieobsadzony, obszary stanowisk
+      // kolejność (kolory: radio.css): tło FIR-ów, sąsiedzi, FIR EPWW nieobsadzony, obszary stanowisk
       // ACC (obsadzone: ciemne, pełne – pod nimi nic nie ginie), czerwone tło alarmów przepływu (sektory ACC warstwy,
       // na LOW także TMA – zawsze, bez względu na warstwy i obsadę), granice TMA/CTR/FIS EPWW i sąsiadów, granica FIR EPWW
       m.svg.innerHTML = g("rb-firs", geo.firs)
@@ -757,7 +757,8 @@ export default {
     loaBox.addEventListener("click", (e) => {
       if (e.target.closest(".rb-loa-x")) return closeLoa();
       const doc = e.target.closest("button[data-coord]");
-      if (doc) navigate("coordination", "docs/" + doc.dataset.coord);   // COORDINATION › DOKUMENTY z tym LOA
+      // COORDINATION › DOKUMENTY z tym LOA
+      if (doc) navigate("coordination", "docs/" + doc.dataset.coord);
     });
     // filtr: wiersze tabel i zasady zawierające wpisany tekst; sekcje bez trafień znikają
     loaBox.addEventListener("input", (e) => {

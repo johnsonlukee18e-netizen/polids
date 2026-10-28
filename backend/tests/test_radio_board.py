@@ -547,9 +547,8 @@ console.log(JSON.stringify({
     rb.gridArea({ col: "4", row: 0.4, cols: -2, rows: "x" })],
   brows: [rb.buttonRows({ col: 8, rows: { fis: 14, twra: 12, high: 6, low: 6, mid: 6, atis: 5, app: 8, twr: 10, bogus: 3 } }),
     rb.buttonRows({ col: 8, rows: { low: 6, atis: 0 } }), rb.buttonRows(null)],
-  // napis okienka: ID i granice jak na szkicu; połączone – nazwa połączonego; dymek: od dolnej do górnej
-  boxText: [rb.boxText({ id: "OSE2", label: "OSE2", upper: 660, lower: 365 }), rb.boxText({ id: "ACC", upper: 999, lower: 0 }),
-    rb.boxText({ id: "U+M+L+E", label: "L", upper: 660, lower: 95 }), rb.boxText(null)],
+  // granice okienka jak na szkicu (górna-dolna; połączone – suma granic); dymek: od dolnej do górnej
+  limText: [{ upper: 660, lower: 365 }, { upper: 999, lower: 0 }, { upper: 660, lower: 95 }, null].map(rb.limText),
   limTip: [{ upper: 660, lower: 365 }, { upper: 999, lower: 0 }, { upper: 285, lower: 0 }, { upper: 125, lower: 55 }].map(rb.limTip),
   proj: { a: pj.P([14, 55]), b: pj.P([24, 49]), box: pj.box },
   bottom: rb.projection([0, 0, 1, 1], { x: 0, y: 0, w: 100, h: 400 }, 0, "bottom").box,
@@ -626,7 +625,7 @@ def test_js_layout_helpers(js):
                               {"col": 8, "row": 8, "ids": ["app"]}, {"col": 8, "row": 10, "ids": ["twr"]},
                               {"col": 8, "row": 12, "ids": ["twra"]}, {"col": 8, "row": 14, "ids": ["fis"]}]
     assert js["brows"][1] == [{"col": 8, "row": 6, "ids": ["low"]}] and js["brows"][2] == []
-    assert js["boxText"] == ["OSE2 660-365", "ACC 999-0", "L 660-95", " 0-0"]
+    assert js["limText"] == ["660-365", "999-0", "660-95", "0-0"]
     assert js["limTip"] == ["FL365–FL660", "GND–UNL", "GND–FL285", "FL055–FL125"]
     a, b, box = js["proj"]["a"], js["proj"]["b"], js["proj"]["box"]
     assert a == pytest.approx([box["x"], box["y"]]) and b == pytest.approx([box["x"] + box["w"], box["y"] + box["h"]])
@@ -1083,7 +1082,7 @@ const ON = (...cs) => Object.fromEntries(cs.map((c) => [c, { callsign: c, freque
 const TMA = [["TMA Warszawa · EPWA_APP", "EPWA_APP", 0, 9500], ["TMA Warszawa · EPWA_N_APP", "EPWA_N_APP", 2500, 9500],
   ["TMA Warszawa · EPWA_S_APP", "EPWA_S_APP", 2500, 9500], ["TMA Radom", "EPWA_S_APP", 3500, 9500]]
   .map(([id, nominal, lo, hi]) => ({ id, nominal, lo, hi, tma: id.split(" · ")[0], icao: "EPWA", owners: [] }));
-const flow = { tma: { "TMA Warszawa": [{ tip: ["Flow restriction: max occupancy 20 until 18:00"] }], "TMA Radom": [{ tip: ["Occupancy 9 of 10"] }] } };
+const flow = { tma: { "TMA Warszawa": [{ tip: ["Flow restriction: max occupancy 20 until 18:00Z"] }], "TMA Radom": [{ tip: ["Occupancy 9 of 10"] }] } };
 const plate = (owner, covers, at = [52.1, 21.0]) => ({ owner, tma: "TMA Warszawa", icao: "EPWA", at, frequency: FQ[owner], covers,
   parts: covers.filter((c) => c.startsWith("TMA Warszawa")).map((c) => c.split(" · ")[1]) });
 const ctr = { id: "CTR Warszawa", nominal: "EPWA_TWR", atis: "EPWA_ATIS", owners: [] };
@@ -1165,7 +1164,7 @@ def test_js_label_variants(tmp_path):
     assert a["lb"]["id"] == "WA APP" and a["lb"]["ls"] == [{"fq": "128.805", "by": ""}] and a["lb"]["state"] == "on"
     assert a["lb"]["rt"].split("\n") == ["TMA Warszawa – all parts (GND–FL095)", "Position: EPWA_APP · pos",
                                          "Now: EPWA_APP 128.805 – Jan", "Also covers: TMA Radom",
-                                         "Flow restriction: max occupancy 20 until 18:00", "TMA Radom: Occupancy 9 of 10"]
+                                         "Flow restriction: max occupancy 20 until 18:00Z", "TMA Radom: Occupancy 9 of 10"]
     assert out["appS"]["lb"]["rt"].split("\n")[0] == "TMA Warszawa – part WA S APP (FL025–FL095)"
     # plakietka TWR: wieża online; linia ATIS z literą tylko na TWR/A (skrócona: litera za częstotliwością wieży)
     t0, t1 = out["twrOn"]
@@ -1249,7 +1248,7 @@ const bd = {
     { id: "LC", layer: "LOW", letter: "C", owner: "EPWW_N_CTR" }],
   tma: [{ tma: "TMA Warszawa", owners: ["EPWA_APP"] }, { tma: "TMA Warszawa", owners: [] }],
   flow: { ok: true, sectors: { HB: [{ tip: ["Occupancy 12 of 14"] }], LC: [] },
-    tma: { "TMA Warszawa": [{ tip: ["Flow restriction: max occupancy 20 until 18:00"] }], "TMA Nowhere": [{ tip: ["x"] }] } },
+    tma: { "TMA Warszawa": [{ tip: ["Flow restriction: max occupancy 20 until 18:00Z"] }], "TMA Nowhere": [{ tip: ["x"] }] } },
 };
 const slices = [{ letter: "B", name: "EPWWB", lo: 36500, geometry: sq(20, 52) }, { letter: "C", name: "EPWWC", lo: 9500, geometry: sq(18, 52) }];
 const tmaGeo = [{ name: "EPWA_TMA_A", tma: "TMA Warszawa", geometry: sq(20.5, 52, 0.4) }, { name: "EPWA_TMA_B", tma: "TMA Warszawa", geometry: sq(20.7, 52.1, 0.4) },
@@ -1312,7 +1311,7 @@ def test_js_flow_and_tip_position(tmp_path):
     assert lib["MID"]["areas"] == [] and lib["MID"]["svg"] == "" and out["empty"] == ""
     assert lib["HIGH"]["areas"][0]["rt"].split("\n") == ["Sector HB · HIGH", "Now: unstaffed", "Occupancy 12 of 14"]
     assert lib["LOW"]["areas"][0]["rt"].split("\n") == ["TMA Warszawa", "Now: EPWA_APP online",
-                                                          "Flow restriction: max occupancy 20 until 18:00"]
+                                                          "Flow restriction: max occupancy 20 until 18:00Z"]
     # klasa flow na ścieżce przestrzeni, jeden obrys TMA (suma dwóch kształtów), dymek z powodem
     hb, wa = lib["HIGH"]["svg"], lib["LOW"]["svg"]
     assert hb.startswith('<g class="rb-flow"><path class="flow acc" data-rt="Sector HB') and "Occupancy 12 of 14" in hb
@@ -1354,6 +1353,19 @@ def test_radio_page_without_provenance_notes():
         for bad in ("Coverage order", "coverage order", "sector position", "VACS", "VATSpy", ".ese", "sector file",
                     "om.plvacc", "VATSIM", "PDF extract", "per LOA", "chainText", "in this part", "g.apps"):
             assert bad not in code, (name, bad)
+
+
+
+def test_radio_files_ascii_and_no_source_names():
+    """Konwencja: w JS strony RADIO znaki spoza ASCII tylko w samodzielnych liniach komentarza (w kodzie, napisach i
+    komentarzach na końcu linii escape \\u); w plikach RADIO, także w komentarzach i w radio.css, bez nazw źródeł danych."""
+    for name in ("tabs/radio.js", "radioboard.js"):
+        for n, ln in enumerate((FRONTEND / "js" / name).read_text("utf-8").splitlines(), 1):
+            assert ln.lstrip().startswith("//") or ln.isascii(), (name, n, ln)
+    for f in (FRONTEND / "js" / "tabs" / "radio.js", FRONTEND / "js" / "radioboard.js", FRONTEND / "css" / "radio.css"):
+        text = f.read_text("utf-8").lower()
+        for bad in ("euroscope", "plik sektora", "pliku sektora", ".sct", "vacs", "vatspy", "vatsim", ".ese", "viff"):
+            assert bad not in text, (f.name, bad)
 
 
 def test_frontend_imports_resolve():

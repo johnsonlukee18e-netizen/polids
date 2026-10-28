@@ -3,13 +3,14 @@
    (żółte nazwy), kolumna przycisków warstw w środku, podgląd LOW na lewo od niej, HIGH na prawo, mały MID na dole.
    Czarne tło, czcionka bezszeryfowa zwykłej grubości (bez pogrubień: znaczenie niesie kolor); bez poświaty i cieni pod
    tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP). Układ nie zależy od czcionki o stałej szerokości.
-   0.12.5 (Marek): kolory podglądów z pliku sektora EuroScope (#define COLOR_… w EPWW-Sector.sct i zrzut od Marka):
+   0.12.5 (Marek): kolory podglądów jak na zrzucie od Marka:
    jasnoszare = nieobsadzone, ciemne = obsadzone – na LOW, MID, HIGH i u sąsiadów tak samo; granice sektorów, FIR i TMA
-   COLOR_FIRBorder/COLOR_TMA (70,70,70), CTR COLOR_TWR-CTR (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9).
+   szare (70,70,70), CTR czerwone (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9).
    Przyciski, okienka i pasek ATIS jak na zdjęciu PANDORY: jasne prostokąty
    z ciemnym tekstem, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
    Rozmiary od wielkości strony RADIO (container: cqw/cqh), nie od treści: --rb-f = częstotliwość w okienku (ok. 13 px
-   na 1366×768, 16 px na 1600×900, 18 px na 1920×1080, mniej na niskim oknie), --rb-bw = kolumna okienek, --rb-hw =
+   na 1366×768, 16 px na 1600×900, 18 px na 1920×1080, mniej na niskim oknie), --rb-bw = kolumna okienek (najmniej 78 px:
+   najdłuższy napis okienka, OSE2 660-365, przy najmniejszej czcionce 10 px), --rb-hw =
    kolumna przycisków i podglądu MID, --rb-nw = kolumna samych nazw FIR-ów (z linią ADVISORY 122.800). */
 .rb { --rb-f: clamp(10px, min(1.1cqw, 1.8cqh), 18px);
   --rb-bw: max(calc(var(--rb-f) * 5 + 14px), 78px); --rb-hw: clamp(150px, 13cqw, 250px); --rb-nw: calc(var(--rb-f) * 6.4 + 8px);
@@ -95,10 +96,10 @@
 .rb-marks .rb-lead { stroke: #9a9a9a; stroke-width: 1; }
 .rb-dot.fis { fill: var(--rb-lbl2); }
 
-/* --- etykiety (sektory, APP, TWR, FIS) i pola stosów jak na zdjęciu PANDORY: jasne pole, małe ID w prawym górnym
+/* --- etykiety (sektory, APP, TWR, FIS) jak na zdjęciu PANDORY: jasne pole, małe ID w prawym górnym
    rogu, pod nim duża ciemna częstotliwość; skrót stanowiska, które przejmuje (inne niż stanowisko sektora), przed
    częstotliwością. Częstotliwość tylko, gdy ktoś obsługuje (runda 11, Marek): bez nikogo samo ID w ciemniejszym,
-   przygaszonym polu (etykieta w odmianie skróconej .cmp, pole stosu bez linii) */
+   przygaszonym polu (etykieta w odmianie skróconej .cmp) */
 .rb-lbls { position: absolute; inset: 0; pointer-events: none; }
 .rb-lbl { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-grid; justify-items: end; align-content: start;
   padding: 0 4px 1px; background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line); border-radius: 0; white-space: nowrap;
@@ -118,7 +119,7 @@
 .rb-lbl.cmp { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 3px; }
 .rb-lbl.cmp .rb-id { font-size: max(9px, calc(var(--rb-f) - 2px)); }
 .rb-lbl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-/* rodzaj etykiety: pasek z lewej w kolorach pliku sektora (TMA szary, CTR czerwony; FIS oliwkowy), rozjaśnionych na polu */
+/* rodzaj etykiety: pasek z lewej w kolorach granic z podglądów (TMA szary, CTR czerwony; FIS oliwkowy), rozjaśnionych na polu */
 .rb-lbl.app { border-left: 3px solid #7c8a99; }
 .rb-lbl.twr { border-left: 3px solid #a04656; cursor: pointer; }
 .rb-lbl.fis { border-left: 3px solid #a3a62a; }

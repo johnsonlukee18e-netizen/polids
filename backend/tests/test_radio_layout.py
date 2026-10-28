@@ -534,9 +534,9 @@ def test_flow_alerts_pure():
                                                                              "TMA Poznań S"}
     hb = {a["tv"]: a for a in out["sectors"]["HB"]}
     assert set(hb) == {"EP-BH", "EP-XYZ"}
-    assert hb["EP-BH"]["tip"] == ["Flow restriction: max 30 entries per hour until 23:59"] and not hb["EP-BH"]["busy"]
+    assert hb["EP-BH"]["tip"] == ["Flow restriction: max 30 entries per hour until 23:59Z"] and not hb["EP-BH"]["busy"]
     assert hb["EP-XYZ"]["tip"] == ["EP-XYZ: Occupancy 9 of 10"]
-    assert out["sectors"]["HC"][0]["tip"][0] == "Flow restriction: max occupancy 20 until 02:00"
+    assert out["sectors"]["HC"][0]["tip"][0] == "Flow restriction: max occupancy 20 until 02:00Z"
     lb = out["sectors"]["LB"][0]
     assert (lb["busy"], lb["occupancy"], lb["capacity"], lb["tip"]) == (True, 12, 14, ["Occupancy 12 of 14"])
     assert out["tma"]["TMA Warszawa"][0]["tv"] == "EP-WATMAD"
