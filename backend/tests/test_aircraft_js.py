@@ -203,8 +203,8 @@ def test_css_boxes_flat_and_linked():
     assert "text-shadow" not in text
     assert all(v.strip().startswith("inset") for v in re.findall(r"box-shadow:\s*([^;}]+)", text))
     # wartość wyraźnie większa od etykiety; kratki się zawijają
-    label = int(re.search(r"\.acb > span \{[^}]*font: 700 (\d+)px", text).group(1))
-    value = int(re.search(r"\.acb > b \{[^}]*font: 700 (\d+)px", text).group(1))
+    label = int(re.search(r"\.acb > span \{[^}]*font: (\d+)px", text).group(1))
+    value = int(re.search(r"\.acb > b \{[^}]*font: (\d+)px", text).group(1))
     assert value >= label + 6
     assert re.search(r"\.ac-boxes \{[^}]*flex-wrap: wrap", text)
     # kolor kategorii RECAT-EU na wartości: selektor silniejszy od białej wartości (.acb > b)

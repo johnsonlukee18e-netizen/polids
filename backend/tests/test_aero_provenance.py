@@ -46,7 +46,9 @@ def test_neutral_messages():
         assert '"Network data unavailable"' in (FRONTEND / name).read_text("utf-8"), name
     # wiatr w punktach podejścia (INFO): błędy prognozy i METAR bez treści z serwera (tam bywa nazwa dostawcy)
     aero = _code((FRONTEND / "tabs/aerodrome.js").read_text("utf-8"))
-    assert 'aw.model_error && "Forecast unavailable"' in aero and 'aw.metar_error && "METAR unavailable"' in aero
+    assert 'aw.model_error && "Wind forecast unavailable"' in aero and 'aw.metar_error && "METAR unavailable"' in aero
+    # te same etykiety co w panelu pasów AWALON › lotnisko ("10 m FCST", "Wind forecast unavailable"), bez słowa "model"
+    assert "<i>10 m FCST</i>" in aero and "model 10 m" not in aero
     assert "[aw.model_error, aw.metar_error]" not in aero
 
 
@@ -115,14 +117,15 @@ def test_dman_aman_tooltips_without_formulas():
 def test_runway_in_use_wording_like_overview():
     """Pas w użyciu wszędzie jak w OVERVIEW: z ATIS litera ATIS ("ATIS K"), bez niego pas preferowany ("PREF",
     "preferred runway"); bez "system suggestion" i "no runway from ATIS"."""
-    for name in ("strips.js", "dman.js", "aman.js", "awos.js", "tabs/meteo.js", "tabs/aerodrome.js", "overview.js"):
+    for name in ("dman.js", "aman.js", "awos.js", "tabs/meteo.js", "tabs/awalon.js", "tabs/aerodrome.js", "overview.js"):   # 0.13.0: bez strips.js
         code = _code((FRONTEND / name).read_text("utf-8"))
         for word in ("system suggestion", "suggested, no ATIS", "suggestion, no ATIS", "from ATIS", ">suggested<"):
             assert word not in code, (name, word)
     awos = (FRONTEND / "awos.js").read_text("utf-8")
     assert '`ATIS ${st.atis?.letter || ""}`.trim() : "PREF"' in awos
-    met = (FRONTEND / "tabs/meteo.js").read_text("utf-8")
-    assert '"ARR?/DEP?: preferred runway."' in met and "letter: x.atis?.letter" in met
+    # 0.13.0: panel pasów dawnego METEO › WIND jest w AWALON
+    awl = (FRONTEND / "tabs/awalon.js").read_text("utf-8")
+    assert '"ARR?/DEP?: preferred runway."' in awl and "letter: x.atis?.letter" in awl
     aero = (FRONTEND / "tabs/aerodrome.js").read_text("utf-8")
     assert "ARR? / DEP? = preferred runway" in aero and '<i class="sw-hatch"></i>preferred</span>' in aero
 

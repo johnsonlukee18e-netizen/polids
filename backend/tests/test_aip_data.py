@@ -461,7 +461,7 @@ def test_seed_runways_unique_and_elevations():
         for end in (r["le_ident"], r["he_ident"]):
             assert (r["airport_ident"], end) not in seen, (r["airport_ident"], end)
             seen.add((r["airport_ident"], end))
-    # lotniska z pasami mają elewację (punkt podejścia w /api/meteo/approach-points liczony od elewacji)
+    # lotniska z pasami mają elewację (punkt podejścia w /api/meteo/approach-wind liczony od elewacji)
     ap = {a["ident"]: a for a in _seed_rows("airports.csv")}
     assert all(ap[i]["elevation_ft"] for i, _ in seen)
     assert (ap["EPDS"]["elevation_ft"], ap["EPDS"]["elevation_source"]) == ("1644", "lotniska.dlapilota.pl")

@@ -1,0 +1,63 @@
+/* OTHER › FLIGHT PLAN (0.13.0): pole znaku, nagłówek z ONLINE / PREFILED i MAP ›, wartości w kratkach (mała
+   etykieta nad wartością) w grupach Pilot, Now i Flight plan; plan wiersz na pole planu ICAO (numer pola z lewej).
+   Czarno-zielony jak PANDORA, ostre krawędzie, bez cieni i poświaty, zwykła grubość pisma (bez pogrubień);
+   układ nie zależy od czcionki o stałej szerokości. Kratki zawijają się w wąskim oknie bez przewijania w poziomie. */
+.fpl { display: flex; flex-direction: column; gap: 10px; }
+/* podzakładka z .pane.fill (bez paddingu i przewijania): pasek z polem stoi, przewija się tylko wynik */
+.pane.fill > .fpl { flex: 1; min-height: 0; overflow: hidden; padding: 12px 16px 0; }
+.pane.fill > .fpl > .fpl-out { flex: 1; min-height: 0; overflow: auto; padding-bottom: 12px; }
+.fpl-out > * { flex: none; }
+
+.fpl-bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.fpl-bar input.fpl-q { width: 200px; max-width: 100%; padding: 4px 8px; border-radius: 0; font: 400 18px/1.3 var(--sans);
+  letter-spacing: .5px; text-transform: uppercase; }
+.fpl-bar input.fpl-q::placeholder { color: #5d665d; letter-spacing: 1px; }
+.fpl-bar .fpl-go { padding: 5px 16px; border-radius: 0; font-weight: 400; letter-spacing: .6px; }
+.fpl-msg { font-size: 13px; }
+.fpl-msg.hint { color: var(--muted); }
+.fpl-msg.error { color: var(--bad); }
+.fpl-out { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fpl-empty, .fpl-err { margin: 4px 0; font-size: 14px; }
+
+/* nagłówek: znak, stan, odnośnik do mapy */
+.fpl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.fpl-cs { font: 400 26px/1.15 var(--sans); color: #fff; letter-spacing: .5px; }
+.fpl-state { padding: 1px 8px; border: 1px solid; border-radius: 0; font: 400 12px/1.5 var(--ui); letter-spacing: .8px; }
+.fpl-state.on { background: var(--green-hi); border-color: var(--green-hi); color: #041a02; }
+.fpl-state.pre { color: var(--yellow); border-color: #6b5d10; }
+.fpl-map { color: var(--cyan); text-decoration: none; font-size: 14px; letter-spacing: .5px; }
+.fpl-map:hover { text-decoration: underline; }
+
+/* grupy */
+.fpl-row { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.fpl-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fpl-plan { gap: 3px; }
+.fpl-h { margin: 0 0 2px; font: 400 11px/1.3 var(--ui); letter-spacing: 1px; text-transform: uppercase; color: var(--green-text); }
+.fpl-rev { margin-left: 8px; color: var(--muted); letter-spacing: .3px; text-transform: none; }
+.fpl-note { margin: 2px 0 0; font-size: 12px; color: var(--warn); }
+.fpl-note.pending { color: var(--muted); }
+.fpl-none { margin: 2px 0; }
+
+/* wiersz pola planu: numer pola, obok kratki */
+.fpl-item { display: flex; align-items: stretch; gap: 6px; }
+.fpl-n { flex: none; width: 30px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line);
+  color: var(--muted); font: 400 13px var(--ui); cursor: help; }
+
+/* kratki */
+.fpl-boxes { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.fpb { display: flex; flex-direction: column; justify-content: center; min-width: 64px; padding: 2px 9px 3px; border: 1px solid #2f5a26;
+  border-radius: 0; background: #08140a; }
+.fpb-k { font: 400 10px/1.25 var(--ui); letter-spacing: .6px; text-transform: uppercase; color: var(--green-text); white-space: nowrap; }
+.fpb-v { font: 400 18px/1.25 var(--sans); color: #fff; white-space: nowrap; }
+.fpb.wide { flex: 1 1 320px; min-width: 0; }
+.fpb.wide .fpb-v { font-size: 15px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.fpb.f18 .fpb-v { font-size: 15px; }
+/* łączność głosowa tylko odbiór albo tylko tekst: wyróżniona (pilot nie odpowie głosem) */
+.fpb.voice-limited { border-color: #6b5d10; }
+.fpb.voice-limited .fpb-v { color: var(--yellow); }
+/* pilot: kratki szaroniebieskie (dane osoby, nie planu); teraz: szare */
+.fpl-pilot .fpb { background: #0b1520; border-color: #2a4a66; }
+.fpl-pilot .fpb-k { color: #80b6dd; }
+.fpb.name { cursor: help; }
+.fpl-now .fpb { background: #101410; border-color: #3a453a; }
+.fpl-now .fpb-k { color: #a0aca0; }

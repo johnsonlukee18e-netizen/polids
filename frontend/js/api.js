@@ -44,7 +44,8 @@ export async function api(path, options = {}) {
   if (!res.ok) {
     const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
       : `PolIDS server error (HTTP ${res.status})`;
-    throw new Error(msg);
+    // status: np. 404 przy odświeżeniu to odpowiedź ("nie ma"), nie awaria (FLIGHT PLAN)
+    throw Object.assign(new Error(msg), { status: res.status });
   }
   return body;
 }
@@ -126,15 +127,16 @@ export function clearNavPath(view) { WANT.delete(view); }
 // tabs: [{id, label, render(pane), fill?}] albo {sep: true} jako odstęp.
 // Kliknięcie podzakładki to krok do cofnięcia (remember z kluczem zakładki i ścieżką id podmenu);
 // opts.remember = false wyłącza, opts.arg(id) podaje własny arg adresu zamiast ścieżki id.
+// opts.first: id podzakładki domyślnej (bez adresu i dla nieznanego id), gdy nie ma być nią pierwsza w kolumnie.
 export function subtabs(root, tabs, opts = {}) {
   const nav = h(`<nav class="submenu">${tabs.map((t) => t.sep ? `<div class="sep"></div>` : `<button data-id="${esc(t.id)}">${esc(t.label)}</button>`).join("")}</nav>`);
   const pane = h(`<div class="pane"></div>`);
   root.append(nav, pane);
   let current = null, currentId = null;
-  const first = tabs.find((x) => !x.sep).id;
+  const first = (tabs.find((x) => !x.sep && x.id === opts.first) || tabs.find((x) => !x.sep)).id;
   const show = (id) => {
     current?.destroy?.();
-    const t = tabs.find((x) => !x.sep && x.id === id) || tabs.find((x) => !x.sep);
+    const t = tabs.find((x) => !x.sep && x.id === id) || tabs.find((x) => x.id === first);
     currentId = t.id;
     nav.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("active", b.dataset.id === t.id));
     pane.className = "pane" + (t.fill ? " fill" : "");
@@ -304,6 +306,18 @@ export function splitTaf(raw) {
     lines[lines.length - 1].push(t);
   });
   return lines.map((l) => l.join(" "));
+}
+
+// Szerokość (px) najdłuższego z napisów w czcionce elementu el: kolumna "na najdłuższą nazwę listy" bez liczenia znaków
+// (0.13.0: Arial zamiast Consolas, wielka litera jest szersza niż 1ch). Bez kontekstu canvas zgrubnie 0.75em na znak.
+let measurer;
+export function textWidth(texts, el) {
+  const cs = getComputedStyle(el);
+  measurer ??= document.createElement("canvas").getContext("2d");
+  const list = texts.map((t) => String(t ?? ""));
+  if (!measurer) return Math.ceil(Math.max(0, ...list.map((t) => t.length * 0.75 * parseFloat(cs.fontSize))));
+  measurer.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return Math.ceil(Math.max(0, ...list.map((t) => measurer.measureText(t).width)));
 }
 
 // localStorage bywa niedostępny (tryb prywatny, zablokowane dane witryny): odczyt i zapis zawsze w try

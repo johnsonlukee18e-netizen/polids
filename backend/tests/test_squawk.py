@@ -479,7 +479,7 @@ def test_detect_roles_without_name_hints():
     assert (forced["code"], forced["from"], forced["type"], forced["remarks"]) == (1, None, 6, None)
 
 
-# --- frontend: czyste funkcje tabs/squawk.js w Node (bez DOM)
+# --- frontend: czyste funkcje squawk.js (od 0.13.0 OTHER › SQUAWK) w Node (bez DOM)
 
 NODE_SCRIPT = r"""
 const sq = await import(process.argv[2]);
@@ -560,7 +560,7 @@ def js(tmp_path_factory):
     front = settings.frontend_dir / "js"
     d = tmp_path_factory.mktemp("sqjs")
     (d / "api.mjs").write_text((front / "api.js").read_text("utf-8"), "utf-8")
-    (d / "squawk.mjs").write_text((front / "tabs" / "squawk.js").read_text("utf-8").replace('"../api.js"', '"./api.mjs"'), "utf-8")
+    (d / "squawk.mjs").write_text((front / "squawk.js").read_text("utf-8").replace('"./api.js"', '"./api.mjs"'), "utf-8")
     (d / "run.mjs").write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(d / "run.mjs"), (d / "squawk.mjs").as_uri()], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
@@ -658,7 +658,7 @@ def test_js_lookup_answer(js):
     assert 'class="sq-bad"' in a["7800"] and "8 and 9" in a["7800"]
     # kod specjalny: sam tytuł, bez opisu; 0001 pokazuje tytuł LPR i pulę EPWW, na którą się nakłada
     assert "LPR – RESCUE / MEDICAL TRANSPORT MISSION" in a["0001"] and "Also in 1 pool: EPWW 0001–0017" in a["0001"]
-    assert 'class="sq-big emerg">7700</b> <b class="sq-label">EMERGENCY</b>' in a["7700"] and "Not in any pool." in a["7700"]
+    assert 'class="sq-big emerg">7700</span> <span class="sq-label">EMERGENCY</span>' in a["7700"] and "Not in any pool." in a["7700"]
     assert "In 2 pools: EPWW 7401–7477 · EUR-E 7401–7477: LR CIV/MIL APP" in a["7450"] and "not a special code" in a["1234"]
     assert "4131" in a["4131 ccams"] and "not a special code" in a["4131 ccams"]
     assert "Loading" in js["answerLoading"]
@@ -675,10 +675,12 @@ def _code_only(src: str) -> str:
 
 
 def test_squawk_tab_wiring():
-    """Zakładka czyta /api/squawk, adres #squawk/<kod>; jedno pole wyszukiwania nad jedną listą (bez przełącznika
-    grup pul i osobnego panelu kodów specjalnych); arkusz stylów podpięty."""
-    src = (settings.frontend_dir / "js" / "tabs" / "squawk.js").read_text("utf-8")
-    assert 'api("/api/squawk")' in src and 'remember("squawk", addr)' in src and "activate: (arg)" in src
+    """Podzakładka OTHER › SQUAWK czyta /api/squawk, adres #other/squawk/<kod> składa OTHER (onCode = krok historii);
+    jedno pole wyszukiwania nad jedną listą (bez przełącznika grup pul i osobnego panelu kodów specjalnych); arkusz
+    stylów podpięty."""
+    src = (settings.frontend_dir / "js" / "squawk.js").read_text("utf-8")
+    assert 'api("/api/squawk")' in src and "onCode(addr)" in src and "remember(" not in src and "activate: (arg)" in src
+    assert "window.removeEventListener(ONLINE_EVENT, online)" in src and "export default" not in src
     # Wstecz na wpis z tym samym kodem nie kasuje tekstu filtra: pole podmienia tylko inny kod w adresie
     assert "textFromAddress(arg, addr)" in src and "arg !== input.value" not in src
     assert "data-view" not in src and "setView" not in src and "sq-special\"><h3>" not in src
@@ -691,7 +693,7 @@ def test_squawk_tab_wiring():
 def test_squawk_tab_without_provenance():
     """0.12.6 (issue #21): w napisach zakładki żadnych dopisków skąd dane (wydanie CAL, plik arkusza, data importu,
     wiersz arkusza, źródła kodów specjalnych, stopka ICAO/SERA/AIP); polskie znaki tylko w liniach komentarza."""
-    src = (settings.frontend_dir / "js" / "tabs" / "squawk.js").read_text("utf-8")
+    src = (settings.frontend_dir / "js" / "squawk.js").read_text("utf-8")
     code = _code_only(src)
     for word in ("EUROCONTROL", "CAL ", "CAL\"", "· CAL", "source", "SERA", "ICAO", "AIP", "sheet", "import $", "squawk.json",
                  "VATSIM", "plugin", "meaning", "excluded", "meta.edition", "Ver<"):
@@ -703,3 +705,101 @@ def test_squawk_tab_without_provenance():
     assert "shadow" not in css and "glow" not in css
     assert all(r.strip() == "0" for r in re.findall(r"border(?:-[a-z]+)*-radius:\s*([^;}]+)", css))
     assert not re.search(r"[.#][\w-]*(ad-|ads|advert|banner|sponsor|promo)", css + code)
+    # 0.13.0 (issue #23): bez pogrubień (znaczenie niesie kolor)
+    assert not re.search(r"<(b|strong)[\s>]", code)
+    assert not re.search(r"font-weight:\s*(bold|[6-9]00)|font:\s*(bold|[6-9]00)\b", css)
+
+
+MOUNT_SCRIPT = r"""
+// atrapy: window z listą nasłuchów (__l), api z ręcznie rozstrzyganymi odpowiedziami (__pending), licznik fokusu
+globalThis.__focus = 0;
+globalThis.__pending = [];
+globalThis.__l = [];
+globalThis.window = { addEventListener(t, f) { globalThis.__l.push([t, f]); },
+  removeEventListener(t, f) { globalThis.__l = globalThis.__l.filter(([a, b]) => !(a === t && b === f)); } };
+const sq = await import(process.argv[2]);
+const pane = { append(x) { this.box = x; } };
+const count = () => globalThis.__l.filter(([t]) => t === "polids:online").length;
+const codes = [], cleared = [], texts = [];
+const data = { pools: [{ from: "7401", to: "7477", category: "epww", pa: "EUR-E", unit: "EP", ar: "A" }],
+  special: [{ code: "7700", label: "EMERGENCY" }], meta: {} };
+// A: pełny cykl; B: zniszczona przed odpowiedzią
+const a = sq.mountSquawk(pane, { start: "7700", onCode: (c, o = {}) => (o.replace ? cleared : codes).push(c),
+  onInput: (t) => texts.push(t) });
+const boxA = pane.box, inputA = boxA.querySelector(".sq-q"), bodyA = boxA.querySelector(".sq-table tbody");
+const out = { afterMount: count(), startValue: inputA.value, requests: globalThis.__pending.map((p) => p.url),
+  focusAfterMount: globalThis.__focus };
+for (const v of ["77", "7700 x", "7500", "abc"]) { inputA.value = v; inputA.on.input.forEach((f) => f()); }
+out.codes = [...codes];
+// wyczyszczone pole: adres bez kodu (replace), raz; tekst pola za każdym razem do onInput
+for (const v of ["", ""]) { inputA.value = v; inputA.on.input.forEach((f) => f()); }
+out.cleared = [...cleared];
+out.texts = [...texts];
+inputA.value = "";
+globalThis.__pending.shift().res(data);
+await new Promise((r) => setTimeout(r, 0));
+out.drawnA = bodyA.innerHTML.includes("7401");
+const b = sq.mountSquawk(pane, {});
+const bodyB = pane.box.querySelector(".sq-table tbody");
+out.twoMounted = count();
+b.destroy();
+out.afterDestroy = count();
+const focus = globalThis.__focus;
+b.activate("7600");
+b.focus();
+out.focusAfterDestroy = globalThis.__focus - focus;
+globalThis.__pending.shift().res(data);
+await new Promise((r) => setTimeout(r, 0));
+out.drawnB = bodyB.innerHTML;
+a.destroy();
+out.allGone = count();
+// tekst filtra z OTHER (start) przy kodzie w adresie (addr): ten sam kod z adresu nie zmienia pola, inny tak
+const c = sq.mountSquawk(pane, { start: "NATO", addr: "7700" });
+const inputC = pane.box.querySelector(".sq-q");
+out.startText = inputC.value;
+c.activate("7700");
+out.sameAddr = inputC.value;
+c.activate("7600");
+out.otherAddr = inputC.value;
+c.destroy();
+console.log(JSON.stringify(out));
+"""
+API_STUB = r"""
+// atrapa elementu: pola, nasłuchy (on), querySelector zwraca stały element potomny dla selektora
+const makeEl = () => ({ value: "", innerHTML: "", textContent: "", scrollTop: 0, kids: {}, on: {},
+  classList: { toggle() {} }, addEventListener(t, f) { (this.on[t] ||= []).push(f); }, dispatchEvent() {},
+  focus() { globalThis.__focus += 1; }, scrollIntoView() {},
+  querySelector(sel) { return (this.kids[sel] ||= makeEl()); } });
+export const ONLINE_EVENT = "polids:online";
+export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const h = () => makeEl();
+export const api = (url) => new Promise((res, rej) => globalThis.__pending.push({ url, res, rej }));
+"""
+
+
+def test_squawk_mount_and_destroy(tmp_path):
+    """OTHER › SQUAWK rysuje się od nowa przy każdym kliknięciu w podmenu: destroy() zdejmuje nasłuch ONLINE_EVENT
+    (bez niego każde kliknięcie dokładało nasłuch), spóźniona odpowiedź /api/squawk nic nie rysuje, a zniszczona
+    strona nie łapie fokusu. Kod z adresu (start) od razu w polu; onCode tylko dla samego pełnego kodu."""
+    import shutil
+    import subprocess
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text(API_STUB, "utf-8")
+    src = (settings.frontend_dir / "js" / "squawk.js").read_text("utf-8")
+    assert '"./api.js"' in src
+    (tmp_path / "squawk.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    (tmp_path / "run.mjs").write_text(MOUNT_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "squawk.mjs").as_uri()], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["afterMount"] == 1 and out["startValue"] == "7700" and out["requests"] == ["/api/squawk"]
+    assert out["focusAfterMount"] == 1
+    assert out["codes"] == ["7500"]
+    assert out["cleared"] == [""] and out["texts"] == ["77", "7700 x", "7500", "abc", "", ""]
+    assert (out["startText"], out["sameAddr"], out["otherAddr"]) == ("NATO", "NATO", "7600")
+    assert out["drawnA"] is True
+    assert out["twoMounted"] == 2 and out["afterDestroy"] == 1 and out["allGone"] == 0
+    assert out["focusAfterDestroy"] == 0 and out["drawnB"] == ""

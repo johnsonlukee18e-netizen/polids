@@ -13,14 +13,14 @@
 .alist-bar { container: alistbar / inline-size; display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap;
   margin-bottom: 8px; }
 .alist-q { width: 380px; max-width: 36vw; padding: 5px 10px; background: #eef1ee; color: #000; border: 2px solid #9aa49a;
-  border-radius: 0; outline: none; font: 700 18px/1.2 var(--mono); text-transform: uppercase; }
+  border-radius: 0; outline: none; font: 18px/1.2 var(--mono); text-transform: uppercase; }
 .alist-q::placeholder { color: #7a827a; font-weight: 400; text-transform: none; }
 .alist-q:focus { border-color: var(--green-hi); }
 .alist-btn { padding: 6px 16px; background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 0;
-  color: #f4fff0; font: 700 14px/1.35 var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; }
+  color: #f4fff0; font: 14px/1.35 var(--ui); letter-spacing: .5px; cursor: pointer; white-space: nowrap; }
 .alist-btn:hover { background: linear-gradient(#52bd3c, #36992a); }
 .alist-btn:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
-.alist-title { margin-left: 10px; color: var(--muted); font: 700 14px var(--mono); text-transform: uppercase; letter-spacing: .5px; }
+.alist-title { margin-left: 10px; color: var(--muted); font: 14px var(--mono); text-transform: uppercase; letter-spacing: .5px; }
 .alist-title b { color: #fff; font-size: 18px; margin-right: 6px; }
 .alist-n { flex: none; min-width: 15ch; white-space: nowrap; }    /* "123 aerodromes" i "3 of 123" tej samej szerokości */
 .alist-legend { white-space: nowrap; }
@@ -31,9 +31,10 @@
    z niej też PgUp PgDn (page() w aerolist.js) */
 .alist-box { --alist-row-h: 38px; position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
   background: #000; border: 1px solid var(--line); }
-/* jeden wiersz = jedno lotnisko: ICAO, nazwa (kolumna na najdłuższą nazwę listy, --nmw z aerolist.js), MIL, stanowiska
-   online; pasy (.odd) liczone po widocznych wierszach, na całą szerokość okienka */
-.alist-row { display: grid; grid-template-columns: 4ch minmax(0, var(--nmw, 30ch)) 3.5ch auto; justify-content: start;
+/* jeden wiersz = jedno lotnisko: ICAO, nazwa (kolumna na najdłuższą nazwę listy, --nmw zmierzone w aerolist.js), MIL,
+   stanowiska online; pasy (.odd) liczone po widocznych wierszach, na całą szerokość okienka. ICAO 3.3em: cztery wielkie
+   litery w Arialu (EPWW) są szersze niż 4ch */
+.alist-row { display: grid; grid-template-columns: 3.3em minmax(0, var(--nmw, 30ch)) 3.5ch auto; justify-content: start;
   align-items: center; column-gap: 2.5ch; height: var(--alist-row-h); padding: 0 18px; cursor: pointer;
   font: 20px/1.4 var(--mono); white-space: nowrap; color: #e4e9e4; }
 .alist-row[hidden], .alist-msg[hidden] { display: none; }
@@ -56,8 +57,8 @@
 /* karta lotniska zagranicznego: METAR na całą szerokość, niżej TAF i stanowiska (APP, TWR, GND, DEL, ATIS) */
 .acard { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .acard-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; }
-.acard-head > b { color: #fff; font: 700 28px/1.1 var(--mono); }
-.acard-name { color: #fff; font: 700 22px/1.1 var(--mono); }
+.acard-head > b { color: #fff; font: 28px/1.1 var(--mono); }
+.acard-name { color: #fff; font: 22px/1.1 var(--mono); }
 .acard-fir { font-size: 13px; }
 .acard .metar-head { margin-bottom: 8px; }
 .acard .metar-head .wx { font-size: 17px; }
@@ -77,7 +78,7 @@ table.data.acard-pos td { padding: 4px 10px; vertical-align: middle; }
 .acard-pos tr.off .ab { opacity: .45; }
 .acard-pos tr.on td { color: #fff; }
 .acard-pos .freq { font-size: 14px; padding: 1px 6px; }
-.acard-cs { font: 700 14px var(--mono); }
+.acard-cs { font: 14px var(--mono); }
 .acard-pn { display: block; color: var(--muted); font: 11px var(--mono); }
 .acard-st b { color: var(--green-hi); }
 .acard-unk { color: var(--muted); font-style: italic; }

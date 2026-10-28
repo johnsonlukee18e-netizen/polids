@@ -11,7 +11,7 @@
 .as-pre button { flex: 1; padding: 1px 0; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #aab4aa;
   font: 11px var(--mono); cursor: pointer; }
 .as-pre button:hover { border-color: var(--green-hi); color: #fff; }
-.as-pre button.on { background: var(--green); border-color: var(--green-hi); color: #fff; font-weight: 700; }
+.as-pre button.on { background: var(--green); border-color: var(--green-hi); color: #fff; }
 .as-row { display: flex; align-items: center; gap: 6px; }
 .as-row > .sw { flex: 1; min-width: 0; }
 .pk-btn { flex: none; max-width: 104px; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #aab4aa;
@@ -108,8 +108,8 @@
 .as-tip td { padding: 1px 5px; }
 .as-tip td:last-child { white-space: normal; }
 .as-tip td.lv { color: var(--yellow); }
-.as-tip .fq { color: #9dff6e; font-weight: 700; }
-.as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 0; font: 700 10px/14px var(--mono); text-align: center; }
+.as-tip .fq { color: #9dff6e; }
+.as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 0; font: 10px/14px var(--mono); text-align: center; }
 .as-k.as-acc { color: #5fd23a; } .as-k.as-tma { color: #7f95ff; } .as-k.as-ctr { color: #ff6b6b; } .as-k.as-fis { color: #35c4b0; }
 .as-k.as-cta { color: #c9b26b; } .as-k.as-atz { color: #e08ad6; } .as-k.as-nb, .as-k.as-oth { color: #aab4bd; }
 /* podpowiedź pod liczbą przestrzeni (TMA / CTR poza wybranym poziomem) */

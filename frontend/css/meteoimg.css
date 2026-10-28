@@ -1,10 +1,10 @@
 /* METEO: obrazy (SAT PL, SAT EUR, TURB, SIGWX) (runda 10).
    SAT PL / SAT EUR to ramki Windy (iframe.embed ze style.css). TURB i SIGWX: obraz z serwera IMGW na czarnym tle,
-   dopasowany do okna (object-fit: contain) albo 1:1 z przewijaniem; nad nim pasek jak w METEO › WIND. Bez poświaty. */
+   dopasowany do okna (object-fit: contain) albo 1:1 z przewijaniem; nad nim pasek z tytułem i przyciskami. Bez poświaty. */
 .mimg { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .mimg-bar { flex: none; display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; padding: 6px 10px; background: var(--panel);
   border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
-.mimg-title { font: 700 13px var(--mono); letter-spacing: .8px; color: var(--green-text); }
+.mimg-title { font: 13px var(--mono); letter-spacing: .8px; color: var(--green-text); }
 /* opis (źródło, potem czas pobrania): gdy brak miejsca w jednym wierszu, w dwóch (pasek się nie wydłuża), dalej ucięty "…" */
 .mimg-hint { flex: 1 1 0; min-width: 0; text-align: right; line-height: 13px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
@@ -12,10 +12,10 @@
 /* okno węższe niż 1600 px (np. 1366x768): przy TURB pasek ma mało miejsca na opis, więc przycisk tylko "Otwórz ↗" */
 @media (max-width: 1599px) { .mimg-turb .mimg-long { display: none; } }
 
-/* przyciski w jednej ramce jak .wnd-seg (METEO › WIND) */
+/* przyciski w jednej ramce (jak dawny przełącznik 0 / 3000 ft w METEO › WIND) */
 .mimg-seg { display: inline-flex; flex: none; border: 1px solid var(--line); }
 .mimg-seg button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 9px; cursor: pointer;
-  font: 700 12px var(--mono); letter-spacing: .3px; white-space: nowrap; }
+  font: 12px var(--mono); letter-spacing: .3px; white-space: nowrap; }
 .mimg-seg button:last-child { border-right: 0; }
 .mimg-seg button:hover { color: var(--text); background: var(--panel-2); }
 .mimg-seg button.active { background: #14240f; color: var(--green-hi); box-shadow: inset 0 -2px 0 var(--green-hi); }
@@ -43,7 +43,7 @@
 .mimg-msg.err { border-color: #7a2a22; }
 .mimg-msg.err b { color: var(--bad); }
 .mimg-acts { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
-.mimg-acts a { color: var(--green-text); font-weight: 700; }
+.mimg-acts a { color: var(--green-text); }
 
 /* --- GAMET (0.12.3): wybór rejonu A1–A5 / ALL w pasku jak klatki TURB; tekst komunikatu po lewej (pre, przewijany),
    mapa rejonów IMGW po prawej, dopasowana do okna */
@@ -52,12 +52,12 @@
 .gmt-area { margin: 0 0 14px; max-width: 110ch; }
 .gmt-area h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 6px; padding: 4px 8px;
   background: var(--head); border-left: 3px solid var(--green-hi); font: 12px var(--mono); color: var(--muted); }
-.gmt-area h4 b { font: 700 14px var(--mono); color: var(--green-text); letter-spacing: .5px; }
+.gmt-area h4 b { font: 14px var(--mono); color: var(--green-text); letter-spacing: .5px; }
 .gmt-area h4 .old { color: var(--bad); }
 .gmt-area pre { margin: 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); font: 14px/1.5 var(--mono);
   color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .gmt-text .error { font: 13px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
-.gmt-text .error a { color: var(--green-text); font-weight: 700; }
+.gmt-text .error a { color: var(--green-text); }
 .gmt-map { flex: 0 1 46%; min-width: 0; position: relative; display: flex; align-items: center; justify-content: center;
   background: var(--bg); border-left: 1px solid var(--line); }
 .gmt-img { width: 100%; height: 100%; object-fit: contain; }
@@ -65,7 +65,7 @@
 .gmt-imgmsg { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; max-width: 360px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 0; font: 12px/1.45 var(--mono); color: var(--muted); text-align: center; }
 .gmt-imgmsg[hidden] { display: none; }
-.gmt-imgmsg a { color: var(--green-text); font-weight: 700; }
+.gmt-imgmsg a { color: var(--green-text); }
 .gmt-map.off { flex: 0 0 300px; align-items: flex-start; padding-top: 10px; }
 @media (max-width: 1365px) { .gmt-map { flex-basis: 38%; } }
 
@@ -75,7 +75,7 @@
 /* --- SUN (0.12.3): mapa świata z granicą dnia i nocy, obok karta lotniska (godziny UTC, pod nimi czas polski) */
 .sun-l { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .sun-icao { width: 64px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 0; padding: 3px 6px;
-  font: 700 13px var(--mono); text-transform: uppercase; outline: none; }
+  font: 13px var(--mono); text-transform: uppercase; outline: none; }
 .sun-icao:focus { border-color: var(--green-hi); }
 .sun-body { flex: 1; min-height: 0; display: flex; }
 .sun-map { flex: 1 1 auto; min-width: 0; cursor: crosshair; }
@@ -91,7 +91,7 @@
 .sun-next { font: 12px var(--mono); color: var(--muted); margin-bottom: 8px; }
 .sun-next b { color: var(--text); }
 .sun-tab td.num, .sun-tab th.num { text-align: right; white-space: nowrap; }
-.sun-tab td.num { font: 700 14px var(--mono); color: #fff; }
+.sun-tab td.num { font: 14px var(--mono); color: #fff; }
 .sun-tab td small { display: block; font: 11px var(--mono); color: var(--muted); }
 .sun-tab td small.d { display: inline; color: var(--yellow); }
 .sun-polar { margin: 6px 0 0; font: 12px var(--mono); color: var(--yellow); }
@@ -112,7 +112,7 @@
 .sun-map .sun-subsolar { fill: var(--yellow); fill-opacity: 1; stroke: #000; stroke-width: 2; }
 .sun-map .sun-place { fill: var(--green-hi); fill-opacity: 1; stroke: #000; stroke-width: 2; }
 .sun-map .leaflet-tooltip.sun-tip { background: #111; color: #fff; border: 1px solid var(--green-hi); border-radius: 0;
-  font: 700 12px var(--mono); padding: 1px 5px; box-shadow: none; }
+  font: 12px var(--mono); padding: 1px 5px; box-shadow: none; }
 .sun-map .leaflet-tooltip.sun-tip::before { display: none; }
 /* przyciski +/− mapy bez zaokrągleń, z ostrymi krawędziami jak w PANDORZE (0.12.5) */
 .sun-map .leaflet-bar, .sun-map .leaflet-bar a, .sun-map .leaflet-bar a:first-child, .sun-map .leaflet-bar a:last-child,

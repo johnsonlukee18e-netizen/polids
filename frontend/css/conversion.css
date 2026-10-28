@@ -12,8 +12,8 @@
 .conv-clocks { flex: none; display: flex; gap: 6px; margin-left: auto; }
 .conv-clock { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px; background: #000; border: 1px solid var(--line);
   border-left: 3px solid var(--green-hi); border-radius: 0; white-space: nowrap; }
-.conv-ck-l { color: var(--green-text); font: 700 11px/1.3 var(--sans); letter-spacing: .8px; }
-.conv-ck-t { color: #fff; font: 700 20px/1.2 var(--mono); }
+.conv-ck-l { color: var(--green-text); font: 11px/1.3 var(--sans); letter-spacing: .8px; }
+.conv-ck-t { color: #fff; font: 20px/1.2 var(--mono); }
 .conv-ck-s { color: var(--muted); font: 12px var(--mono); }
 
 /* cztery kolumny kart; węższe okno (poniżej ok. 1150 px): dwie kolumny jedna pod drugą */
@@ -25,7 +25,7 @@
 .conv-card h3 { margin-bottom: 6px; }
 .conv-rows { display: flex; flex-direction: column; gap: 3px; }
 .conv-row { display: flex; align-items: center; gap: 8px; }
-.conv-name { flex: none; width: 6ch; color: var(--green-text); font: 700 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
+.conv-name { flex: none; width: 6ch; color: var(--green-text); font: 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
 .conv-row input.field { flex: none; width: 130px; padding: 2px 8px; border-radius: 0; font: 15px/1.3 var(--mono); text-align: right; }
 .conv-row input.field.bad { border-color: var(--bad); }
 .conv-unit { color: var(--text); font: 13px var(--mono); white-space: nowrap; }

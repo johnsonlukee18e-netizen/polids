@@ -51,8 +51,10 @@ def test_two_symmetric_columns(js):
     assert ".submenu.letters button.all { grid-column: 1 / -1; }" in CSS
     letters = re.findall(r'<button data-l="[A-Z]">', js["html"])
     assert len(letters) == 26 and len(letters) % 2 == 0
-    # żadna inna reguła nie zmienia siatki menu liter ani miejsca przycisków (np. grid-column dla liter)
-    rules = re.findall(r"^([^{}\n]*\.letters[^{}]*)\{", CSS, re.M)
+    # żadna inna reguła nie zmienia siatki menu liter ani miejsca przycisków (np. grid-column dla liter); reguły
+    # z .letters tylko w :not(.letters) (niskie okno w 0.13.0: inne podmenu w kolumnie flex) liter nie dotyczą
+    rules = [r for r in re.findall(r"^([^{}\n]*\.letters[^{}]*)\{", CSS, re.M)
+             if ".letters" in r.replace(":not(.letters)", "")]
     assert [r.strip() for r in rules] == [".submenu.letters", ".submenu.letters button", ".submenu.letters button.all"]
 
 

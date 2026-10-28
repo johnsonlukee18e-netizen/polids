@@ -1,0 +1,255 @@
+{
+ "_uwaga": "Kody przyczyn regulacji ATFM (REGCAUSE) z OTHER › REGCAUSE, kolejność = kolejność na ekranie: kategorie po literze przyczyny (A, C, E, G, I, M, N, O, P, R, S, T, V, W; jak na zdjęciu PANDORY A, C, E), w kategorii D (lotnisko odlotu), E (trasa), A (lotnisko przylotu). Kod = litera przyczyny + litera miejsca + numer opóźnienia IATA; iata = opis tego numeru IATA. Całość przepisana z ATFCM Users Manual, wydanie 27.0 z 25-04-2023, aneks D 'Correlation between IATA Delay Codes and NM Regulation Causes' (s. 106-108; PDF od Marka 28.10.2026): nazwy kategorii, kody, numery i opisy IATA, wytyczne jako opisy. Ujednolicenia względem PDF: ATC capacity ma w PDF jedną komórkę na trzy wiersze ('En Route: ...' dla E, 'Airport: ...' dla D i A), tu jak w PANDORZE każdy wiersz dostaje swoje zdanie bez przedrostka; kropka na końcu każdego opisu (w PDF brak przy C/E, I, R, M); opis 82 zawsze 'STAFF / EQUIPMENT' (w PDF raz bez spacji przy M), 89 bez zbłąkanego apostrofu przy G. Interfejs pokazuje tylko categories (name, rows: code, description, iata); ta uwaga nie trafia do /api/regcause.",
+ "categories": [
+  {
+   "name": "Accident / incident",
+   "rows": [
+    {
+     "code": "AD 89",
+     "description": "Reduction of expected ATC capacity due to an aircraft accident / incident.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "AA 83",
+     "description": "Reduction of expected ATC capacity due to an aircraft accident / incident.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "ATC capacity",
+   "rows": [
+    {
+     "code": "CD 89",
+     "description": "Demand exceeds declared or expected ATC capacity.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "CE 81",
+     "description": "Demand exceeds or complexity reduces declared or expected ATC capacity.",
+     "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
+    },
+    {
+     "code": "CA 83",
+     "description": "Demand exceeds declared or expected ATC capacity.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Aerodrome Services",
+   "rows": [
+    {
+     "code": "ED 99",
+     "description": "Reduced capacity due to the degradation or non-availability of support equipment at an airport e.g. Fire Service, De-icing / snow removal equipment or other ground handling equipment.",
+     "iata": "OTHER"
+    },
+    {
+     "code": "EA 99",
+     "description": "Reduced capacity due to the degradation or non-availability of support equipment at an airport e.g. Fire Service, De-icing / snow removal equipment or other ground handling equipment.",
+     "iata": "OTHER"
+    }
+   ]
+  },
+  {
+   "name": "Aerodrome capacity",
+   "rows": [
+    {
+     "code": "GD 89",
+     "description": "Reduction in declared or expected capacity due to the degradation or non-availability of infrastructure at an airport. e.g. Work in Progress, shortage of aircraft stands etc. Or when demand exceeds expected aerodrome capacity.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "GA 83",
+     "description": "Reduction in declared or expected capacity due to the degradation or non-availability of infrastructure at an airport. e.g. Work in Progress, shortage of aircraft stands etc. Or when demand exceeds expected aerodrome capacity.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "ATC industrial action",
+   "rows": [
+    {
+     "code": "ID 89",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "IE 82",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
+     "iata": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE"
+    },
+    {
+     "code": "IA 83",
+     "description": "Reduction in any capacity due to industrial action by ATC staff.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Airspace management",
+   "rows": [
+    {
+     "code": "MD 89",
+     "description": "Reduction in declared or expected capacity following changes in airspace / route availability due to small scale military activity.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "ME 82",
+     "description": "Reduction in declared or expected capacity following changes in airspace / route availability due to small scale military activity.",
+     "iata": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE"
+    },
+    {
+     "code": "MA 83",
+     "description": "Reduction in declared or expected capacity following changes in airspace / route availability due to small scale military activity.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Industrial action NON-ATC",
+   "rows": [
+    {
+     "code": "ND 98",
+     "description": "A reduction in expected / planned capacity due to industrial action by non ATC personnel.",
+     "iata": "INDUSTRIAL ACTION OUTSIDE OWN AIRLINE"
+    },
+    {
+     "code": "NA 98",
+     "description": "A reduction in expected / planned capacity due to industrial action by non ATC personnel.",
+     "iata": "INDUSTRIAL ACTION OUTSIDE OWN AIRLINE"
+    }
+   ]
+  },
+  {
+   "name": "Other",
+   "rows": [
+    {
+     "code": "OD 89",
+     "description": "This should only be used in exceptional circumstances when no other category is sufficient. An explanatory ANM remark MUST be given to allow post ops analysis.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "OE 81",
+     "description": "This should only be used in exceptional circumstances when no other category is sufficient. An explanatory ANM remark MUST be given to allow post ops analysis.",
+     "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
+    },
+    {
+     "code": "OA 83",
+     "description": "This should only be used in exceptional circumstances when no other category is sufficient. An explanatory ANM remark MUST be given to allow post ops analysis.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Special event",
+   "rows": [
+    {
+     "code": "PD 89",
+     "description": "Reduction in planned, declared or expected capacity or when demand exceeds the above capacities as a result of a major sporting, governmental or social event. It may also be used for ATM system upgrades and transitions. Large multinational military exercises may also use this reason. This category should only be used with prior approval during the planning process.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "PE 82",
+     "description": "Reduction in planned, declared or expected capacity or when demand exceeds the above capacities as a result of a major sporting, governmental or social event. It may also be used for ATM system upgrades and transitions. Large multinational military exercises may also use this reason. This category should only be used with prior approval during the planning process.",
+     "iata": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE"
+    },
+    {
+     "code": "PA 83",
+     "description": "Reduction in planned, declared or expected capacity or when demand exceeds the above capacities as a result of a major sporting, governmental or social event. It may also be used for ATM system upgrades and transitions. Large multinational military exercises may also use this reason. This category should only be used with prior approval during the planning process.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "ATC routeings",
+   "rows": [
+    {
+     "code": "RE 81",
+     "description": "Network solutions / scenarios used to balance demand and capacity.",
+     "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
+    }
+   ]
+  },
+  {
+   "name": "ATC staffing",
+   "rows": [
+    {
+     "code": "SD 89",
+     "description": "Unplanned staff shortage reducing expected capacity.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "SE 82",
+     "description": "Unplanned staff shortage reducing expected capacity.",
+     "iata": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE"
+    },
+    {
+     "code": "SA 83",
+     "description": "Unplanned staff shortage reducing expected capacity.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "ATC equipment",
+   "rows": [
+    {
+     "code": "TD 89",
+     "description": "Reduction of expected or declared capacity due to the non-availability or degradation of equipment used to provide an ATC service.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "TE 82",
+     "description": "Reduction of expected or declared capacity due to the non-availability or degradation of equipment used to provide an ATC service.",
+     "iata": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE"
+    },
+    {
+     "code": "TA 83",
+     "description": "Reduction of expected or declared capacity due to the non-availability or degradation of equipment used to provide an ATC service.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Environmental issue",
+   "rows": [
+    {
+     "code": "VD 89",
+     "description": "Reduction in any capacity or when demand exceeds any capacity due to agreed local noise, runway usage or similar procedures. This category should only be used with prior agreement in the planning process.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "VE 81",
+     "description": "Reduction in any capacity or when demand exceeds any capacity due to agreed local noise, runway usage or similar procedures. This category should only be used with prior agreement in the planning process.",
+     "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
+    },
+    {
+     "code": "VA 83",
+     "description": "Reduction in any capacity or when demand exceeds any capacity due to agreed local noise, runway usage or similar procedures. This category should only be used with prior agreement in the planning process.",
+     "iata": "ATFM due to RESTRICTION AT DESTINATION AIRPORT"
+    }
+   ]
+  },
+  {
+   "name": "Weather",
+   "rows": [
+    {
+     "code": "WD 89",
+     "description": "Reduction in expected capacity due to any weather phenomena. This includes where weather impacts airport infrastructure capacity, but where aerodrome services are operating as planned / expected.",
+     "iata": "RESTRICTIONS AT AIRPORT OF DEPARTURE"
+    },
+    {
+     "code": "WE 81",
+     "description": "Reduction in expected capacity due to any weather phenomena. This includes where weather impacts airport infrastructure capacity, but where aerodrome services are operating as planned / expected.",
+     "iata": "ATFM due to ATC ENROUTE DEMAND / CAPACITY"
+    },
+    {
+     "code": "WA 84",
+     "description": "Reduction in expected capacity due to any weather phenomena. This includes where weather impacts airport infrastructure capacity, but where aerodrome services are operating as planned / expected.",
+     "iata": "ATFM due to WEATHER AT DESTINATION"
+    }
+   ]
+  }
+ ]
+}

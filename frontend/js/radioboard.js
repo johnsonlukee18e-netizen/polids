@@ -1,5 +1,6 @@
 // RADIO (jedna strona jak w PANDORZE): czyste funkcje bez DOM – adres (warstwy i przekrój LOW), rzutowanie map,
-// układ etykiet bez nakładania się, pasma wysokości w stosach sąsiadów. Testowane w Node (test_radio_board.py).
+// układ etykiet bez nakładania się, siatka strony wg szkicu (0.13.0: kolumny, komórki, przyciski, napisy okienek).
+// Testowane w Node (test_radio_board.py).
 
 // Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
 export const LAYERS = [
@@ -9,14 +10,14 @@ export const LAYERS = [
   { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH" },
   { id: "app", label: "APP", tip: "TMAs and APP frequencies, neighbour TMAs at the FIR border (on the LOW preview)" },
   { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies, neighbour CTRs at the FIR border (on the LOW preview)" },
-  { id: "twra", label: "TWR/ATIS", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
+  { id: "twra", label: "TWR/A", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
   { id: "fis", label: "FIS", tip: "FIS areas and Warszawa Information frequencies (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
 // przekrój LOW (FL): na FL300 są wszystkie sektory LOW (F od FL285, T od FL195)
 export const DEFAULT_CUT = 300;
-// suwak wysokości LOW co 500 ft (granice wycinków w pliku .ese są co 500 ft)
+// suwak wysokości LOW co 500 ft (granice wycinków są co 500 ft)
 export const CUT_STEP = 5;
 
 // adres "#radio/<warstwy>/fl<przekrój>": warstwy po przecinku w stałej kolejności, "none" = żadna
@@ -77,13 +78,13 @@ export function bboxOf(g) {
   ringsOf(g).forEach((r) => r.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }));
   return [x0, y0, x1, y1];
 }
-// ramka FIR EPWW, gdy brak granicy z VATSpy (bbox bez punktów: ±Infinity)
+// ramka FIR EPWW, gdy brak granicy FIR-u (bbox bez punktów: ±Infinity)
 export const EPWW_BBOX = [14.1, 49.0, 24.2, 55.0];
 export const bboxOrDefault = (b) => (b && b.length === 4 && b.every(Number.isFinite) && b[2] > b[0] && b[3] > b[1] ? b : null);
-// czas z VATSIM (np. "2026-10-12T12:00:43.0000000Z": 7 cyfr ułamka) jako "HH:MMZ"; nieczytelny → "–"
+// czas z sieci (np. "2026-10-12T12:00:43.0000000Z": 7 cyfr ułamka) jako "HH:MMZ"; nieczytelny → "–"
 export function utcHhmm(iso) {
   const t = Date.parse(String(iso || "").replace(/(\.\d{3})\d+/, "$1"));
-  return Number.isNaN(t) ? "–" : new Date(t).toISOString().slice(11, 16) + "Z";
+  return Number.isNaN(t) ? "\u2013" : new Date(t).toISOString().slice(11, 16) + "Z";
 }
 // liczba kontrolerów na tablicy: online = stanowisko → kontroler; ten sam kontroler pod znakiem sąsiada (alias_of)
 // i ATIS-y nie liczą się osobno
@@ -171,30 +172,25 @@ function distSeg(px, py, [x0, y0, x1, y1]) {
   const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
   return Math.hypot(px - x0 - t * dx, py - y0 - t * dy);
 }
-// zasięg etykiety kształtu (część TMA, CTR): pół przekątnej ramki box [lon0, lat0, lon1, lat1] w pikselach + 20 px,
-// w granicach lo–hi; bez ramki null
-export function boxReach(box, P, lo, hi) {
-  if (box?.length !== 4) return null;
-  const [a, b] = [P([box[0], box[3]]), P([box[2], box[1]])];
-  return Math.max(lo, Math.min(hi, Math.hypot(b[0] - a[0], b[1] - a[1]) / 2 + 20));
-}
-// Parametry etykiety warstwy do placeLabels (wspólne dla strony i testu): kind acc / app / twr / fis; box = ramka
-// kształtu (część TMA, CTR), on = obsadzona, fq = z częstotliwością, shapes = obrysy na podglądzie ("twr": CTR,
-// "app": TMA, "" = żadne). ACC: do 70 px od punktu, schodzi z CTR i małych TMA, gdy jest miejsce; część TMA: do pół
-// przekątnej swojej ramki (50–160 px); CTR: 60–90 px (CTR na 1366 px ma kilkanaście px, a w środku kraju leży pięć
-// lotnisk), obrys najważniejszy – mały CTR nie znika pod etykietą; punkt TMA i lotniska zostaje widoczny (pin);
-// częstotliwość obsadzonych i podanych ważniejsza niż odległość (wv)
-export function labelOpts(kind, { box = null, on = false, fq = false, shapes = "" } = {}, P = null) {
+// Plakietki APP i TWR (0.13.0, Marek): tylko zalogowani, plakietka w środku swojej przestrzeni (części TMA, CTR), bez
+// linii do punktu – wolno ją tylko lekko odsunąć od innej etykiety: krawędź pełnej plakietki najwyżej PLATE_NEAR px od
+// punktu, skróconej PLATE_MAX px (w tłoku × STRETCH)
+export const PLATE_NEAR = 12, PLATE_MAX = 20;
+// Parametry etykiety warstwy do placeLabels (wspólne dla strony i testu): kind acc / app / twr / fis; on = obsadzona,
+// fq = z częstotliwością, shapes = obrysy na podglądzie ("twr": CTR, "app": TMA, "" = żadne). ACC: do 70 px od punktu,
+// schodzi z CTR i małych TMA, gdy jest miejsce; plakietki APP i TWR: w środku, obrysy pod nimi bez kary (plakietka
+// stoi na swoim CTR), bez kropki; FIS jak dotąd; częstotliwość obsadzonych ważniejsza niż odległość (wv)
+export function labelOpts(kind, { on = false, fq = false, shapes = "" } = {}) {
   if (kind === "acc") return { max: 70, wc: { twr: 1, app: 0.5 }[shapes] ?? 0.15 };
-  const r = P ? (kind === "twr" ? boxReach(box, P, 60, 90) : boxReach(box, P, 50, 160)) : null;
-  return { ...(r ? { max: r, near: r } : {}), wc: kind === "twr" ? 6 : 1.5, wv: on || fq ? 4 : 2, pin: kind !== "fis" };
+  if (kind === "app" || kind === "twr") return { near: PLATE_NEAR, max: PLATE_MAX, wc: 0, wv: 4 };
+  return { wc: 1.5, wv: on || fq ? 4 : 2 };
 }
 
 // Etykiety bez nakładania się. items [{x, y, w, h, alts?: [{w, h}], near?, max?, wc?, wv?, pin?}] w kolejności priorytetu
 // (najpierw ważniejsze); x, y = punkt zakotwiczenia, w, h = rozmiar pełnej etykiety, alts = mniejsze odmiany (np.
 // skrócona w jednej linii), pin = punkt to kropka na mapie (lotnisko, TMA), której żadna etykieta nie zasłania.
 // Kandydaci leżą na pierścieniach coraz dalej od punktu (coraz więcej kierunków); dozwolony jest tylko kandydat bez
-// kolizji z już ułożonymi etykietami i przeszkodami (obstacles: stosy sąsiadów, tytuł podglądu; {x0, y0, x1, y1}),
+// kolizji z już ułożonymi etykietami i przeszkodami (obstacles: tytuł podglądu; {x0, y0, x1, y1}),
 // w obrębie bounds {x, y, w, h} i bez kropki z pin (swojej i cudzej) pod sobą. Spośród nich wygrywa najtańszy:
 // odległość etykiety od punktu (px) + pole zasłoniętych obrysów warstwy (cover z coverGrid, waga wc etykiety,
 // domyślnie 1) × WC + kara za mniejszą odmianę (× wv) + kara WX za linię prowadzącą przez inną etykietę, przez inną
@@ -302,48 +298,60 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
   return win.out;
 }
 
-// FL660: górna granica stosów sąsiadów – ta sama co TOP_FT w backend/app/services/radioboard.py (zmieniać razem)
-export const TOP_FT = 66000;
-// Stos sąsiada: kafelki VACS (już od najwyższego zakresu; lo/hi w stopach, null = bez wysokości) w pasma o tym samym
-// zakresie, ułożone w ciągi stykających się pasm. Każda granica raz: fl = poziom pod pasmem (ft), top = nad pasmem
-// (tylko na początku pierwszego ciągu, gdy pasmo nie sięga FL660). Pasmo styka się z poprzednim, gdy zaczyna się
-// dokładnie na jego dolnej granicy (EYVL M 335-365 pod EYVL U +365) albo gdy poprzednie sięga ziemi, a to jest niżej
-// (ESMM L -195 pod ESMM 8 -365); inaczej nowy ciąg (gap: EDUU SPE +315 po OSE12/HVL12 285-365): kreska i zakres
-// pasma jak w VACS (re: "+315", "-165", "165-245") nad nim zamiast granic, żeby oś nigdy nie czytała się wstecz
-// (365, 285, kreska, +315 SPE – bez 315 pod SPE).
-const reText = (lo, hi) => (hi >= TOP_FT ? `+${flNum(lo)}` : lo ? `${flNum(lo)}-${flNum(hi)}` : `-${flNum(hi)}`);
-export function stackBands(tiles) {
-  const bands = [];
-  (tiles || []).forEach((t) => {
-    const lo = t.lo ?? 0, hi = t.hi ?? TOP_FT;
-    const b = bands.find((x) => x.lo === lo && x.hi === hi);
-    if (b) b.tiles.push(t);
-    else bands.push({ lo, hi, tiles: [t], top: null, fl: null, gap: false, re: null });
-  });
-  const out = [];
-  let cur = null;
-  // dolna granica pasma kończącego ciąg; po nowym ciągu jest już w jego zakresie (re)
-  const end = (b) => (b.re ? null : b.lo || null);
-  while (bands.length) {
-    const i = cur?.lo ? bands.findIndex((b) => b.hi === cur.lo) : -1;
-    const b = bands.splice(Math.max(0, i), 1)[0];
-    const joins = !!cur && (b.hi === cur.lo || (cur.lo === 0 && b.hi < cur.hi));
-    if (cur) cur.fl = joins ? b.hi : end(cur);
-    b.gap = !!cur && !joins;
-    if (b.gap) b.re = reText(b.lo, b.hi);
-    else if (!joins && b.hi < TOP_FT) b.top = b.hi;
-    out.push(b);
-    cur = b;
-  }
-  if (cur) cur.fl = end(cur);
-  return out;
-}
-// UNICOM: sąsiad bez nikogo online w sektorach przy granicy (jedna linia pod nagłówkiem stosu)
+// UNICOM: FIR sąsiada bez nikogo online w sektorach przy granicy (linia pod nazwą FIR-u)
 export const ADVISORY_FQ = "122.800";
 
-// Skrót stanowiska, które przejmuje pole stosu sąsiada: bez pierwszego członu (EDWW FLG → FLG, ESMM 6 → 6),
-// chyba że to cała nazwa (LKAA, UKLV)
-export const byShort = (name) => {
-  const w = String(name || "").split(" ");
-  return w.length > 1 ? w.slice(1).join(" ") : w[0];
-};
+// --- siatka strony wg szkicu Marka (0.13.0, data/seed/radio_layout.json; komórki col/row od 1, jak linie siatki CSS)
+// Kolumny o stałej szerokości, żeby zmiana danych (łączenie okienek, dłuższy wskaźnik, ATIS) nigdy nie przesuwała
+// strony: rodzaj kolumny z części stałej (grid.tracks): box = okienka, wskaźniki, BERLIN; btn = przyciski warstw
+// i podgląd MID; name = same nazwy FIR-ów (z linią ADVISORY); reszta (podglądy LOW i HIGH) dzieli wolne miejsce.
+const TRACK = { box: "var(--rb-bw)", btn: "var(--rb-hw)", name: "var(--rb-nw)" };
+export const gridTracks = (kinds) => (kinds || []).map((k) => TRACK[k] || "minmax(0, 1fr)").join(" ");
+// miejsce w siatce {col, row, cols?, rows?} → wartość grid-area
+export function gridArea(c) {
+  const n = (v, d) => Math.max(1, Math.round(Number(v) || d));
+  return `${n(c?.row, 1)} / ${n(c?.col, 1)} / span ${n(c?.rows, 1)} / span ${n(c?.cols, 1)}`;
+}
+// rzędy przycisków warstw z części stałej (buttons: {col, rows: {id: rząd}}): [{col, row, ids}] od góry, w rzędzie
+// w kolejności LAYERS (LOW MID HIGH w jednym rzędzie); warstwa bez rzędu – bez przycisku
+export function buttonRows(buttons) {
+  const by = new Map();
+  LAYER_IDS.forEach((id) => {
+    const r = Number(buttons?.rows?.[id]);
+    if (!r) return;
+    if (!by.has(r)) by.set(r, { col: Number(buttons.col) || 1, row: r, ids: [] });
+    by.get(r).ids.push(id);
+  });
+  return [...by.values()].sort((a, b) => a.row - b.row);
+}
+// granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0"
+export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round(Number(b?.lower) || 0)}`;
+// granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
+const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
+export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "GND"}\u2013${Number(b?.upper) >= 999 ? "UNL" : flOf(Number(b?.upper) || 0)}`;
+
+// --- dymek przy kursorze (0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość (radio.css), na prawo
+// od kursora, a gdy podszedłby bliżej niż TIP_GAP px do prawej krawędzi okna – na lewo od niego; pod kursorem, przy
+// dolnej krawędzi nad nim; nigdy bliżej brzegu okna niż TIP_GAP. cx, cy = kursor, w, h = rozmiar dymku (szerokość
+// stała, więc mierzona przed ustawieniem miejsca jest ta sama), vw, vh = okno. Wynik {left, top, flipX, flipY} (px)
+// Dymek wyższy niż miejsce nad i pod kursorem: dosunięty do dolnej krawędzi (12 px od niej), a gdy wyższy niż okno,
+// od góry – radio.css ogranicza wysokość dymku do okna bez dwóch odstępów, więc nic nie wychodzi poza okno
+export const TIP_GAP = 12;
+export function tipPos(cx, cy, w, h, vw, vh) {
+  const flipX = cx + 14 + w > vw - TIP_GAP, flipY = cy + 16 + h > vh - TIP_GAP;
+  const left = flipX ? cx - 14 - w : cx + 14, top = flipY ? cy - 10 - h : cy + 16;
+  return { left: Math.round(Math.max(TIP_GAP, Math.min(left, vw - TIP_GAP - w))),
+    top: Math.round(Math.max(TIP_GAP, Math.min(top, vh - TIP_GAP - h))), flipX, flipY };
+}
+
+// Panel LOA (kliknięcie nazwy FIR-u): po tej stronie klikniętego FIR-u, gdzie jest więcej miejsca, i nie szerszy niż
+// to miejsce, żeby nazwa i okienka tego FIR-u zostały widoczne (drugie kliknięcie nazwy zamyka panel; ESAA, LKAA, LZBB
+// i UMKK stoją blisko środka strony). x0, x1 = lewa i prawa krawędź nazwy i okienek FIR-u w siatce, W = szerokość
+// siatki (px). Najwyżej LOA_MAX px i LOA_FRAC siatki, nie węższy niż LOA_MIN px (wtedy może zasłonić część FIR-u).
+// Wynik {left: panel przy lewej krawędzi siatki, width}
+export const LOA_MAX = 1120, LOA_FRAC = 0.72, LOA_MIN = 420, LOA_GAP = 8;
+export function loaPlace(x0, x1, W) {
+  const want = Math.min(LOA_MAX, W * LOA_FRAC), roomL = x0 - LOA_GAP, roomR = W - x1 - LOA_GAP;
+  const room = Math.max(roomL, roomR);
+  return { left: roomL > roomR, width: Math.round(Math.max(Math.min(want, room), Math.min(want, LOA_MIN))) };
+}

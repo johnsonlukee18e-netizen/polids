@@ -1,12 +1,12 @@
 import logging
 import re
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Aerodrome
+from ..services import awalon as awalon_svc
 from ..services import gamet as gamet_svc
 from ..services import qnh as qnh_svc
 from ..services import sun as sun_svc
@@ -64,7 +64,7 @@ async def qnh_regions(db: Session = Depends(get_db)):
     return await qnh_svc.regions(db, get_metars)
 
 
-# --- wiatr przy ziemi i na 3000 ft na podejściu (METEO › WIND, AERODROME › PRZEGLĄD)
+# --- wiatr przy ziemi i na 3000 ft na podejściu (AWALON › lotnisko, AERODROME › INFO)
 
 def _components(wind: dict | None, heading: float) -> dict:
     """Składowe wiatru względem pasa: hw (czołowy, < 0 w plecy), xw (boczny, > 0 z prawej)."""
@@ -72,14 +72,6 @@ def _components(wind: dict | None, heading: float) -> dict:
         return {"hw": None, "xw": None}
     hw, xw = wind_components(wind["dir"], wind["speed"], heading)
     return {"hw": hw, "xw": xw}
-
-
-@router.get("/approach-points")
-def approach_points(db: Session = Depends(get_db)):
-    """Punkty podejścia pasów lotnisk z bazy: FAF/IF z procedur .ese albo punkt na przedłużeniu osi, w którym ścieżka
-    3° osiąga 3000 ft AMSL (bez wiatru, do list wyboru). Bez pasów trawiastych, awaryjnych, krótkich i bez współrzędnych
-    progu, chyba że mają procedurę podejścia (upperwind.approach_runways)."""
-    return {"alt_ft": upperwind.ALT_FT, "aerodromes": upperwind.approach_points(db)}
 
 
 @router.get("/approach-wind/{icao}")
@@ -101,12 +93,17 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     metar_wind = {"dir": p.wind_dir, "speed": p.wind_speed, "gust": p.wind_gust, "variable": p.wind_variable,
                   "var_from": p.wind_var_from, "var_to": p.wind_var_to, "time": p.time} if p else None
     model, model_error = None, None
+    now = upperwind.utc_now()
     try:
-        model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]])
+        model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]], now)
     except UpstreamError as exc:
         # w exc krótki powód (upperwind.model_winds), pełny komunikat z adresem w exc.__cause__
         log.warning("WIND %s, prognoza: %s", ad["icao"], f"{exc} ({exc.__cause__})" if exc.__cause__ else exc)
         model_error = f"Wind forecast unavailable: {describe(exc)}"
+    if model and upperwind.outdated(model[0]["valid"], now):
+        # jak w AWALON: kopia z cache z poprzedniej doby UTC (serwer nie odpowiada od północy) to nie bieżąca prognoza
+        log.warning("WIND %s, prognoza: kopia z cache z %s", ad["icao"], model[0]["valid"])
+        model, model_error = None, f"Wind forecast unavailable: {upperwind.OUTDATED}"
     surface_model = model[0]["surface"] if model else None
     runways = []
     for i, r in enumerate(ad["runways"]):
@@ -118,9 +115,19 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
             "elevation_ft": ad["elevation_ft"], "alt_ft": upperwind.ALT_FT,
             "source": "Open-Meteo", "source_url": "https://open-meteo.com", "model": "best_match",
             "valid": model[0]["valid"] if model else None,
-            "fetched": datetime.now(timezone.utc).strftime("%H:%MZ"),
+            "fetched": now.strftime("%H:%MZ"),
             "metar": metar, "metar_wind": metar_wind, "model_surface": surface_model, "runways": runways,
             "metar_error": metar_error, "model_error": model_error}
+
+
+# --- AWALON: profil wiatru 0–10 000 ft AMSL co 1000 ft nad lotniskami AD 2 (services/awalon.py)
+
+@router.get("/wind-profile")
+async def wind_profile(db: Session = Depends(get_db)):
+    """Wiatr przy ziemi (METAR, bez niego prognoza 10 m) i na wysokościach 1000–10 000 ft AMSL nad każdym lotniskiem
+    AD 2, bieżąca godzina prognozy z min/max z godziny poprzedniej, bieżącej i następnej. Bez wyjątku przy awarii
+    METAR-ów albo prognozy: metar_error / model_error z krótkim opisem."""
+    return await awalon_svc.wind_profile(db, get_metars)
 
 
 # --- SUN: słońce nad lotniskiem albo punktem mapy (METEO › SUN)

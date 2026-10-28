@@ -1,5 +1,6 @@
 """Wiatr na podejściu: punkty FAF/IF z procedur .ese albo na przedłużeniu osi (3°), interpolacja wiatru Open-Meteo
-do 3000 ft AMSL i endpointy /api/meteo/approach-points, /api/meteo/approach-wind/{icao}."""
+do 3000 ft AMSL i endpoint /api/meteo/approach-wind/{icao} (AERODROME › INFO, AWALON › lotnisko). 0.13.0: bez
+/api/meteo/approach-points (lista wyboru dawnego METEO › WIND), punkty podejścia z upperwind.approach_points()."""
 import json
 import os
 import tempfile
@@ -63,6 +64,8 @@ def fake_meteo(monkeypatch):
     monkeypatch.setattr(uw, "fetch_text", fetch)
     monkeypatch.setattr(meteo, "get_metars", metars)
     monkeypatch.setattr(uw, "parse_forecast", lambda text, now=None, _f=uw.parse_forecast: _f(text, NOW))
+    # ta sama chwila dla endpointu (kopia prognozy z innej doby UTC to błąd prognozy, upperwind.outdated)
+    monkeypatch.setattr(uw, "utc_now", lambda: NOW)
     return calls
 
 
@@ -207,14 +210,30 @@ def test_model_winds_one_request(fake_meteo):
     assert params["latitude"] == "52.1657,52.2274" and params["longitude"] == "20.9671,20.7465"
     hourly = params["hourly"].split(",")
     assert "wind_speed_10m" in hourly and all(f"geopotential_height_{p}hPa" in hourly for p in uw.LEVELS)
+    # tuż po północy UTC kopia sprzed północy jest nieaktualna (forecast_days=1): ważność do 00:00, nie 10 min
+    asyncio.run(uw.model_winds([(52.16571, 20.9671)], datetime(2026, 10, 7, 0, 5, tzinfo=timezone.utc)))
+    assert fake_meteo[-1][1] == 300
+
+
+def test_approach_wind_outdated_copy(client, fake_meteo, monkeypatch, caplog):
+    """Serwer prognoz nie odpowiada od poprzedniej doby UTC, cache oddaje wczorajszą odpowiedź: panel pasów pokazuje
+    błąd prognozy zamiast wczorajszej 23:00 jako bieżącej (jak AWALON)."""
+    monkeypatch.setattr(uw, "utc_now", lambda: datetime(2026, 10, 7, 0, 5, tzinfo=timezone.utc))
+    d = client.get("/api/meteo/approach-wind/EPWA").json()
+    assert d["model_error"] == "Wind forecast unavailable: outdated" and d["valid"] is None
+    assert d["model_surface"] is None and all(r["w3000"] is None for r in d["runways"])
+    assert d["metar_wind"]["speed"] == 14 and d["fetched"] == "00:05Z"
+    assert any("kopia z cache z 2026-10-06T16:00Z" in m.getMessage() for m in caplog.records if m.name == "polids.meteo")
 
 
 # --- endpointy
 
-def test_approach_points_endpoint(client):
-    d = client.get("/api/meteo/approach-points").json()
-    assert d["alt_ft"] == 3000 and len(d["aerodromes"]) > 10
-    ads = {a["icao"]: a for a in d["aerodromes"]}
+def test_approach_points(client):
+    from backend.app.database import SessionLocal
+    with SessionLocal() as db:
+        found = uw.approach_points(db)
+    assert len(found) > 10 and client.get("/api/meteo/approach-points").status_code == 404
+    ads = {a["icao"]: a for a in found}
     for a in ads.values():
         for r in a["runways"]:
             assert r["method"] in ("procedure", "centreline")

@@ -58,7 +58,7 @@
    'qnh_at' (e, w, n, s; w narożniku ne/nw/se/sw dolny albo górny brzeg ramki na wysokości środka numeru) */
 .qr-num { font: 400 28px/20px var(--mono); color: var(--qr-reg); }
 .qr-num.band { color: var(--qr-band); }
-.qr-num .q { position: absolute; font: 700 11px/13px var(--mono); color: var(--qr-ink); background: #fff;
+.qr-num .q { position: absolute; font: 11px/13px var(--mono); color: var(--qr-ink); background: #fff;
   border: 1px solid var(--qr-reg); padding: 0 2px; border-radius: 0; }
 .qr-num.band .q { border-color: var(--qr-band); }
 .qr-num .q.nil { color: #8a8f95; }
@@ -73,7 +73,7 @@
 .qr-num.on, .qr-cap.on { outline: 2px solid #0b6fd1; outline-offset: 1px; }
 
 /* opisy "BELOW TMA / QNH FROM EPxx" czarnym napisem jak na mapie, QNH lotniska w ramce na końcu drugiego wiersza */
-.qr-cap { display: flex; flex-direction: column; align-items: center; font: 700 9px/11px var(--mono); color: var(--qr-ink); }
+.qr-cap { display: flex; flex-direction: column; align-items: center; font: 9px/11px var(--mono); color: var(--qr-ink); }
 .qr-cap > span { display: block; height: 11px; }
 .qr-cap .q { display: inline-block; font: inherit; line-height: 9px; padding: 0 1px; border: 1px solid var(--qr-ink);
   background: #fff; border-radius: 0; }
@@ -89,7 +89,7 @@
   border: 1.2px solid var(--qr-ink); background: #fff; transform: rotate(45deg); border-radius: 0; }
 .qr-aero.ctl i { left: -4.5px; top: -4.5px; width: 9px; height: 9px; border-width: 1.3px; border-radius: 50%; transform: none;
   background: radial-gradient(circle, var(--qr-ink) 0 1.5px, #fff 1.9px); }
-.qr-aero span { position: absolute; font: 700 8px/9px var(--mono); color: var(--qr-ink); }
+.qr-aero span { position: absolute; font: 8px/9px var(--mono); color: var(--qr-ink); }
 .qr-aero.s-e span, .qr-aero.s-ne span, .qr-aero.s-se span { left: 6.5px; }
 .qr-aero.s-w span, .qr-aero.s-nw span, .qr-aero.s-sw span { right: 6.5px; }
 .qr-aero.s-e span, .qr-aero.s-w span { top: -4.5px; }
@@ -104,14 +104,14 @@
 .qrwrap.qr-far .qr-aero span, .qrwrap.qr-far .qr-cap, .qrwrap.qr-far .qr-des,
 .qrwrap.qr-far .qr-aero:not(.ctl) { display: none; }
 .leaflet-tooltip.qr-tip { background: #fff; color: var(--qr-ink); border: 1px solid #555; border-radius: 0; box-shadow: none;
-  font: 700 11px var(--mono); padding: 1px 5px; }
+  font: 11px var(--mono); padding: 1px 5px; }
 .leaflet-tooltip.qr-tip::before { display: none; }
 
 /* panel boczny: pasek tytułu, przełączniki warstw, gęste tabele */
 .qrside { width: 360px; flex: none; overflow: auto; background: #050705; border-left: 1px solid var(--line); padding: 8px;
   display: flex; flex-direction: column; gap: 8px; }
 .qr-head { display: flex; align-items: baseline; gap: 8px; padding: 2px 2px 0; }
-.qr-head b { font: 700 13px var(--sans, var(--ui)); letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+.qr-head b { font: 13px var(--sans, var(--ui)); letter-spacing: 2px; text-transform: uppercase; color: #fff; }
 .qr-stamp { margin-left: auto; font: 12px var(--mono); color: var(--muted); }
 .qr-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 6px; border: 1px solid var(--line); background: var(--panel);
   font: 11px var(--sans, var(--ui)); color: var(--muted); }
@@ -121,14 +121,14 @@
 .qr-err:empty { display: none; }
 .qr-card { background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
 .qr-card h4 { margin: 0; padding: 4px 8px; background: var(--head, var(--panel-2)); border-bottom: 1px solid var(--head-line, var(--line));
-  font: 700 11px/1.3 var(--sans, var(--ui)); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px;
+  font: 11px/1.3 var(--sans, var(--ui)); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px;
   display: flex; justify-content: space-between; gap: 8px; }
 .qr-card h4 span { font-weight: 400; color: var(--muted); letter-spacing: .3px; text-transform: none; }
 .qrside table.data { width: 100%; }
 .qrside table.data th { position: static; padding: 3px 5px; font-size: 10px; }
 .qrside table.data td { padding: 2px 5px; font-size: 12px; vertical-align: top; }
 .qrside table.data td.num { font-size: 12px; white-space: nowrap; }   /* "----" bez łamania na myślnikach */
-.qrside table.data td.q { font-weight: 700; font-size: 13px; color: var(--cyan); }
+.qrside table.data td.q { font-size: 13px; color: var(--cyan); }
 .qrside table.qr-tma td.q { color: var(--green-hi); }
 .qrside table.data td.sta { font: 11px/1.45 var(--mono); color: var(--muted); }
 .qrside td.sta .low { color: var(--text); }

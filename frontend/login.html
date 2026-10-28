@@ -14,7 +14,7 @@
             --green-text: #5fbf4a; --yellow: #f2d21b; --bad: #e0302a; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
-    body { background: var(--bg); color: var(--text); font: 14px/1.45 Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+    body { background: var(--bg); color: var(--text); font: 14px/1.45 Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
            display: flex; align-items: center; justify-content: center; padding: 16px; }
     main { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
     header { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); text-align: center; }
@@ -23,12 +23,12 @@
     section { padding: 18px 20px 20px; }
     .btn { display: block; width: 100%; padding: 9px 6px; margin-top: 6px; text-align: center; text-decoration: none;
            background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 0; color: #f4fff0;
-           font: 700 15px/1.35 Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-variant: small-caps; letter-spacing: .5px; cursor: pointer; }
+           font: 15px/1.35 Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif; text-transform: uppercase; letter-spacing: .3px; cursor: pointer; }
     .btn:hover { background: linear-gradient(#52bd3c, #36992a); }
     .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--green-text); outline-offset: 1px; }
     label { display: block; margin-bottom: 9px; color: var(--muted); font-size: 12px; }
     input, select { display: block; width: 100%; margin-top: 3px; padding: 6px 8px; background: #000; color: var(--text);
-                    border: 1px solid var(--line); border-radius: 0; font: 14px Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; }
+                    border: 1px solid var(--line); border-radius: 0; font: 14px Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif; }
     .error { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--bad); color: #ffb3ad; }
     .warn { margin: 0 0 12px; color: var(--yellow); font-size: 12px; }
     .hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; }

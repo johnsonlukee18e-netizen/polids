@@ -177,8 +177,9 @@ RADIO_CS = re.compile(r"([A-Z]{3})(\d[A-Z0-9]{0,4})")
 
 
 def _radio_callsigns(db: Session, board: dict) -> None:
-    """Pełny znak wywoławczy do okna lotu (Extended Label SDD, wiersz 1): telefonia linii z ICAO_Airlines + numer lotu,
-    np. DLH4AB → "LUFTHANSA 4AB". Znak bez prefiksu linii (SPKAT) albo prefiks bez telefonii: telephony = None."""
+    """Pełny znak wywoławczy w polu telephony paska (do 0.12.6 wiersz 1 okna lotu STRIP; pole zostaje w odpowiedzi):
+    telefonia linii z ICAO_Airlines + numer lotu, np. DLH4AB → "LUFTHANSA 4AB". Znak bez prefiksu linii (SPKAT) albo
+    prefiks bez telefonii: telephony = None."""
     strips = [s for k in ("departures", "arrivals", "local", "planned") for s in board.get(k, [])]
     parts = {s["callsign"]: m.groups() for s in strips if (m := RADIO_CS.fullmatch(str(s.get("callsign") or "")))}
     prefixes = {p for p, _ in parts.values()}
@@ -191,8 +192,9 @@ def _radio_callsigns(db: Session, board: dict) -> None:
 
 @router.get("/{icao}/strips")
 async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
-    """Paski postępu lotu do STRIP i AERODROME › TRAFFIC (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
-    vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese i kategoria turbulencji z bazy typów.
+    """Paski postępu lotu do AERODROME › TRAFFIC (DMAN/AMAN, dman.js pyta z ?dman=1; zakładki STRIP nie ma od 0.13.0):
+    ruch VATSIM, pas w użyciu i litera ATIS (jak /status), vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese
+    i kategoria turbulencji z bazy typów. Bez ?dman=1 ta sama tablica z lotami OFFLINE (zgodność wstecz, test_strips.py).
 
     Każdy pasek ma też pola DMAN/AMAN (services/dman.py): registration, a przylot entry_fix, eta_s, eldt_s, eldt.
     ?dman=1 (widok DMAN/AMAN) dodatkowo pyta vIFF o ELDT przylotów (/ifps/callsign) i ustawienia A-CDM lotniska
@@ -238,7 +240,7 @@ async def strips(icao: str, dman: bool = False, db: Session = Depends(get_db)):
         viff_etas = await viff_service.arrival_etas(ad.icao, [s["callsign"] for s in asked])
     if dman:
         # RUCH (DMAN/AMAN) bez lotów OFFLINE: planowane znane tylko z vIFF (pilot niepołączony, bez planu w sieci
-        # VATSIM) zostają w STRIP; prefile (plan złożony w sieci przed połączeniem) RUCH pokazuje dalej
+        # VATSIM) tylko bez ?dman=1; prefile (plan złożony w sieci przed połączeniem) RUCH pokazuje dalej
         board["planned"] = [s for s in board["planned"] if s.get("planned") != "viff"]
     dman_service.annotate(board, ad.icao, now, viff_etas)
     return {

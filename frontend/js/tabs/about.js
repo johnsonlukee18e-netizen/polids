@@ -1,6 +1,10 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["28.10.2026", "0.13.0 \u2013 per issue #23: a thin bar across the top with Reload (reloads and comes back to the same screen), Brighter and Darker (brightness of the whole screen, two steps either way, kept in the browser); the whole program in a plain sans-serif font at normal weight, nothing in bold, as in PANDORA; menu buttons tight and evenly spaced, EMERGENCY too; SYT OP in light green. The STRIP tab is gone: old strip links open AERODROME \u203a TRAFFIC of that aerodrome."],
+  ["28.10.2026", "AWALON: new tab with the wind from the surface to 10 000 ft every 1000 ft over the 15 AD 2 aerodromes \u2013 all of them in one table, and for each aerodrome a wind profile chart, a profile table with gusts and the runway winds. METEO \u203a WIND is now only the Windy wind map."],
+  ["28.10.2026", "RADIO: one page after the layout sketch \u2013 a fixed ATIS bar (hiding ATIS no longer moves the page), configuration indicators ACC GAT (letters of the ACC sectors online, ALL and ALH in full), APP WA (HL, H+L, 2H+L, +D for the director) and APP GD, APP KK and APP PO (number of active APP frequencies), BERLIN WEST or EAST from the EDDB ATIS (red when it comes from the wind), neighbour sector boxes with their limits that merge when one controller works them (EDUU, EDMM, ESAA, EYVL, LZBB and LKAA, never EDWW), red sectors and TMAs for a flow restriction or occupancy above 80 % of capacity, APP and TWR plates only for stations online (one per controller when APP is split, as at EPWA or EPKK), hover windows of a fixed size kept away from the screen edge."],
+  ["28.10.2026", "OTHER: 18 items as in PANDORA \u2013 FLIGHT PLAN (the flight plan by callsign with the pilot's first and last name, PID and VATSIM hours), FMP (traffic volumes with capacity and occupancy, active ones grey), REGCAUSE (ATFM regulation cause codes by category), SQUAWK (moved here from its own tab; old #squawk addresses redirect), VFR MINIMA (VMC minima, minimum heights, night VFR, special VFR and HEMS minima); 4P, AFTN, BOMB PHONE, BRAKING ACTION, HOLDING, IA, LIGHT GUN, METEO, NATO WEATHER and POSITION will be available in the future."],
   ["20.10.2026", "0.12.6 – per issue #21: the interface no longer says where data comes from or how values are worked out; error messages are short and neutral. CHECKLIST moved into OTHER as a sub-tab after PHRASEOLOGY (old #checklist addresses redirect, ticks are kept), with a new TIPS checklist: five tips for controllers."],
   ["20.10.2026", "AERODROME › OVERVIEW: the runway in use for each aerodrome – from ATIS with its letter (solid frame) or the preferred runway (dashed PREF frame), ARR/DEP when they differ. MINE/ALL switch for ACC and APP positions: MINE hides the aerodromes another online controller covers now (\"N hidden\" lists who), ALL shows them with that callsign."],
   ["20.10.2026", "AD CIV: one entry per chart with a short name (AERODROME, PARKING APN 2, RWY 29 SID, RWY 11 ILS Z CAT II / LOC Z) and the full title in the tooltip; filters ADC, APDC, SID, STAR, IAC, VFR, OBST with correct counts. AIRCRAFT: values in boxes – a small label over a large value, coloured by category (identification, performance, weight and wake, dimensions), with the ARC code; a click on a type opens its photo in place."],
@@ -73,17 +77,16 @@ const CHANGES = [
 
 const TILES = [
   ["aerodrome", "AERODROME", "FIR EPWW overview, aerodrome lists of EPWW and neighbours, the aerodrome on one screen: METAR, wind, runways, ATIS, NOTAM, AWOS, TRAFFIC (DMAN/AMAN)."],
-  ["meteo", "METEO", "METAR and TAF of aerodromes, surface and approach wind, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
+  ["meteo", "METEO", "METAR and TAF of aerodromes, wind map, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
+  ["awalon", "AWALON", "Wind from the surface to 10 000 ft every 1000 ft over the 15 AD 2 aerodromes: all in one table, a profile chart and runway winds for each aerodrome."],
   ["map", "MAP", "Traffic with labels on hover, airspace at the selected level, TMA/CTR, sector capacity and flight details."],
-  ["radio", "RADIO", "One page: EPWW ACC sectors on LOW/MID/HIGH previews with frequencies, APP/TWR/FIS layers, ATIS and neighbour positions; a neighbour FIR name opens its LOA."],
+  ["radio", "RADIO", "One page laid out as in PANDORA: ATIS bar, ACC and APP indicators, BERLIN runway configuration, EPWW LOW/MID/HIGH previews with APP/TWR/FIS layers, neighbour sector boxes and red flow alerts; a neighbour FIR name opens its LOA."],
   ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents as PDF."],
   ["sytop", "SYT OP", "Active NOTAMs of FIR EPWW and the main aerodromes."],
-  ["strip", "STRIP", "EFES flight progress strips for the 15 main aerodromes; a click opens the extended label window."],
   ["callsign", "CALLSIGN", "Airline radiotelephony callsigns."],
   ["aircraft", "AIRCRAFT", "ICAO aircraft types by manufacturer with their values in boxes: wake turbulence categories, performance, dimensions, photos."],
-  ["squawk", "SQUAWK", "SSR code pools of FIR EPWW and special codes in one list with search."],
   ["conversion", "CONVERSION", "Unit conversion: pressure, height, FL at QNH, speed, Mach; UTC and Poland LT clocks."],
-  ["other", "OTHER", "Documents, phraseology and checklists: position opening and closing, handover, runway change, tips for controllers."],
+  ["other", "OTHER", "Flight plan by callsign, FMP traffic volumes, delay codes (REGCAUSE), SSR codes (SQUAWK), VFR minima, documents, phraseology and checklists."],
   ["emergency", "EMERGENCY", "ASSIST and emergency checklists."],
 ];
 

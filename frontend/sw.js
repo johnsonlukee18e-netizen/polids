@@ -1,6 +1,7 @@
 // Tylko strona offline, API nie cache'ujemy (dane muszą być świeże).
-// nowa wersja strony offline (0.12.5: po angielsku, 0.12.6: bez nazw źródeł danych): stara pamięć jest usuwana w activate
-const CACHE = "offline-v3";
+// nowa wersja strony offline (0.12.5: po angielsku, 0.12.6: bez nazw źródeł danych, 0.13.0: Arial bez pogrubień):
+// stara pamięć jest usuwana w activate
+const CACHE = "offline-v4";
 const OFFLINE = "/static/offline.html";
 
 self.addEventListener("install", (e) => {
