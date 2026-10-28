@@ -160,6 +160,19 @@ def test_vfr_minima_sections(js):
     assert "Speed 140 kt IAS or less" in text
     assert "Ground visibility Less than 1500 m Helicopters: less than 800 m Ceiling Less than 180 m (600 ft)" in text
     assert "Ceiling Less than 450 m (1500 ft) Ground visibility Less than 5 km" in text
+    # poniżej tych wartości VFR na lotnisku w strefie kontrolowanej tylko ze zgodą na specjalne VFR (nie "zgoda ATC",
+    # bo VFR w strefie kontrolowanej zawsze jej potrzebuje)
+    assert ("Without a special VFR clearance, VFR flights may not take off or land at an aerodrome within a control zone, "
+            "or enter its aerodrome traffic zone or circuit, when reported: Ceiling Less than 450 m") in text
+    assert "needs an ATC clearance" not in text
+    # minimalne wysokości VFR (w dzień i w nocy) w sekcji VMC
+    vmc = _text(html[html.index('<section class="vfr-sec vfr-vmc">'):html.index('<section class="vfr-sec vfr-night">')])
+    assert ("Minimum heights, day and night, except when necessary for take-off or landing: Over congested areas of cities, "
+            "towns or settlements or over an open-air assembly of persons 300 m (1000 ft) above the highest obstacle within "
+            "600 m of the aircraft Elsewhere 150 m (500 ft) above the ground or water, or 150 m (500 ft) above the highest "
+            "obstacle within 150 m (500 ft) of the aircraft") in vmc
+    # przypis "*" nie spada sam do nowej linii (twarda spacja przed nim)
+    assert "class G\u00a0*" in html and "5 km\u00a0*" in html and "G *<" not in html
 
 
 def test_vfr_minima_hems_table(js):

@@ -1,19 +1,29 @@
 // OTHER › VFR MINIMA (0.13.0): stałe tabele dla FIR Warszawa: minima VMC (widzialność i odległość od chmur wg pasma
-// wysokości i klasy przestrzeni C, D, G), VFR w nocy, specjalne VFR (warunki dla pilota i kiedy ATC nie wydaje
-// zgody) i minima meteo lotów HEMS (LPR) jak w tabeli z dokumentu LPR. Wartości z tekstów przepisów i polskiego AIP
+// wysokości i klasy przestrzeni C, D, G) i minimalne wysokości lotu VFR, VFR w nocy, specjalne VFR (kiedy VFR na
+// lotnisku w strefie kontrolowanej wymaga zgody na specjalne VFR, warunki dla pilota i kiedy ATC nie wydaje zgody)
+// i minima meteo lotów HEMS (LPR) jak w tabeli z dokumentu LPR. Wartości z tekstów przepisów i polskiego AIP
 // (notatki rundy 16: vfr.md); w podpowiedzi do śmigłowców w klasie G angielski AIP ma błąd tłumaczenia ("in less than
 // 800 m"), polski tekst i rozporządzenie: "nie mniejszej niż 800 m", więc "not less than 800 m".
 // Na ekranie bez numerów przepisów i nazw dokumentów. Strona bez danych z serwera i bez timerów.
 
 const CLOUD = "1500 m horizontally<br>300 m (1000 ft) vertically";
 const LOW = "900 m (3000 ft) AMSL or 300 m (1000 ft) above terrain, whichever is the higher";
+// znacznik przypisu bez łamania linii przed nim (twarda spacja)
+const STAR = "\u00a0*";
 
 // minima VMC: [pasmo, klasy, widzialność w locie, odległość od chmur]; pasmo null = to samo co w wierszu wyżej (rowspan)
 export const VMC = [
   ["At and above FL100", "C", "8 km", CLOUD],
   [`Below FL100 and above ${LOW}`, "C D G", "5 km", CLOUD],
   [`At and below ${LOW}`, "C D", "5 km", CLOUD],
-  [null, "G", "5 km *", "Clear of cloud and<br>with the surface in sight"],
+  [null, "G", `5 km${STAR}`, "Clear of cloud and<br>with the surface in sight"],
+];
+// minimalne wysokości lotu VFR (w dzień i w nocy; w nocy dodatkowo poziomy minimalne niżej): [gdzie, wysokość]
+export const MIN_HEIGHT = [
+  ["Over congested areas of cities, towns or settlements or over an open-air assembly of persons",
+    "300 m (1000 ft) above the highest obstacle within 600 m of the aircraft"],
+  ["Elsewhere", "150 m (500 ft) above the ground or water, or 150 m (500 ft) above the highest obstacle within 150 m "
+    + "(500 ft) of the aircraft"],
 ];
 // * klasa G nisko, w dzień: zmniejszona widzialność w locie
 export const CLASS_G_REDUCED = [
@@ -26,7 +36,7 @@ export const CLASS_G_REDUCED = [
 export const NIGHT = [
   ["Visibility and distance from cloud", "As in VMC minima"],
   ["Ceiling", "Not less than 450 m (1500 ft)"],
-  ["Reduced flight visibility in class G *", "Does not apply"],
+  [`Reduced flight visibility in class G${STAR}`, "Does not apply"],
   [`At and below ${LOW} (classes C, D, G)`, "Continuous sight of the surface"],
   ["Flight plan", "Required when leaving the vicinity of an aerodrome"],
   ["Radio", "Two-way communication on the appropriate ATS channel, when available"],
@@ -35,7 +45,7 @@ export const NIGHT = [
 ];
 export const DAY_NIGHT = "Day: from 30 min before sunrise to 30 min after sunset. Night: from 30 min after sunset to 30 min before "
   + "sunrise. Minimum levels do not apply when necessary for take-off or landing.";
-// VFR na lotnisku w strefie kontrolowanej bez zgody ATC: [co, poniżej]
+// VFR na lotnisku w strefie kontrolowanej tylko ze zgodą na specjalne VFR, gdy: [co, poniżej]
 export const CTR_VFR = [["Ceiling", "Less than 450 m (1500 ft)"], ["Ground visibility", "Less than 5 km"]];
 // specjalne VFR: warunki dla pilota i kiedy ATC nie wydaje zgody
 export const SVFR_PILOT = [
@@ -69,14 +79,16 @@ export function vfrHtml() {
       <tbody>${vmc}</tbody></table>
     <p class="vfr-sub">* Class G by day, at and below ${LOW}: flight visibility may be reduced to</p>
     <table class="vfr-table vfr-kv"><tbody>${rows(CLASS_G_REDUCED)}</tbody></table>
+    <p class="vfr-sub">Minimum heights, day and night, except when necessary for take-off or landing:</p>
+    <table class="vfr-table vfr-kv vfr-minh"><tbody>${rows(MIN_HEIGHT)}</tbody></table>
   </section>
   <section class="vfr-sec vfr-night"><h3 class="vfr-bar">Night VFR</h3>
     <table class="vfr-table vfr-kv"><tbody>${rows(NIGHT)}</tbody></table>
     <p class="vfr-note">${DAY_NIGHT}</p>
   </section>
   <section class="vfr-sec vfr-svfr"><h3 class="vfr-bar">Special VFR</h3>
-    <p class="vfr-sub">VFR at an aerodrome in a control zone (take-off, landing, entering the aerodrome traffic zone or
-      circuit) needs an ATC clearance when reported:</p>
+    <p class="vfr-sub">Without a special VFR clearance, VFR flights may not take off or land at an aerodrome within a
+      control zone, or enter its aerodrome traffic zone or circuit, when reported:</p>
     <table class="vfr-table vfr-kv"><tbody>${rows(CTR_VFR)}</tbody></table>
     <p class="vfr-sub">Special VFR: within a control zone, with an ATC clearance, day only. Pilot:</p>
     <table class="vfr-table vfr-kv"><tbody>${rows(SVFR_PILOT)}</tbody></table>
