@@ -115,7 +115,7 @@ def test_dman_aman_tooltips_without_formulas():
 def test_runway_in_use_wording_like_overview():
     """Pas w użyciu wszędzie jak w OVERVIEW: z ATIS litera ATIS ("ATIS K"), bez niego pas preferowany ("PREF",
     "preferred runway"); bez "system suggestion" i "no runway from ATIS"."""
-    for name in ("strips.js", "dman.js", "aman.js", "awos.js", "tabs/meteo.js", "tabs/aerodrome.js", "overview.js"):
+    for name in ("dman.js", "aman.js", "awos.js", "tabs/meteo.js", "tabs/aerodrome.js", "overview.js"):   # 0.13.0: bez strips.js
         code = _code((FRONTEND / name).read_text("utf-8"))
         for word in ("system suggestion", "suggested, no ATIS", "suggestion, no ATIS", "from ATIS", ">suggested<"):
             assert word not in code, (name, word)

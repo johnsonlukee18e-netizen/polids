@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="/static/css/awos.css">
   <link rel="stylesheet" href="/static/css/qnh.css">
   <link rel="stylesheet" href="/static/css/viff.css">
-  <link rel="stylesheet" href="/static/css/strips.css">
   <link rel="stylesheet" href="/static/css/radio.css">
   <link rel="stylesheet" href="/static/css/map.css">
   <link rel="stylesheet" href="/static/css/wind.css">
@@ -29,6 +28,11 @@
   <link rel="stylesheet" href="/static/css/squawk.css">
 </head>
 <body>
+  <header id="topbar" class="topbar" role="toolbar" aria-label="Screen">
+    <button type="button" data-act="reload" title="Reload the application and come back to this screen">Reload</button>
+    <button type="button" data-act="brighter" title="Brighter screen">Brighter</button>
+    <button type="button" data-act="darker" title="Darker screen">Darker</button>
+  </header>
   <aside class="menu">
     <a class="brand" href="#home" title="PolIDS – Polish Integrated Display System"><img src="/static/icons/polids-logo-bez-podpisu.svg" alt="PolIDS"></a>
     <nav id="tabs">
@@ -48,7 +52,6 @@
       <button data-tab="conversion">CONVERSION</button>
       <button data-tab="sytop">SYT OP</button>
       <button data-tab="aup">AUP</button>
-      <button data-tab="strip">STRIP</button>
       <button data-tab="squawk">SQUAWK</button>
       <button data-tab="other">OTHER</button>
       <button data-tab="about">ABOUT</button>

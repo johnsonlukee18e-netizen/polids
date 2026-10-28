@@ -1,9 +1,8 @@
-"""AERODROME › RUCH jako DMAN/AMAN i zakładka STRIP: rejestracja, punkt wejścia, ETA/ELDT, ELDT z vIFF,
+"""AERODROME › RUCH jako DMAN/AMAN (do 0.12.6 też zakładka STRIP): rejestracja, punkt wejścia, ETA/ELDT, ELDT z vIFF,
 endpoint /strips?dman=1 oraz czyste funkcje frontendu (sekwencja AMAN, LND/SEP, rozkładanie etykiet) w Node."""
 import asyncio
 import json
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -489,16 +488,18 @@ def test_fix_colors(js):
     assert vampu == again and vampu.startswith("#") and known and other and not clash and extra
 
 
-def test_strip_tab_and_ruch_wiring():
-    strip = (FRONTEND / "js" / "tabs" / "strip.js").read_text("utf-8")
-    airports = json.loads(re.search(r"STRIP_AIRPORTS = (\[[^\]]+\])", strip).group(1))
-    assert airports == sorted(airports) and len(airports) == 15 and "EPWA" in airports
-    assert "subtabs(" in strip and "mountStrips(" in strip and 'remember("strip"' in strip and 'lsGet("strip.icao")' in strip
+def test_ruch_wiring_without_strip_tab():
+    """0.13.0 (issue #23): zakładki STRIP nie ma (paski EFES), DMAN nie ma przycisku STRIPS ani własnych BRIGHTER/DARKER
+    (jasność całego ekranu w pasku u góry); RELOAD DMAN zostaje i pobiera dane od razu. Dane DMAN dalej z /strips?dman=1."""
+    assert not (FRONTEND / "js" / "tabs" / "strip.js").exists() and not (FRONTEND / "js" / "strips.js").exists()
     dm = (FRONTEND / "js" / "dman.js").read_text("utf-8")
     assert "export function mountDman(" in dm and "strips?dman=1" in dm and 'navigate("map"' in dm
-    # STRIP i AERODROME › RUCH: paski EFES tylko w zakładce STRIP; PASKI tylko dla lotnisk z podzakładką w STRIP
-    assert "import { mountStrips" not in dm and "mountStrips(" not in dm
-    assert "STRIP_AIRPORTS.includes(icao)" in dm and "Strips only for the 15 main aerodromes" in dm
+    assert "mountStrips(" not in dm and "STRIP_AIRPORTS" not in dm and "tabs/strip.js" not in dm
+    assert 'data-act="strip"' not in dm and 'navigate("strip"' not in dm and ">STRIPS<" not in dm
+    assert 'data-act="brighter"' not in dm and 'data-act="darker"' not in dm and "dman.bright" not in dm
+    assert "brightness(" not in dm and "st.bright" not in dm
+    assert '<button data-act="reload" title="Download data now (it refreshes by itself every 30 s)">RELOAD</button>' in dm
+    assert 'if (act === "reload") {' in dm and "return refresh();" in dm
     # RUCH bez lotów OFFLINE (planowane tylko z vIFF): filtr także w przeglądarce, bez statusu OFFLINE w szczegółach
     assert 'd.planned = (d.planned || []).filter((s) => s.planned !== "viff");' in dm and '"OFFLINE"' not in dm
     # widok DMAN/AMAN ↔ AMAN w adresie AERODROME (#aerodrome/EPWA/aman): kliknięcie = krok do cofnięcia
@@ -533,5 +534,5 @@ def test_strip_tab_and_ruch_wiring():
     code = "\n".join(ln.split(" // ")[0] for ln in (dm + am).splitlines() if not ln.strip().startswith(("//", "*", "/*")))
     for word in ("from vIFF", "in vIFF", "(vIFF)", "VATSIM", ".ese file", "flight plan remarks"):
         assert word not in code, word
-    for css in ("dman.css", "strips.css"):
-        assert f"css/{css}" in (FRONTEND / "index.html").read_text("utf-8")
+    index = (FRONTEND / "index.html").read_text("utf-8")
+    assert "css/dman.css" in index and "css/strips.css" not in index and not (FRONTEND / "css" / "strips.css").exists()

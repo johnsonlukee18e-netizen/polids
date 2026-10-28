@@ -14,11 +14,11 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 
 # INOP pod AD VFR, DOCS w OTHER (runda 11); 0.12.3 (issue #13): COORDINATION i CONVERSION po MAP, SQUAWK po STRIP,
-# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER
+# PHRASEOLOGY w OTHER; 0.12.6 (issue #21): CHECKLIST w OTHER; 0.13.0 (issue #23): bez STRIP
 MENU = ["home", "radio", "meteo", "aerodrome", "adciv", "admil", "advfr", "inop", "callsign", "aircraft", "map",
-        "coordination", "conversion", "sytop", "aup", "strip", "squawk", "other", "about", "emergency", "admin"]
+        "coordination", "conversion", "sytop", "aup", "squawk", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
-          "COORDINATION", "CONVERSION", "SYT OP", "AUP", "STRIP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
+          "COORDINATION", "CONVERSION", "SYT OP", "AUP", "SQUAWK", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
 
@@ -110,6 +110,27 @@ def test_checklist_moved_to_other():
         assert not re.search(r"""navigate\(\s*["']checklist["']|href=["']#checklist""", src), path.name
 
 
+def test_strip_removed():
+    """0.13.0 (issue #23): zakładki STRIP nie ma (paski EFES, tabs/strip.js, strips.js, strips.css). Stary adres
+    #strip/<ICAO> otwiera AERODROME › <ICAO> › TRAFFIC (DMAN/AMAN, najbliższy widok), samo #strip AERODROME.
+    Reguły ze strips.css używane w AERODROME › INFO (próbki .lg w karcie Traffic, .aero-ruch) są w style.css.
+    Endpoint /api/aerodromes/{icao}/strips i strip_board zostają: to dane DMAN (test_dman.py)."""
+    assert "strip" not in MENU and 'data-tab="strip"' not in INDEX and "css/strips.css" not in INDEX
+    for path in ("js/tabs/strip.js", "js/strips.js", "css/strips.css"):
+        assert not (FRONTEND / path).exists(), path
+    assert "strip" not in [k.strip() for k in re.search(r"const TABS = \{([^}]+)\}", APP).group(1).split(",")]
+    assert "tabs/strip.js" not in APP
+    assert '  strip: (arg) => ["aerodrome", /^[A-Za-z]{4}$/.test(arg || "") ? arg.toUpperCase() + "/dman" : arg],' in MOVED_SRC
+    for path in (FRONTEND / "js").rglob("*.js"):
+        src = path.read_text("utf-8")
+        assert not re.search(r"""navigate\(\s*["']strip["']|href=["']#strip|tabs/strip\.js|strips\.js|mountStrips\(""", src), path.name
+    css = (FRONTEND / "css" / "style.css").read_text("utf-8")
+    for rule in (".lg.dep {", ".lg.arr {", ".lg.loc {", ".lg.plan {", ".aero-col > .card.aero-ruch {", ".aero-ruch .ruch-line {"):
+        assert rule in css, rule
+    aero = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
+    assert '<s class="lg dep"></s>' in aero and 'class="card aero-ruch"' in aero
+
+
 def test_hidden_menu_button_takes_no_space():
     """display:block przycisków menu przykrywał [hidden]: ADMIN był widoczny dla każdego."""
     css = (FRONTEND / "css" / "style.css").read_text("utf-8")
@@ -146,6 +167,8 @@ console.log(JSON.stringify({
   phraseology: moved.MOVED.phraseology(),
   // kafelek ABOUT / link #checklist bez arg, "#checklist", "#checklist/<id>"
   checklist: [undefined, "", "close-position"].map((a) => moved.MOVED.checklist(a)),
+  // 0.13.0: stare #strip, #strip/<ICAO> (także małymi literami) i adres, który nie jest kodem lotniska
+  strip: [undefined, "", "EPWA", "epkk", "x", "EPWA/1"].map((a) => moved.MOVED.strip(a)),
 }));
 """
 
@@ -191,6 +214,10 @@ def test_moved_docs(js):
     assert js["phraseology"] == ["other", "phraseology"]
     # CHECKLIST: bez arg i "" = pierwsza checklista w OTHER › CHECKLIST, id = ta checklista
     assert js["checklist"] == [["other", "checklist"], ["other", "checklist"], ["other", "checklist/close-position"]]
+    # STRIP: bez arg AERODROME w swoim stanie, "" = domyślny ekran, ICAO = TRAFFIC (DMAN/AMAN) tego lotniska, reszta
+    # jak wpisany adres AERODROME (zły kod: OVERVIEW)
+    assert js["strip"] == [["aerodrome", None], ["aerodrome", ""], ["aerodrome", "EPWA/dman"], ["aerodrome", "EPKK/dman"],
+                           ["aerodrome", "x"], ["aerodrome", "EPWA/1"]]
 
 
 def test_home_greeting(js):
@@ -288,7 +315,9 @@ def test_menu_fits_low_windows():
     zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
     przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
     zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
-    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej."""
+    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej. 0.13.0: pasek
+    u góry (18 px) w budżecie, EMERGENCY i ADMIN bez dodatkowego odstępu; Playwright 1366x600 z użytkownikiem:
+    21 przycisków po 19 px, 22 po 18,1 px, bez przewijania menu."""
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
     low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")
     assert ".menu nav { display: flex; flex-direction: column; }" in low
@@ -300,18 +329,20 @@ def test_menu_fits_low_windows():
     # wysokość bez ściskania jak przy paddingu 5 px (od 900 px), linia mieści się w najniższym przycisku (tekst na środku)
     assert height == 5 + 14 * 1.2 + 5 + 2 and line <= min_h - 2
     assert re.search(r"#tabs button \{ height: 24\.8px; margin-bottom: 1px; \}", lower)   # 3 + 16,8 + 3 + ramka
-    # w flex marginesy się nie łączą: odstęp nad EMERGENCY / ADMIN jak w układzie blokowym (10 px, od 820 px 6 px)
-    assert "#tabs button.red, #tabs button.admin { margin-top: 8px; }" in low
-    assert "#tabs button.red, #tabs button.admin { margin-top: 5px; }" in lower
+    # 0.13.0: wszystkie przyciski z tym samym odstępem (margin-bottom 2 px, od 820 px 1 px), EMERGENCY i ADMIN też
+    assert "margin-top" not in low and "margin-top" not in lower
     assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
     assert ".menu nav { flex: 1; overflow-y: auto; }" in css
-    # budżet 600 px (pomiary Playwright przy 1366x600): logo z paddingiem menu 45,5 px, zegar z AIRAC 49,8 px,
-    # użytkownik z wylogowaniem 66 px; 22 przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie
+    # budżet 600 px (pomiary Playwright przy 1366x600): pasek u góry 18 px, logo z paddingiem menu 45,5 px, zegar
+    # z AIRAC 49,8 px, użytkownik z wylogowaniem 66 px; przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie,
+    # liczone z index.html, i zapas na jeszcze jeden (22: AWALON)
+    topbar = float(re.search(r"--topbar-h: ([\d.]+)px;", css).group(1))
     n = len(_menu_buttons())
-    assert n == 22
-    margins = n * 1 + 5 + 5
-    for user in (0, 66):
-        nav = 600 - 45.5 - 49.8 - user - 6
-        assert n * min_h + margins <= nav, (user, nav)
+    assert 20 <= n <= 22
+    for count in (n, 22):
+        margins = count * 1
+        for user in (0, 66):
+            nav = 600 - topbar - 45.5 - 49.8 - user - 6
+            assert count * min_h + margins <= nav, (count, user, nav)
     # kolejność: niskie okno przed 820 px (te same selektory, niższe okno nadpisuje)
     assert css.index("@media (max-height: 899px)") < css.index("@media (max-height: 820px)")
