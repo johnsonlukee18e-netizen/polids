@@ -5,7 +5,9 @@ import { api, esc, h, ONLINE_EVENT } from "./api.js";
 // (sam tytuł). Jedno pole na górze: pełny kod (4 cyfry 0–7) zaznacza kod specjalny i pule, w których leży, i przewija
 // listę do pierwszej, tekst filtruje listę (każde słowo musi pasować).
 // Adres składa OTHER: "#other/squawk" albo "#other/squawk/7700" (szukany kod); każdy wpisany pełny kod to krok do
-// cofnięcia (onCode). Stare "#squawk" i "#squawk/<kod>" przekierowuje app.js.
+// cofnięcia (onCode), wyczyszczone pole (Esc, usunięcie) zamienia adres na "#other/squawk" bez nowego kroku
+// (onCode("", {replace: true})). Tekst pola (także filtr) OTHER pamięta przez onInput: po powrocie z innej
+// podzakładki pole ma ten sam tekst. Stare "#squawk" i "#squawk/<kod>" przekierowuje app.js.
 
 const EMERGENCY = new Set(["7500", "7600", "7700"]);
 // po powrocie na zakładkę dane z serwera najwyżej minutowe (nowy import bez F5)
@@ -13,10 +15,10 @@ const RELOAD_MS = 60 * 1000;
 
 // grupy pul (kategoria z importera): znacznik w kolumnie Area, opis w dymku; kolejność = kolejność pul tego samego zakresu
 export const CATEGORIES = [
-  { id: "epww", tag: "EPWW", line: "EPWW – pools from which FIR EPWW assigns codes itself." },
-  { id: "ccams", tag: "CCAMS", line: "CCAMS – codes assigned centrally by CCAMS." },
-  { id: "nato", tag: "NATO", line: "NATO – NATO military pools." },
-  { id: "eur-e", tag: "EUR-E", line: "EUR-E – allocations of the other EUR-E members and retention." },
+  { id: "epww", tag: "EPWW", line: "EPWW \u2013 pools from which FIR EPWW assigns codes itself." },
+  { id: "ccams", tag: "CCAMS", line: "CCAMS \u2013 codes assigned centrally by CCAMS." },
+  { id: "nato", tag: "NATO", line: "NATO \u2013 NATO military pools." },
+  { id: "eur-e", tag: "EUR-E", line: "EUR-E \u2013 allocations of the other EUR-E members and retention." },
 ];
 const CAT = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 export const catTag = (id) => CAT[id]?.tag || String(id || "?").toUpperCase();
@@ -33,8 +35,8 @@ export const inRange = (code, pool) => codeValue(pool.from) <= codeValue(code) &
 export function checkCode(text) {
   const code = String(text ?? "").trim();
   if (!code) return { code, ok: false, error: null };
-  if (/[89]/.test(code)) return { code, ok: false, error: "8 and 9 do not occur in SSR codes: digits 0–7 (octal)." };
-  if (!/^\d+$/.test(code)) return { code, ok: false, error: "An SSR code has digits 0–7 only." };
+  if (/[89]/.test(code)) return { code, ok: false, error: "8 and 9 do not occur in SSR codes: digits 0\u20137 (octal)." };
+  if (!/^\d+$/.test(code)) return { code, ok: false, error: "An SSR code has digits 0\u20137 only." };
   if (code.length > 4) return { code, ok: false, error: "An SSR code has 4 digits." };
   return { code, ok: code.length === 4, error: null };
 }
@@ -55,12 +57,12 @@ export function parseQuery(text) {
 
 // A/R: A = przydział (kody przydziela JEDNOSTKA), R = retencja (kod nadany przez PRZYDZIELA zostaje)
 export function arInfo(ar) {
-  if (ar === "A") return { text: "allocation", tip: "A – allocation: codes from this pool are assigned by the UNIT (Unit column) in the PA area." };
+  if (ar === "A") return { text: "allocation", tip: "A \u2013 allocation: codes from this pool are assigned by the UNIT (Unit column) in the PA area." };
   if (ar === "R") {
-    return { text: "retention", tip: "R – retention: a code assigned by the unit in the ASSIGNED BY column (Unit which assigned) "
+    return { text: "retention", tip: "R \u2013 retention: a code assigned by the unit in the ASSIGNED BY column (Unit which assigned) "
       + "is kept unchanged when the flight enters the area of the UNIT (Unit column)." };
   }
-  return { text: ar || "–", tip: "" };
+  return { text: ar || "\u2013", tip: "" };
 }
 export const civMil = (v) => (v === "CIV_MIL" ? "CIV/MIL" : v || "");
 // lista Unit równa całemu obszarowi PA (areas = meta.participating_areas) → "whole EUR-E"
@@ -78,7 +80,7 @@ export function lookup(data, code) {
 // 1 code, 2 codes, 0 codes
 export const plural = (n, one, many) => (n === 1 ? one : many);
 const nPools = (n) => `${n} ${plural(n, "pool", "pools")}`;
-export const rangeText = (p) => (p.to && p.to !== p.from ? `${p.from}–${p.to}` : p.from);
+export const rangeText = (p) => (p.to && p.to !== p.from ? `${p.from}\u2013${p.to}` : p.from);
 const countOf = (p) => p.count ?? rangeSize(p.from, p.to || p.from);
 
 // lista prefiksów w odpowiedzi: cały obszar PA, do 4 prefiksów wprost, dłuższa jako liczba (pełna lista w wierszu)
@@ -93,8 +95,8 @@ export function poolBrief(p, areas, full = false) {
   const parts = [];
   if (p.category === "eur-e") {
     if (p.ar === "R") {
-      parts.push(`retention${full ? ` in ${unitsBrief(p.unit, p.pa, areas) || "–"}` : ""} (assigned by ${unitsBrief(p.assigned_by) || "–"})`);
-    } else parts.push(unitsBrief(p.unit, p.pa, areas) || "–");
+      parts.push(`retention${full ? ` in ${unitsBrief(p.unit, p.pa, areas) || "\u2013"}` : ""} (assigned by ${unitsBrief(p.assigned_by) || "\u2013"})`);
+    } else parts.push(unitsBrief(p.unit, p.pa, areas) || "\u2013");
   }
   if (p.category !== "nato" && p.civ_mil && p.civ_mil !== "CIV") parts.push(civMil(p.civ_mil));
   if (p.app === "APP") parts.push("APP");
@@ -114,12 +116,12 @@ export function hitsText(r, areas) {
     briefs = briefs.filter(Boolean);
     return briefs.length ? `${k}: ${briefs.join(", ")}` : k;
   });
-  return `${r.special.length ? "Also in" : "In"} ${nPools(r.pools.length)}: ${parts.join(" · ")}`;
+  return `${r.special.length ? "Also in" : "In"} ${nPools(r.pools.length)}: ${parts.join(" \u00b7 ")}`;
 }
 // czego kod nie ma (wynik lookup): "" = leży w puli
 export function missText(r) {
   if (r.pools.length) return "";
-  return r.special.length ? "Not in any pool." : "– not a special code and not in any pool.";
+  return r.special.length ? "Not in any pool." : "\u2013 not a special code and not in any pool.";
 }
 
 // --- jedna lista: wiersze {kind: "special", s} i {kind: "pool", p} po kodzie; kod specjalny przed pulą od tego
@@ -152,13 +154,13 @@ export function countText(shown, all) {
     const n = shown.filter((r) => r.kind === kind).length, total = all.filter((r) => r.kind === kind).length;
     return `${n === total ? "" : `${n} of `}${total} ${plural(total, one, many)}`;
   };
-  return `${part("pool", "pool", "pools")} · ${part("special", "special code", "special codes")}`;
+  return `${part("pool", "pool", "pools")} \u00b7 ${part("special", "special code", "special codes")}`;
 }
 
 // --- widok
 // lista prefiksów ICAO z wyróżnionym EP (Polska)
 const units = (text) => (text ? String(text).split(/\s+/).filter(Boolean)
-  .map((t) => (t === "EP" ? `<span class="sq-ep">EP</span>` : esc(t))).join(" ") : "–");
+  .map((t) => (t === "EP" ? `<span class="sq-ep">EP</span>` : esc(t))).join(" ") : "\u2013");
 const FIELDS = [["pa", "PA"], ["unit", "Unit"], ["civ_mil", "CIV/MIL"], ["app", "APP"], ["assigned_by", "Unit which assigned"],
   ["ar", "A/R"], ["destination", "Destination"], ["via", "Via"], ["protection", "Protection"], ["remarks", "Remarks"], ["type", "purpose"]];
 const poolTip = (p) => [catTag(p.category), ...FIELDS.filter(([k]) => p[k]).map(([k, n]) => `${n}: ${p[k]}`),
@@ -167,11 +169,11 @@ const COLS = 10;
 
 function poolRow(r, code, areas) {
   const p = r.p, ar = arInfo(p.ar);
-  const notes = [p.type, p.remarks].filter(Boolean).join(" · ");
+  const notes = [p.type, p.remarks].filter(Boolean).join(" \u00b7 ");
   return `<tr class="sq-pool${rowHas(r, code) ? " selected" : ""}" title="${esc(poolTip(p))}">
   <td class="sq-range">${esc(rangeText(p))}</td><td class="num">${countOf(p)}</td>
   <td><span class="tag sq-grp${p.category === "epww" ? " own" : ""}" title="${esc(CAT[p.category]?.line || "")}">${esc(catTag(p.category))}</span></td>
-  <td class="sq-cm">${esc(civMil(p.civ_mil) || "–")}${p.app === "APP" ? ` <span class="tag sq-app">APP</span>` : ""}</td>
+  <td class="sq-cm">${esc(civMil(p.civ_mil) || "\u2013")}${p.app === "APP" ? ` <span class="tag sq-app">APP</span>` : ""}</td>
   <td><span class="sq-ar sq-ar-${p.ar === "R" ? "r" : "a"}" title="${esc(ar.tip)}">${esc(ar.text)}</span></td>
   <td class="sq-units">${wholeArea(p.unit, p.pa, areas) ? `<span class="sq-all" title="${esc(p.unit)}">whole ${esc(p.pa)}</span>` : units(p.unit)}</td>
   <td class="sq-units">${units(p.assigned_by)}</td>
@@ -194,7 +196,7 @@ export function answerHtml(data, text) {
   if (q.error) return `<p class="sq-bad">${esc(q.error)}</p>`;
   if (q.more) return `<p class="hint">${q.more} more ${plural(q.more, "digit", "digits")}</p>`;
   if (!q.code) return "";
-  if (!data) return `<p class="hint">Loading…</p>`;
+  if (!data) return `<p class="hint">Loading\u2026</p>`;
   const r = lookup(data, q.code);
   const big = (c) => `<span class="sq-big${EMERGENCY.has(c) ? " emerg" : ""}">${esc(c)}</span>`;
   const lines = r.special.map((s) => `<p>${big(s.code)} <span class="sq-label">${esc(s.label || "")}</span></p>`);
@@ -204,15 +206,16 @@ export function answerHtml(data, text) {
   return lines.join("");
 }
 
-// OTHER › SQUAWK w panelu podzakładki. start = kod (albo tekst) z adresu; onCode(kod) po wpisaniu pełnego kodu (OTHER
-// zapisuje krok historii). destroy() przy przejściu do innej podzakładki: zdejmuje nasłuch ONLINE_EVENT, a spóźniona
-// odpowiedź /api/squawk nic już nie rysuje (seq).
-export function mountSquawk(pane, { start = "", onCode = () => {} } = {}) {
+// OTHER › SQUAWK w panelu podzakładki. start = tekst pola (kod z adresu albo ostatnio wpisany tekst), addr = kod
+// w adresie (domyślnie start); onCode(kod) po wpisaniu pełnego kodu (OTHER zapisuje krok historii), onCode("",
+// {replace: true}) po wyczyszczeniu pola, onInput(tekst) przy każdej zmianie pola. destroy() przy przejściu do innej
+// podzakładki: zdejmuje nasłuch ONLINE_EVENT, a spóźniona odpowiedź /api/squawk nic już nie rysuje (seq).
+export function mountSquawk(pane, { start = "", addr: startAddr, onCode = () => {}, onInput = () => {} } = {}) {
   const box = h(`<div class="pane sq-pane">
-    <h2 class="title">SQUAWK – SSR codes FIR EPWW</h2>
+    <h2 class="title">SQUAWK \u2013 SSR codes FIR EPWW</h2>
     <div class="card sq-card">
       <div class="sq-top">
-        <input class="field sq-q" type="text" autocomplete="off" spellcheck="false" placeholder="Code or text: 7700, EPWW, LR…"
+        <input class="field sq-q" type="text" autocomplete="off" spellcheck="false" placeholder="Code or text: 7700, EPWW, LR\u2026"
           title="A code highlights its pools, text filters the list; EPWW, CCAMS, NATO or EUR-E shows that group"
           aria-label="Search SSR codes">
         <div class="sq-answer"></div>
@@ -222,7 +225,7 @@ export function mountSquawk(pane, { start = "", onCode = () => {} } = {}) {
         <table class="data sq-table"><thead><tr><th>Code</th><th class="num">Count</th><th>Area</th><th>CIV/MIL</th>
           <th title="${esc(`${arInfo("A").tip}\n${arInfo("R").tip}`)}">A/R</th><th>Unit</th><th>Assigned by</th>
           <th>Dest</th><th>Protection</th><th>Remarks</th></tr></thead>
-          <tbody><tr><td colspan="${COLS}" class="hint">Loading…</td></tr></tbody></table>
+          <tbody><tr><td colspan="${COLS}" class="hint">Loading\u2026</td></tr></tbody></table>
       </div>
     </div>
   </div>`);
@@ -278,12 +281,16 @@ export function mountSquawk(pane, { start = "", onCode = () => {} } = {}) {
   input.addEventListener("input", () => {
     update(true);
     const q = parseQuery(input.value);
-    // sam pełny kod = krok do cofnięcia; tekst, puste albo niepełne pole nie zmienia adresu
+    onInput(input.value);
+    // sam pełny kod = krok do cofnięcia; puste pole: adres bez kodu (bez kroku), żeby powrót nie przywracał
+    // wyczyszczonego kodu; tekst albo niepełne pole nie zmienia adresu
     if (q.code && !q.words.length) { addr = q.code; onCode(addr); }
+    else if (!input.value.trim() && addr) { addr = ""; onCode("", { replace: true }); }
   });
   input.addEventListener("keydown", (e) => { if (e.key === "Escape" && input.value) { input.value = ""; input.dispatchEvent(new Event("input")); } });
   window.addEventListener(ONLINE_EVENT, online);
-  if (start) { addr = String(start); input.value = addr; }
+  if (start) input.value = String(start);
+  addr = String(startAddr ?? start ?? "");
   update(false);
   load();
   input.focus();

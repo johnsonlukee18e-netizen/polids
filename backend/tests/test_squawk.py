@@ -720,16 +720,21 @@ globalThis.window = { addEventListener(t, f) { globalThis.__l.push([t, f]); },
 const sq = await import(process.argv[2]);
 const pane = { append(x) { this.box = x; } };
 const count = () => globalThis.__l.filter(([t]) => t === "polids:online").length;
-const codes = [];
+const codes = [], cleared = [], texts = [];
 const data = { pools: [{ from: "7401", to: "7477", category: "epww", pa: "EUR-E", unit: "EP", ar: "A" }],
   special: [{ code: "7700", label: "EMERGENCY" }], meta: {} };
 // A: pełny cykl; B: zniszczona przed odpowiedzią
-const a = sq.mountSquawk(pane, { start: "7700", onCode: (c) => codes.push(c) });
+const a = sq.mountSquawk(pane, { start: "7700", onCode: (c, o = {}) => (o.replace ? cleared : codes).push(c),
+  onInput: (t) => texts.push(t) });
 const boxA = pane.box, inputA = boxA.querySelector(".sq-q"), bodyA = boxA.querySelector(".sq-table tbody");
 const out = { afterMount: count(), startValue: inputA.value, requests: globalThis.__pending.map((p) => p.url),
   focusAfterMount: globalThis.__focus };
 for (const v of ["77", "7700 x", "7500", "abc"]) { inputA.value = v; inputA.on.input.forEach((f) => f()); }
 out.codes = [...codes];
+// wyczyszczone pole: adres bez kodu (replace), raz; tekst pola za każdym razem do onInput
+for (const v of ["", ""]) { inputA.value = v; inputA.on.input.forEach((f) => f()); }
+out.cleared = [...cleared];
+out.texts = [...texts];
 inputA.value = "";
 globalThis.__pending.shift().res(data);
 await new Promise((r) => setTimeout(r, 0));
@@ -748,6 +753,15 @@ await new Promise((r) => setTimeout(r, 0));
 out.drawnB = bodyB.innerHTML;
 a.destroy();
 out.allGone = count();
+// tekst filtra z OTHER (start) przy kodzie w adresie (addr): ten sam kod z adresu nie zmienia pola, inny tak
+const c = sq.mountSquawk(pane, { start: "NATO", addr: "7700" });
+const inputC = pane.box.querySelector(".sq-q");
+out.startText = inputC.value;
+c.activate("7700");
+out.sameAddr = inputC.value;
+c.activate("7600");
+out.otherAddr = inputC.value;
+c.destroy();
 console.log(JSON.stringify(out));
 """
 API_STUB = r"""
@@ -784,6 +798,8 @@ def test_squawk_mount_and_destroy(tmp_path):
     assert out["afterMount"] == 1 and out["startValue"] == "7700" and out["requests"] == ["/api/squawk"]
     assert out["focusAfterMount"] == 1
     assert out["codes"] == ["7500"]
+    assert out["cleared"] == [""] and out["texts"] == ["77", "7700 x", "7500", "abc", "", ""]
+    assert (out["startText"], out["sameAddr"], out["otherAddr"]) == ("NATO", "NATO", "7600")
     assert out["drawnA"] is True
     assert out["twoMounted"] == 2 and out["afterDestroy"] == 1 and out["allGone"] == 0
     assert out["focusAfterDestroy"] == 0 and out["drawnB"] == ""

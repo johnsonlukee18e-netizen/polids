@@ -24,8 +24,9 @@ const future = (pane) => { pane.append(h(`<div class="pane ot-future"><p>${FUTUR
 export default {
   mount(root, ctx) {
     // stan podzakładek, który przetrwa ponowne rysowanie (każde kliknięcie w podmenu rysuje od nowa):
-    // file: dokument DOCS ("" = pierwszy), chkId: checklista ("" = pierwsza), sqCode: kod SQUAWK, fpCs: znak FLIGHT PLAN
-    let file = "", chkId = "", sqCode = "", fpCs = "";
+    // file: dokument DOCS ("" = pierwszy), chkId: checklista ("" = pierwsza), sqCode: kod SQUAWK w adresie, sqText:
+    // tekst pola SQUAWK (kod albo filtr, jak w dawnej osobnej zakładce), fpCs: znak FLIGHT PLAN
+    let file = "", chkId = "", sqCode = "", sqText = "", fpCs = "";
     let sub = null, live = null;   // live: obiekt strony na ekranie (z render), np. docs z pick()
     // Strona: {id, label, render(pane) → obiekt strony albo nic, arg() → stan do adresu, set(rest) → stan z adresu,
     // update(live) → otwarta strona pokazuje nowy stan z adresu, resume(live) → przycisk menu przy otwartej stronie}.
@@ -59,10 +60,12 @@ export default {
       { id: "phraseology", label: "PHRASEOLOGY", render: (pane) => { mountPhraseology(pane, ctx); } },
       { id: "position", label: "POSITION" },
       { id: "regcause", label: "REGCAUSE", render: (pane) => mountRegcause(pane) },
-      // każdy wpisany pełny kod to krok do cofnięcia (onCode); przycisk menu: fokus w polu i świeże dane
-      { id: "squawk", label: "SQUAWK", arg: () => sqCode, set: (c) => { sqCode = c; },
+      // każdy wpisany pełny kod to krok do cofnięcia (onCode); wyczyszczone pole podmienia adres (replace); tekst pola
+      // (onInput) wraca po przejściu przez inną podzakładkę; przycisk menu: fokus w polu i świeże dane
+      { id: "squawk", label: "SQUAWK", arg: () => sqCode, set: (c) => { sqCode = sqText = c; },
         update: (sq) => sq.activate(sqCode), resume: (sq) => sq.activate(),
-        render: (pane) => mountSquawk(pane, { start: sqCode, onCode: (c) => { sqCode = c; remember("other", argOf()); } }) },
+        render: (pane) => mountSquawk(pane, { start: sqText, addr: sqCode, onInput: (t) => { sqText = t; },
+          onCode: (c, o = {}) => { sqCode = sqText = c; remember("other", argOf(), { replace: !!o.replace }); } }) },
       { id: "vfr-minima", label: "VFR MINIMA", render: (pane) => mountVfrMinima(pane) },
     ];
     const byId = new Map(PAGES.map((p) => [p.id, p]));

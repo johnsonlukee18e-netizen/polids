@@ -121,7 +121,7 @@ const sub = globalThis.__sub;
 const initial = { sub: sub.current(), tabs: globalThis.__tabs, docs: globalThis.__docs.map((d) => d.start) };
 const steps = [];
 const page = (kind) => globalThis.__pages.filter((x) => x.kind === kind)
-  .map((x) => ({ start: x.opts?.start ?? null, calls: [...x.calls], dead: x.dead }));
+  .map((x) => ({ start: x.opts?.start ?? null, addr: x.opts?.addr ?? null, calls: [...x.calls], dead: x.dead }));
 const step = (name, fn) => { log.length = 0; fn(); steps.push({ name, sub: sub.current(), log: [...log],
   mounts: globalThis.__chk.map((c) => ({ start: c.opts.start, picks: [...c.picks], dead: c.dead })),
   docs: globalThis.__docs.map((d) => ({ start: d.start, picks: [...d.picks] })),
@@ -163,6 +163,11 @@ step("empty", () => view.activate(""));
 // 0.13.0: znak z adresu oczyszczony jak w polu (adres też); pusty znak z pola: adres bez znaku
 step("fp-dash", () => view.activate("flight-plan/lot-3827"));
 step("fp-clear", () => last("fp").opts.onLookup(""));
+// SQUAWK: tekst pola (filtr) wraca po innej podzakładce; wyczyszczone pole podmienia adres, kod nie wraca
+step("sq-open", () => view.activate("squawk/7700"));
+step("sq-filter", () => { last("squawk").opts.onInput("NATO"); sub.click("regcause"); sub.click("squawk"); });
+step("sq-clear", () => { last("squawk").opts.onInput(""); last("squawk").opts.onCode("", { replace: true }); });
+step("sq-after-clear", () => { sub.click("vfr-minima"); sub.click("squawk"); });
 console.log(JSON.stringify({ html, initial, steps, future: globalThis.__future }));
 """
 
@@ -459,3 +464,74 @@ def test_other_flight_plan_clean_address(js):
     assert dash["sub"] == "flight-plan" and dash["fp"][-1]["start"] == "LOT3827"
     assert dash["log"] == [["remember", "other", "flight-plan/LOT3827", False]]
     assert _step(js, "fp-clear")["log"] == [["remember", "other", "flight-plan", False]]
+
+
+def test_other_squawk_text_and_cleared_code(js):
+    """0.13.0: SQUAWK w OTHER: tekst pola (np. filtr NATO) wraca po przejściu przez inną podzakładkę, jak w dawnej
+    osobnej zakładce; wyczyszczone pole podmienia adres (bez kroku), więc ponowne otwarcie nie przywraca kodu."""
+    op = _step(js, "sq-open")
+    assert (op["squawk"][-1]["start"], op["squawk"][-1]["addr"]) == ("7700", "7700")
+    flt = _step(js, "sq-filter")
+    assert flt["sub"] == "squawk" and (flt["squawk"][-1]["start"], flt["squawk"][-1]["addr"]) == ("NATO", "7700")
+    assert flt["log"][-1] == ["remember", "other", "squawk/7700", False]
+    assert _step(js, "sq-clear")["log"] == [["remember", "other", "squawk", True]]
+    after = _step(js, "sq-after-clear")
+    assert (after["squawk"][-1]["start"], after["squawk"][-1]["addr"]) == ("", "")
+    assert after["log"][-1] == ["remember", "other", "squawk", False]
+
+
+SUBTABS_SCRIPT = r"""
+// atrapa DOM dla prawdziwego subtabs() z api.js: <template> buduje <nav> z przyciskami albo panel
+const el = (html) => {
+  const buttons = [...html.matchAll(/<button data-id="([^"]+)">/g)].map(([, id]) => ({ dataset: { id }, cls: new Set(),
+    classList: { toggle(c, on) { on ? this.owner.cls.add(c) : this.owner.cls.delete(c); } } }));
+  buttons.forEach((b) => { b.classList.owner = b; b.closest = () => b; });
+  return { html, className: "", innerHTML: "", on: {}, buttons, closest: () => null,
+    querySelectorAll: () => buttons, addEventListener(t, f) { this.on[t] = f; } };
+};
+globalThis.document = { createElement: () => ({ set innerHTML(v) { this.h = v; }, get content() { return { firstElementChild: el(this.h) }; } }) };
+const api = await import(process.argv[2]);
+const run = (opts) => {
+  const drawn = [], killed = [];
+  const page = (id) => ({ id, fill: id === "d", render: () => { drawn.push(id); return { destroy: () => killed.push(id) }; } });
+  const tabs = [page("a"), { sep: true }, page("c"), page("d")];
+  const root = { append(...xs) { this.kids = xs; } };
+  const ctl = api.subtabs(root, tabs, opts);
+  const [nav, pane] = root.kids;
+  const view = { querySelectorAll: () => [nav] };
+  const active = () => nav.buttons.filter((b) => b.cls.has("active")).map((b) => b.dataset.id);
+  const o = { start: ctl.current(), active: active() };
+  ctl.show("nope"); o.unknown = ctl.current();
+  ctl.show("d"); o.d = [ctl.current(), pane.className, active()];
+  api.selectNavPath(view, ""); o.pathEmpty = ctl.current();
+  api.selectNavPath(view, "zzz"); o.pathUnknown = ctl.current();
+  api.selectNavPath(view, "a"); o.pathA = [ctl.current(), api.navPath(view)];
+  nav.on.click({ target: nav.buttons.find((b) => b.dataset.id === "d") }); o.click = ctl.current();
+  o.drawn = drawn; o.killed = killed;
+  return o;
+};
+console.log(JSON.stringify({ first: run({ first: "c" }), none: run({}), bad: run({ first: "nope" }) }));
+"""
+
+
+def test_subtabs_first_option(tmp_path):
+    """Prawdziwe subtabs() z api.js (nie atrapa): opts.first = podzakładka na start, dla nieznanego id w show()
+    i w ścieżce adresu (selectNavPath, NAVS.first); bez first albo z nieznanym first: pierwsza w kolumnie (bez
+    odstępu). show() niszczy poprzednią stronę (destroy), panel .fill tylko dla podzakładki z fill."""
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text((FRONTEND / "js" / "api.js").read_text("utf-8"), "utf-8")
+    (tmp_path / "run.mjs").write_text(SUBTABS_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "api.mjs").as_uri()], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    f = out["first"]
+    assert f["start"] == "c" and f["active"] == ["c"] and f["unknown"] == "c"
+    assert f["d"] == ["d", "pane fill", ["d"]]
+    assert f["pathEmpty"] == "c" and f["pathUnknown"] == "c" and f["pathA"] == ["a", "a"] and f["click"] == "d"
+    assert f["drawn"] == ["c", "c", "d", "c", "a", "d"] and f["killed"] == ["c", "c", "d", "c", "a"]
+    for name in ("none", "bad"):
+        o = out[name]
+        assert o["start"] == "a" and o["unknown"] == "a" and o["pathEmpty"] == "a" and o["pathUnknown"] == "a", name

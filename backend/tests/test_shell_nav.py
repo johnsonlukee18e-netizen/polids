@@ -156,7 +156,8 @@ def test_squawk_moved_to_other():
     assert "squawk" not in re.findall(r"^import (\w+) from", APP, re.M)
     assert '  squawk: (arg) => ["other", arg ? "squawk/" + arg : "squawk"],' in MOVED_SRC
     sq = (FRONTEND / "js" / "squawk.js").read_text("utf-8")
-    assert "export function mountSquawk(pane, { start = \"\", onCode = () => {} } = {})" in sq
+    # 0.13.0: addr (kod w adresie) i onInput (tekst pola wraca po innej podzakładce)
+    assert "export function mountSquawk(pane, { start = \"\", addr: startAddr, onCode = () => {}, onInput = () => {} } = {})" in sq
     assert 'import { api, esc, h, ONLINE_EVENT } from "./api.js";' in sq and "remember(" not in sq
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { mountSquawk } from "../squawk.js";' in other
