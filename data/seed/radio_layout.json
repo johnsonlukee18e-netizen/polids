@@ -1,16 +1,19 @@
 {
-  "note": "Układ strony RADIO wg szkicu Marka (issue #23, img/i4-radio-layout-sketch.png, siatka Excela A..M) i zdjęcia PANDORY: kolumna col 1..13 (A..M), wiersz row 1..21. Okienka FIR-ów sąsiednich: id i granice pionowe (upper/lower, FL) jak na szkicu, nie z kafelków; tiles = etykiety kafelków sąsiadów z vacs_epww.json (neighbours), callsign = stanowisko okienka (wybiera kafelek, gdy dwa mają tę samą etykietę). Okienko z kilkoma kafelkami (ACC UMMV, RLV UKLV, ACC UMKK) obsługuje pierwsze stanowisko online z ich kolejności po kolei. merge = łączenie okienek jednego stanowiska (tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW). Wskaźniki u góry: reguły w jednym miejscu (count = liczba stanowisk online, hl = H/L jak APP WA, ab = a-b jak APP KK, acc = skróty ACC EPWW).",
+  "note": "Układ strony RADIO wg szkicu Marka (issue #23, img/i4-radio-layout-sketch.png, siatka Excela A..M) i zdjęcia PANDORY: kolumna col 1..13 (A..M), wiersz row 1..21. Okienka FIR-ów sąsiednich: id i granice pionowe (upper/lower, FL) jak na szkicu, nie z kafelków; tiles = etykiety kafelków sąsiadów z vacs_epww.json (neighbours), callsign = stanowisko okienka (wybiera kafelek, gdy dwa mają tę samą etykietę). Okienko z kilkoma kafelkami (ACC UMMV, RLV UKLV, ACC UMKK) obsługuje pierwsze stanowisko online z ich kolejności po kolei. merge = łączenie okienek jednego stanowiska (tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW). Wskaźniki u góry: reguły w jednym miejscu (count = liczba stanowisk online, hl = H/L jak APP WA, ab = a-b jak APP KK, acc = skróty ACC EPWW), tip = opis wskaźnika w dymku. maps = prostokąty podglądów LOW, HIGH i MID (col, row, cols, rows), status = stan danych, legend = legenda; wszystkie miejsca stałe, żeby strona nie zmieniała układu przy zmianie danych.",
   "grid": {"cols": 13, "rows": 21},
   "indicators": [
-    {"id": "ACC GAT", "col": 1, "row": 1, "rule": "acc"},
-    {"id": "APP GD", "col": 2, "row": 1, "rule": "count", "count": ["EPGD_APP", "EPGD_L_APP"]},
-    {"id": "APP WA", "col": 3, "row": 1, "rule": "hl", "h": ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], "l": ["EPWA_F_APP"]},
-    {"id": "APP KK", "col": 4, "row": 1, "rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]},
-    {"id": "APP PO", "col": 5, "row": 1, "rule": "count", "count": ["EPPO_*_APP"]}
+    {"id": "ACC GAT", "col": 1, "row": 1, "tip": "EPWW ACC positions online, the one with the most sectors first", "rule": "acc"},
+    {"id": "APP GD", "col": 2, "row": 1, "tip": "Gdańsk APP positions online", "rule": "count", "count": ["EPGD_APP", "EPGD_L_APP"]},
+    {"id": "APP WA", "col": 3, "row": 1, "tip": "Warszawa APP online: H = radar positions, L = director", "rule": "hl", "h": ["EPWA_APP", "EPWA_N_APP", "EPWA_S_APP"], "l": ["EPWA_F_APP"]},
+    {"id": "APP KK", "col": 4, "row": 1, "tip": "Kraków APP online: radar positions - directors", "rule": "ab", "a": ["EPKK_APP", "EPKK_E_APP"], "b": ["EPKK_KK_APP", "EPKK_KT_APP"]},
+    {"id": "APP PO", "col": 5, "row": 1, "tip": "Poznań APP positions online", "rule": "count", "count": ["EPPO_*_APP"]}
   ],
   "berlin": {"col": 1, "row": 6, "box": {"col": 1, "row": 7, "cols": 2}},
   "buttons": {"col": 8, "rows": {"atis": 5, "low": 6, "mid": 6, "high": 6, "app": 8, "twr": 10, "twra": 12, "fis": 14}},
-  "maps": {"low": {"col": 6, "row": 11}, "high": {"col": 10, "row": 11}, "mid": {"col": 8, "row": 18}},
+  "maps": {"low": {"col": 4, "row": 8, "cols": 4, "rows": 10}, "high": {"col": 9, "row": 6, "cols": 3, "rows": 12},
+           "mid": {"col": 8, "row": 16, "rows": 6}},
+  "status": {"col": 8, "row": 15},
+  "legend": {"col": 1, "row": 18, "cols": 3, "rows": 4},
   "firs": [
     {"fir": "EDWW", "name": {"col": 2, "row": 4}, "merge": false, "boxes": [
       {"id": "MRZ", "col": 2, "row": 5, "upper": 285, "lower": 0, "callsign": "EDWW_MRZ_CTR", "tiles": ["EDWW MRZ"]},

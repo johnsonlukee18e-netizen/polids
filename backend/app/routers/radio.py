@@ -315,21 +315,20 @@ async def _flow_tvs(now: datetime) -> list[dict] | None:
 @router.get("/board")
 async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)):
     """Wszystko dla strony RADIO w jednym zapytaniu: sektory ACC EPWW (LOW/MID/HIGH) z właścicielem wg kolejności
-    przejmowania (ownership.json), TMA/APP, CTR/TWR, FIS, ATIS polskich lotnisk i stosy sąsiadów (ESAA, EDWW, EDUU,
-    EDMM, LKAA po lewej; UMKK, EYVL, UMMV, UKLV, LZBB po prawej): kafelki sektorów graniczących z EPWW jak w VACS
-    (bez FMP) z wysokością VACS (alt, lo/hi w stopach) i właścicielem (owner); TMA w częściach wg stanowiska APP
+    przejmowania (ownership.json), TMA/APP, CTR/TWR, FIS i ATIS polskich lotnisk; TMA w częściach wg stanowiska APP
     (WA APP, WA N APP, WA S APP), TMA proceduralne z wieżą lotniska.
     owner/owners = pierwsze stanowisko online z kolejności (null/[] = nikt: na stronie sektora ACC nie ma, sektory
-    jednego stanowiska to jeden obszar; TMA, CTR i FIS EPWW samo ID, kafelek sąsiada bez częstotliwości).
+    jednego stanowiska to jeden obszar; TMA, CTR i FIS EPWW samo ID, okienko sąsiada bez częstotliwości).
     `ver`: wersja danych z importu. `geo=1` albo `have=<ver>` inne niż bieżąca: także geometria podglądów (granica
     EPWW, FIR-y w tle, wycinki ACC, TMA, CTR, FIS) – strona trzyma ją, dopóki `ver` się nie zmieni (np. po imporcie).
-    Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (EPWW: same ID; stosy sąsiadów bez
+    Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (EPWW: same ID; okienka sąsiadów bez
     częstotliwości i bez ADVISORY, bo nie wiadomo, czy ktoś tam jest).
-    Od 0.13.0 (układ wg szkicu Marka, data/seed/radio_layout.json): `grid` (siatka 13 × 21, przyciski, podglądy),
+    Od 0.13.0 (układ wg szkicu Marka, data/seed/radio_layout.json): `grid` (siatka 13 × 21, przyciski, prostokąty
+    podglądów, miejsce stanu danych i legendy),
     `firs` (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu okienek jednego stanowiska), `indicators`
     (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST z ATIS EDDB, bez ATIS wg wiatru z METAR),
     `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %; `ok=false` = brak danych vIFF) i `plates`
-    (plakietki APP i TWR tylko dla zalogowanych). `stacks` zostają dla dotychczasowej strony."""
+    (plakietki APP i TWR tylko dla zalogowanych). Stosy sąsiadów (`stacks`) zastąpiły okienka `firs`."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
     merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}

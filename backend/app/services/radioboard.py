@@ -3,9 +3,10 @@
 Trzy podglądy FIR EPWW: sektory ACC w warstwach LOW, MID i HIGH (data/seed/ownership.json), a do tego warstwy
 APP (TMA), TWR (CTR lotnisk), FIS i pasek ATIS. Każda etykieta ma kolejność przejmowania (chain); właściciel to
 pierwsze stanowisko z tej kolejności, które jest teraz online (dopasowanie z /api/radio/online, z aliasami sąsiadów).
-Sąsiedzi: stosy sektorów graniczących z FIR EPWW jak w VACS (kafelki profilu ACC_EPWW z data/seed/vacs_epww.json,
-bez FMP) z zakresem wysokości, ułożone wokół podglądów tak jak leżą na mapie; kafelek obsługuje pierwsze stanowisko
-online z jego kolejności (controlled_by).
+Sąsiedzi (0.13.0): okienka FIR-ów sąsiednich w siatce strony wg szkicu Marka (data/seed/radio_layout.json); kolejność
+przejmowania okienka z kafelków sektorów graniczących z FIR EPWW jak w VACS (profil ACC_EPWW z data/seed/vacs_epww.json,
+bez FMP); okienko obsługuje pierwsze stanowisko online z tej kolejności (controlled_by), okienka jednego stanowiska
+łączymy (merge_boxes).
 
 Część zależna tylko od danych z importu (wycinki, kafelki, punkty etykiet, geometria) jest liczona raz i trzymana
 w pamięci do zmiany bazy, ownership.json albo vacs_epww.json; przy każdym odświeżeniu liczymy tylko, kto jest online."""
@@ -24,18 +25,19 @@ from .runways import atis_state, wind_components
 LAYERS = ("LOW", "MID", "HIGH")
 TOP_FT = 66000  # FL660: górna granica podglądów (Kaliningrad ma w pliku 99900)
 
-# Sąsiedzi wokół podglądów (Marek, runda 10): lewy podgląd LOW i prawy HIGH; at = strona mapy, po której leży FIR.
+# FIR-y sąsiednie na stronie RADIO (okienka wg szkicu, radio_layout.json): kod i nazwa do dymku i panelu LOA.
+# Kafelki sąsiadów (stack_tiles) dają okienkom kolejność przejmowania; stosów jako takich strona już nie rysuje (0.13.0).
 STACKS = (
-    {"fir": "ESAA", "map": "left", "at": "n", "title": "SVERIGE"},
-    {"fir": "EDWW", "map": "left", "at": "nw", "title": "BREMEN"},
-    {"fir": "EDUU", "map": "left", "at": "w", "title": "RHEIN"},
-    {"fir": "EDMM", "map": "left", "at": "sw", "title": "MÜNCHEN"},
-    {"fir": "LKAA", "map": "left", "at": "s", "title": "PRAHA"},
-    {"fir": "UMKK", "map": "right", "at": "n", "title": "KALININGRAD"},
-    {"fir": "EYVL", "map": "right", "at": "ne", "title": "VILNIUS"},
-    {"fir": "UMMV", "map": "right", "at": "e", "title": "MINSK"},
-    {"fir": "UKLV", "map": "right", "at": "se", "title": "LVIV"},
-    {"fir": "LZBB", "map": "right", "at": "s", "title": "BRATISLAVA"},
+    {"fir": "ESAA", "title": "SVERIGE"},
+    {"fir": "EDWW", "title": "BREMEN"},
+    {"fir": "EDUU", "title": "RHEIN"},
+    {"fir": "EDMM", "title": "MÜNCHEN"},
+    {"fir": "LKAA", "title": "PRAHA"},
+    {"fir": "UMKK", "title": "KALININGRAD"},
+    {"fir": "EYVL", "title": "VILNIUS"},
+    {"fir": "UMMV", "title": "MINSK"},
+    {"fir": "UKLV", "title": "LVIV"},
+    {"fir": "LZBB", "title": "BRATISLAVA"},
 )
 STACK_FIRS = {s["fir"] for s in STACKS}
 # kafelek VACS → stos: pierwszy człon etykiety (EYVL U → EYVL); lotniska i FIR-y bez własnego stosu do stosu obok
@@ -619,8 +621,32 @@ def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
     buttons = layout.get("buttons") or {}
     for row in (buttons.get("rows") or {}).values():
         occupied[(int(buttons.get("col") or 0), int(row))] = "buttons"
-    return {"grid": layout.get("grid") or {}, "buttons": buttons, "maps": layout.get("maps") or {},
+    # podglądy (prostokąty LOW, HIGH, MID), stan danych i legenda: stałe miejsca, połączone okienko ich nie zajmie
+    maps = {k: _cell(v) for k, v in (layout.get("maps") or {}).items()}
+    for k, c in maps.items():
+        occupied.update(dict.fromkeys(_cells_of(c), f"map:{k}"))
+    places = {k: _cell(layout[k]) for k in ("status", "legend") if layout.get(k)}
+    for k, c in places.items():
+        occupied.update(dict.fromkeys(_cells_of(c), k))
+    grid = layout.get("grid") or {}
+    return {"grid": grid, "buttons": buttons, "maps": maps, **places,
+            "tracks": col_kinds(occupied, int(grid.get("cols") or 0), int(buttons.get("col") or 0)),
             "indicators": inds, "berlin": berlin, "firs": firs, "occupied": occupied}
+
+
+def col_kinds(occupied: dict, cols: int, button_col: int) -> list[str]:
+    """Rodzaj każdej kolumny siatki do jej szerokości na stronie (stała, niezależna od tego, kto jest online): btn =
+    przyciski warstw, box = okienka, wskaźniki, BERLIN i legenda, name = same nazwy FIR-ów (EYVL, UMMV, UKLV z prawej),
+    map = reszta (podglądy LOW i HIGH; dzielą wolne miejsce)."""
+    tags: dict[int, set[str]] = {}
+    for (x, _), tag in occupied.items():
+        tags.setdefault(x, set()).add(tag.split(":")[0])
+    out = []
+    for x in range(1, max([cols, *tags]) + 1 if tags or cols else 1):
+        t = tags.get(x, set())
+        out.append("btn" if x == button_col else "box" if t & {"box", "ind", "berlin", "legend"}
+                   else "name" if "name" in t else "map")
+    return out
 
 
 def freq_of(cs: str | None, online: dict, positions: dict | None = None) -> str | None:
@@ -792,8 +818,8 @@ def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str
     out = []
     for r in lay.get("indicators") or ():
         value, counted = indicator_value(r, online, sectors, acc_short)
-        out.append({"id": r["id"], **{k: r[k] for k in ("col", "row", "cols", "rows")}, "value": value,
-                    "positions": [_who(cs, online) for cs in counted]})
+        out.append({"id": r["id"], **{k: r[k] for k in ("col", "row", "cols", "rows")}, "tip": r.get("tip") or "",
+                    "value": value, "positions": [_who(cs, online) for cs in counted]})
     return out
 
 
@@ -1028,7 +1054,6 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
         if s["fir"].upper() == "EPWW" and k in kinds:
             kinds[k].append(s)
     tiles = stack_tiles(vacs_tiles, first_chains(nb_chains), positions, chain_tails(nb_chains))
-    stacks = [{**st, "tiles": tiles.get(st["fir"], [])} for st in STACKS]
     acc_geo, seen = [], set()
     for s in kinds["acc"]:
         m = re.match(r"^EPWW([A-Z])", s["name"])
@@ -1066,7 +1091,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
             "acc_short": {cs: (v or {}).get("short") or cs for cs, v in acc_pos.items()},
             "sectors": acc_sectors(own), "tma": tma_groups(kinds["tma"], own),
             "twr": ctr_groups(kinds["ctr"], own, coords, positions), "fis": fis_groups(fis_sl, own),
-            "atis": atis, "stacks": stacks, "nb": [{"id": a["id"], "chain": a["chain"]} for a in nb], "geo": geo,
+            "atis": atis, "nb": [{"id": a["id"], "chain": a["chain"]} for a in nb], "geo": geo,
             "layout": layout_static(layout or {}, tiles), "plates": tma_plate_static(kinds["tma"], own)}
 
 
@@ -1080,10 +1105,6 @@ def _referenced(static: dict) -> set[str]:
         refs.update(cs for ch in g["chains"] for cs in ch)
         if g.get("atis"):
             refs.add(g["atis"])
-    for st in static["stacks"]:
-        for t in st["tiles"]:
-            refs.add(t["callsign"])
-            refs.update(t["chain"])
     for f in (static.get("layout") or {}).get("firs") or ():
         refs.update(f["area"])
         for b in f["boxes"]:
@@ -1098,7 +1119,7 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     """Stan tablicy dla zestawu zalogowanych (online: znak stanowiska → kontroler, jak /api/radio/online).
     Od 0.13.0 także układ wg szkicu: grid, firs (okienka FIR-ów sąsiednich po łączeniu), indicators, plates (APP i TWR
     tylko dla zalogowanych), berlin (berlin_config z feedu i METAR, liczy endpoint) z miejscem w siatce i flow
-    (flow_alerts z vIFF, liczy endpoint; None = brak danych). stacks zostają dla dotychczasowej strony."""
+    (flow_alerts z vIFF, liczy endpoint; None = brak danych). Stosów sąsiadów już nie ma (okienka firs)."""
     sectors = [{**s, "owner": first_online(s["chain"], online)} for s in static["sectors"]]
     # APP, TWR, FIS: właściciel spośród stanowisk tej przestrzeni (APP, TWR, informacja); sektor ACC, który przejmuje
     # ją top-down, osobno (topdown) – ACC widać już na podglądach LOW/MID/HIGH
@@ -1112,9 +1133,6 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     tma = [local(g) for g in static["tma"]]
     twr = [local(g) for g in static["twr"]]
     fis = [local(g) for g in static["fis"]]
-    # stosy sąsiadów: kafelek obsługuje pierwsze stanowisko online z jego kolejności (null = nikt, bez częstotliwości)
-    stacks = [{**st, "tiles": [{**t, "owner": first_online(t["chain"], online)} for t in st["tiles"]]}
-              for st in static["stacks"]]
     # ATIS: polskie stanowiska ATIS z pliku .ese oraz zalogowane EP**_ATIS spoza niego (np. EPWA_D_ATIS)
     atis = [{"callsign": cs, "icao": cs[:4], "online": cs in online} for cs in static["atis"]]
     known = {online[a["callsign"]]["callsign"] for a in atis if a["online"]}
@@ -1139,10 +1157,11 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     nb = {a["id"]: o for a in static.get("nb") or () if (o := first_online(a["chain"], online))}
     lay = static.get("layout") or {}
     grid = {"cols": (lay.get("grid") or {}).get("cols"), "rows": (lay.get("grid") or {}).get("rows"),
-            "buttons": lay.get("buttons") or {}, "maps": lay.get("maps") or {}}
+            "buttons": lay.get("buttons") or {}, "maps": lay.get("maps") or {}, "tracks": lay.get("tracks") or [],
+            **{k: lay[k] for k in ("status", "legend") if lay.get(k)}}
     flow = flow or {}
     return {"layers": static["layers"], "sectors": sectors, "tma": tma, "twr": twr,
-            "fis": fis, "atis": atis, "stacks": stacks, "nb": nb, "pos": pos,
+            "fis": fis, "atis": atis, "nb": nb, "pos": pos,
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra},
             "grid": grid, "firs": fir_blocks(lay, online, positions, net_ok),
             "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),

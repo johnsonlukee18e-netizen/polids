@@ -1,37 +1,37 @@
-// RADIO: jedna strona jak w PANDORZE (runda 10, Marek): u góry pasek ATIS, po lewej duży podgląd LOW z sektoryzacją
-// FIR EPWW i stosami sąsiadów (ESAA, EDWW, EDUU, EDMM, LKAA), w środku przyciski warstw i mały podgląd MID, po prawej
-// duży podgląd HIGH ze stosami UMKK, EYVL, UMMV, UKLV, LZBB. Sektory ACC na podglądach (runda 12, Marek): wycinki
-// obsługiwane przez to samo stanowisko (kolejność przejmowania, ownership.json) jako jeden obszar z jedną etykietą
-// (stanowisko i częstotliwość), granica tylko tam, gdzie zmienia się obsługujący; sektorów bez nikogo nie rysujemy
-// (ramą zostaje granica FIR EPWW). APP, TWR, ATIS i FIS bez nikogo: samo ID (runda 11, Marek: częstotliwość dopiero,
-// gdy ktoś obsługuje). Stosy sąsiadów
-// (runda 11): sektory graniczące z EPWW jak w VACS (bez FMP), częstotliwość tylko, gdy ktoś je obsługuje; nikt w całym
-// stosie → jedna linia ADVISORY 122.800.
+// RADIO: jedna strona jak w PANDORZE. Od 0.13.0 (issue #23, szkic Marka i zdjęcie PANDORY) siatka 13 × 21 komórek
+// z data/seed/radio_layout.json (GET /api/radio/board: grid, firs, indicators, berlin): u góry stały pasek ATIS (ta sama
+// wysokość, gdy jest ukryty i przy dowolnej liczbie ATIS-ów – strona nigdy nie skacze), pod nim wskaźniki ACC GAT,
+// APP GD, APP WA, APP KK, APP PO, BERLIN (WEST/EAST, czerwony napis = konfiguracja preferowana, bez pasa z ATIS),
+// okienka FIR-ów sąsiednich (żółta nazwa, w okienku ID i granice jak na szkicu, np. "OSE2 660-365", i częstotliwość,
+// gdy ktoś je obsługuje; okienka jednego stanowiska połączone w backendzie), w środku kolumna przycisków ATIS /
+// LOW MID HIGH / APP / TWR / TWR/A / FIS, podgląd LOW na lewo od niej, HIGH na prawo, mały MID na dole.
+// Sektory ACC na podglądach (runda 12, Marek): wycinki obsługiwane przez to samo stanowisko (kolejność przejmowania,
+// ownership.json) jako jeden obszar z jedną etykietą (stanowisko i częstotliwość), granica tylko tam, gdzie zmienia
+// się obsługujący; sektorów bez nikogo nie rysujemy (ramą zostaje granica FIR EPWW). APP, TWR, ATIS i FIS bez nikogo:
+// samo ID (runda 11, Marek: częstotliwość dopiero, gdy ktoś obsługuje).
 // Runda 11 (Marek): warstwa APP w częściach TMA wg stanowiska APP (WA APP, WA N APP, WA S APP) i z TMA proceduralnymi
 // (SC/LB/SY TWR); etykiety APP i TWR obok kształtów TMA/CTR z linią do punktu; LOW z suwakiem wysokości (FL095–FL330).
-// Dane: GET /api/radio/board co 30 s (geometria raz, potem tylko po zmianie wersji danych `ver`, np. po imporcie nowego
-// pliku .ese). Kliknięcie nagłówka stosu sąsiada (np. EDWW BREMEN): panel z wyciągiem z LOA EPWW z tym FIR-em
+// Dane: GET /api/radio/board co 30 s (geometria raz, potem tylko po zmianie wersji danych `ver`, np. po imporcie nowych
+// danych sektorów). Kliknięcie nazwy FIR-u sąsiada (np. EDWW): panel z wyciągiem z LOA EPWW z tym FIR-em
 // (GET /api/radio/loa), z przyciskiem do dokumentu w COORDINATION › DOKUMENTY i PDF-em w nowej karcie.
 import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
 import { dissolve, pointIn } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
-import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, TOP_FT, argOf, bboxOf, bboxOrDefault, byShort,
-  controllersOn, coverGrid, cutAt, cutBand, cutBounds, cutRange, flNum, flText, labelOpts, parseArg, pathAll, pathOf, placeLabels, projection,
-  ringsOf, sliceAt, stackBands, utcHhmm } from "../radioboard.js";
+import { ADVISORY_FQ, DEFAULT_CUT, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, argOf, bboxOf, bboxOrDefault, buttonRows, byShort,
+  controllersOn, coverGrid, cutAt, cutBand, cutBounds, cutRange, flText, gridArea, gridTracks, labelOpts, limText, limTip, parseArg,
+  pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, utcHhmm } from "../radioboard.js";
 
 const LS_LAYERS = "radio.layers", LS_CUT = "radio.cut";
 const REFRESH_MS = 30000;
 // MID i HIGH mają jeden kształt sektorów
 const LEVEL_FT = { MID: 35000, HIGH: 40000 };
+// podglądy: miejsce w siatce z grid.maps (klucz = warstwa)
 const MAPS = [
-  { key: "LOW", layer: "low", cls: "rb-low", side: "left" },
-  { key: "MID", layer: "mid", cls: "rb-midmap", side: null },
-  { key: "HIGH", layer: "high", cls: "rb-high", side: "right" },
+  { key: "LOW", layer: "low", cls: "rb-low" },
+  { key: "MID", layer: "mid", cls: "rb-midmap" },
+  { key: "HIGH", layer: "high", cls: "rb-high" },
 ];
-// miejsce stosu sąsiada w panelu: strona mapy z /api/radio/board (at) → obszar siatki panelu
-const AREA = { n: "top", s: "bot", nw: "col", w: "col", sw: "col", ne: "col", e: "col", se: "col" };
-const COL_ORDER = { nw: 0, w: 1, sw: 2, ne: 0, e: 1, se: 2 };
 // etykiety warstw APP/TWR/FIS: krótkie ID bez rodzaju (kolor paska z lewej mówi, co to jest): WA S APP → WA S
 const shortId = (id) => String(id).replace(/ (?:APP|DEP|TWR|FIS)$/, "");
 
@@ -152,41 +152,64 @@ export function groupTip(g, title, x, extra = [], now = null) {
   return [title, `Position: ${x.pos(g.nominal)}`, cur, ...extra].join("\n");
 }
 
-// --- stos sąsiada (runda 11, Marek): kafelki VACS sektorów graniczących z EPWW (bez FMP). Częstotliwość tylko, gdy ktoś
-// obsługuje sektor (owner: pierwsze stanowisko online z kolejności VACS), ze skrótem tego stanowiska, gdy to nie
-// stanowisko kafelka; nikt w całym stosie → jedna linia ADVISORY 122.800 pod nagłówkiem. Granice pionowe raz, na osi
-// między pasmami (stackBands). st: stos z /api/radio/board; x: {nm(cs), freq(cs), who(cs), pos(cs), sel, net} – nazwa,
-// częstotliwość i zalogowany z tablicy, opis stanowiska, FIR otwartego LOA, false = brak danych VATSIM (bez ADVISORY).
-const altText = (t) => (t.lo ? (t.hi < TOP_FT ? `${flText(t.lo)}–${flText(t.hi)}` : `from ${flText(t.lo)}`) : `up to ${flText(t.hi)}`);
-const bdHtml = (ft) => `<div class="rb-bd" data-rt="${esc(flText(ft))}"><i>${esc(flNum(ft))}</i></div>`;
-// nowy ciąg pasm (gap): krótka kreska, a pod nią zakres pasma jak w VACS (+315) – należy do pasma poniżej
-const reHtml = (b) => `<div class="rb-sep"></div><div class="rb-bd rb-re" data-rt="${esc(`New band group: ${altText(b)} (not adjacent to the bands above)`)}">`
-  + `<i>${esc(b.re)}</i></div>`;
-// nobody: nikt w całym stosie – tylko wtedy kafelek bez nikogo mówi o ADVISORY
-function tileHtml(t, x, nobody) {
-  const o = t.owner;
-  const rt = [`${t.label}${t.alt ? ` · ${altText(t)}` : ""}`, `Position: ${x.pos(t.callsign)}`,
-    !o && nobody ? `Now: unstaffed – ADVISORY ${ADVISORY_FQ}` : nowText(o ? [o] : [], x)].join("\n");
-  const by = o && o !== t.callsign ? `<i class="rb-by">${esc(byShort(x.nm(o)))}</i>` : "";
-  return `<div class="rb-box ${o ? "on" : "off"}" data-rt="${esc(rt)}"><b class="rb-id">${esc(t.label)}</b>`
-    + `${o ? `<span class="rb-ln">${by}<span class="rb-fq">${esc(x.freq(o))}</span></span>` : ""}</div>`;
+// --- okienka wg szkicu (0.13.0): wskaźniki, BERLIN, nazwy FIR-ów i okienka sąsiadów z /api/radio/board. Każde ma
+// stałe miejsce w siatce (gridArea z komórek grid); x: {who(cs), pos(cs), freq(cs), net, sel} – zalogowany i opis
+// stanowiska z tablicy, false = brak danych o zalogowanych (bez ADVISORY i bez zer we wskaźnikach), FIR otwartego LOA
+const onlineLine = (o) => `${o.callsign} ${o.frequency || ""} \u2013 ${o.name || "?"}`.replace(/  +/g, " ");
+// wskaźnik u góry: żółta nazwa, pod nią szare pole z wartością (ALL+S, 2H+L, 1-0); w dymku znaczenie i liczone stanowiska
+export function indicatorHtml(i, x) {
+  const ps = arr(i.positions);
+  const rt = [`${i.id}${i.tip ? `: ${i.tip}` : ""}`, ...(x.net === false ? ["Now: no data"] : ps.length ? ps.map(onlineLine) : ["Nobody online"])].join("\n");
+  const v = x.net === false ? "\u2013" : String(i.value ?? "0");
+  return `<div class="rb-ind" style="grid-area: ${gridArea({ ...i, rows: 1 })}" data-rt="${esc(rt)}">${esc(i.id)}</div>`
+    + `<div class="rb-indv" style="grid-area: ${gridArea({ ...i, row: (Number(i.row) || 1) + 1, rows: 1 })}" data-rt="${esc(rt)}">${esc(v)}</div>`;
 }
-export function nbStackHtml(st, x) {
-  const tiles = arr(st.tiles), bands = stackBands(tiles);
-  const owners = [...new Set(tiles.map((t) => t.owner).filter(Boolean))];
-  const nobody = x.net !== false && tiles.length > 0 && !owners.length;
-  // bez wysokości (UMMV, UKLV): bez osi z lewej
-  const flat = !bands.some((b) => b.top || b.fl || b.re);
-  const tipH = [`${st.fir} ${st.title}: sectors bordering FIR EPWW`,
-    ...(flat ? [] : ["numbers between the tiles: vertical limits (FL)"]),
-    ...(bands.some((b) => b.re) ? ["dash and range (e.g. +315): new band group, not adjacent to the bands above"] : []),
-    ...(nobody ? [`Nobody online – ADVISORY ${ADVISORY_FQ}`] : owners.map((o) => `Online: ${x.who(o) || o}`)), `Click: LOA EPWW – ${st.fir}`].join("\n");
-  return `<div class="rb-nb${flat ? " flat" : ""}" data-fir="${esc(st.fir)}"><div class="rb-nbh${x.sel === st.fir ? " sel" : ""}" role="button" tabindex="0" data-title="${esc(st.title)}" data-rt="${esc(tipH)}"><b>${esc(st.fir)}</b> ${esc(st.title)}</div>`
-    + (nobody ? `<div class="rb-unicom">ADVISORY ${ADVISORY_FQ}</div>` : "")
-    + (bands.length ? bands.map((b) => `${b.re ? reHtml(b) : ""}${b.top ? bdHtml(b.top) : ""}`
-      + `<div class="rb-bxs">${b.tiles.map((t) => tileHtml(t, x, nobody)).join("")}</div>${b.fl ? bdHtml(b.fl) : ""}`).join("")
-      : `<div class="rb-none">no sectors</div>`) + "</div>";
+// BERLIN: konfiguracja pasów Berlina w szarym polu jak w PANDORZE; bez pasa z ATIS (preferred) czerwony napis
+export function berlinHtml(b) {
+  const pref = !!b?.preferred;
+  const rt = ["BERLIN: runway configuration of Berlin Brandenburg, WEST (runways 24) or EAST (runways 06)", b?.tip || "",
+    ...(pref ? ["Red text: preferred configuration, no runway in use from ATIS"] : [])].filter(Boolean).join("\n");
+  const box = b?.box?.col ? b.box : { col: b?.col, row: (Number(b?.row) || 1) + 1, cols: 2 };
+  return `<div class="rb-blbl" style="grid-area: ${gridArea(b)}" data-rt="${esc(rt)}">BERLIN</div>`
+    + `<div class="rb-bln${pref ? " pref" : ""}" style="grid-area: ${gridArea(box)}" data-rt="${esc(rt)}">${esc(b?.config || "\u2013")}</div>`;
 }
+// nazwa nad okienkami (okienko FIR-u tuż pod nią) albo obok nich (side: EYVL, UMMV, UKLV w kolumnie po prawej)
+export function nameSide(f) {
+  const n = f?.name || {};
+  const c0 = Number(n.col) || 1, c1 = c0 + (Number(n.cols) || 1) - 1, below = (Number(n.row) || 1) + (Number(n.rows) || 1);
+  return !arr(f?.boxes).some((b) => Number(b.row) === below && Number(b.col) <= c1 && Number(b.col) + (Number(b.cols) || 1) - 1 >= c0);
+}
+// nazwa FIR-u sąsiada (żółta; kliknięcie: LOA EPWW z tym FIR-em); cały FIR bez nikogo – pod nazwą ADVISORY 122.800
+export function firNameHtml(f, x) {
+  const on = arr(f.online);
+  const rt = [`${f.fir} ${f.title || ""}`.trim(),
+    ...(x.net === false ? ["Online: no data"] : on.length ? on.map((o) => `Online: ${onlineLine(o)}`) : [`Nobody online \u2013 ADVISORY ${ADVISORY_FQ}`]),
+    `Click: LOA EPWW \u2013 ${f.fir}`].join("\n");
+  return `<div class="rb-fir${nameSide(f) ? " side" : ""}${x.sel === f.fir ? " sel" : ""}" role="button" tabindex="0" data-fir="${esc(f.fir)}" data-title="${esc(f.title || "")}"`
+    + ` style="grid-area: ${gridArea(f.name)}" data-rt="${esc(rt)}"><span class="rb-firn">${esc(f.fir)}</span>`
+    + `${f.advisory && x.net !== false ? `<span class="rb-unfq">ADVISORY ${ADVISORY_FQ}</span>` : ""}</div>`;
+}
+// dymek okienka: ID i granice, stanowisko okienka, kto teraz (znak, częstotliwość, kontroler), okienka połączone
+// w jedno; okienko na cały FIR (UMKK, UMMV, UKLV) – także pozostali zalogowani tego FIR-u
+export function boxTip(b, f, x) {
+  const lines = [`${f.fir} ${b.label} \u00b7 ${limTip(b)}`];
+  if (!b.merged && b.callsign) lines.push(`Position: ${x.pos(b.callsign)}`);
+  lines.push(b.owner ? nowText([b.owner], x) : x.net === false ? "Now: no data"
+    : f.advisory ? `Now: unstaffed \u2013 ADVISORY ${ADVISORY_FQ}` : "Now: unstaffed");
+  if (b.merged) lines.push(`Merged: ${arr(b.members).map((m) => `${m.id} ${limText(m)}`).join(", ")}`);
+  if (arr(f.boxes).length === 1) arr(f.online).filter((o) => o.position !== b.owner).forEach((o) => lines.push(`Also online: ${onlineLine(o)}`));
+  return lines.join("\n");
+}
+// okienko sąsiada jak na szkicu i zdjęciu PANDORY: ID i granice ("OSE2 660-365"), pod nimi częstotliwość tego, kto je
+// teraz obsługuje (białe pole); bez nikogo samo ID i granice (ciemnoszare pole); połączone przez kilka komórek
+export function boxHtml(b, f, x) {
+  const fq = b.owner ? b.frequency || x.freq(b.owner) : "";
+  return `<div class="rb-box ${b.owner ? "on" : "off"}${b.merged ? " mrg" : ""}" data-fir="${esc(f.fir)}" data-box="${esc(b.id)}"`
+    + ` style="grid-area: ${gridArea(b)}" data-rt="${esc(boxTip(b, f, x))}">`
+    + `<span class="rb-bt"><span class="rb-id">${esc(b.label)}</span> <span class="rb-lim">${esc(limText(b))}</span></span>`
+    + `${fq ? `<span class="rb-fq">${esc(fq)}</span>` : ""}</div>`;
+}
+export const firHtml = (f, x) => firNameHtml(f, x) + arr(f.boxes).map((b) => boxHtml(b, f, x)).join("");
 
 // --- etykieta podglądu (sektor ACC, APP, TWR, FIS) w odmianach: 0 pełna (ID nad częstotliwością), 1 skrócona (ID
 // i częstotliwość w jednej linii, gdy pełna nie mieści się przy swoim punkcie) i 2 samo ID; szczegóły zawsze w dymku.
@@ -258,15 +281,16 @@ export function twrLines(g, x, twra = false) {
 
 export default {
   mount(root) {
+    // siatka wg szkicu: podglądy, przyciski warstw (rzędy z grid.buttons), okienka (rb-cells: wskaźniki, BERLIN, FIR-y),
+    // stan danych i legenda; miejsca i szerokości kolumn ustawia renderLayout z części stałej (do tego czasu ukryte)
     const el = h(`<div class="rb">
-      <div class="rb-atis" aria-label="ATIS"></div>
+      <div class="rb-atis" aria-label="ATIS"><div class="rb-atis-in"></div></div>
       <div class="rb-grid">
-        ${MAPS.map((m) => m.key === "MID" ? `<div class="rb-mid">
-            <div class="rb-btns">${LAYERS.map((l) => `<button type="button" data-ly="${l.id}" title="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>
-            <div class="rb-status"></div>
-            <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour tile without frequency, nobody in the whole stack – ADVISORY ${ADVISORY_FQ}"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>↑ covered by (TWR)</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
-            ${panelHtml(m)}
-          </div>` : panelHtml(m)).join("")}
+        ${MAPS.map(panelHtml).join("")}
+        <div class="rb-btns"></div>
+        <div class="rb-cells"></div>
+        <div class="rb-status"></div>
+        <div class="rb-legend"><span title="Staffed airspace (EPWW and neighbour ACC sectors): dark area. EPWW ACC sectors: one area and one label (position, frequency) per position; a boundary only where the controlling position changes. Neighbour box: white with the frequency of the controller covering it."><i class="rb-sw on"></i>staffed</span><span title="Unstaffed airspace: light grey area. TMA, CTR and FIS of EPWW without anyone online: ID only, no frequency (position and frequency in the tooltip); neighbour box: dark grey, ID and limits only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} under its name"><i class="rb-sw off"></i>unstaffed (ID only)</span><span title="Tower offline, covered by another position (e.g. APP): frequency of the covering position"><i class="rb-sw cov"></i>\u2191 covered by (TWR)</span><span title="TMA boundary (APP layer)"><i class="rb-ln-sw tma"></i>TMA</span><span title="CTR boundary (TWR layers)"><i class="rb-ln-sw ctr"></i>CTR</span></div>
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
       </div>
       <div class="rb-tip" hidden></div>
@@ -298,34 +322,50 @@ export default {
     // linijki etykiet (lblLines, tmaLines, twrLines): częstotliwości i nazwy z tablicy
     const lx = () => ({ freq: freqOf, nm, on, pos: d?.pos });
 
-    // --- pasek ATIS
+    // --- pasek ATIS: zawsze na miejscu i tej samej wysokości (jedna linia); przycisk ATIS chowa tylko treść
+    // (visibility), więc podglądy pod nim nie zmieniają rozmiaru ani przy przełączaniu, ani gdy ATIS-y się logują
     function renderAtis() {
-      const box = $(".rb-atis");
-      box.hidden = !layers.has("atis");
-      if (box.hidden || !d) return;
-      box.innerHTML = d.atis.map((a) => {
+      const box = $(".rb-atis"), off = !layers.has("atis");
+      box.classList.toggle("off", off);
+      box.firstElementChild.setAttribute("aria-hidden", String(off));
+      if (!d) return;
+      box.firstElementChild.innerHTML = d.atis.map((a) => {
         const o = on(a.callsign), fq = freqOf(a.callsign) || "—";
         const rt = [posLine(a.callsign), o ? `Online: ${who(a.callsign)}${o.atis_code ? `\nInformation ${o.atis_code}` : ""}` : "ATIS offline",
           ...(o?.text_atis || []).slice(0, 6), "Click: AERODROME"].join("\n");
         return `<button type="button" class="rb-at ${o ? "on" : "off"}" data-icao="${esc(a.icao)}" data-rt="${esc(rt)}">`
           + `<span class="rb-ati">${esc(a.callsign.replace(/_ATIS$/, "").replace(/_/g, " "))}</span><span class="rb-fq">${esc(fq)}</span>`
-          + `${o?.atis_code ? `<b class="rb-code">${esc(o.atis_code)}</b>` : ""}</button>`;
+          + `${o?.atis_code ? `<span class="rb-code">${esc(o.atis_code)}</span>` : ""}</button>`;
       }).join("") || `<span class="rb-none">No ATIS positions.</span>`;
     }
 
-    // --- stosy sąsiadów (nbStackHtml): nazwy, częstotliwości i zalogowani z tablicy
-    const nbCtx = () => ({ nm, freq: freqOf, who, pos: posLine, sel: loaFir, net: d?.net?.ok !== false });
-    function renderStacks() {
-      if (!d) return;
-      ["left", "right"].forEach((side) => {
-        const m = MAPS.find((x) => x.side === side);
-        const p = maps[m.key].el;
-        const sts = d.stacks.filter((s) => s.map === side);
-        const html = (list) => list.map((st) => nbStackHtml(st, nbCtx())).join("");
-        p.querySelector(".rb-top").innerHTML = html(sts.filter((s) => AREA[s.at] === "top"));
-        p.querySelector(".rb-bot").innerHTML = html(sts.filter((s) => AREA[s.at] === "bot"));
-        p.querySelector(".rb-col").innerHTML = html(sts.filter((s) => AREA[s.at] === "col").sort((a, b) => COL_ORDER[a.at] - COL_ORDER[b.at]));
-      });
+    // --- siatka strony (część stała grid): szerokości kolumn, miejsca podglądów, przycisków, stanu i legendy. Tylko gdy
+    // zmieni się układ (nowa wersja danych): przy zwykłym odświeżeniu nic się nie przesuwa
+    let layKey = "";
+    function renderLayout() {
+      const g = d?.grid;
+      if (!g?.cols) return;
+      const key = JSON.stringify(g);
+      if (key === layKey) return;
+      layKey = key;
+      const grid = $(".rb-grid");
+      grid.style.gridTemplateColumns = gridTracks(g.tracks);
+      grid.style.gridTemplateRows = `repeat(${Number(g.rows) || 21}, minmax(0, 1fr))`;
+      MAPS.forEach((m) => { if (g.maps?.[m.layer]) maps[m.key].el.style.gridArea = gridArea(g.maps[m.layer]); });
+      if (g.status) $(".rb-status").style.gridArea = gridArea(g.status);
+      if (g.legend) $(".rb-legend").style.gridArea = gridArea(g.legend);
+      $(".rb-btns").innerHTML = buttonRows(g.buttons).map((r) => `<div class="rb-brow" style="grid-area: ${gridArea(r)}">`
+        + r.ids.map((id) => LAYERS.find((l) => l.id === id)).map((l) => `<button type="button" data-ly="${l.id}" title="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")
+        + "</div>").join("");
+      grid.classList.add("laid");
+    }
+    // --- okienka: wskaźniki, BERLIN, nazwy FIR-ów i okienka sąsiadów (firHtml); kto i częstotliwości z tablicy
+    const cx = () => ({ who, pos: posLine, freq: freqOf, sel: loaFir, net: d?.net?.ok !== false });
+    function renderCells() {
+      if (!d?.grid?.cols) return;
+      const x = cx();
+      $(".rb-cells").innerHTML = arr(d.indicators).map((i) => indicatorHtml(i, x)).join("")
+        + (d.berlin?.col ? berlinHtml(d.berlin) : "") + arr(d.firs).map((f) => firHtml(f, x)).join("");
     }
 
     // --- podglądy
@@ -417,7 +457,7 @@ export default {
         + (low && layers.has("app") ? g("rb-tmag", geo.tma) : "")
         + (low && twrOn ? g("rb-ctrg", geo.ctr) : "")
         + `<path class="rb-border" d="${pathOf(geo.border, P)}"/>`;
-      renderTitle(m, { top: fr.top - pr.top, left: fr.left - pr.left, right: pr.right - fr.right });
+      renderTitle(m);
       // etykiety: wstawiamy wszystkie odmiany, mierzymy, układamy (ważniejsze pierwsze), zostawiamy wybraną odmianę
       const items = labelsFor(m, groups).map((it) => ({ ...it, prio: lblPrio(it.kind, it.lb) })).sort((a, b) => a.prio - b.prio);
       const vs = items.map((it) => lblVariants(it.lb, it.kind !== "acc"));
@@ -427,9 +467,9 @@ export default {
       const vars = vs.map((x) => els.slice(ei, (ei += x.length)));
       const sz = (e) => ({ w: e.offsetWidth, h: e.offsetHeight });
       const pts = items.map((it) => P([it.at[1], it.at[0]]));
-      // przeszkody: stosy sąsiadów i tytuł podglądu (współrzędne w panelu)
+      // przeszkoda: tytuł podglądu (współrzędne w panelu)
       const rel = (e) => { const r = e.getBoundingClientRect(); return { x0: r.left - pr.left - 2, y0: r.top - pr.top - 2, x1: r.right - pr.left + 2, y1: r.bottom - pr.top + 2 }; };
-      const obstacles = [...p.querySelectorAll(".rb-nb, .rb-title")].filter((e) => e.offsetWidth && e.offsetHeight).map(rel);
+      const obstacles = [...p.querySelectorAll(".rb-title")].filter((e) => e.offsetWidth && e.offsetHeight).map(rel);
       // kształty, których etykiety nie zasłaniają (runda 11, Marek): TMA na warstwie APP, CTR na TWR i TWR/ATIS, kropki
       // lotnisk i punktów TMA; etykieta APP/TWR staje obok nich z linią do punktu, sektora ACC przesuwa się mniej
       const shapes = low ? [...(layers.has("app") ? geo.tma : []), ...(twrOn ? geo.ctr : []), ...nbTma, ...nbCtr] : [];
@@ -460,15 +500,13 @@ export default {
       });
       if (marks) m.svg.insertAdjacentHTML("beforeend", `<g class="rb-marks">${marks}</g>`);
     }
-    // tytuł w górnym rogu wolnego pola (bez stosów sąsiadów) od strony środkowej kolumny
-    function renderTitle(m, free) {
+    // tytuł w lewym górnym rogu podglądu (LOW: nad mapą, z suwakiem wysokości; radio.css)
+    function renderTitle(m) {
       const t = m.el.querySelector(".rb-title");
-      if (m.key === "LOW") Object.assign(t.style, { top: `${Math.round(free.top)}px`, right: `${Math.round(free.right)}px` });
-      if (m.key === "HIGH") Object.assign(t.style, { top: `${Math.round(free.top)}px`, left: `${Math.round(free.left)}px` });
       const ly = d?.layers?.[m.key];
       // szkielet raz: suwak LOW powstały od nowa przy każdym rysowaniu zgubiłby przeciąganie i fokus
       if (!t.firstChild) {
-        t.innerHTML = `<b>${m.key}</b> <span class="rb-tl"></span>` + (m.key !== "LOW" ? ""
+        t.innerHTML = `<span class="rb-tk">${m.key}</span> <span class="rb-tl"></span>` + (m.key !== "LOW" ? ""
           : `<span class="rb-lvl"><input type="range" class="rb-cut" aria-label="LOW cross-section level"><span class="rb-ticks" aria-hidden="true"></span></span>`
             + `<output class="rb-cutv"></output>`);
       }
@@ -487,12 +525,12 @@ export default {
       t.querySelector(".rb-ticks").innerHTML = b.filter((x) => x / 100 > r.min && x / 100 <= r.max)
         .map((x) => `<i style="left:${(((x / 100 - r.min) / Math.max(1, r.max - r.min)) * 100).toFixed(1)}%"></i>`).join("");
     }
+    // włączona warstwa: jasne pole i ciemny napis, wyłączona: szare pole i jasny napis (kolor, bez pogrubienia)
     function renderButtons() {
       el.querySelectorAll(".rb-btns button[data-ly]").forEach((b) => {
         b.classList.toggle("on", layers.has(b.dataset.ly));
         b.setAttribute("aria-pressed", String(layers.has(b.dataset.ly)));
       });
-      el.classList.toggle("noatis", !layers.has("atis"));
     }
     function renderStatus() {
       const s = $(".rb-status");
@@ -509,10 +547,11 @@ export default {
     function renderAll() {
       cancelAnimationFrame(raf);
       raf = 0;
+      safe(renderLayout);
       safe(renderButtons);
+      safe(renderAtis);
       if (d) {
-        safe(renderAtis);
-        safe(renderStacks);
+        safe(renderCells);
         Object.values(maps).forEach((m) => safe(renderMap, m));
       }
       safe(renderStatus);
@@ -525,7 +564,7 @@ export default {
       if (loading) return;
       loading = true;
       try {
-        // geometria raz, potem tylko gdy zmieni się wersja danych (np. po imporcie nowego pliku .ese)
+        // geometria raz, potem tylko gdy zmieni się wersja danych (np. po imporcie nowych danych sektorów)
         const r = await api(`/api/radio/board${geo && geoVer ? `?have=${encodeURIComponent(geoVer)}` : "?geo=1"}`);
         if (r.geo) {
           geo = r.geo;
@@ -571,12 +610,13 @@ export default {
       if (a.cut && a.cut >= 95 && a.cut <= 335 && a.cut !== cut) { cut = cutAt(a.cut, cutRange(d?.layers?.LOW)); changed = true; }
       if (changed) { save(); renderAll(); }
     };
+    // przyciski warstw powstają z układu (renderLayout): kliknięcie łapiemy na kontenerze
     el.querySelector(".rb-btns").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-ly]");
       if (!b) return;
       const s = new Set(layers);
       if (s.has(b.dataset.ly)) s.delete(b.dataset.ly); else s.add(b.dataset.ly);
-      // TWR/ATIS zawiera TWR: włączenie jednej z nich wyłącza drugą
+      // TWR/A (wieże i ATIS) zawiera TWR: włączenie jednej z nich wyłącza drugą
       if (s.has(b.dataset.ly) && b.dataset.ly === "twra") s.delete("twr");
       if (s.has(b.dataset.ly) && b.dataset.ly === "twr") s.delete("twra");
       layers = s;
@@ -609,17 +649,21 @@ export default {
       if (a && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); navigate("aerodrome", a.dataset.icao); }
     });
 
-    // --- LOA: nagłówek stosu sąsiada otwiera panel (drugie kliknięcie, ✕ albo Esc zamyka); bez kroku w historii
-    const markLoa = () => el.querySelectorAll(".rb-nbh").forEach((x) => x.classList.toggle("sel", x.closest(".rb-nb")?.dataset.fir === loaFir));
+    // --- LOA: nazwa FIR-u sąsiada otwiera panel (drugie kliknięcie, ✕ albo Esc zamyka); bez kroku w historii
+    const markLoa = () => el.querySelectorAll(".rb-fir[data-fir]").forEach((x) => x.classList.toggle("sel", x.dataset.fir === loaFir));
     const radioOf = (cs) => d?.pos?.[cs]?.name || "";
-    const sideOf = (hd) => (hd.closest(".rb-high") ? "right" : "left");
+    // strona strony, po której leży FIR (kolumna jego nazwy w siatce)
+    const sideOf = (fir) => {
+      const f = arr(d?.firs).find((x) => x.fir === fir);
+      return f && Number(f.name?.col) > (Number(d?.grid?.cols) || 13) / 2 ? "right" : "left";
+    };
     function closeLoa() {
       loaFir = null;
       loaBox.hidden = true;
       loaBox.innerHTML = "";
       markLoa();
     }
-    // panel po przeciwnej stronie niż kliknięty stos (stosy tej strony zostają widoczne: inny FIR jednym kliknięciem)
+    // panel po przeciwnej stronie niż kliknięty FIR (okienka tej strony zostają widoczne: inny FIR jednym kliknięciem)
     async function openLoa(fir, title, side) {
       if (loaFir === fir) return closeLoa();
       loaFir = fir;
@@ -640,12 +684,12 @@ export default {
       loaBox.querySelector(".rb-loa-b").scrollTop = 0;
     }
     el.addEventListener("click", (e) => {
-      const hd = e.target.closest(".rb-nbh");
-      if (hd) openLoa(hd.closest(".rb-nb").dataset.fir, hd.dataset.title || "", sideOf(hd));
+      const hd = e.target.closest(".rb-fir[data-fir]");
+      if (hd) openLoa(hd.dataset.fir, hd.dataset.title || "", sideOf(hd.dataset.fir));
     });
     el.addEventListener("keydown", (e) => {
-      const hd = e.target.closest?.(".rb-nbh");
-      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.closest(".rb-nb").dataset.fir, hd.dataset.title || "", sideOf(hd)); }
+      const hd = e.target.closest?.(".rb-fir[data-fir]");
+      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || "", sideOf(hd.dataset.fir)); }
       if (e.key === "Escape" && !loaBox.hidden) { e.preventDefault(); closeLoa(); }
     });
     loaBox.addEventListener("click", (e) => {
@@ -705,12 +749,9 @@ export default {
   },
 };
 
+// podgląd: mapa (svg), wolne pole do rzutowania (rb-free: cały panel bez marginesu, LOW pod tytułem z suwakiem),
+// etykiety i tytuł
 function panelHtml(m) {
-  const frame = m.side === "left"
-    ? `<div class="rb-frame"><div class="rb-col"></div><div class="rb-top"></div><div class="rb-free"></div><div class="rb-bot"></div></div>`
-    : m.side === "right"
-      ? `<div class="rb-frame"><div class="rb-top"></div><div class="rb-free"></div><div class="rb-bot"></div><div class="rb-col"></div></div>`
-      : `<div class="rb-frame"><div class="rb-free"></div></div>`;
-  return `<section class="rb-panel ${m.cls}" data-map="${m.key}"><svg class="rb-svg" aria-hidden="true"></svg>${frame}
-    <div class="rb-lbls"></div><div class="rb-title"></div></section>`;
+  return `<section class="rb-panel ${m.cls}" data-map="${m.key}"><svg class="rb-svg" aria-hidden="true"></svg>`
+    + `<div class="rb-frame"><div class="rb-free"></div></div><div class="rb-lbls"></div><div class="rb-title"></div></section>`;
 }

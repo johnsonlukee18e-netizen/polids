@@ -1,5 +1,6 @@
 // RADIO (jedna strona jak w PANDORZE): czyste funkcje bez DOM – adres (warstwy i przekrój LOW), rzutowanie map,
-// układ etykiet bez nakładania się, pasma wysokości w stosach sąsiadów. Testowane w Node (test_radio_board.py).
+// układ etykiet bez nakładania się, siatka strony wg szkicu (0.13.0: kolumny, komórki, przyciski, napisy okienek).
+// Testowane w Node (test_radio_board.py).
 
 // Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
 export const LAYERS = [
@@ -9,14 +10,14 @@ export const LAYERS = [
   { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH" },
   { id: "app", label: "APP", tip: "TMAs and APP frequencies, neighbour TMAs at the FIR border (on the LOW preview)" },
   { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies, neighbour CTRs at the FIR border (on the LOW preview)" },
-  { id: "twra", label: "TWR/ATIS", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
+  { id: "twra", label: "TWR/A", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
   { id: "fis", label: "FIS", tip: "FIS areas and Warszawa Information frequencies (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
 // przekrój LOW (FL): na FL300 są wszystkie sektory LOW (F od FL285, T od FL195)
 export const DEFAULT_CUT = 300;
-// suwak wysokości LOW co 500 ft (granice wycinków w pliku .ese są co 500 ft)
+// suwak wysokości LOW co 500 ft (granice wycinków są co 500 ft)
 export const CUT_STEP = 5;
 
 // adres "#radio/<warstwy>/fl<przekrój>": warstwy po przecinku w stałej kolejności, "none" = żadna
@@ -77,10 +78,10 @@ export function bboxOf(g) {
   ringsOf(g).forEach((r) => r.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }));
   return [x0, y0, x1, y1];
 }
-// ramka FIR EPWW, gdy brak granicy z VATSpy (bbox bez punktów: ±Infinity)
+// ramka FIR EPWW, gdy brak granicy FIR-u (bbox bez punktów: ±Infinity)
 export const EPWW_BBOX = [14.1, 49.0, 24.2, 55.0];
 export const bboxOrDefault = (b) => (b && b.length === 4 && b.every(Number.isFinite) && b[2] > b[0] && b[3] > b[1] ? b : null);
-// czas z VATSIM (np. "2026-10-12T12:00:43.0000000Z": 7 cyfr ułamka) jako "HH:MMZ"; nieczytelny → "–"
+// czas z sieci (np. "2026-10-12T12:00:43.0000000Z": 7 cyfr ułamka) jako "HH:MMZ"; nieczytelny → "–"
 export function utcHhmm(iso) {
   const t = Date.parse(String(iso || "").replace(/(\.\d{3})\d+/, "$1"));
   return Number.isNaN(t) ? "–" : new Date(t).toISOString().slice(11, 16) + "Z";
@@ -302,48 +303,43 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
   return win.out;
 }
 
-// FL660: górna granica stosów sąsiadów – ta sama co TOP_FT w backend/app/services/radioboard.py (zmieniać razem)
-export const TOP_FT = 66000;
-// Stos sąsiada: kafelki VACS (już od najwyższego zakresu; lo/hi w stopach, null = bez wysokości) w pasma o tym samym
-// zakresie, ułożone w ciągi stykających się pasm. Każda granica raz: fl = poziom pod pasmem (ft), top = nad pasmem
-// (tylko na początku pierwszego ciągu, gdy pasmo nie sięga FL660). Pasmo styka się z poprzednim, gdy zaczyna się
-// dokładnie na jego dolnej granicy (EYVL M 335-365 pod EYVL U +365) albo gdy poprzednie sięga ziemi, a to jest niżej
-// (ESMM L -195 pod ESMM 8 -365); inaczej nowy ciąg (gap: EDUU SPE +315 po OSE12/HVL12 285-365): kreska i zakres
-// pasma jak w VACS (re: "+315", "-165", "165-245") nad nim zamiast granic, żeby oś nigdy nie czytała się wstecz
-// (365, 285, kreska, +315 SPE – bez 315 pod SPE).
-const reText = (lo, hi) => (hi >= TOP_FT ? `+${flNum(lo)}` : lo ? `${flNum(lo)}-${flNum(hi)}` : `-${flNum(hi)}`);
-export function stackBands(tiles) {
-  const bands = [];
-  (tiles || []).forEach((t) => {
-    const lo = t.lo ?? 0, hi = t.hi ?? TOP_FT;
-    const b = bands.find((x) => x.lo === lo && x.hi === hi);
-    if (b) b.tiles.push(t);
-    else bands.push({ lo, hi, tiles: [t], top: null, fl: null, gap: false, re: null });
-  });
-  const out = [];
-  let cur = null;
-  // dolna granica pasma kończącego ciąg; po nowym ciągu jest już w jego zakresie (re)
-  const end = (b) => (b.re ? null : b.lo || null);
-  while (bands.length) {
-    const i = cur?.lo ? bands.findIndex((b) => b.hi === cur.lo) : -1;
-    const b = bands.splice(Math.max(0, i), 1)[0];
-    const joins = !!cur && (b.hi === cur.lo || (cur.lo === 0 && b.hi < cur.hi));
-    if (cur) cur.fl = joins ? b.hi : end(cur);
-    b.gap = !!cur && !joins;
-    if (b.gap) b.re = reText(b.lo, b.hi);
-    else if (!joins && b.hi < TOP_FT) b.top = b.hi;
-    out.push(b);
-    cur = b;
-  }
-  if (cur) cur.fl = end(cur);
-  return out;
-}
-// UNICOM: sąsiad bez nikogo online w sektorach przy granicy (jedna linia pod nagłówkiem stosu)
+// UNICOM: FIR sąsiada bez nikogo online w sektorach przy granicy (linia pod nazwą FIR-u)
 export const ADVISORY_FQ = "122.800";
 
-// Skrót stanowiska, które przejmuje pole stosu sąsiada: bez pierwszego członu (EDWW FLG → FLG, ESMM 6 → 6),
-// chyba że to cała nazwa (LKAA, UKLV)
+// Skrót stanowiska, które przejmuje wieżę (↑APP) albo pole sąsiada: bez pierwszego członu (EDWW FLG → FLG,
+// ESMM 6 → 6), chyba że to cała nazwa (LKAA, UKLV)
 export const byShort = (name) => {
   const w = String(name || "").split(" ");
   return w.length > 1 ? w.slice(1).join(" ") : w[0];
 };
+
+// --- siatka strony wg szkicu Marka (0.13.0, data/seed/radio_layout.json; komórki col/row od 1, jak linie siatki CSS)
+// Kolumny o stałej szerokości, żeby zmiana danych (łączenie okienek, dłuższy wskaźnik, ATIS) nigdy nie przesuwała
+// strony: rodzaj kolumny z części stałej (grid.tracks): box = okienka, wskaźniki, BERLIN; btn = przyciski warstw
+// i podgląd MID; name = same nazwy FIR-ów (z linią ADVISORY); reszta (podglądy LOW i HIGH) dzieli wolne miejsce.
+const TRACK = { box: "var(--rb-bw)", btn: "var(--rb-hw)", name: "var(--rb-nw)" };
+export const gridTracks = (kinds) => (kinds || []).map((k) => TRACK[k] || "minmax(0, 1fr)").join(" ");
+// miejsce w siatce {col, row, cols?, rows?} → wartość grid-area
+export function gridArea(c) {
+  const n = (v, d) => Math.max(1, Math.round(Number(v) || d));
+  return `${n(c?.row, 1)} / ${n(c?.col, 1)} / span ${n(c?.rows, 1)} / span ${n(c?.cols, 1)}`;
+}
+// rzędy przycisków warstw z części stałej (buttons: {col, rows: {id: rząd}}): [{col, row, ids}] od góry, w rzędzie
+// w kolejności LAYERS (LOW MID HIGH w jednym rzędzie); warstwa bez rzędu – bez przycisku
+export function buttonRows(buttons) {
+  const by = new Map();
+  LAYER_IDS.forEach((id) => {
+    const r = Number(buttons?.rows?.[id]);
+    if (!r) return;
+    if (!by.has(r)) by.set(r, { col: Number(buttons.col) || 1, row: r, ids: [] });
+    by.get(r).ids.push(id);
+  });
+  return [...by.values()].sort((a, b) => a.row - b.row);
+}
+// granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0"
+export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round(Number(b?.lower) || 0)}`;
+// napis okienka: ID i granice, "OSE2 660-365"; połączone – nazwa połączonego i suma granic ("L 660-95")
+export const boxText = (b) => `${b?.label ?? b?.id ?? ""} ${limText(b)}`;
+// granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
+const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
+export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "GND"}\u2013${Number(b?.upper) >= 999 ? "UNL" : flOf(Number(b?.upper) || 0)}`;

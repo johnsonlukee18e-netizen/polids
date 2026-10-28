@@ -1,55 +1,64 @@
-/* RADIO (runda 10): jedna strona jak w PANDORZE. U góry pasek ATIS, po lewej podgląd LOW ze stosami sąsiadów
-   z zachodu, północy i południa, w środku przyciski warstw i mały podgląd MID, po prawej podgląd HIGH ze stosami
-   ze wschodu. Czarne tło, Consolas; bez poświaty i cieni pod tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP).
+/* RADIO (runda 10): jedna strona jak w PANDORZE. Od 0.13.0 (issue #23, szkic Marka) siatka 13 × 21 komórek
+   z data/seed/radio_layout.json: u góry stały pasek ATIS, pod nim wskaźniki, BERLIN, okienka FIR-ów sąsiednich
+   (żółte nazwy), kolumna przycisków warstw w środku, podgląd LOW na lewo od niej, HIGH na prawo, mały MID na dole.
+   Czarne tło, czcionka bezszeryfowa zwykłej grubości (bez pogrubień: znaczenie niesie kolor); bez poświaty i cieni pod
+   tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP). Układ nie zależy od czcionki o stałej szerokości.
    0.12.5 (Marek): kolory podglądów z pliku sektora EuroScope (#define COLOR_… w EPWW-Sector.sct i zrzut od Marka):
    jasnoszare = nieobsadzone, ciemne = obsadzone – na LOW, MID, HIGH i u sąsiadów tak samo; granice sektorów, FIR i TMA
    COLOR_FIRBorder/COLOR_TMA (70,70,70), CTR COLOR_TWR-CTR (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9),
-   lotniska turkusowe trójkąty (144,237,229). Przyciski, pola częstotliwości i pasek ATIS jak na zdjęciu PANDORY:
-   jasnoszare prostokąty z ciemnym tekstem, ID w prawym górnym rogu pola, ATIS jasnofioletowy.
-   --rb-f: rozmiar częstotliwości na etykietach (mniejszy na 1366×768, większy na 1920×1080). */
-.rb { --rb-f: clamp(11px, .8vw, 15px);
+   lotniska turkusowe trójkąty (144,237,229). Przyciski, okienka i pasek ATIS jak na zdjęciu PANDORY: jasne prostokąty
+   z ciemnym tekstem, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
+   Rozmiary od wielkości strony RADIO (container: cqw/cqh), nie od treści: --rb-f = częstotliwość w okienku (ok. 13 px
+   na 1366×768, 16 px na 1600×900, 18 px na 1920×1080, mniej na niskim oknie), --rb-bw = kolumna okienek, --rb-hw =
+   kolumna przycisków i podglądu MID, --rb-nw = kolumna samych nazw FIR-ów (z linią ADVISORY 122.800). */
+.rb { --rb-f: clamp(10px, min(1.1cqw, 1.8cqh), 18px);
+  --rb-bw: calc(var(--rb-f) * 5 + 14px); --rb-hw: clamp(150px, 13cqw, 250px); --rb-nw: calc(var(--rb-f) * 6.4 + 8px);
   --rb-unst: #1e1e1e; --rb-st: #020202; --rb-line: #464646; --rb-ctr: #612e36; --rb-act: #787b09; --rb-ad: #90ede5;
   --rb-lbl: #c8d4ee; --rb-lbl2: #c8b686;
   --rb-tile: #dcdace; --rb-tile-hi: #f4f2e6; --rb-tile-tx: #15191d; --rb-tile-id: #3d4247;
   --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
-  --rb-btn-on: #e9e7da; --rb-btn-off: #85857c; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
-  flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px;
-  padding: 4px 6px 6px; overflow: hidden; background: #000; }
+  --rb-box: #f1f0ea; --rb-grey: #595959; --rb-grey-line: #8a8a8a; --rb-name: var(--yellow); --rb-pref: #ff5245;
+  --rb-btn-on: #ecebe2; --rb-btn-off: #7b7b74; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
+  container-type: size; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 3px;
+  padding: 3px 6px 5px; overflow: hidden; background: #000; font-family: var(--sans); font-weight: 400; }
+/* bez pogrubień w całej zakładce (Marek, 0.13.0): także w etykietach i panelu LOA */
+.rb b, .rb strong, .rb h4, .rb th { font-weight: 400; }
 
-/* --- pasek ATIS: ICAO i częstotliwość jasnofioletowe jak w PANDORZE (offline przygaszone), online z literą informacji */
-.rb-atis { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px clamp(8px, 1vw, 18px); padding: 2px 4px 3px;
-  border-bottom: 1px solid #1a1a1a; }
-.rb-atis[hidden] { display: none; }
-.rb-at { display: inline-flex; align-items: baseline; gap: 5px; padding: 0 2px; background: none; border: 0; border-radius: 0; cursor: pointer;
-  font: 700 calc(var(--rb-f) + 3px)/1.25 var(--mono); color: var(--rb-atis-off); white-space: nowrap; }
-.rb-at .rb-ati { font-size: calc(var(--rb-f) - 1px); color: inherit; }
+/* --- pasek ATIS: zawsze ta sama wysokość (jedna linia, nadmiar ucięty, nie zawija się), przycisk ATIS chowa tylko
+   treść – podglądy pod nim nie zmieniają rozmiaru. ICAO i częstotliwość jasnofioletowe jak w PANDORZE (offline
+   przygaszone), online z literą informacji */
+.rb-atis { flex: none; height: calc(var(--rb-f) * 1.3 + 7px); overflow: hidden; border-bottom: 1px solid #1a1a1a; }
+.rb-atis-in { height: 100%; display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-evenly;
+  gap: 0 clamp(4px, .7cqw, 14px); padding: 0 4px; overflow: hidden; }
+.rb-atis.off .rb-atis-in { visibility: hidden; }
+.rb-at { flex: none; display: inline-flex; align-items: baseline; gap: 4px; padding: 0 1px; background: none; border: 0; border-radius: 0;
+  cursor: pointer; font: 400 var(--rb-f)/1.2 var(--sans); color: var(--rb-atis-off); white-space: nowrap; }
+.rb-at .rb-ati { font-size: calc(var(--rb-f) * .74); color: inherit; }
 .rb-at .rb-fq { color: inherit; font: inherit; }
 .rb-at.on { color: var(--rb-atis); }
 .rb-at:hover .rb-ati { text-decoration: underline; }
-.rb-code { margin-left: 3px; padding: 0 3px; font: 700 calc(var(--rb-f) - 1px)/1.2 var(--mono); color: #000; background: var(--yellow);
+.rb-code { margin-left: 3px; padding: 0 3px; font: 400 calc(var(--rb-f) * .8)/1.2 var(--sans); color: #000; background: var(--yellow);
   border-radius: 0; }
 
-/* --- siatka: [LOW + sąsiedzi] [przyciski + MID] [HIGH + sąsiedzi] */
-.rb-grid { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(200px, 16vw, 330px) minmax(0, 1fr); gap: 6px; }
+/* --- siatka wg szkicu: kolumny i rzędy z części stałej (radio.js renderLayout: kolumny o stałej szerokości, podglądy
+   LOW i HIGH dzielą resztę), tu tylko zapas do pierwszego wczytania; zanim przyjdzie układ, widać tylko stan danych */
+.rb-grid { position: relative; flex: 1; min-height: 0; display: grid; gap: 2px 4px;
+  grid-template-columns: repeat(13, minmax(0, 1fr)); grid-template-rows: repeat(21, minmax(0, 1fr)); }
+.rb-grid:not(.laid) > :not(.rb-status) { visibility: hidden; }
+.rb-btns, .rb-cells { display: contents; }
 .rb-panel { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; border: 1px solid #1a1a1a; }
+.rb-low { grid-area: 8 / 4 / span 10 / span 4; }
+.rb-high { grid-area: 6 / 9 / span 12 / span 3; }
+.rb-midmap { grid-area: 16 / 8 / span 6 / span 1; --rb-f: clamp(10px, .68vw, 13px); }
 /* tło podglądu poza FIR EPWW i sektorami sąsiadów: jak przestrzeń nieobsadzona (nie wiemy o nikim) – ciemne jest tylko
    to, co ktoś obsługuje */
 .rb-panel .rb-svg { background: var(--rb-unst); }
 .rb-svg { position: absolute; inset: 0; display: block; }
-.rb-frame { position: absolute; inset: 0; display: grid; gap: 6px; padding: 5px; pointer-events: none; }
-.rb-low .rb-frame { grid-template: "col top" auto "col free" minmax(0, 1fr) "col bot" auto / auto minmax(0, 1fr); }
-.rb-high .rb-frame { grid-template: "top col" auto "free col" minmax(0, 1fr) "bot col" auto / minmax(0, 1fr) auto; }
-.rb-midmap .rb-frame { grid-template: "free" minmax(0, 1fr) / minmax(0, 1fr); padding: 20px 3px 3px; }
-.rb-col { grid-area: col; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; }
-.rb-top { grid-area: top; display: flex; align-items: flex-start; gap: 8px; }
-.rb-bot { grid-area: bot; display: flex; align-items: flex-end; gap: 8px; }
-.rb-free { grid-area: free; min-width: 0; min-height: 0; }
-/* stosy mniej więcej tam, gdzie leży FIR: Szwecja nad zachodnią częścią Polski, Czechy na południowym zachodzie,
-   Kaliningrad nad wschodnią częścią, Słowacja na południu */
-.rb-low .rb-top { justify-content: flex-start; padding-left: 12%; }
-.rb-low .rb-bot { justify-content: flex-start; padding-left: 4%; }
-.rb-high .rb-top { justify-content: flex-end; padding-right: 8%; }
-.rb-high .rb-bot { justify-content: center; }
+/* wolne pole do rzutowania mapy: cały panel bez marginesu; LOW pod tytułem z suwakiem, MID pod tytułem */
+.rb-frame { position: absolute; inset: 0; display: grid; padding: 4px; pointer-events: none; }
+.rb-low .rb-frame { padding-top: 24px; }
+.rb-midmap .rb-frame { padding: 18px 3px 3px; }
+.rb-free { min-width: 0; min-height: 0; }
 
 /* --- podgląd: tło FIR-ów, sektory ACC sąsiadów, FIR EPWW, obszary stanowisk ACC warstwy, warstwy APP/TWR/FIS (LOW).
    Ta sama zasada na LOW, MID i HIGH (0.12.5, Marek: „czemu MID ma inny kolor skoro też jest nieobsadzony?”):
@@ -80,17 +89,17 @@
    częstotliwością. Częstotliwość tylko, gdy ktoś obsługuje (runda 11, Marek): bez nikogo samo ID w ciemniejszym,
    przygaszonym polu (etykieta w odmianie skróconej .cmp, pole stosu bez linii) */
 .rb-lbls { position: absolute; inset: 0; pointer-events: none; }
-.rb-lbl, .rb-box { display: inline-grid; justify-items: end; align-content: start; padding: 0 4px 1px; background: var(--rb-tile-off);
-  border: 1px solid var(--rb-tile-off-line); border-radius: 0; white-space: nowrap; line-height: 1.05; cursor: help; }
-.rb-lbl { position: absolute; left: 0; top: 0; pointer-events: auto; }
+.rb-lbl { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-grid; justify-items: end; align-content: start;
+  padding: 0 4px 1px; background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line); border-radius: 0; white-space: nowrap;
+  line-height: 1.05; cursor: help; }
 /* ID sektora i liczby FL nie mniejsze niż 9 px (8 px na etykietach APP/TWR/FIS), także na 1366×768 */
-.rb-id { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.15 var(--mono); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
+.rb-id { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.15 var(--sans); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
 .rb-ln { display: flex; align-items: baseline; gap: 4px; }
-.rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--mono); color: var(--rb-tile-tx); }
-.rb-by { font: 700 max(8px, calc(var(--rb-f) - 3px))/1 var(--mono); font-style: normal; color: #1f4f86; }
-.rb-more { font: 700 max(8px, calc(var(--rb-f) - 4px)) var(--mono); font-style: normal; color: #1f4f86; }
-.rb-lbl.on, .rb-box.on { background: var(--rb-tile); border-color: var(--rb-tile-hi); }
-.rb-lbl.on .rb-id, .rb-box.on .rb-id { color: var(--rb-tile-id); }
+.rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--sans); color: var(--rb-tile-tx); }
+.rb-by { font: 400 max(8px, calc(var(--rb-f) - 3px))/1 var(--sans); font-style: normal; color: #1f4f86; }
+.rb-more { font: 400 max(8px, calc(var(--rb-f) - 4px)) var(--sans); font-style: normal; color: #1f4f86; }
+.rb-lbl.on { background: var(--rb-tile); border-color: var(--rb-tile-hi); }
+.rb-lbl.on .rb-id { color: var(--rb-tile-id); }
 /* APP, TWR i FIS mniejsze niż sektory ACC (na podglądzie LOW bywa ich kilkadziesiąt) */
 .rb-lbl.app, .rb-lbl.twr, .rb-lbl.fis { --rb-f: clamp(10px, .7vw, 13px); }
 .rb-lbl.app .rb-id, .rb-lbl.twr .rb-id, .rb-lbl.fis .rb-id { font-size: max(8px, calc(var(--rb-f) - 3px)); }
@@ -109,34 +118,44 @@
 .rb-lbl .rb-atl .rb-by { color: #1f4f86; }
 .rb-lbl.off .rb-atl .rb-by, .rb-lbl.off .rb-atl .rb-fq { color: var(--rb-atis); }
 .rb-lbl .rb-atl .rb-code { font-size: max(8px, calc(var(--rb-f) - 4px)); }
-.rb-lbl:hover, .rb-box:hover { outline: 1px solid #fff; }
+.rb-lbl:hover { outline: 1px solid #fff; }
 
-/* --- stosy sąsiadów (kafelki VACS) jak na zdjęciu PANDORY: nazwa FIR żółta, ADVISORY, gdy nikt nie obsługuje sektorów
-   przy granicy, pasma kafelków o tym samym zakresie; każda granica pionowa (FL) raz, małą białą liczbą między polami */
-.rb-nb { --rb-ax: 0px; pointer-events: auto; min-width: 0; padding: 1px 4px 3px; background: rgba(30, 30, 30, .9); border: 0; border-radius: 0; }
-.rb-nbh { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.3 var(--mono); color: #8c8c8c; white-space: nowrap; cursor: help; }
-.rb-nbh b { font-size: calc(var(--rb-f) + 1px); color: var(--yellow); }
-.rb-unicom { margin: 1px 0 1px var(--rb-ax); font: 700 calc(var(--rb-f) - 1px)/1.25 var(--mono); color: #fff; white-space: nowrap; }
-.rb-bd { display: flex; align-items: center; gap: 3px; margin: 1px 0 0 2px; font: 700 max(9px, calc(var(--rb-f) - 3px))/1.05 var(--mono);
-  color: #fff; cursor: help; }
-.rb-bd i { flex: none; font-style: normal; }
-/* nowy ciąg pasm (EDUU SPE po OSE12/HVL12): krótka kreska, pod nią zakres pasma (+315) zamiast granicy pod nim */
-.rb-sep { width: 34%; margin: 5px 0 1px 2px; border-top: 2px solid #6a6a6a; }
-.rb-bd.rb-re i { color: #fff; }
-.rb-bxs { display: flex; flex-wrap: wrap; gap: 2px; margin: 1px 0 0 var(--rb-ax); font: 700 var(--rb-f) var(--mono); }
-/* boczna kolumna: jedno pole w linii (wąsko, mapa zostaje duża); u góry i u dołu do czterech obok siebie */
-.rb-col .rb-bxs { flex-direction: column; align-items: stretch; }
-.rb-top .rb-bxs, .rb-bot .rb-bxs { max-width: calc(32ch + 50px); }
-.rb-box { min-width: calc(7ch + 12px); }
-.rb-none { font: 11px var(--mono); color: #6a6a6a; padding: 2px 0; }
+/* --- okienka FIR-ów sąsiednich wg szkicu i zdjęcia PANDORY: w okienku ID i granice jak na szkicu ("OSE2 660-365"),
+   pod nimi duża częstotliwość tego, kto je obsługuje (białe pole z ciemnym tekstem); bez nikogo ciemnoszare pole
+   z samym ID i granicami. Okienko wypełnia swoje komórki (połączone przez kilka), treść nie zmienia siatki */
+.rb-box { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 4px; background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line); border-radius: 0;
+  color: var(--rb-tile-off-tx); white-space: nowrap; cursor: help; }
+.rb-bt { font: 400 calc(var(--rb-f) * .72)/1.1 var(--sans); overflow: hidden; text-overflow: ellipsis; }
+.rb-box .rb-id { font: inherit; color: inherit; letter-spacing: 0; }
+.rb-box .rb-fq { font: 400 var(--rb-f)/1.1 var(--sans); color: var(--rb-tile-tx); }
+.rb-box.on { background: var(--rb-box); border-color: #fff; color: var(--rb-tile-id); }
+.rb-box:hover { outline: 1px solid #fff; outline-offset: -1px; }
+.rb-box.on:hover { outline-color: #000; }
+/* nazwa FIR-u: żółta, nad okienkami przy ich dolnej krawędzi (side: obok okienka, na środku komórki); cały FIR bez
+   nikogo – pod nazwą ADVISORY 122.800 (może wyjść w pustą komórkę obok) */
+.rb-fir { min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 1px 1px; color: var(--rb-name);
+  white-space: nowrap; cursor: pointer; }
+.rb-fir.side { justify-content: center; }
+.rb-firn { font: 400 calc(var(--rb-f) * .95)/1.1 var(--sans); }
+.rb-unfq { font: 400 calc(var(--rb-f) * .68)/1.15 var(--sans); color: #fff; }
+.rb-fir:hover .rb-firn, .rb-fir.sel .rb-firn { text-decoration: underline; }
+.rb-fir.sel { color: #fff; }
+.rb-fir:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
+/* wskaźniki u góry i BERLIN: żółta nazwa przy dolnej krawędzi komórki, pod nią szare pole z białą wartością */
+.rb-ind, .rb-blbl { min-width: 0; align-self: end; padding: 0 1px 1px; font: 400 calc(var(--rb-f) * .85)/1.1 var(--sans);
+  color: var(--rb-name); white-space: nowrap; cursor: help; }
+.rb-indv, .rb-bln { min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0 4px;
+  background: var(--rb-grey); border: 1px solid var(--rb-grey-line); border-radius: 0; color: #f4f4f4;
+  font: 400 var(--rb-f)/1.1 var(--sans); white-space: nowrap; cursor: help; }
+.rb-bln { font-size: calc(var(--rb-f) * 1.1); letter-spacing: .5px; }
+/* BERLIN bez pasa z ATIS: konfiguracja preferowana czerwonym napisem */
+.rb-bln.pref { color: var(--rb-pref); }
 
 /* --- tytuł podglądu (warstwa, zakres) i suwak wysokości LOW */
-.rb-title { position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 1px 4px; font: 11px var(--mono);
-  color: #9a9a9a; white-space: nowrap; background: rgba(30, 30, 30, .9); }
-.rb-title b { font-size: 13px; color: #fff; letter-spacing: 1px; }
-/* LOW i HIGH: w rogu wolnego pola przy środkowej kolumnie (miejsce ustawia radio.js), MID: lewy górny róg */
-.rb-low .rb-title { right: 4px; top: 3px; }
-.rb-high .rb-title, .rb-midmap .rb-title { left: 4px; top: 3px; }
+.rb-title { position: absolute; z-index: 2; left: 3px; top: 2px; display: flex; align-items: center; gap: 6px; padding: 1px 4px;
+  font: 400 11px var(--sans); color: #9a9a9a; white-space: nowrap; background: rgba(30, 30, 30, .9); }
+.rb-tk { font-size: 13px; color: #fff; letter-spacing: 1px; }
 /* suwak: jasnoszary uchwyt (jak przyciski) na ciemnym torze, kreski pod torem = granice wycinków ACC (tam zmieniają się
    kształty) */
 .rb-lvl { position: relative; display: inline-flex; align-items: center; width: clamp(96px, 8.5vw, 170px); height: 18px; }
@@ -152,97 +171,78 @@
 .rb-cut:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 .rb-ticks { position: absolute; left: 5px; right: 5px; bottom: 0; height: 4px; pointer-events: none; }
 .rb-ticks i { position: absolute; top: 0; width: 1px; height: 4px; background: #8a8a8a; }
-.rb-cutv { min-width: 5ch; font: 700 12px var(--mono); color: #fff; }
+.rb-cutv { min-width: 5ch; font: 400 12px var(--sans); color: #fff; }
 
-/* --- środkowa kolumna: przyciski warstw (LOW MID HIGH w jednym rzędzie), stan sieci, legenda, podgląd MID */
-.rb-mid { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
-/* przyciski jak na zdjęciu PANDORY: jasnoszare prostokąty z ciemnym tekstem, kąty proste, krzyż ATIS / LOW MID HIGH,
-   pod nim w kolumnie APP / TWR / TWR/ATIS / FIS (OAT pomijamy). Włączona warstwa: jasne pole i czarny pogrubiony tekst,
-   wyłączona: ciemniejsze szare pole */
-.rb-btns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto auto repeat(4, minmax(0, 1fr)); align-items: center; gap: 4px; padding: 6px 6% 2px; }
-.rb-btns button { grid-column: 2; height: clamp(24px, 4.4vh, 38px); min-height: 0; padding: 2px; background: var(--rb-btn-off);
-  border: 1px solid #000; border-radius: 0; color: #1a1a1a; font: 400 clamp(11px, .85vw, 15px)/1.2 var(--ui); letter-spacing: .3px;
-  cursor: pointer; white-space: nowrap; overflow: hidden; }
-.rb-btns button[data-ly="low"] { grid-column: 1; }
-.rb-btns button[data-ly="high"] { grid-column: 3; }
-/* kolumna APP / TWR / TWR/ATIS / FIS: szerokość jednej trzeciej rzędu LOW MID HIGH, ale nie węższa niż napis z odstępem
-   po bokach (runda 14, przegląd: "TWR/ATIS" przy 1280–1600 px nie mieścił się w jednej trzeciej i był ucięty). Jak na
-   zdjęciu PANDORY: TWR/A trochę szerszy od TWR, reszta równa; czcionka o stałej szerokości, więc pogrubienie (włączona
-   warstwa) szerokości nie zmienia */
-.rb-btns button:is([data-ly="app"], [data-ly="twr"], [data-ly="twra"], [data-ly="fis"]) { grid-column: 1 / -1; justify-self: center;
-  width: calc((100% - 8px) / 3); min-width: max-content; padding: 2px 5px; }
-.rb-btns button:hover { outline: 1px solid #fff; outline-offset: 0; }
-.rb-btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-.rb-btns button.on { background: var(--rb-btn-on); color: #000; font-weight: 700; }
-.rb-status { flex: none; font: 11px/1.35 var(--mono); color: #9a9a9a; text-align: center; overflow-wrap: anywhere; }
-.rb-legend { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font: 10px/1.3 var(--mono); color: #9a9a9a; }
-.rb-legend span { display: inline-flex; align-items: center; gap: 4px; }
+/* --- kolumna przycisków warstw jak na zdjęciu PANDORY: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS, każdy rząd w swojej
+   komórce siatki. Przycisk szeroki na jedną trzecią kolumny (LOW MID HIGH w jednym rzędzie), ale nie węższy niż
+   napis z odstępem po bokach (runda 14: "TWR/ATIS" był ucięty). Włączona warstwa: jasne pole i ciemny napis,
+   wyłączona: szare pole i jasny napis – kolorem, bez pogrubienia (0.13.0) */
+.rb-brow { min-width: 0; min-height: 0; display: flex; justify-content: center; align-items: center; gap: 4px; }
+.rb-brow button { flex: 0 0 calc((100% - 8px) / 3); min-width: max-content; height: min(100%, 36px); min-height: 0; padding: 1px 6px;
+  background: var(--rb-btn-off); border: 1px solid #000; border-radius: 0; color: #f2f2ec; font: 400 calc(var(--rb-f) * .9)/1.2 var(--sans);
+  letter-spacing: .3px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.rb-brow button:hover { outline: 1px solid #fff; outline-offset: 0; }
+.rb-brow button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.rb-brow button.on { background: var(--rb-btn-on); color: #111; }
+/* stan danych pod przyciskami, legenda w wolnym lewym dolnym rogu */
+.rb-status { grid-area: 15 / 8; min-width: 0; align-self: center; font: 400 calc(var(--rb-f) * .74)/1.3 var(--sans); color: #9a9a9a;
+  text-align: center; overflow-wrap: anywhere; }
+.rb-legend { grid-area: 18 / 1 / span 4 / span 3; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-wrap: wrap;
+  align-content: flex-end; gap: 2px 10px; font: 400 calc(var(--rb-f) * .7)/1.3 var(--sans); color: #9a9a9a; }
+.rb-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .rb-sw { display: inline-block; width: 11px; height: 9px; border: 1px solid var(--rb-line); background: var(--rb-unst); }
 .rb-sw.on { border-color: var(--rb-act); background: var(--rb-st); }
 .rb-sw.cov { border: 1px dashed #c4c4ba; background: #b9b7aa; }
 .rb-ln-sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--rb-line); }
 .rb-ln-sw.ctr { border-color: var(--rb-ctr); }
-.rb-midmap { flex: none; aspect-ratio: .9; max-height: 55%; --rb-f: clamp(10px, .68vw, 13px); }
 
-/* --- stos sąsiada: nagłówek otwiera LOA */
-.rb-nbh[role="button"] { cursor: pointer; }
-.rb-nbh:hover b, .rb-nbh.sel b { text-decoration: underline; }
-.rb-nbh.sel { color: #fff; }
-.rb-nbh:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
-
-/* --- panel LOA EPWW z sąsiadem: nad podglądem po przeciwnej stronie niż kliknięty stos */
+/* --- panel LOA EPWW z sąsiadem (kliknięcie nazwy FIR-u): nad siatką po przeciwnej stronie niż ten FIR */
 .rb-loa { position: absolute; z-index: 5; top: 0; right: 0; width: min(1120px, 72%); max-height: 100%; display: flex; flex-direction: column;
   background: #050705; border: 1px solid var(--green); border-radius: 0; }
 .rb-loa.at-left { right: auto; left: 0; }
 .rb-loa[hidden] { display: none; }
 .rb-loa-h { flex: none; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 4px 8px; background: var(--head);
-  border-bottom: 1px solid var(--head-line); font: 12px var(--mono); white-space: nowrap; }
-.rb-loa-tag { flex: none; padding: 0 6px; border: 1px solid var(--green); border-radius: 0; color: var(--green-hi); font: 700 11px/16px var(--mono); }
+  border-bottom: 1px solid var(--head-line); font: 12px var(--sans); white-space: nowrap; }
+.rb-loa-tag { flex: none; padding: 0 6px; border: 1px solid var(--green); border-radius: 0; color: var(--green-hi); font: 400 11px/16px var(--sans); }
 .rb-loa-fir { flex: none; color: var(--muted); }
 .rb-loa-fir b { color: var(--yellow); }
-.rb-loa-t { flex: 0 1 auto; min-width: 12ch; overflow: hidden; text-overflow: ellipsis; color: #fff; font-weight: 700; }
-.rb-loa-n { flex: none; font: 11px var(--mono); color: #b9c2b9; }
+.rb-loa-t { flex: 0 1 auto; min-width: 12ch; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+.rb-loa-n { flex: none; font: 11px var(--sans); color: #b9c2b9; }
 .rb-loa-sp { flex: 1; }
 .rb-loa-a, .rb-loa-x { flex: none; padding: 0 8px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #c3cdc3;
-  font: 12px/18px var(--mono); text-decoration: none; cursor: pointer; }
+  font: 12px/18px var(--sans); text-decoration: none; cursor: pointer; }
 .rb-loa-a:hover, .rb-loa-x:hover { border-color: var(--green-hi); color: #fff; }
 .rb-loa-b { min-height: 0; overflow: auto; padding: 0 10px 8px; }
-.rb-loa-b > p { margin: 8px 0; font: 12px var(--mono); }
+.rb-loa-b > p { margin: 8px 0; font: 12px var(--sans); }
 .rb-loa-tools { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; height: 32px; background: #050705; }
-.rb-loa-q { flex: 0 1 260px; min-width: 120px; padding: 2px 6px; background: #000; border: 1px solid #2f3a2f; border-radius: 0; color: var(--text); font: 12px var(--mono); }
+.rb-loa-q { flex: 0 1 260px; min-width: 120px; padding: 2px 6px; background: #000; border: 1px solid #2f3a2f; border-radius: 0; color: var(--text); font: 12px var(--sans); }
 .rb-loa-q:focus { outline: none; border-color: var(--green-hi); }
-.rb-loa-cnt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--muted); }
+.rb-loa-cnt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--sans); color: var(--muted); }
 .rb-loa-cnt:empty { display: none; }
 .rb-loa-sec[hidden], .rb-loa [data-f][hidden] { display: none; }
-.rb-loa h4 { margin: 8px 0 3px; font: 700 11px/1.3 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
-.rb-loa h4 small { margin-left: 6px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
-.rb-loa-tab { width: 100%; border-collapse: collapse; font: 12px/1.35 var(--mono); }
+.rb-loa h4 { margin: 8px 0 3px; font: 400 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.rb-loa h4 small { margin-left: 6px; color: var(--muted); letter-spacing: 0; }
+.rb-loa-tab { width: 100%; border-collapse: collapse; font: 12px/1.35 var(--sans); }
 .rb-loa-tab th { position: sticky; top: 32px; z-index: 1; padding: 2px 8px 2px 4px; background: #111611; border-bottom: 1px solid var(--head-line);
-  color: var(--muted); font-weight: 400; text-align: left; white-space: nowrap; }
+  color: var(--muted); text-align: left; white-space: nowrap; }
 .rb-loa-tab td { padding: 2px 8px 2px 4px; border-bottom: 1px solid #161b16; vertical-align: top; color: #d6ded6; }
 .rb-loa-tab tbody tr:nth-child(even) td { background: var(--row-alt); }
 .rb-loa-tab tbody tr:hover td { background: var(--row-hover); }
 .rb-loa-tab .trf { width: 170px; color: var(--cyan); }
-.rb-loa-tab .cop { width: 90px; color: #fff; font-weight: 700; }
+.rb-loa-tab .cop { width: 90px; color: #fff; }
 .rb-loa-tab .lvl { min-width: 90px; color: var(--yellow); }
 .rb-loa-tab .sec { white-space: nowrap; }
 .rb-loa-tab .cond { color: #aab3aa; }
 .rb-loa-tab.pos td:first-child { width: 60px; }
 .rb-loa-tab.pos .pcs { width: 120px; color: var(--cyan); }
-.rb-loa-tab.pos .cop { width: 220px; font-weight: 400; }
+.rb-loa-tab.pos .cop { width: 220px; color: #d6ded6; }
 .rb-loa-tab .ep { color: var(--muted); }
 .rb-loa-tab .nb { color: #fff; }
 .rb-loa-rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 18px; }
-.rb-loa ul { margin: 0; padding: 0 0 0 16px; font: 12px/1.4 var(--mono); color: #d6ded6; }
+.rb-loa ul { margin: 0; padding: 0 0 0 16px; font: 12px/1.4 var(--sans); color: #d6ded6; }
 .rb-loa li { margin: 0 0 3px; }
 .rb-loa li::marker { color: var(--green-text); }
 
 /* --- dymek (jeden, przy kursorze) */
 .rb-tip { position: fixed; z-index: 3000; max-width: 480px; padding: 5px 8px; background: #0d110d; border: 1px solid var(--green);
-  border-radius: 0; color: var(--text); font: 12px/1.35 var(--mono); white-space: pre-wrap; pointer-events: none; }
-
-@media (max-height: 820px) {
-  .rb-btns button { font-size: 12px; }
-  .rb-legend { display: none; }
-}
+  border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans); white-space: pre-wrap; pointer-events: none; }

@@ -144,7 +144,23 @@ def test_layout_boxes_map_to_known_callsigns(client):
     take("berlin box", **d["berlin"]["box"])
     for row in set(d["grid"]["buttons"]["rows"].values()):
         take("buttons", d["grid"]["buttons"]["col"], row)
+    # 0.13.0 etap 2: podglądy LOW (lewo od środka), HIGH (prawo) i MID (dół środka), stan danych i legenda też mają
+    # stałe miejsca w siatce, bez nakładania się na okienka, wskaźniki i przyciski
+    g = d["grid"]
+    assert set(g["maps"]) == {"low", "high", "mid"}
+    for k, c in g["maps"].items():
+        take(f"map {k}", **c)
+    take("status", **g["status"])
+    take("legend", **g["legend"])
+    btn = g["buttons"]["col"]
+    assert g["maps"]["low"]["col"] + g["maps"]["low"]["cols"] == btn == g["maps"]["mid"]["col"] < g["maps"]["high"]["col"]
+    assert g["maps"]["mid"]["row"] + g["maps"]["mid"]["rows"] - 1 == g["rows"]  # MID przy dolnej krawędzi
     assert max(x for x, _ in cells) <= d["grid"]["cols"] == 13 and max(y for _, y in cells) <= d["grid"]["rows"] == 21
+    # kolumny siatki wg tego, co w nich stoi (stała szerokość okienek, przycisków i nazw; podglądy dzielą resztę)
+    assert g["tracks"] == ["box"] * 6 + ["map", "btn", "map", "box", "map", "box", "name"]
+    assert rb.col_kinds({(1, 1): "box:X", (2, 1): "name:X", (2, 2): "ind:A", (4, 1): "map:low"}, 5, 3) == [
+        "box", "box", "btn", "map", "map"]
+    assert all(i["tip"] and set(i) >= {"id", "tip", "col", "row", "value", "positions"} for i in d["indicators"])
     # HVL2: w plikach sektorów nie ma osobnego stanowiska HVL2, obsługuje je OSE2 (EDUU_O22_CTR)
     eduu = {b["id"]: b for b in boxes(d, "EDUU")}
     assert eduu["HVL2"]["chain"][0] == "EDUU_O22_CTR" and eduu["HVL1"]["chain"][0] == "EDUU_H12_CTR"
