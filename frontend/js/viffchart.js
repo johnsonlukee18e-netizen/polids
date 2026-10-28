@@ -148,3 +148,52 @@ export function chartHtml(tv, now, pilot = () => null, sel = null) {
       <tbody>${rows}</tbody></table></div>` : `<div class="vf-empty">no flights within the hour</div>`}
     </div>`;
 }
+
+// --- OTHER › FMP (0.13.0): tabela SECTOR | CAPACITY | OCCUPANCY, wiersz na traffic volume (dane z /api/viff/sectors)
+
+const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+// "18 (45)": liczba i przepustowość jak w FMP PANDORY; brak liczby albo limitu = "–", brak obu = samo "–"
+export const pairText = (n, cap) => (n === null && cap === null ? "–" : `${n ?? "–"} (${cap ?? "–"})`);
+const RESTR_KIND = { "ENR-ENTRIES": "entries", "ENR-OCCUPANCY": "occupancy" };
+
+// Sektor teraz: wejścia w bieżącej godzinie (koszyk o tej godzinie, nie hours[0], które bywa następną godziną),
+// przepustowość wejść tej godziny (albo z definicji TV), zajętość w tej minucie (occupancy[0]) i jej przepustowość.
+// now = "HHMM" z odpowiedzi; to samo przyda się RADIO (sektor na czerwono przy dużej zajętości).
+export function tvNow(tv, now) {
+  const cur = (tv.hours || []).find((x) => x.hour === String(now || "").slice(0, 2)) || null;
+  return {
+    entries: num(cur?.entries), entriesCap: num(cur?.entries_cap) ?? num(tv.entries_cap),
+    occupancy: num(Array.isArray(tv.occupancy) ? tv.occupancy[0] : null), occupancyCap: num(tv.occupancy_cap),
+    peak: num(tv.peak_60),
+  };
+}
+
+// opis regulacji z definicji TV do dymka: "entries 20 1500–1600"
+const restrText = (r) => [RESTR_KIND[r?.type] || String(r?.type || "").toLowerCase(), r?.value, r?.start && r?.end ? `${r.start}–${r.end}` : ""]
+  .filter((x) => x !== null && x !== undefined && x !== "").join(" ");
+
+// wiersze FMP: aktywne na początku, potem po id; liczby, napisy komórek, dymki i klasy obciążenia (loadClass)
+export function fmpRows(data) {
+  const prefix = (data?.prefix || "EP") + "-";
+  const rows = (data?.sectors || []).filter((tv) => tv && tv.id).map((tv) => {
+    const n = tvNow(tv, data.now);
+    const active = !!(tv.active ?? tv.status === 1);
+    const restr = Array.isArray(tv.restrictions) ? tv.restrictions.map(restrText).filter(Boolean) : [];
+    const sectorTip = [`${tv.id}: ${tvLabel(tv.id)}`, active ? "active" : "inactive",
+      tv.restricted ? "regulated now" : "", restr.length ? `regulations: ${restr.join(", ")}` : ""].filter(Boolean).join(" · ");
+    const capacityTip = `${n.entries === null ? "No entry count this hour" : `${n.entries} ${n.entries === 1 ? "entry" : "entries"} this hour`}, `
+      + (n.entriesCap === null ? "no limit" : `capacity ${n.entriesCap}`);
+    const occupancyTip = `${n.occupancy === null ? "No occupancy data" : `${n.occupancy} aircraft in the sector now`}, `
+      + (n.occupancyCap === null ? "no limit" : `capacity ${n.occupancyCap}`)
+      + (n.peak === null ? "" : ` · peak ${n.peak} within the hour`);
+    return {
+      id: tv.id, code: tv.id.startsWith(prefix) ? tv.id.slice(prefix.length) : tv.id, label: tvLabel(tv.id),
+      active, restricted: !!tv.restricted, ...n,
+      capacity: pairText(n.entries, n.entriesCap), occupancyText: pairText(n.occupancy, n.occupancyCap),
+      sectorTip, capacityTip, occupancyTip,
+      entriesCls: loadClass(n.entries, n.entriesCap), occupancyCls: loadClass(n.occupancy, n.occupancyCap),
+    };
+  });
+  rows.sort((a, b) => (a.active === b.active ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.active ? -1 : 1));
+  return rows;
+}

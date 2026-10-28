@@ -1,6 +1,8 @@
 import { api, clearNavPath, esc, hashOf, navPath, parseHash, presetNavPath, selectNavPath, setRouter } from "./api.js";
+import { mountTopbar, reloadTarget, takeReload } from "./topbar.js";
 import home from "./tabs/home.js";
 import meteo from "./tabs/meteo.js";
+import awalon from "./tabs/awalon.js";
 import { adciv, admil, advfr } from "./tabs/aip.js";
 import inop from "./tabs/inop.js";
 import about from "./tabs/about.js";
@@ -14,25 +16,29 @@ import coordination from "./tabs/coordination.js";
 import conversion from "./tabs/conversion.js";
 import sytop from "./tabs/sytop.js";
 import aup from "./tabs/aup.js";
-import strip from "./tabs/strip.js";
-import squawk from "./tabs/squawk.js";
 import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
-const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
-  sytop, aup, strip, squawk, other, emergency, admin };
+const TABS = { home, about, radio, meteo, awalon, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination,
+  conversion, sytop, aup, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
 // bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
-// #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista
+// #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista;
+// 0.13.0: zakładki STRIP nie ma, #strip/<ICAO> → AERODROME › <ICAO> › TRAFFIC (DMAN/AMAN), samo #strip → AERODROME;
+// #squawk/<kod> → OTHER › SQUAWK z tym kodem, #squawk i kafelek w ABOUT (bez arg) → OTHER › SQUAWK
 const MOVED = {
   docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],
   phraseology: () => ["other", "phraseology"],
   checklist: (arg) => ["other", arg ? "checklist/" + arg : "checklist"],
+  strip: (arg) => ["aerodrome", /^[A-Za-z]{4}$/.test(arg || "") ? arg.toUpperCase() + "/dman" : arg],
+  squawk: (arg) => ["other", arg ? "squawk/" + arg : "squawk"],
 };
 const views = document.getElementById("views");
 const back = document.getElementById("nav-back");
 const mounted = {};
 const ctx = { config: null, open: (tab, arg) => open(tab, arg, true) };
+// pasek u góry (Reload | Brighter | Darker): jasność od razu, przed wczytaniem konfiguracji; Reload działa zawsze
+mountTopbar(document.getElementById("topbar"));
 
 // --- Historia ekranów (przycisk ← i Wstecz przeglądarki). Każdy wpis historii tej sesji ma stan {n: głębokość};
 // n = 0 to pierwszy ekran po uruchomieniu (HOME), więc ← nigdy nie wychodzi z aplikacji (np. do strony logowania).
@@ -163,6 +169,9 @@ tickLoop();
   // po uruchomieniu zawsze HOME ("?"), niezależnie od adresu zapamiętanego w przeglądarce; to pierwszy wpis historii (n = 0)
   depth = 0;
   open("home");
+  // Reload z paska u góry (jednorazowy znacznik): ten sam ekran co przed wczytaniem, krok po HOME (← wraca do HOME)
+  const again = reloadTarget(takeReload());
+  if (again) open(again.tab, again.arg, true);
   ready = true;
   window.addEventListener("popstate", fromLocation);
   window.addEventListener("hashchange", fromLocation);

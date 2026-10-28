@@ -201,6 +201,15 @@ def _cap(value) -> int | None:
     return value if isinstance(value, int) and 0 < value < 999 else None
 
 
+def restriction_active(r, now: datetime) -> bool:
+    """Regulacja z definicji TV ({type, value, start: "HHMM", end: "HHMM", reason}) obowiązuje teraz; okno
+    może przechodzić przez północ (2200–0200). Wspólna reguła dla AERODROME › OVERVIEW, OTHER › FMP i RADIO."""
+    if not isinstance(r, dict):
+        return False
+    start, end, t = str(r.get("start") or ""), str(r.get("end") or ""), now.strftime("%H%M")
+    return bool(start and end and (start <= t <= end if start <= end else not end < t < start))
+
+
 def sector_load(tv: str, buckets: list[dict], now: datetime, horizon: int = 60) -> dict:
     """Ruch w sektorze od teraz do +horizon minut: wejścia w oknach 20-minutowych, zajętość minuta po minucie
     i godzinowe liczniki vIFF (bieżąca i następna godzina) z przepustowością.
@@ -310,6 +319,9 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
         item.update({"volumes": [v for v in (d.get("volumes") or "").split(",") if v], "status": d.get("status"),
                      "entries_cap": _cap(d.get("entries")), "occupancy_cap": _cap(d.get("occupancy")),
                      "restrictions": d.get("restrictions") or []})
+        # regulacja obowiązująca teraz (FMP, RADIO: sektor na czerwono)
+        rs = item["restrictions"]
+        item["restricted"] = isinstance(rs, list) and any(restriction_active(r, now) for r in rs)
         if item["entries_cap"] is None and item["hours"]:
             item["entries_cap"] = item["hours"][0]["entries_cap"]
         if item["occupancy_cap"] is None and item["hours"]:

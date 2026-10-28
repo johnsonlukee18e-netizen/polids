@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     secret_key: str = ""  # wymagany przy vatsim, min. 32 znaki
     session_days: int = 7
     vatsim_auth_url: str = "https://auth.vatsim.net"  # sandbox: https://auth-dev.vatsim.net
+    # API członków VATSIM (godziny pilota i ATC w OTHER › FLIGHT PLAN: /v2/members/{cid}/stats); bez klucza
+    vatsim_api_url: str = "https://api.vatsim.net"
     vatsim_client_id: str = ""
     vatsim_client_secret: str = ""
     # CID-y administratorów, po przecinku. Resztę dostępu nadaje admin w zakładce ADMIN.

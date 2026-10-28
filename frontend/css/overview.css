@@ -9,12 +9,12 @@
 .ov > .toolbar.ov-bar { margin: 0 0 6px; flex-wrap: nowrap; }
 .ov-bar > * { flex: none; }
 .ov-bar label.sc { gap: 6px; }
-.ov-bar select.ov-pos { font: 700 13px var(--mono); max-width: 330px; }
+.ov-bar select.ov-pos { font: 13px var(--mono); max-width: 330px; }
 /* MINE / ALL: przyciski jak INFO / AWOS / TRAFFIC, wybrany zielony; obok liczba ukrytych lotnisk */
 .ov-bar .ov-scope { display: inline-flex; flex: none; border: 1px solid var(--line); }
 .ov-bar .ov-scope[hidden] { display: none; }
 .ov-scope button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 10px;
-  font: 700 11px var(--mono); letter-spacing: .5px; cursor: pointer; border-radius: 0; }
+  font: 11px var(--mono); letter-spacing: .5px; cursor: pointer; border-radius: 0; }
 .ov-scope button:last-child { border-right: 0; }
 .ov-scope button:hover { color: var(--text); background: var(--panel-2); }
 .ov-scope button.on { background: #14240f; color: var(--green-hi); }
@@ -38,9 +38,9 @@
 .ov-col .scroll { flex: 1; min-height: 0; overflow: auto; }
 
 /* --- wspólne drobiazgi */
-.ov .ic { font: 700 13px var(--mono); color: #fff; }
+.ov .ic { font: 13px var(--mono); color: #fff; }
 .ov-chip { display: inline-block; flex: none; padding: 0 5px; border: 1px solid var(--line); color: var(--muted);
-  font: 700 10px/16px var(--ui); letter-spacing: .4px; white-space: nowrap; }
+  font: 10px/16px var(--ui); letter-spacing: .4px; white-space: nowrap; }
 .ov-chip.on { background: #14240f; border-color: var(--green-hi); color: var(--green-hi); }
 .ov-chip.warn { border-color: var(--warn); color: var(--warn); }
 .ov-chip.bad { background: #b0201a; border-color: #ff5a4a; color: #fff; }
@@ -53,7 +53,7 @@
 .ov table.data.ov-tab { font-size: 12px; }
 .ov table.data.ov-tab th, .ov table.data.ov-tab td { padding: 2px 6px; }
 .ov table.data.ov-tab td.num { font-size: 12px; }
-.ov .ok { color: var(--ok); } .ov .near { color: var(--warn); } .ov .over { color: var(--bad); font-weight: 700; }
+.ov .ok { color: var(--ok); } .ov .near { color: var(--warn); } .ov .over { color: var(--bad); }
 .ov [data-tip] { position: relative; }
 /* dolna połowa przewijanego panelu METAR: dymek w górę (klasa tip-up z JS), żeby dolna krawędź panelu go nie ucięła */
 .ov-wx-body [data-tip].tip-up:hover::after { top: auto; bottom: 100%; }
@@ -78,7 +78,7 @@
 @container (max-width: 480px) {
   .ov-aero-head .ov-obs, .ov-aero-head .ov-more .w, .ov-aero.other .ov-traffic { display: none; }
 }
-.ov-aero-head .cat { font: 700 11px var(--mono); }
+.ov-aero-head .cat { font: 11px var(--mono); }
 .ov-aero-head .ov-traffic { font: 12px var(--mono); color: var(--cyan); }
 .ov-aero-head .ov-obs { font: 11px var(--mono); color: var(--muted); }
 .ov-aero-head .ov-more { margin-left: auto; font: 10px var(--sans); color: var(--muted); }
@@ -88,9 +88,9 @@
 .ov-lvp-why { padding-left: 2ch; font: 11px var(--mono); color: var(--warn); }
 /* pas w użyciu: z ATIS pełna zielona ramka z literą, preferowany kreskowana (jak PREFERRED RWY w AERODROME) */
 .ov-rwy { display: inline-flex; flex: none; align-items: baseline; gap: 4px; padding: 0 5px; border: 1px solid var(--ok);
-  font: 700 12px/16px var(--mono); color: #fff; white-space: nowrap; }
+  font: 12px/16px var(--mono); color: #fff; white-space: nowrap; }
 .ov-rwy.pref { border-color: var(--cyan); border-style: dashed; }
-.ov-rwy i { font: 700 10px/16px var(--ui); font-style: normal; color: var(--muted); letter-spacing: .4px; }
+.ov-rwy i { font: 10px/16px var(--ui); font-style: normal; color: var(--muted); letter-spacing: .4px; }
 .ov-rwy i.src { color: var(--green-hi); }
 .ov-rwy.pref i.src { color: var(--cyan); }
 .ov-rwy b { color: #fff; }
@@ -105,11 +105,11 @@
 .ov-nt { padding: 3px 6px; margin-bottom: 4px; background: #111; border-left: 3px solid var(--ok); }
 .ov-nt-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .ov-nt-head .id { font-size: 11px; color: var(--cyan); }
-.ov-nt-head .valid { font: 700 11px var(--mono); color: var(--ok); }
+.ov-nt-head .valid { font: 11px var(--mono); color: var(--ok); }
 .ov-nt-txt { font: 12px/1.4 var(--mono); color: #dfe8df; overflow-wrap: anywhere; }
 
 /* --- ECFMP / vIFF */
-.ov-sub { margin: 6px 0 3px; padding-bottom: 2px; color: var(--yellow); font: 700 11px/1.4 var(--sans);
+.ov-sub { margin: 6px 0 3px; padding-bottom: 2px; color: var(--yellow); font: 11px/1.4 var(--sans);
   text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--head-line); }
 .ov-flow-body > .ov-sub:first-child { margin-top: 0; }
 .ov-fm { padding: 3px 6px; margin-bottom: 4px; background: #111; border-left: 3px solid var(--line); }
@@ -130,7 +130,7 @@
 .ov-mon-body td.tip, .ov-mon-body [title] { cursor: help; }
 
 /* --- checklista otwarcia stanowiska */
-.ov-chk-pos { margin-bottom: 2px; font: 700 13px var(--mono); color: var(--green-hi); }
+.ov-chk-pos { margin-bottom: 2px; font: 13px var(--mono); color: var(--green-hi); }
 .ov-chk-body .checklist { font-size: 12px; }
 .ov-chk-body .chk-row { padding: 1px 2px; }
 .ov-chk-body .chk-section { margin: 5px 0 2px; }
@@ -142,4 +142,7 @@
   .ov-grid { grid-template-columns: 272px minmax(0, 1.4fr); }
   .ov-col > .card.grow, .ov-col > .card.part { flex: none; max-height: none; }
   .ov-col .scroll { max-height: 300px; }
+  /* tabela ograniczeń przepływu w lewej kolumnie (250 px treści): w Arialu (0.13.0) "OCCUPANCY" i "1400–1600" przy
+     odstępach 6 px wychodziły 2 px poza okienko (poziomy pasek przewijania) */
+  .ov-flow-body table.data.ov-tab th, .ov-flow-body table.data.ov-tab td { padding: 2px 4px; }
 }

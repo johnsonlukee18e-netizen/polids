@@ -1,5 +1,6 @@
-import { api, atisHtml, esc, fmt, h, hhmm, lvpState, lvpTip, positionTip, remember, stash, stashed, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
-import { colorize, wxLines, windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "./meteo.js";
+import { api, atisHtml, esc, fmt, h, hhmm, lvpState, lvpTip, positionTip, remember, stash, stashed, textWidth, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { colorize, wxLines } from "./meteo.js";
+import { windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "../wind.js";
 import { FIR_KEYS, FIR_LABELS, aeroArg, firOf, mountAeroCard, mountFirList, obsInfo, splitArg } from "../aerolist.js";
 import { mountAwos } from "../awos.js";
 import { notamState } from "../notamstate.js";
@@ -34,7 +35,7 @@ function aipFreqs(list) {
 }
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
-// Kolor = rola jak na paskach postępu lotu (strips.css): ARR żółty, DEP niebieski (ten sam pas do obu: połowa na połowę).
+// Kolor = rola jak na paskach postępu lotu (EFES): ARR żółty, DEP niebieski (ten sam pas do obu: połowa na połowę).
 // Wypełnienie pełne = pas w użyciu wg ATIS; kreskowane = pas preferowany (sugestia systemu).
 const USE_COLOR = { arr: "#ffd84a", dep: "#6db8ff" };
 const ROLE_LABEL = { arr: "ARR", dep: "DEP" };
@@ -113,10 +114,10 @@ function windrose(status) {
       // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa) i rola
       const [x, y] = pt(e.heading + 180, 88);
       const col = ro.length ? USE_COLOR[ro[0]] : "#c8ced4";
-      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700"
+      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle"
         font-size="${ro.length ? 16 : 12}" fill="${col}">${esc(e.designator)}</text>`;
       if (ro.length) {
-        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700" font-size="10"
+        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-size="10"
           fill="${col}">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
         // szewrony wzdłuż pasa w kierunku ruchu
         marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="#fff" stroke-width="2.5" opacity="${ra.length ? 1 : 0.7}">${[48, 12, -24]
@@ -219,7 +220,7 @@ const NOTAM_SORT = {
   end: (a, b) => (a.perm - b.perm) || (a.end || "9").localeCompare(b.end || "9"),
 };
 
-// Ruch: w INFO tylko jednowierszowe podsumowanie; widok TRAFFIC to DMAN/AMAN (dman.js), paski EFES są w zakładce STRIP.
+// Ruch: w INFO tylko jednowierszowe podsumowanie; widok TRAFFIC to DMAN/AMAN (dman.js); 0.13.0: bez zakładki STRIP.
 // Liczby z sieci VATSIM (połączeni piloci i prefile), bez lotów OFFLINE znanych tylko z vIFF.
 function ruchLine(t, icao) {
   const local = t.departures.filter((p) => p.arrival === icao).length;
@@ -265,7 +266,7 @@ export default {
         <datalist id="aero-list"></datalist>
         <button class="btn primary go">Show</button>
         <span class="aero-view"><button data-view="overview">INFO</button><button data-view="awos">AWOS</button><button data-view="ruch">TRAFFIC</button></span>
-        <span class="title" style="font-weight:600"></span><span style="flex:1"></span>
+        <span class="title" style="color:#fff"></span><span style="flex:1"></span>
         <span class="hint upd"></span>
       </div>
       <div class="content"></div>
@@ -345,7 +346,6 @@ export default {
         const aipOf = (p) => info.frequencies.filter((x) => near(x.mhz, p.frequency));
         const aipRest = info.frequencies.filter((x) => !ps.some((p) => near(x.mhz, p.frequency)));
         const names = [...ps.map((p) => p.name), ...aipRest.map((x) => x.description)];
-        el.style.setProperty("--nm-w", `${Math.max(0, ...names.map((n) => (n || "").length))}ch`);
         el.innerHTML = ((ps.map((p) => {
           const on = online[p.callsign], books = bookings[p.callsign] || [];
           const cls = on ? "on" : books.length ? "booked" : "";
@@ -361,6 +361,12 @@ export default {
             <span class="pos-txt"><span class="cs">${esc(cs)}</span><span class="nm"></span>
             <span class="booked-txt">${hhmm(bookings[cs][0].start)}–${hhmm(bookings[cs][0].end)}</span></span></div>`).join("")
           + `<p class="hint">${msg}</p>`;
+        // zmierzona w czcionce nazwy stacji (nie liczba znaków w ch: w Arialu litery mają różną szerokość)
+        const nm = el.querySelector(".nm");
+        if (nm) el.style.setProperty("--nm-w", `${textWidth(names, nm)}px`);
+        // kolumna znaków tak samo: najdłuższy znak tej listy (EPKK_RZ_APP ok. 86 px), nie stała szerokość na każde lotnisko
+        const css = [...el.querySelectorAll(".cs")];
+        if (css.length) el.style.setProperty("--cs-w", `${textWidth(css.map((c) => c.textContent), css[0]) + 1}px`);
       };
       draw();
       const [on, bk] = await Promise.allSettled([vatsimOnline(), vatsimBookings()]);

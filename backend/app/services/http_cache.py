@@ -82,6 +82,11 @@ def peek(url: str, params: dict | None = None) -> tuple[float, str] | None:
     return (time.monotonic() - hit[0], hit[1]) if hit else None
 
 
+def forget(url: str, params: dict | None = None):
+    """Usuwa adres z cache: odpowiedź 200 z nieczytelną treścią nie wraca z cache przez cały ttl."""
+    _cache.pop(_key(url, params), None)
+
+
 def clear_cache():
     _cache.clear()
     _locks.clear()

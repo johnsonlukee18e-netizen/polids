@@ -1,0 +1,33 @@
+/* OTHER › FMP (0.13.0): tabela sektorów SECTOR | CAPACITY | OCCUPANCY jak FMP PANDORY: białe napisy na czarnym,
+   nagłówki białymi kapitalikami, cienkie ciemne linie między kolumnami. Aktywny sektor = cały wiersz na szarym tle
+   (ciemniejszym niż w PANDORZE, żeby biały tekst był czytelny), nieaktywny na czarnym; bez pasków zebry, żeby szare
+   tło znaczyło tylko "aktywny". Zwykła grubość pisma, ostre krawędzie, bez cieni; układ bez czcionki o stałej szerokości
+   (cyfry w kolumnach wyrównane przez tabular-nums). */
+.fmp { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+/* podzakładka z .pane.fill: pasek stoi, przewija się tylko tabela (nagłówek tabeli przyklejony) */
+.pane.fill > .fmp { flex: 1; padding: 12px 16px; }
+.pane.fill > .fmp > .fmp-scroll { flex: 1; min-height: 0; overflow: auto; }
+
+.fmp-bar { flex: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; min-height: 18px; }
+.fmp-info { font-size: 13px; }
+.fmp-msg { font-size: 13px; }
+.fmp-msg:empty { display: none; }
+.fmp-empty, .fmp-err { margin: 4px 0; font-size: 14px; }
+
+table.fmp-table { width: 100%; max-width: 680px; border-collapse: collapse; font: 400 17px/1.3 var(--sans);
+  font-variant-numeric: tabular-nums; color: #fff; }
+table.fmp-table th { position: sticky; top: 0; z-index: 1; padding: 4px 12px; background: #000; color: #fff; text-align: left;
+  font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; border-bottom: 1px solid #3a3a3a; cursor: help; }
+table.fmp-table td { padding: 2px 12px; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
+table.fmp-table th + th, table.fmp-table td + td { border-left: 1px solid #262626; }
+table.fmp-table th:first-child, table.fmp-table td.fmp-sec { width: 130px; }
+/* aktywny: szare tło całego wiersza; nieaktywny: czarne */
+table.fmp-table tr.on td { background: #484848; }
+table.fmp-table tr.off td { background: #000; }
+table.fmp-table tr.on:hover td { background: #575757; }
+table.fmp-table tr.off:hover td { background: var(--row-hover); }
+table.fmp-table td.fmp-sec { letter-spacing: .4px; cursor: help; }
+table.fmp-table td.fmp-num { cursor: help; }
+/* obciążenie: żółte od 90 % przepustowości, czerwone powyżej; regulacja teraz: id sektora czerwone */
+table.fmp-table td.fmp-num.near { color: var(--yellow); }
+table.fmp-table td.fmp-num.over, table.fmp-table td.fmp-sec.reg { color: #ff5a4a; }
