@@ -19,7 +19,7 @@ const WAKE = { L: "light", M: "medium", H: "heavy", J: "super" };
 export const CALLSIGN_RE = /^[A-Z0-9]{2,12}$/;
 export const cleanCallsign = (v) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
 
-// Pola 10 i 18: kopia equipment() i field18() z strips.js (STRIP znika w 0.13.0), bez zmian w działaniu.
+// Pola 10 i 18: equipment() i field18() przeniesione z dawnej zakładki STRIP (usuniętej w 0.13.0), bez zmian w działaniu.
 // pole 10 z pełnego typu: "B38M/M-SDE2E3FGHIJ1RWXY/LB1" → typ, WTC, NAV/COM, dozorowanie
 export function equipment(full) {
   const m = /^([A-Z0-9]{2,4})(?:\/([LMHJ]))?(?:-([A-Z0-9]*))?(?:\/([A-Z0-9]*))?$/.exec(String(full || "").trim().toUpperCase());
