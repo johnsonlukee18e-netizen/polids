@@ -329,8 +329,14 @@ def test_sans_tokens_whole_app():
 
 
 def test_base_rule_normal_weight():
-    """Przeglądarka sama pogrubia b, strong, th i h1-h6: jedna reguła zwykłej grubości w style.css."""
-    assert "b, strong, th, h1, h2, h3, h4, h5, h6 { font-weight: normal; }" in STYLE
+    """Przeglądarka sama pogrubia b, strong, th, h1-h6 i optgroup (grupy w polach Position): jedna reguła zwykłej
+    grubości w style.css. leaflet.css pogrubia +/- (font: bold 18px): reguła Leafleta w style.css zdejmuje i to
+    (Playwright: przed poprawką optgroup i +/- na MAP, METEO › QNH i SUN miały 700)."""
+    assert "b, strong, th, h1, h2, h3, h4, h5, h6, optgroup { font-weight: normal; }" in STYLE
+    leaflet = (FRONTEND / "vendor" / "leaflet" / "leaflet.css").read_text("utf-8")
+    assert re.search(r"\.leaflet-control-zoom-in,\s*\.leaflet-control-zoom-out \{\s*font: bold", leaflet)
+    rule = _rule(STYLE, ".leaflet-control-zoom a, .leaflet-container a.leaflet-popup-close-button")
+    assert "font-family: var(--mono);" in rule and "font-weight: normal;" in rule
 
 
 # radio.css przechodzi na zwykłą grubość w obszarze RADIO rundy 16 (zbiór znika po scaleniu)

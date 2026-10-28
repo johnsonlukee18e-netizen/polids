@@ -43,8 +43,9 @@ html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); overflow: hidden; display: grid;
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr); }
 button, input, select, textarea { font: inherit; color: inherit; }
-/* bez pogrubień także tam, gdzie przeglądarka pogrubia sama (b, strong, nagłówki tabel i stron) */
-b, strong, th, h1, h2, h3, h4, h5, h6 { font-weight: normal; }
+/* bez pogrubień także tam, gdzie przeglądarka pogrubia sama (b, strong, nagłówki tabel i stron, grupy w listach
+   wyboru: optgroup w polach Position na HOME, w OVERVIEW i COORDINATION) */
+b, strong, th, h1, h2, h3, h4, h5, h6, optgroup { font-weight: normal; }
 a { color: var(--green-text); }
 
 /* --- pasek u góry (jak w PANDORZE: Reload | Brighter | Darker): trzy równe zielone pola na całą szerokość ekranu,
@@ -385,8 +386,9 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .mapwrap { flex: 1; display: flex; min-height: 0; position: relative; }
 .map { flex: 1; background: #000; }
 .leaflet-container { font: inherit; background: #000; }
-/* przyciski Leafleta (+/−, zamknięcie dymka) też w Consolas, nie w Lucida Console / Tahoma z leaflet.css */
-.leaflet-control-zoom a, .leaflet-container a.leaflet-popup-close-button { font-family: var(--mono); }
+/* przyciski Leafleta (+/−, zamknięcie dymka) czcionką aplikacji zwykłej grubości, nie pogrubioną Lucida Console
+   / Tahoma z leaflet.css (font: bold 18px przy +/−) */
+.leaflet-control-zoom a, .leaflet-container a.leaflet-popup-close-button { font-family: var(--mono); font-weight: normal; }
 /* kontrolki, dymki i okienka Leafleta na wszystkich mapach (RADIO, METEO, MAP) też bez zaokrągleń z leaflet.css */
 .leaflet-bar, .leaflet-control-layers, .leaflet-tooltip, .leaflet-popup-content-wrapper, .leaflet-container .leaflet-bar a,
 .leaflet-container .leaflet-bar a:first-child, .leaflet-container .leaflet-bar a:last-child { border-radius: 0; }
