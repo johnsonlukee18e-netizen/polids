@@ -59,14 +59,17 @@
 .awl-sw.s10 { background: var(--awl-s10); }
 .awl-sw.none { background: transparent; box-shadow: inset 0 0 0 2px var(--awl-none); }
 
-/* tabela profilu pod wykresem */
-table.data.awl-prof { margin-top: 10px; }
-table.data.awl-prof th, table.data.awl-prof td { padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+/* tabela profilu pod wykresem: stałe szerokości kolumn (<colgroup> z PROF_COLS w awalon.js), więc kolumny stoją tak
+   samo na każdym lotnisku, z porywem i bez */
+table.data.awl-prof { margin-top: 10px; table-layout: fixed; }
+table.data.awl-prof th, table.data.awl-prof td { padding: 2px 6px; font-size: 12px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
 table.data.awl-prof th { font-weight: 400; }
 table.data.awl-prof th.num { text-align: right; }
 table.data.awl-prof td.num { font-family: var(--sans); font-variant-numeric: tabular-nums; }
 table.data.awl-prof tr.gnd td { color: var(--muted); }
-table.data.awl-prof .awl-sw { margin-right: 6px; vertical-align: -1px; }
+/* kwadrat klasy prędkości zawsze przy lewej krawędzi kolumny Speed, prędkość z prawej jak w innych kolumnach liczb */
+table.data.awl-prof td.spd .awl-sw { float: left; margin-top: 3px; }
 
 /* panel pasów (dawniej METEO › WIND): wiatr przy ziemi nad tabelą, pas w użyciu w kolorze roli */
 .card.awl-rwy { --cy: 6px; --cx: 10px; flex: 1 1 400px; min-width: 380px; max-width: 470px; }
@@ -101,6 +104,8 @@ table.data.awl-rt td.num { font-family: var(--sans); font-variant-numeric: tabul
 
 /* --- ALL: wiersze 10K–SFC, kolumna na lotnisko, komórka w kolorze klasy prędkości --- */
 .awl-bar { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+/* stała szerokość czasu prognozy: przełącznik Show colors nie skacze, gdy prognozy brak ("Forecast for: -") */
+.awl-bar .awl-for { min-width: 200px; }
 .awl-errs:empty { display: none; }
 .awl-allv .awl-errs { margin-bottom: 6px; }
 table.awl-mx { width: 100%; table-layout: fixed; border-collapse: collapse; font: 12px var(--sans); }

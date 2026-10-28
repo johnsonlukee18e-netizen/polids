@@ -71,6 +71,15 @@ console.log(JSON.stringify({
   rwyAtis: a.rwyPanel(aw, { arr: "29", dep: "29", source: "ATIS", letter: "K" }, ""),
   rwyPref: a.rwyPanel(aw, { arr: "11", dep: "29", source: "preferred" }, ""),
   rwyNone: a.rwyPanel(aw, null, ""), rwyLoading: a.rwyPanel(null, null, ""), rwyErr: a.rwyPanel(null, null, "Unknown aerodrome EPXX"),
+  // EPKT 1008 ft (wiersz 1000 ft to ziemia) i lotnisko niżej: miejsce SFC na wykresie i w tabeli
+  ktPlace: (() => { const p = data.aerodromes[0].profile, at = a.placeOf(p); return p.map((r) => [r.alt_ft, at(r)]); })(),
+  wa: (() => { const p = data.aerodromes[1].profile, at = a.placeOf(p); return p.map((r) => [r.alt_ft, at(r)]); })(),
+  ktChart: a.chartModel(data.aerodromes[0].profile).bands.map((b) => [b.ft, b.at, b.kind, b.tip]),
+  ktTable: a.profileTable(data.aerodromes[0].profile),
+  waTable: a.profileTable([row(0, "sfc", "METAR", 310, 14, { gust: 26, min_dir: 280, max_dir: 340, min_speed: 14, max_speed: 14 }),
+    row(1000, "air", "FCST", 294, 15, { min_dir: 290, max_dir: 300, min_speed: 14, max_speed: 16 })]),
+  cols: a.PROF_COLS, tick: a.TICK,
+  stale: [a.stale(0, 1e12), a.stale(1e12 - a.REFRESH, 1e12), a.stale(1e12 - a.REFRESH - 1, 1e12), a.stale(1e12 - 1000, 1e12)],
 }));
 """
 
@@ -164,6 +173,9 @@ def test_chart_model(js):
     assert js["x"] == [c["l"], c["l"] + pw / 2, c["l"] + pw, c["l"] + pw, c["l"]]
     b = {x["ft"]: x for x in m["bands"]}
     assert (b[0]["cls"], b[1000]["cls"], b[2000]["cls"], b[3000]["cls"], b[4000]["cls"]) == ("s10", "none", "s20", "s40", "none")
+    # wiersz 1000 ft to ziemia (GND): SFC na jego miejscu (pas 1K), pas GND pod nim na 0 (wiatr nie "pod ziemią")
+    assert (b[0]["at"], b[1000]["at"], b[2000]["at"]) == (1000, 0, 2000)
+    assert b[0]["cy"] == pytest.approx(c["t"] + ph * 9.5 / 11, abs=0.1) and b[1000]["tip"] == "GND: at or below aerodrome elevation"
     assert b[2000]["rot"] == 90 and b[2000]["x"] == pytest.approx(c["l"] + pw * 20 / 50, abs=0.1)
     assert b[3000]["rot"] == 270 and b[1000]["rot"] is None and b[1000]["x"] is None and b[1000]["kind"] == "gnd"
     # VRB: bez grotu, kółko w miejscu prędkości
@@ -173,6 +185,37 @@ def test_chart_model(js):
     assert b[2000]["y"] == pytest.approx(c["t"] + ph * (10500 - 2500) / 11000, abs=0.1)
     assert [a["label"] for a in m["alts"]] == ["0", "1K", "2K", "3K", "4K", "5K"]
     assert js["big"] == 70 and js["empty"] == 40
+
+
+def test_surface_row_at_aerodrome_elevation(js):
+    """EPKT 1008 ft: wiersz 1000 ft to ziemia. Wiatr przy ziemi (SFC) stoi na wykresie i w tabeli na wysokości lotniska
+    (pas 1K), pod nim GND; przed poprawką pas SFC z grotem był na 0 pod pasem GND, a w tabeli SFC pod "1000 ft GND".
+    Lotnisko niżej (EPWA) bez zmian: SFC na dole. Macierz ALL zostaje wierszami wysokości (domyślny układ)."""
+    assert js["ktPlace"] == [[0, 1000], [1000, 0], [2000, 2000]] and js["wa"] == [[0, 0], [1000, 1000]]
+    assert js["ktChart"] == [[0, 1000, "sfc", "SFC: 300\u00b0/10 kt \u00b7 METAR"], [1000, 0, "gnd", "GND: at or below aerodrome elevation"],
+                             [2000, 2000, "air", "2000 ft: 304\u00b0/22 kt \u00b7 FCST"]]
+    body = js["ktTable"].split("<tbody>")[1]
+    assert body.index("2000 ft</td>") < body.index("SFC</td>") < body.index("1000 ft</td>")
+
+
+def test_profile_table_fixed_columns(js):
+    """Tabela profilu: stałe szerokości kolumn (colgroup + table-layout: fixed), więc kolumny nie przesuwają się między
+    lotniskami z porywem i bez (przegląd: do 19 px); kwadrat klasy prędkości przy lewej krawędzi kolumny Speed, poryw
+    we własnej kolumnie Gust; Max Spd bez porywu (jak w wierszu SFC z prognozy)."""
+    names = [n for n, _ in js["cols"]]
+    assert names == ["Altitude", "Dir", "Speed", "Gust", "Status", "Min Angle", "Max Angle", "Min Spd", "Max Spd"]
+    assert sum(w for _, w in js["cols"]) <= 620   # .awl-main 620 px
+    for html in (js["ktTable"], js["waTable"]):
+        assert html.count("<col ") == 9 and html.count("</th>") == 9
+        rows = html.split("<tbody>")[1].split("</tr>")[:-1]
+        assert rows and all(r.count("<td") == 9 for r in rows)
+        assert all('<td class="num spd"><i class="awl-sw ' in r for r in rows)
+    sfc = next(r for r in js["waTable"].split("<tbody>")[1].split("</tr>") if "SFC</td>" in r)
+    assert "14 kt</td>\n    <td class=\"num\">26 kt</td>" in sfc and " G26" not in sfc
+    assert sfc.rstrip().endswith('<td class="num">14 kt</td><td class="num">14 kt</td>')
+    assert 'title="Previous, current and next hour; SFC from METAR: variable sector"' in js["waTable"]
+    assert re.search(r"table\.data\.awl-prof \{[^}]*table-layout: fixed;", CSS)
+    assert "table.data.awl-prof td.spd .awl-sw { float: left;" in CSS
 
 
 def test_runway_panel(js):
@@ -205,18 +248,35 @@ def test_tab_wiring():
     assert "...AWALON_AD.map((i) => ({ id: i, label: i, render: aeroView(store, i) }))" in mount
     assert mount.index('id: "all"') < mount.index("AWALON_AD.map")
     assert AWALON.count('api("/api/meteo/wind-profile")') == 1 and 'remember("awalon", icao)' in AWALON
-    assert "root.offsetParent !== null" in mount and "!document.hidden" in mount and "ONLINE_EVENT" in mount
+    assert "root.offsetParent === null" in mount and "document.hidden" in mount and "ONLINE_EVENT" in mount
     view = AWALON[AWALON.index("function aeroView("):AWALON.index("export default {")]
     assert "/api/meteo/approach-wind/${icao}" in view and "/api/aerodromes/${icao}/status" in view
-    assert "clearInterval(timer)" in view and "removeEventListener(ONLINE_EVENT, online)" in view and "off()" in view
+    assert "offWake()" in view and "removeEventListener(ONLINE_EVENT, online)" in view and "off()" in view
     assert "Wind Profile Chart for Aerodrome ${icao}" in view and "Forecast for: " in view
     allv = AWALON[AWALON.index("function allView("):AWALON.index("// --- strona lotniska")]
     assert "matrixRows(data)" in allv and 'closest("[data-icao]")' in allv and "open(c.dataset.icao)" in allv
     # przełącznik kolorów jak w PANDORZE, wybór zapamiętany
     assert '<span>Show colors</span>' in AWALON and 'lsGet(COLORS_KEY) !== "0"' in AWALON and '"awalon.colors"' in AWALON
-    # nagłówki tabeli profilu
-    for th in ("Altitude", "Dir", "Speed", "Status", "Min Angle", "Max Angle", "Min Spd", "Max Spd"):
-        assert th + "<" in AWALON or f'mm("{th}")' in AWALON, th
+    # nagłówki tabeli profilu (PROF_COLS)
+    cols = AWALON[AWALON.index("export const PROF_COLS"):AWALON.index("export function profileTable")]
+    for th in ("Altitude", "Dir", "Speed", "Gust", "Status", "Min Angle", "Max Angle", "Min Spd", "Max Spd"):
+        assert f'["{th}", ' in cols, th
+
+
+def test_refresh_when_back_on_screen(js):
+    """Powrót na AWALON (przycisk menu, Wstecz do tej samej podzakładki) nie rysuje podzakładki od nowa, więc dane
+    sprawdza budzenie: zmiana klasy widoku, powrót do karty przeglądarki i zegar co 30 s; nowe dane tylko starsze
+    niż 10 min (przegląd: po 35 min w tle stare dane do 10 min po powrocie). Panel pasów ma ten sam zegar."""
+    assert js["tick"] == 30000 and js["refresh"] == 600000
+    assert js["stale"] == [True, False, True, False]
+    mount = AWALON[AWALON.index("export default {"):]
+    assert "setInterval(wake, TICK);" in mount and 'document.addEventListener("visibilitychange", wake);' in mount
+    assert 'new MutationObserver(wake).observe(root, { attributes: true, attributeFilter: ["class"] });' in mount
+    assert "fresh: () => { if ((!data && !loading) || (!loading && stale(at))) load(); }," in mount
+    assert "wakers.forEach((f) => f());" in mount and "REFRESH);" not in mount
+    view = AWALON[AWALON.index("function aeroView("):AWALON.index("export default {")]
+    assert "const offWake = store.onWake(() => stale(awAt) && loadRwy());" in view and "setInterval(" not in view
+    assert "awAt = Date.now();" in view and "if (busy) return;" in view
 
 
 def test_english_without_provenance_and_bold():
@@ -225,9 +285,10 @@ def test_english_without_provenance_and_bold():
     for name, src in (("awalon.js", AWALON), ("wind.js", WIND)):
         code = _code(src)
         assert not [line for line in code.splitlines() if POLISH.search(line)], name
-        # polskie litery tylko w samodzielnych liniach komentarza
+        # żadne znaki spoza ASCII (polskie litery, °, ≈, –, ·, …) poza samodzielnymi liniami komentarza: w kodzie
+        # i napisach escape \u00b0 itp. (przegląd: CL 3°, 3° path ≈, Loading…, · w dymkach)
         for line in src.splitlines():
-            if POLISH.search(line):
+            if re.search(r"[^\x00-\x7f]", line):
                 assert line.strip().startswith("//"), (name, line)
         low = re.sub(r"https://[^\s\"`]*", "", code).lower()
         for word in ("open-meteo", "ecmwf", "vatsim", "viff", "windy", "model", "based on", "source:", "interpolated",
