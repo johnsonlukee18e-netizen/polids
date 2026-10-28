@@ -300,7 +300,6 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
 def tv_restrictions(volumes, now: datetime) -> list[dict]:
     """Regulacje vIFF na sektorach (traffic volumes) EP: ograniczenia wejść/zajętości z godzinami obowiązywania."""
     out = []
-    hhmm = now.strftime("%H%M")
     for tv in volumes if isinstance(volumes, list) else []:
         if not isinstance(tv, dict) or not tv.get("id"):
             continue
@@ -308,10 +307,9 @@ def tv_restrictions(volumes, now: datetime) -> list[dict]:
             if not isinstance(r, dict):
                 continue
             start, end = str(r.get("start") or ""), str(r.get("end") or "")
-            active = bool(start and end and (start <= hhmm <= end if start <= end else not end < hhmm < start))
             out.append({"tv": tv["id"], "label": viff_service.tv_label(tv["id"]), "type": r.get("type"),
                         "value": r.get("value"), "start": start, "end": end, "reason": r.get("reason") or "",
-                        "active": active})
+                        "active": viff_service.restriction_active(r, now)})
     out.sort(key=lambda r: (not r["active"], r["tv"], r["start"]))
     return out
 
