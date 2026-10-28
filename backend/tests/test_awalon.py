@@ -9,12 +9,14 @@ from datetime import datetime, timezone
 os.environ.setdefault("POLIDS_DATABASE_URL",
                       "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
 
+import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app import main  # noqa: E402
 from backend.app.routers import meteo  # noqa: E402
 from backend.app.services import awalon  # noqa: E402
+from backend.app.services import http_cache  # noqa: E402
 from backend.app.services import overview  # noqa: E402
 from backend.app.services import upperwind as uw  # noqa: E402
 from backend.app.services.eaip import AD2_AERODROMES  # noqa: E402
@@ -102,6 +104,53 @@ def test_cache_does_not_cross_midnight():
     """Odpowiedź obejmuje tylko swoją dobę UTC: tuż po północy kopia sprzed północy jest nieaktualna."""
     at = lambda h, m, s=0: datetime(2026, 10, 28, h, m, s, tzinfo=timezone.utc)  # noqa: E731
     assert [uw.profile_ttl(at(*t)) for t in ((16, 25), (0, 30), (0, 10), (0, 0, 0), (23, 59))] == [1800, 1800, 600, 1, 1800]
+    # panel pasów (approach-wind, 10 min) też nie przechodzi przez północ: o 00:05 kopia z 23:58 jest już nieaktualna
+    assert [uw.day_ttl(uw.CACHE_SECONDS, at(*t)) for t in ((16, 25), (0, 5), (0, 10, 1), (0, 0, 0))] == [600, 300, 600, 1]
+
+
+def test_outdated_cached_copy_after_midnight(client, fake, monkeypatch, caplog):
+    """Serwer prognoz nie odpowiada od wczoraj: fetch_text oddaje kopię z cache, która (forecast_days=1) ma tylko
+    poprzednią dobę UTC. Bez sprawdzenia doby bieżącą godziną byłaby wczorajsza 23:00 bez żadnego błędu."""
+    monkeypatch.setattr(awalon, "_now", lambda: datetime(2026, 10, 29, 9, 0, tzinfo=timezone.utc))
+    d = client.get("/api/meteo/wind-profile").json()
+    assert d["model_error"] == "Wind forecast unavailable: outdated" and d["valid"] is None
+    assert all(a["model_surface"] is None for a in d["aerodromes"])
+    wa = rows(next(a for a in d["aerodromes"] if a["icao"] == "EPWA"))
+    assert wa[0]["status"] == "METAR" and wa[3000]["status"] == "N/A" and wa[3000]["speed"] is None
+    assert any("kopia z cache z doby 2026-10-28" in m.getMessage() for m in caplog.records if m.name == "polids.meteo")
+    assert uw.outdated("2026-10-28T23:00Z", datetime(2026, 10, 29, 0, 5, tzinfo=timezone.utc))
+    assert not uw.outdated("2026-10-29T00:00", datetime(2026, 10, 29, 0, 5, tzinfo=timezone.utc))
+    assert not uw.outdated(None, NOW)
+
+
+def test_unreadable_reply_not_kept_in_cache(monkeypatch):
+    """Odpowiedź 200, z której nic nie wynika (zły JSON, obiekt błędu, za mało punktów), nie zostaje w cache na 30 min:
+    następne zapytanie pyta serwer od nowa i ma dane; dobra odpowiedź zostaje w cache jak dotąd."""
+    replies = ["<html>maintenance</html>", json.dumps({"error": True, "reason": "busy"}),
+               json.dumps([item(52.0, 21.0)]), None]
+    calls = []
+    real = httpx.AsyncClient
+
+    def handler(request):
+        calls.append(request.url.path)
+        body = replies[min(len(calls) - 1, len(replies) - 1)]
+        if body is None:
+            q = request.url.params
+            body = json.dumps([item(float(a), float(b)) for a, b in zip(q["latitude"].split(","), q["longitude"].split(","))])
+        return httpx.Response(200, text=body, request=request)
+
+    monkeypatch.setattr(http_cache.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    http_cache.clear_cache()
+    pts = [(52.0, 21.0), (50.0, 19.8)]
+    try:
+        for reason in ("unreadable response", "busy", "1 points in the response instead of 2"):
+            with pytest.raises(UpstreamError, match=reason):
+                asyncio.run(uw.model_profiles(pts, NOW))
+        good = asyncio.run(uw.model_profiles(pts, NOW))
+        again = asyncio.run(uw.model_profiles(pts, NOW))
+    finally:
+        http_cache.clear_cache()
+    assert len(good) == 2 and good == again and len(calls) == 4
 
 
 def test_shape(client, fake):
@@ -160,6 +209,16 @@ def test_levels_below_ground_dropped():
     k = (304.8 - (792 * 0.3048 + 10)) / (320 - (792 * 0.3048 + 10))
     assert r[1000]["dir"] == 300 and r[1000]["speed"] == pytest.approx(10 + 10 * k, abs=1)
     assert r[1000]["levels_hpa"] == [975] and r[1000]["samples"] == 1
+    # dolny punkt interpolacji to wiatr 10 m bez zaokrąglenia (anchor), nie wartość do pokazania: 1000 ft tuż nad
+    # wiatrem 10 m (k = 0,02), z 12,45 kt wychodzi 12,80 -> 13 kt, z zaokrąglonych 12 kt byłoby 12,36 -> 12 kt
+    hours = [{"time": "2026-10-28T16:00", "surface": {"dir": 300, "speed": 12, "gust": None},
+              "anchor": {"dir": 300, "speed": 12.45}, "levels": [(975, 2921, 30, 300)]}]
+    r = {x["alt_ft"]: x for x in awalon.profile(hours, 0, 792, None)}
+    k = (304.8 - (792 * 0.3048 + 10)) / (2921 - (792 * 0.3048 + 10))
+    assert round(12 + 18 * k) == 12 and round(12.45 + 17.55 * k) == 13
+    assert (r[0]["status"], r[0]["speed"]) == ("FCST", 12) and r[1000]["speed"] == 13 and r[1000]["dir"] == 300
+    one = uw.parse_profiles(json.dumps(item(52.0, 21.0, sfc=(300, 12.4, 22))))[0][16]
+    assert one["surface"] == {"dir": 300, "speed": 12, "gust": 22} and one["anchor"] == {"dir": 300, "speed": 12.4}
 
 
 def test_surface_metar_or_forecast(client, fake):
@@ -169,7 +228,9 @@ def test_surface_metar_or_forecast(client, fake):
     # METAR z porywem i sektorem zmienności
     assert wa["kind"] == "sfc" and wa["status"] == "METAR"
     assert (wa["dir"], wa["speed"], wa["gust"], wa["variable"]) == (310, 14, 26, False)
-    assert (wa["min_dir"], wa["max_dir"], wa["min_speed"], wa["max_speed"], wa["samples"]) == (280, 340, 14, 26, 1)
+    # 0.13.0 (przegląd): Max Spd to średni wiatr jak w wierszu SFC z prognozy i w wierszach wyżej; poryw ma swoją
+    # kolumnę (wcześniej max_speed = poryw 26 tylko dla METAR-u, a dla prognozy 10 m bez porywu)
+    assert (wa["min_dir"], wa["max_dir"], wa["min_speed"], wa["max_speed"], wa["samples"]) == (280, 340, 14, 14, 1)
     assert by["EPWA"]["metar_wind"]["time"] == "281620Z"
     kt = rows(by["EPKT"])[0]
     assert (kt["status"], kt["dir"], kt["speed"], kt["gust"], kt["min_dir"], kt["max_dir"]) == ("METAR", 250, 8, None, 250, 250)

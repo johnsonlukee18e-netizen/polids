@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Aerodrome, NavPoint
-from .http_cache import UpstreamError, describe, fetch_text
+from .http_cache import UpstreamError, describe, fetch_text, forget
 from .procedures import procedures
 from .runways import equipment_for, runway_heading
 
@@ -269,14 +269,18 @@ def parse_forecast(text: str, now: datetime | None = None) -> list[dict]:
 
 def parse_profiles(text: str) -> list[list[dict]]:
     """Odpowiedź Open-Meteo z poziomami PROFILE_LEVELS -> dla każdego punktu (w kolejności zapytania) lista godzin
-    doby [{time: "2026-10-28T12:00", surface: {...} | None, levels: [(hPa, m, kt, °), ...]}]."""
+    doby [{time: "2026-10-28T12:00", surface: {...} | None, anchor: {dir, speed} | None, levels: [(hPa, m, kt, °), ...]}].
+    anchor: wiatr 10 m bez zaokrąglenia (dolny punkt interpolacji profilu, jak poziomy ciśnienia), surface: do pokazania."""
     out = []
     for item in _items(text):
         hr = item.get("hourly") or {}
+        n = len(hr.get("time") or [])
+        speeds, dirs = hr.get("wind_speed_10m") or [None] * n, hr.get("wind_direction_10m") or [None] * n
         hours = []
         for i, t in enumerate(hr.get("time") or []):
             sfc, levels = hour_wind(hr, i, PROFILE_LEVELS)
-            hours.append({"time": t, "surface": sfc, "levels": levels})
+            anchor = {"dir": dirs[i], "speed": speeds[i]} if sfc else None
+            hours.append({"time": t, "surface": sfc, "anchor": anchor, "levels": levels})
         out.append(hours)
     return out
 
@@ -308,27 +312,55 @@ async def _fetch(points: list[tuple[float, float]], levels: tuple, ttl: int, par
         text = await fetch_text(OPEN_METEO_URL, ttl, _params(points, levels))
     except UpstreamError as exc:
         raise UpstreamError(upstream_reason(exc)) from exc
+    # odpowiedź 200, z której nic nie wynika (zły JSON, obiekt błędu, inna liczba punktów), nie zostaje w cache na
+    # cały ttl (AWALON 30 min z komunikatem błędu): następne zapytanie pyta serwer od nowa
     try:
         res = parse(text)
+    except UpstreamError:
+        forget(OPEN_METEO_URL, _params(points, levels))
+        raise
     except (ValueError, KeyError, TypeError, IndexError) as exc:
+        forget(OPEN_METEO_URL, _params(points, levels))
         raise UpstreamError(f"unreadable response ({exc})") from exc
     if len(res) != len(points):
+        forget(OPEN_METEO_URL, _params(points, levels))
         raise UpstreamError(f"{len(res)} points in the response instead of {len(points)}")
     return res
 
 
-async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
-    """Wiatr z modelu dla punktów [(lat, lon)] jednym zapytaniem (cache 10 min)."""
-    if not points:
-        return []
-    return await _fetch(points, LEVELS, CACHE_SECONDS, parse_forecast)
+def utc_now() -> datetime:
+    """Bieżący czas UTC (jedno miejsce do podmiany w testach endpointu approach-wind)."""
+    return datetime.now(timezone.utc)
+
+
+def day_ttl(cap: int, now: datetime | None = None) -> int:
+    """Ważność odpowiedzi w cache: cap sekund, ale nie dłużej niż od północy UTC (odpowiedź z forecast_days=1 obejmuje
+    tylko swoją dobę, więc kopia sprzed północy jest od razu nieaktualna)."""
+    now = now or utc_now()
+    return max(1, min(cap, now.hour * 3600 + now.minute * 60 + now.second))
 
 
 def profile_ttl(now: datetime | None = None) -> int:
-    """Ważność odpowiedzi AWALON w cache: PROFILE_CACHE_SECONDS, ale nie dłużej niż od północy UTC (odpowiedź
-    z forecast_days=1 obejmuje tylko swoją dobę, więc kopia sprzed północy jest od razu nieaktualna)."""
-    now = now or datetime.now(timezone.utc)
-    return max(1, min(PROFILE_CACHE_SECONDS, now.hour * 3600 + now.minute * 60 + now.second))
+    """Ważność odpowiedzi AWALON w cache: PROFILE_CACHE_SECONDS, bez przechodzenia przez północ UTC."""
+    return day_ttl(PROFILE_CACHE_SECONDS, now)
+
+
+def outdated(time: str | None, now: datetime | None = None) -> bool:
+    """Godzina prognozy z innej doby UTC niż teraz: przy awarii serwera fetch_text oddaje starszą kopię z cache, a ta
+    (forecast_days=1) po północy ma tylko poprzednią dobę, więc bieżąca godzina byłaby wczorajszą 23:00."""
+    now = now or utc_now()
+    return bool(time) and time[:10] != now.strftime("%Y-%m-%d")
+
+
+OUTDATED = "outdated"
+
+
+async def model_winds(points: list[tuple[float, float]], now: datetime | None = None) -> list[dict]:
+    """Wiatr z modelu dla punktów [(lat, lon)] jednym zapytaniem (cache 10 min, bez przechodzenia przez północ UTC)."""
+    if not points:
+        return []
+    now = now or utc_now()
+    return await _fetch(points, LEVELS, day_ttl(CACHE_SECONDS, now), lambda text: parse_forecast(text, now))
 
 
 async def model_profiles(points: list[tuple[float, float]], now: datetime | None = None) -> list[list[dict]]:

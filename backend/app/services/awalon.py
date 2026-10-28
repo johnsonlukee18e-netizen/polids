@@ -7,7 +7,8 @@ liniowo w wysokości po składowych u/v (upperwind.interpolate_wind), od dołu z
 interpolacją, a wiersze na wysokości lotniska i niżej (EPKT 1008 ft: wiersz 1000 ft) to wiersze ziemi bez danych.
 
 Min/max kierunku i prędkości z godziny poprzedniej, bieżącej i następnej (ta sama odpowiedź obejmuje całą dobę UTC),
-dla METAR-u sektor zmienności i poryw. Jedno zapytanie o prognozę i jedno o METAR-y dla wszystkich lotnisk; przy
+dla METAR-u sektor zmienności (poryw osobno, nie w max prędkości). Kopia prognozy z innej doby UTC (serwer nie
+odpowiada od północy, cache oddaje starszą odpowiedź) to błąd prognozy, nie wczorajsza 23:00 jako bieżąca godzina. Jedno zapytanie o prognozę i jedno o METAR-y dla wszystkich lotnisk; przy
 awarii jednego z nich reszta zostaje, a krótki powód idzie do odpowiedzi (pełny z adresem tylko do logu)."""
 
 import logging
@@ -78,15 +79,17 @@ def metar_wind(raw: str | None) -> dict | None:
 
 
 def surface_row(mw: dict | None, sfc_win: list[dict | None], cur: dict | None) -> dict:
-    """Wiersz 0 ft: METAR z porywem i sektorem zmienności, bez wiatru w METAR-ze prognoza 10 m (min/max ±1 h)."""
+    """Wiersz 0 ft: METAR z porywem i sektorem zmienności (min/max kierunku), bez wiatru w METAR-ze prognoza 10 m
+    (min/max ±1 h). Min/max prędkości bez porywu w obu przypadkach."""
     if mw and mw.get("speed") is not None:
         d, spd, gust = mw["dir"], mw["speed"], mw["gust"]
         if mw.get("var_from") is not None and mw.get("var_to") is not None:
             lo, hi = mw["var_from"] or 360, mw["var_to"] or 360
         else:
             lo = hi = d or None
+        # Min/Max Spd to zawsze średni wiatr (jak w wierszach prognozy i w wierszu SFC z prognozy), poryw ma swoją kolumnę
         return _row(0, "sfc", "METAR", dir=d, speed=spd, gust=gust, variable=bool(mw.get("variable")), min_dir=lo,
-                    max_dir=hi, min_speed=spd, max_speed=max(spd, gust or spd), samples=1)
+                    max_dir=hi, min_speed=spd, max_speed=spd, samples=1)
     if cur:
         return _row(0, "sfc", "FCST", dir=cur["dir"], speed=cur["speed"], gust=cur.get("gust"),
                     **spread(sfc_win, cur))
@@ -99,7 +102,8 @@ def profile(hours: list[dict] | None, i: int, elev_ft: float | None, mw: dict | 
     win = [hours[j] for j in js]
     ci = js.index(i) if i in js else None   # bieżąca godzina w oknie (o 00Z pierwsza)
     cur_sfc = win[ci]["surface"] if ci is not None else None
-    lvs = [usable_levels(h["levels"], h["surface"], elev_ft) for h in win]
+    # dolny punkt interpolacji: wiatr 10 m bez zaokrąglenia (anchor), bez niego (testy, starsze dane) ten do pokazania
+    lvs = [usable_levels(h["levels"], h.get("anchor") or h["surface"], elev_ft) for h in win]
     rows = [surface_row(mw, [h["surface"] for h in win], cur_sfc)]
     for alt in ALTS_FT[1:]:
         if alt <= (elev_ft or 0):
@@ -135,6 +139,11 @@ async def wind_profile(db: Session, get_metars, now: datetime | None = None) -> 
         # w exc krótki powód (upperwind._fetch), pełny komunikat z adresem w exc.__cause__
         log.warning("AWALON, prognoza: %s", f"{exc} ({exc.__cause__})" if exc.__cause__ else exc)
         model_error = f"Wind forecast unavailable: {describe(exc)}"
+    first = model[0] if model else None
+    if first and upperwind.outdated(first[upperwind.hour_index([h["time"] for h in first], now)]["time"], now):
+        # serwer nie odpowiada od poprzedniej doby UTC: kopia z cache to wczorajsze godziny, nie bieżąca prognoza
+        log.warning("AWALON, prognoza: kopia z cache z doby %s", first[0]["time"][:10])
+        model, model_error = None, f"Wind forecast unavailable: {upperwind.OUTDATED}"
     valid, out = None, []
     for k, a in enumerate(ads):
         hours = model[k] if model else None

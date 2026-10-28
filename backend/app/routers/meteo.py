@@ -1,6 +1,5 @@
 import logging
 import re
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -94,12 +93,17 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
     metar_wind = {"dir": p.wind_dir, "speed": p.wind_speed, "gust": p.wind_gust, "variable": p.wind_variable,
                   "var_from": p.wind_var_from, "var_to": p.wind_var_to, "time": p.time} if p else None
     model, model_error = None, None
+    now = upperwind.utc_now()
     try:
-        model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]])
+        model = await upperwind.model_winds([(ad["lat"], ad["lon"])] + [(r["lat"], r["lon"]) for r in ad["runways"]], now)
     except UpstreamError as exc:
         # w exc krótki powód (upperwind.model_winds), pełny komunikat z adresem w exc.__cause__
         log.warning("WIND %s, prognoza: %s", ad["icao"], f"{exc} ({exc.__cause__})" if exc.__cause__ else exc)
         model_error = f"Wind forecast unavailable: {describe(exc)}"
+    if model and upperwind.outdated(model[0]["valid"], now):
+        # jak w AWALON: kopia z cache z poprzedniej doby UTC (serwer nie odpowiada od północy) to nie bieżąca prognoza
+        log.warning("WIND %s, prognoza: kopia z cache z %s", ad["icao"], model[0]["valid"])
+        model, model_error = None, f"Wind forecast unavailable: {upperwind.OUTDATED}"
     surface_model = model[0]["surface"] if model else None
     runways = []
     for i, r in enumerate(ad["runways"]):
@@ -111,7 +115,7 @@ async def approach_wind(icao: str, db: Session = Depends(get_db)):
             "elevation_ft": ad["elevation_ft"], "alt_ft": upperwind.ALT_FT,
             "source": "Open-Meteo", "source_url": "https://open-meteo.com", "model": "best_match",
             "valid": model[0]["valid"] if model else None,
-            "fetched": datetime.now(timezone.utc).strftime("%H:%MZ"),
+            "fetched": now.strftime("%H:%MZ"),
             "metar": metar, "metar_wind": metar_wind, "model_surface": surface_model, "runways": runways,
             "metar_error": metar_error, "model_error": model_error}
 
