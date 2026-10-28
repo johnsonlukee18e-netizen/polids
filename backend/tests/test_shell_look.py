@@ -236,13 +236,8 @@ def test_base_rule_normal_weight():
     assert "b, strong, th, h1, h2, h3, h4, h5, h6 { font-weight: normal; }" in STYLE
 
 
-# arkusze, które przechodzą na zwykłą grubość w swoich obszarach rundy 16 (RADIO, AWALON, OTHER); integrator usuwa ten
-# zbiór po scaleniu, a test sprawdza wtedy wszystkie arkusze
-BOLD_PENDING = {"radio.css", "wind.css", "squawk.css"}
-# arkusze tej gałęzi; nowe arkusze innych obszarów sprawdzi test dopiero bez tego filtra (integrator usuwa też ten zbiór)
-SHELL_BRANCH_CSS = {"aerolist.css", "aircraft.css", "awos.css", "conversion.css", "coordination.css", "dman.css", "home.css",
-                    "map.css", "meteoimg.css", "overview.css", "qnh.css", "radio.css", "squawk.css", "style.css", "sytop.css",
-                    "viff.css", "wind.css"}
+# radio.css przechodzi na zwykłą grubość w obszarze RADIO rundy 16 (zbiór znika po scaleniu)
+BOLD_PENDING = {"radio.css"}
 BOLD = re.compile(r"font-weight:\s*(?:[6-9]00|bold|bolder)\b|font:[^;}]*?(?<![\w.-])(?:[6-9]00|bold|bolder)\s")
 
 
@@ -250,7 +245,7 @@ def test_no_bold_in_css():
     """0.13.0 (issue #23): napisy zwykłej grubości jak w PANDORZE; wyróżnienie kolorem, nie pogrubieniem."""
     checked = []
     for path in sorted((FRONTEND / "css").glob("*.css")):
-        if path.name in BOLD_PENDING or path.name not in SHELL_BRANCH_CSS:
+        if path.name in BOLD_PENDING:
             continue
         bad = [m.group(0) for m in BOLD.finditer(_nocomments(path.read_text("utf-8")))]
         assert not bad, (path.name, bad)
