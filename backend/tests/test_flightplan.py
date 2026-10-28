@@ -403,3 +403,17 @@ def test_sectors_restricted_flag(monkeypatch):
     assert by_id["EP-BH"]["restricted"] is True and by_id["EP-WATMA"]["restricted"] is False
     assert by_id["EP-KKTMA"]["restricted"] is False
     assert by_id["EP-BH"]["restrictions"] == tvs[0]["restrictions"]                 # surowa lista zostaje
+    # wartości regulacji obowiązujących teraz (FMP liczy z nich przepustowość); WATMA: regulacja dopiero o 18
+    assert by_id["EP-BH"]["regulated"] == {"entries": 20, "occupancy": None}
+    assert by_id["EP-WATMA"]["regulated"] == by_id["EP-KKTMA"]["regulated"] == {"entries": None, "occupancy": None}
+
+
+def test_regulated_caps():
+    rs = [{"type": "ENR-ENTRIES", "value": 30, "start": "1500", "end": "1700"},
+          {"type": "ENR-ENTRIES", "value": "24", "start": "1400", "end": "1600"},
+          {"type": "ENR-OCCUPANCY", "value": 12, "start": "1500", "end": "1600"},
+          {"type": "ENR-OCCUPANCY", "value": 5, "start": "1800", "end": "1900"},      # jeszcze nie obowiązuje
+          {"type": "ENR-ENTRIES", "value": 0, "start": "1500", "end": "1600"},        # bez sensownej wartości
+          {"type": "AD-DEP", "value": 3, "start": "1500", "end": "1600"}, "x", None]
+    assert viff.regulated_caps(rs, NOW) == {"entries": 24, "occupancy": 12}
+    assert viff.regulated_caps("?", NOW) == viff.regulated_caps([], NOW) == {"entries": None, "occupancy": None}

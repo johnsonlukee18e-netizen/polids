@@ -44,7 +44,8 @@ export async function api(path, options = {}) {
   if (!res.ok) {
     const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
       : `PolIDS server error (HTTP ${res.status})`;
-    throw new Error(msg);
+    // status: np. 404 przy odświeżeniu to odpowiedź ("nie ma"), nie awaria (FLIGHT PLAN)
+    throw Object.assign(new Error(msg), { status: res.status });
   }
   return body;
 }

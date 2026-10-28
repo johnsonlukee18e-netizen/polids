@@ -31,3 +31,5 @@ table.fmp-table td.fmp-num { cursor: help; }
 /* obciążenie: żółte od 90 % przepustowości, czerwone powyżej; regulacja teraz: id sektora czerwone */
 table.fmp-table td.fmp-num.near { color: var(--yellow); }
 table.fmp-table td.fmp-num.over, table.fmp-table td.fmp-sec.reg { color: #ff5a4a; }
+/* przepustowość z regulacji obowiązującej teraz (w nawiasie): czerwona jak id regulowanego sektora */
+table.fmp-table .fmp-regcap { color: #ff5a4a; }

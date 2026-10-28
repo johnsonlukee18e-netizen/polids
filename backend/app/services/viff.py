@@ -210,6 +210,24 @@ def restriction_active(r, now: datetime) -> bool:
     return bool(start and end and (start <= t <= end if start <= end else not end < t < start))
 
 
+# rodzaj regulacji vIFF → pole "regulated" sektora: wejścia na godzinę albo samoloty w sektorze naraz
+_REG_KIND = {"ENR-ENTRIES": "entries", "ENR-OCCUPANCY": "occupancy"}
+
+
+def regulated_caps(restrictions, now: datetime) -> dict:
+    """Przepustowość z regulacji obowiązujących teraz: {"entries": n | None, "occupancy": n | None}; kilka
+    regulacji tego samego rodzaju = najniższa wartość. FMP liczy z niej obciążenie zamiast z deklarowanej."""
+    out = {"entries": None, "occupancy": None}
+    for r in restrictions if isinstance(restrictions, list) else []:
+        kind = _REG_KIND.get(str(r.get("type") or "").upper()) if isinstance(r, dict) else None
+        value = r.get("value") if kind else None
+        if isinstance(value, str) and value.strip().isdigit():
+            value = int(value)
+        if kind and isinstance(value, int) and not isinstance(value, bool) and value > 0 and restriction_active(r, now):
+            out[kind] = value if out[kind] is None else min(out[kind], value)
+    return out
+
+
 def sector_load(tv: str, buckets: list[dict], now: datetime, horizon: int = 60) -> dict:
     """Ruch w sektorze od teraz do +horizon minut: wejścia w oknach 20-minutowych, zajętość minuta po minucie
     i godzinowe liczniki vIFF (bieżąca i następna godzina) z przepustowością.
@@ -319,9 +337,10 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
         item.update({"volumes": [v for v in (d.get("volumes") or "").split(",") if v], "status": d.get("status"),
                      "entries_cap": _cap(d.get("entries")), "occupancy_cap": _cap(d.get("occupancy")),
                      "restrictions": d.get("restrictions") or []})
-        # regulacja obowiązująca teraz (FMP, RADIO: sektor na czerwono)
+        # regulacja obowiązująca teraz (FMP, RADIO: sektor na czerwono) i jej wartości (FMP: przepustowość)
         rs = item["restrictions"]
         item["restricted"] = isinstance(rs, list) and any(restriction_active(r, now) for r in rs)
+        item["regulated"] = regulated_caps(rs, now)
         if item["entries_cap"] is None and item["hours"]:
             item["entries_cap"] = item["hours"][0]["entries_cap"]
         if item["occupancy_cap"] is None and item["hours"]:

@@ -1,7 +1,7 @@
 import { h, navigate, remember, subtabs } from "../api.js";
 import { mountChecklists } from "../checklist.js";
 import { isCoordFile, mountDocs } from "../docs.js";
-import { mountFlightPlan } from "../flightplan.js";
+import { cleanCallsign, mountFlightPlan } from "../flightplan.js";
 import { mountFmp } from "../fmp.js";
 import { mountPhraseology } from "../phraseology.js";
 import { mountRegcause } from "../regcause.js";
@@ -45,10 +45,11 @@ export default {
       // ponowne kliknięcie DOCS wczytuje listę od nowa, z tym samym dokumentem
       { id: "docs", label: "DOCS", arg: () => file, set: (f) => { file = f; }, update: (docs) => docs.pick(file),
         render: (pane) => mountDocs(pane, ctx, { start: file, onPick: (f) => { file = f; remember("other", argOf()); } }) },
-      // każde wyszukanie znaku to krok do cofnięcia (onLookup)
-      { id: "flight-plan", label: "FLIGHT PLAN", arg: () => fpCs, set: (cs) => { fpCs = cs.toUpperCase(); },
-        update: (fp) => fp.activate(fpCs), resume: (fp) => fp.focus(),
-        render: (pane) => mountFlightPlan(pane, { start: fpCs, onLookup: (cs) => { fpCs = String(cs).toUpperCase(); remember("other", argOf()); } }) },
+      // każde wyszukanie znaku to krok do cofnięcia (onLookup); znak z adresu oczyszczony jak w polu ("lot-3827" →
+      // LOT3827, adres też); przycisk menu: plan starszy niż 30 s od razu odświeżony (activate bez arg)
+      { id: "flight-plan", label: "FLIGHT PLAN", arg: () => fpCs, set: (cs) => { fpCs = cleanCallsign(cs); },
+        update: (fp) => fp.activate(fpCs), resume: (fp) => fp.activate(),
+        render: (pane) => mountFlightPlan(pane, { start: fpCs, onLookup: (cs) => { fpCs = cleanCallsign(cs); remember("other", argOf()); } }) },
       { id: "fmp", label: "FMP", update: (fmp) => fmp.activate(), resume: (fmp) => fmp.activate(), render: (pane) => mountFmp(pane) },
       { id: "holding", label: "HOLDING" },
       { id: "ia", label: "IA" },

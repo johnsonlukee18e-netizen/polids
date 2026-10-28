@@ -152,48 +152,67 @@ export function chartHtml(tv, now, pilot = () => null, sel = null) {
 // --- OTHER › FMP (0.13.0): tabela SECTOR | CAPACITY | OCCUPANCY, wiersz na traffic volume (dane z /api/viff/sectors)
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-// "18 (45)": liczba i przepustowość jak w FMP PANDORY; brak liczby albo limitu = "–", brak obu = samo "–"
-export const pairText = (n, cap) => (n === null && cap === null ? "–" : `${n ?? "–"} (${cap ?? "–"})`);
+const DASH = "\u2013", DOT = " \u00b7 ";
+// "18 (45)": liczba i przepustowość jak w FMP PANDORY; brak liczby albo limitu = "-", brak obu = samo "-"
+export const pairText = (n, cap) => (n === null && cap === null ? DASH : `${n ?? DASH} (${cap ?? DASH})`);
 const RESTR_KIND = { "ENR-ENTRIES": "entries", "ENR-OCCUPANCY": "occupancy" };
+// przepustowość, z której liczymy obciążenie: niższa z deklarowanej i z regulacji obowiązującej teraz
+export const capOf = (declared, reg) => (reg === null ? declared : declared === null ? reg : Math.min(declared, reg));
+// regulacja wyznacza przepustowość (nie wyższa od deklarowanej)
+const regBinds = (declared, reg) => reg !== null && (declared === null || reg <= declared);
+const capTip = (declared, reg) => (reg === null ? (declared === null ? "no limit" : `capacity ${declared}`)
+  : `regulated ${reg}, declared ${declared === null ? "no limit" : declared}`);
 
 // Sektor teraz: wejścia w bieżącej godzinie (koszyk o tej godzinie, nie hours[0], które bywa następną godziną),
-// przepustowość wejść tej godziny (albo z definicji TV), zajętość w tej minucie (occupancy[0]) i jej przepustowość.
-// now = "HHMM" z odpowiedzi; to samo przyda się RADIO (sektor na czerwono przy dużej zajętości).
+// przepustowość wejść tej godziny (albo z definicji TV), zajętość w tej minucie (occupancy[0]) i jej przepustowość;
+// *Reg = wartość regulacji obowiązującej teraz (backend: regulated). now = "HHMM" z odpowiedzi; to samo przyda się
+// RADIO (sektor na czerwono przy dużej zajętości).
 export function tvNow(tv, now) {
   const cur = (tv.hours || []).find((x) => x.hour === String(now || "").slice(0, 2)) || null;
   return {
-    entries: num(cur?.entries), entriesCap: num(cur?.entries_cap) ?? num(tv.entries_cap),
+    entries: num(cur?.entries), entriesCap: num(cur?.entries_cap) ?? num(tv.entries_cap), entriesReg: num(tv.regulated?.entries),
     occupancy: num(Array.isArray(tv.occupancy) ? tv.occupancy[0] : null), occupancyCap: num(tv.occupancy_cap),
-    peak: num(tv.peak_60),
+    occupancyReg: num(tv.regulated?.occupancy), peak: num(tv.peak_60),
   };
 }
 
-// opis regulacji z definicji TV do dymka: "entries 20 1500–1600"
-const restrText = (r) => [RESTR_KIND[r?.type] || String(r?.type || "").toLowerCase(), r?.value, r?.start && r?.end ? `${r.start}–${r.end}` : ""]
+// opis regulacji z definicji TV do dymka: "entries 20 1500-1600"
+const restrText = (r) => [RESTR_KIND[r?.type] || String(r?.type || "").toLowerCase(), r?.value, r?.start && r?.end ? `${r.start}${DASH}${r.end}` : ""]
   .filter((x) => x !== null && x !== undefined && x !== "").join(" ");
 
-// wiersze FMP: aktywne na początku, potem po id; liczby, napisy komórek, dymki i klasy obciążenia (loadClass)
+// kolejność FMP jak w PANDORZE: sektory EPWW po literze (pasma L, M, H), potem kombinacje sektorów, TMA i części FIR
+const BAND_ORDER = { L: 0, M: 1, H: 2 };
+const groupRank = (code) => (/^[A-Z][LMH]$/.test(code) ? 0 : /^[A-Z]{2}TMAD?$/.test(code) ? 2 : /^(ALLFIR|NFIR|SFIR)/.test(code) ? 3 : 1);
+const sortKey = (code) => (/^[A-Z][LMH]$/.test(code) ? code[0] + BAND_ORDER[code[1]] : code);
+const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// wiersze FMP: aktywne na początku, potem grupy (groupRank); liczby, napisy komórek, dymki i klasy obciążenia
+// (loadClass z przepustowości po regulacji)
 export function fmpRows(data) {
   const prefix = (data?.prefix || "EP") + "-";
   const rows = (data?.sectors || []).filter((tv) => tv && tv.id).map((tv) => {
     const n = tvNow(tv, data.now);
     const active = !!(tv.active ?? tv.status === 1);
     const restr = Array.isArray(tv.restrictions) ? tv.restrictions.map(restrText).filter(Boolean) : [];
+    const entriesMax = capOf(n.entriesCap, n.entriesReg), occupancyMax = capOf(n.occupancyCap, n.occupancyReg);
     const sectorTip = [`${tv.id}: ${tvLabel(tv.id)}`, active ? "active" : "inactive",
-      tv.restricted ? "regulated now" : "", restr.length ? `regulations: ${restr.join(", ")}` : ""].filter(Boolean).join(" · ");
+      tv.restricted ? "regulated now" : "", restr.length ? `regulations: ${restr.join(", ")}` : ""].filter(Boolean).join(DOT);
     const capacityTip = `${n.entries === null ? "No entry count this hour" : `${n.entries} ${n.entries === 1 ? "entry" : "entries"} this hour`}, `
-      + (n.entriesCap === null ? "no limit" : `capacity ${n.entriesCap}`);
+      + capTip(n.entriesCap, n.entriesReg);
     const occupancyTip = `${n.occupancy === null ? "No occupancy data" : `${n.occupancy} aircraft in the sector now`}, `
-      + (n.occupancyCap === null ? "no limit" : `capacity ${n.occupancyCap}`)
-      + (n.peak === null ? "" : ` · peak ${n.peak} within the hour`);
+      + capTip(n.occupancyCap, n.occupancyReg)
+      + (n.peak === null ? "" : `${DOT}peak ${n.peak} within the hour`);
+    const code = tv.id.startsWith(prefix) ? tv.id.slice(prefix.length) : tv.id;
     return {
-      id: tv.id, code: tv.id.startsWith(prefix) ? tv.id.slice(prefix.length) : tv.id, label: tvLabel(tv.id),
-      active, restricted: !!tv.restricted, ...n,
-      capacity: pairText(n.entries, n.entriesCap), occupancyText: pairText(n.occupancy, n.occupancyCap),
+      id: tv.id, code, label: tvLabel(tv.id),
+      active, restricted: !!tv.restricted, ...n, entriesMax, occupancyMax,
+      capacity: pairText(n.entries, entriesMax), occupancyText: pairText(n.occupancy, occupancyMax),
+      capacityReg: regBinds(n.entriesCap, n.entriesReg), occupancyReg: regBinds(n.occupancyCap, n.occupancyReg),
       sectorTip, capacityTip, occupancyTip,
-      entriesCls: loadClass(n.entries, n.entriesCap), occupancyCls: loadClass(n.occupancy, n.occupancyCap),
+      entriesCls: loadClass(n.entries, entriesMax), occupancyCls: loadClass(n.occupancy, occupancyMax),
     };
   });
-  rows.sort((a, b) => (a.active === b.active ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.active ? -1 : 1));
+  rows.sort((a, b) => (a.active !== b.active ? (a.active ? -1 : 1)
+    : groupRank(a.code) - groupRank(b.code) || cmp(sortKey(a.code), sortKey(b.code)) || cmp(a.id, b.id)));
   return rows;
 }

@@ -160,6 +160,9 @@ step("unknown", () => view.activate("nope/x"));
 step("vfr-again", () => view.activate("vfr-minima"));
 step("vfr-same", () => view.activate("vfr-minima"));
 step("empty", () => view.activate(""));
+// 0.13.0: znak z adresu oczyszczony jak w polu (adres też); pusty znak z pola: adres bez znaku
+step("fp-dash", () => view.activate("flight-plan/lot-3827"));
+step("fp-clear", () => last("fp").opts.onLookup(""));
 console.log(JSON.stringify({ html, initial, steps, future: globalThis.__future }));
 """
 
@@ -236,6 +239,11 @@ def js(tmp_path_factory):
     (stubs / "phraseology.mjs").write_text("export function mountPhraseology() {}\n", "utf-8")
     for mod, (fn, kind) in PAGES.items():
         (stubs / f"{mod}.mjs").write_text(PAGE_STUB % {"fn": fn, "kind": kind}, "utf-8")
+    # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js
+    fp_src = (FRONTEND / "js" / "flightplan.js").read_text("utf-8")
+    clean = next(line for line in fp_src.splitlines() if line.startswith("export const cleanCallsign = "))
+    with open(stubs / "flightplan.mjs", "a", encoding="utf-8") as f:
+        f.write(clean + "\n")
     src = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     for mod in ("api", "checklist", "docs", "phraseology", *PAGES):
         assert f'"../{mod}.js"' in src, mod
@@ -379,7 +387,8 @@ def test_other_flight_plan_and_fmp_addresses(js):
     again = _step(js, "fp-again")
     assert len(again["fp"]) == 1 and again["fp"][0]["calls"] == [["activate", "LOT1"]]
     assert again["log"] == [["remember", "other", "flight-plan/LOT1", False]]
-    assert _step(js, "fp-menu")["fp"][0]["calls"][-1] == ["focus"]
+    # przycisk menu: activate() bez znaku (plan starszy niż 30 s od razu odświeżony), nie samo focus()
+    assert _step(js, "fp-menu")["fp"][0]["calls"][-1] == ["activate", "<menu>"]
     fmp = _step(js, "fmp")
     assert fmp["sub"] == "fmp" and len(fmp["fmp"]) == 1 and fmp["log"] == [["remember", "other", "fmp", False]]
     menu = _step(js, "fmp-menu")
@@ -442,3 +451,11 @@ def test_frame_bar_without_url(tmp_path):
     assert f'<a class="btn" href="{url}" target="_blank" rel="noopener">Open in new tab ↗</a>' in hidden_bar
     assert hidden_frame == plain_frame and f'src="{url}"' in hidden_frame
     assert "example.test" not in plain_bar.replace(f'href="{url}"', "")
+
+
+def test_other_flight_plan_clean_address(js):
+    """0.13.0: znak z adresu jak w polu ("lot-3827" → LOT3827, adres też), pusty znak z pola → "#other/flight-plan"."""
+    dash = _step(js, "fp-dash")
+    assert dash["sub"] == "flight-plan" and dash["fp"][-1]["start"] == "LOT3827"
+    assert dash["log"] == [["remember", "other", "flight-plan/LOT3827", False]]
+    assert _step(js, "fp-clear")["log"] == [["remember", "other", "flight-plan", False]]
