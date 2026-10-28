@@ -15,19 +15,20 @@ import conversion from "./tabs/conversion.js";
 import sytop from "./tabs/sytop.js";
 import aup from "./tabs/aup.js";
 import strip from "./tabs/strip.js";
-import squawk from "./tabs/squawk.js";
 import other from "./tabs/other.js";
 import admin from "./tabs/admin.js";
 
 const TABS = { home, about, radio, meteo, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination, conversion,
-  sytop, aup, strip, squawk, other, emergency, admin };
+  sytop, aup, strip, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
 // bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
 // #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista
+// (0.13.0) #squawk/<kod> → OTHER › SQUAWK z tym kodem, #squawk i kafelek w ABOUT (bez arg) → OTHER › SQUAWK
 const MOVED = {
   docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],
   phraseology: () => ["other", "phraseology"],
   checklist: (arg) => ["other", arg ? "checklist/" + arg : "checklist"],
+  squawk: (arg) => ["other", arg ? "squawk/" + arg : "squawk"],
 };
 const views = document.getElementById("views");
 const back = document.getElementById("nav-back");

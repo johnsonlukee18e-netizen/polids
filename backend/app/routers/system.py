@@ -61,6 +61,15 @@ def checklists():
     return json.loads((settings.seed_dir / "checklists.json").read_text("utf-8"))
 
 
+@router.get("/regcause")
+def regcause():
+    """OTHER › REGCAUSE: kody przyczyn regulacji (data/seed/regcause.json) w kolejności ekranu. Tylko pola widoczne
+    w interfejsie: nazwa kategorii i wiersze (kod, opis, opis opóźnienia IATA); uwaga dla opiekunów danych zostaje w pliku."""
+    data = json.loads((settings.seed_dir / "regcause.json").read_text("utf-8"))
+    return {"categories": [{"name": c["name"], "rows": [{k: r[k] for k in ("code", "description", "iata")} for r in c["rows"]]}
+                           for c in data["categories"]]}
+
+
 @router.get("/status")
 def status(db: Session = Depends(get_db)):
     count = lambda m: db.scalar(select(func.count()).select_from(m))  # noqa: E731

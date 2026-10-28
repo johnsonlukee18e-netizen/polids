@@ -126,15 +126,16 @@ export function clearNavPath(view) { WANT.delete(view); }
 // tabs: [{id, label, render(pane), fill?}] albo {sep: true} jako odstęp.
 // Kliknięcie podzakładki to krok do cofnięcia (remember z kluczem zakładki i ścieżką id podmenu);
 // opts.remember = false wyłącza, opts.arg(id) podaje własny arg adresu zamiast ścieżki id.
+// opts.first: id podzakładki domyślnej (bez adresu i dla nieznanego id), gdy nie ma być nią pierwsza w kolumnie.
 export function subtabs(root, tabs, opts = {}) {
   const nav = h(`<nav class="submenu">${tabs.map((t) => t.sep ? `<div class="sep"></div>` : `<button data-id="${esc(t.id)}">${esc(t.label)}</button>`).join("")}</nav>`);
   const pane = h(`<div class="pane"></div>`);
   root.append(nav, pane);
   let current = null, currentId = null;
-  const first = tabs.find((x) => !x.sep).id;
+  const first = (tabs.find((x) => !x.sep && x.id === opts.first) || tabs.find((x) => !x.sep)).id;
   const show = (id) => {
     current?.destroy?.();
-    const t = tabs.find((x) => !x.sep && x.id === id) || tabs.find((x) => !x.sep);
+    const t = tabs.find((x) => !x.sep && x.id === id) || tabs.find((x) => x.id === first);
     currentId = t.id;
     nav.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("active", b.dataset.id === t.id));
     pane.className = "pane" + (t.fill ? " fill" : "");
