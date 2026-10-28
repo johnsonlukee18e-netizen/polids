@@ -13,7 +13,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.eptraffic import ep_traffic
-from ..services.flightplan import HOURS_DOWN, find_flight_plan, member_hours
+from ..services.flightplan import HOURS_DOWN, find_flight_plan, hours_pending, member_hours
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import online_stations
@@ -179,7 +179,8 @@ async def pilots(bbox: str = "46,8,58,30", ep: bool = False, keep: str = "", db:
 async def flight_plan(callsign: str):
     """OTHER › FLIGHT PLAN: plan lotu po znaku (pilot online, potem najnowszy prefile) z imieniem i nazwiskiem
     z nazwy w sieci, PID (= CID), ratingiem i godzinami pilota i ATC (services/flightplan.py). Pilot online bez planu:
-    flight_plan = null. Godziny nie opóźniają planu: bez odpowiedzi w kilka sekund hours = null i hours_error."""
+    flight_plan = null. Godziny nie opóźniają planu: bez odpowiedzi w HOURS_WAIT_S hours = null i hours_error,
+    a hours_pending = true, gdy zapytanie jeszcze trwa (kończy się w tle; FLIGHT PLAN pyta wtedy ponownie po chwili)."""
     if not re.fullmatch(r"[A-Za-z0-9]{2,12}", callsign):
         raise HTTPException(400, "Callsign = 2–12 letters and digits")
     cs = callsign.upper()
@@ -187,7 +188,8 @@ async def flight_plan(callsign: str):
     if found is None:
         raise HTTPException(404, f"No flight plan for {cs}")
     hours = await member_hours(found["pid"]) if found["pid"] else None
-    return found | {"hours": hours, "hours_error": None if hours else HOURS_DOWN}
+    return found | {"hours": hours, "hours_error": None if hours else HOURS_DOWN,
+                    "hours_pending": not hours and bool(found["pid"]) and hours_pending(found["pid"])}
 
 
 @router.get("/pilots/{callsign}/route")

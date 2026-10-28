@@ -26,7 +26,7 @@ log = logging.getLogger("polids.flightplan")
 # komunikat w interfejsie, gdy godzin nie ma (bez nazwy źródła; szczegóły błędu tylko w logu)
 HOURS_DOWN = "Hours unavailable"
 HOURS_TTL_S = 12 * 3600
-HOURS_WAIT_S = 3.0
+HOURS_WAIT_S = 1.5
 HOURS_MISS_S = 3600     # 404 albo odpowiedź bez godzin: członek bez statystyk
 HOURS_FAIL_S = 600      # inny błąd (sieć, 5xx, nie JSON)
 
@@ -204,6 +204,15 @@ async def member_hours(cid, wait: float | None = None) -> dict | None:
         task.add_done_callback(lambda t, c=cid: _tasks.pop(c) if _tasks.get(c) is t else None)
     done, _pending = await asyncio.wait({task}, timeout=HOURS_WAIT_S if wait is None else wait)
     return task.result() if done else None
+
+
+def hours_pending(cid) -> bool:
+    """Zapytanie o godziny tego członka jeszcze trwa (nie zdążyło w HOURS_WAIT_S): FLIGHT PLAN zapyta wcześniej."""
+    try:
+        task = _tasks.get(int(cid))
+    except (TypeError, ValueError):
+        return False
+    return bool(task and not task.done())
 
 
 def reset_hours():

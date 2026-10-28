@@ -11,6 +11,8 @@ import { api, esc, h, ONLINE_EVENT } from "./api.js";
 // onLookup(znak) raz na każde wyszukanie z pola (OTHER zapisuje #other/flight-plan/<ZNAK>), odświeżenie go nie woła.
 
 const REFRESH_MS = 30000;
+// godziny pilota nie zdążyły (hours_pending): jedno dodatkowe pytanie po chwili, bez czekania na odświeżenie
+const HOURS_RETRY_MS = 4000;
 const RULES = { I: "IFR", V: "VFR", Y: "IFR, then VFR", Z: "VFR, then IFR" };
 const WAKE = { L: "light", M: "medium", H: "heavy", J: "super" };
 // znak jak w endpointcie: 2-12 liter i cyfr (wpisane spacje i myślniki, np. "SP-ABC", są pomijane)
@@ -178,7 +180,7 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
   pane.append(root);
   const input = root.querySelector(".fpl-q"), msg = root.querySelector(".fpl-msg"), out = root.querySelector(".fpl-out");
   // cs = pokazywany znak ("" = pusty formularz); data = ostatnia odpowiedź; seq odrzuca spóźnione odpowiedzi
-  let cs = "", data = null, failed = false, loadedAt = 0, seq = 0, timer = null, dead = false;
+  let cs = "", data = null, failed = false, loadedAt = 0, seq = 0, timer = null, retry = null, dead = false;
   const visible = () => root.isConnected && root.offsetParent !== null;
   const note = (text = "", cls = "hint") => { msg.className = "fpl-msg " + cls; msg.textContent = text; };
 
@@ -192,6 +194,7 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
       data = d; failed = false; loadedAt = Date.now();
       out.innerHTML = fplHtml(d);
       note();
+      if (d.hours_pending && retry === null) retry = setTimeout(() => load(true), HOURS_RETRY_MS);
     } catch (e) {
       if (dead || my !== seq) return;
       failed = true; loadedAt = Date.now();
@@ -199,7 +202,8 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
       else { data = null; out.innerHTML = `<p class="error fpl-err">${esc(e.message)}</p>`; note(); }
     }
   };
-  const stopRefresh = () => { clearInterval(timer); timer = null; };
+  // retry: null = dla tego znaku jeszcze nie pytano ponownie o godziny; potem id zegara (raz na wyszukanie)
+  const stopRefresh = () => { clearInterval(timer); clearTimeout(retry); timer = retry = null; };
   const show = (value) => {
     const v = cleanCallsign(value);
     input.value = v;

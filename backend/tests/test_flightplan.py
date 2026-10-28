@@ -245,6 +245,7 @@ def test_endpoint(client, monkeypatch):
     assert d["hours"] == {"pilot": 812.4, "atc": 0.0} and d["hours_error"] is None
     d = client.get("/api/vatsim/flightplan/LOT45").json()
     assert d["status"] == "prefiled" and d["hours"] is None and d["hours_error"] == "Hours unavailable"
+    assert d["hours_pending"] is False
     assert not SOURCES.search(d["hours_error"])
     d = client.get("/api/vatsim/flightplan/SPKAT").json()
     assert d["flight_plan"] is None and d["status"] == "online"
@@ -281,9 +282,10 @@ def test_endpoint_slow_member_api(client, monkeypatch, members):
     assert r.status_code == 200 and took < 0.45
     d = r.json()
     assert d["hours"] is None and d["hours_error"] == "Hours unavailable" and d["flight_plan"]["route"] == "OLILA L621 RILAB"
+    assert d["hours_pending"] is True                           # zapytanie trwa: FLIGHT PLAN zapyta wcześniej
     time.sleep(0.7)                                             # zapytanie kończy się w tle (pętla TestClient)
     d = client.get("/api/vatsim/flightplan/LOT3827").json()
-    assert d["hours"] == {"pilot": 812.4, "atc": 50.2} and d["hours_error"] is None
+    assert d["hours"] == {"pilot": 812.4, "atc": 50.2} and d["hours_error"] is None and d["hours_pending"] is False
     assert len(members["calls"]) == 1
     assert not SOURCES.search(json.dumps({k: v for k, v in d.items() if k not in ("name", "flight_plan")}))
 
@@ -295,7 +297,8 @@ def test_names_not_logged(client, monkeypatch, members, caplog):
     monkeypatch.setattr(vatsim_router, "get_feed", fake_feed)
     members["mode"] = 500
     with caplog.at_level("DEBUG"):
-        assert client.get("/api/vatsim/flightplan/LOT3827").json()["hours_error"] == "Hours unavailable"
+        d = client.get("/api/vatsim/flightplan/LOT3827").json()
+    assert d["hours_error"] == "Hours unavailable" and d["hours_pending"] is False
     ours = "\n".join(r.getMessage() for r in caplog.records if r.name.startswith("polids"))
     assert "member stats: HTTP 500" in ours and "1234567" not in ours
     assert "Kowalski" not in caplog.text and "Jan " not in caplog.text
