@@ -236,8 +236,6 @@ def test_base_rule_normal_weight():
     assert "b, strong, th, h1, h2, h3, h4, h5, h6 { font-weight: normal; }" in STYLE
 
 
-# radio.css przechodzi na zwykłą grubość w obszarze RADIO rundy 16 (zbiór znika po scaleniu)
-BOLD_PENDING = {"radio.css"}
 BOLD = re.compile(r"font-weight:\s*(?:[6-9]00|bold|bolder)\b|font:[^;}]*?(?<![\w.-])(?:[6-9]00|bold|bolder)\s")
 
 
@@ -245,12 +243,10 @@ def test_no_bold_in_css():
     """0.13.0 (issue #23): napisy zwykłej grubości jak w PANDORZE; wyróżnienie kolorem, nie pogrubieniem."""
     checked = []
     for path in sorted((FRONTEND / "css").glob("*.css")):
-        if path.name in BOLD_PENDING:
-            continue
         bad = [m.group(0) for m in BOLD.finditer(_nocomments(path.read_text("utf-8")))]
         assert not bad, (path.name, bad)
         checked.append(path.name)
-    assert "style.css" in checked and "dman.css" in checked and len(checked) >= 14
+    assert "style.css" in checked and "dman.css" in checked and "radio.css" in checked and len(checked) >= 14
     for name in ("login.html", "offline.html"):
         assert not BOLD.search(_nocomments((FRONTEND / name).read_text("utf-8"))), name
     # wzorzec łapie zarówno font-weight, jak i skrót font z grubością (próbka)

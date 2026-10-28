@@ -21,6 +21,7 @@ from itertools import combinations
 from .metar import parse_metar
 from .radio import facility, sector_group, sector_kind
 from .runways import atis_state, wind_components
+from .viff import restriction_active
 
 LAYERS = ("LOW", "MID", "HIGH")
 TOP_FT = 66000  # FL660: górna granica podglądów (Kaliningrad ma w pliku 99900)
@@ -884,12 +885,6 @@ VOL_SECTOR = re.compile(r"^EPWW-([A-Z])([HML])$")
 VOL_TMA = re.compile(r"^EP([A-Z]{2})-TMA[A-Z]*$")
 
 
-def window_on(start, end, hhmm: str) -> bool:
-    """Okno HHMM–HHMM obejmuje teraz (także przez północ: 2200–0200), jak ograniczenia w OVERVIEW."""
-    start, end = str(start or ""), str(end or "")
-    return bool(start and end and (start <= hhmm <= end if start <= end else not end < hhmm < start))
-
-
 def tv_targets(tv: dict, sector_ids, tma_by_icao: dict[str, list[str]]) -> tuple[list[str], list[str], bool]:
     """Sektory tablicy (HB) i TMA (klucz grupy TMA), których dotyczy traffic volume; trzeci element: TV złożony."""
     tid = str(tv.get("id") or "")
@@ -927,7 +922,6 @@ def flow_alerts(tvs, now, sector_ids, tma_groups_: list[dict]) -> dict:
     """{sectors: {HB: [alert]}, tma: {TMA Warszawa: [alert]}}; alert = {tv, restrictions (aktywne teraz), occupancy,
     capacity, busy (zajętość teraz > 80 % dopuszczalnej, tylko aktywny TV), tip: [linie dymku]}.
     tvs: viff.sectors(...)["sectors"]; now: datetime UTC."""
-    hhmm = now.strftime("%H%M")
     tma_by_icao: dict[str, list[str]] = {}
     for g in tma_groups_:
         if g.get("icao") and g["tma"] not in tma_by_icao.get(g["icao"], []):
@@ -941,7 +935,7 @@ def flow_alerts(tvs, now, sector_ids, tma_groups_: list[dict]) -> dict:
         if not secs and not tmas:
             continue
         restr = [{k: r.get(k) for k in ("type", "value", "start", "end")} for r in tv.get("restrictions") or ()
-                 if isinstance(r, dict) and window_on(r.get("start"), r.get("end"), hhmm)]
+                 if restriction_active(r, now)]
         occ = (tv.get("occupancy") or [None])[0]
         cap = tv.get("occupancy_cap")
         busy = bool(tv.get("active")) and isinstance(occ, int) and isinstance(cap, int) and cap > 0 \

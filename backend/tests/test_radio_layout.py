@@ -19,6 +19,7 @@ from backend.app.routers import radio as radio_router  # noqa: E402
 from backend.app.routers import vatsim as vatsim_api  # noqa: E402
 from backend.app.services import radioboard as rb  # noqa: E402
 from backend.app.services.http_cache import UpstreamError  # noqa: E402
+from backend.app.services.viff import restriction_active  # noqa: E402
 
 SEED = ROOT_DIR / "data" / "seed" / "radio_layout.json"
 EMPTY = {"general": {"update_timestamp": "2026-10-28T12:00:00Z"}, "pilots": [], "controllers": [], "atis": []}
@@ -438,9 +439,12 @@ def test_flow_alerts_pure():
     lb = out["sectors"]["LB"][0]
     assert (lb["busy"], lb["occupancy"], lb["capacity"], lb["tip"]) == (True, 12, 14, ["Occupancy 12 of 14"])
     assert out["tma"]["TMA Warszawa"][0]["tv"] == "EP-WATMAD"
-    # okno przez północ: po północy też, w dzień nie
-    assert rb.window_on("2200", "0200", "0100") and rb.window_on("2200", "0200", "2330")
-    assert not rb.window_on("2200", "0200", "1200") and not rb.window_on("", "0200", "0100")
+    # okno przez północ: po północy też, w dzień nie (wspólna reguła viff.restriction_active, jak OVERVIEW i FMP)
+    def at(hm):
+        return datetime(2026, 10, 28, int(hm[:2]), int(hm[2:]), tzinfo=timezone.utc)
+    win = {"start": "2200", "end": "0200"}
+    assert restriction_active(win, at("0100")) and restriction_active(win, at("2330"))
+    assert not restriction_active(win, at("1200")) and not restriction_active({"start": "", "end": "0200"}, at("0100"))
     assert rb.flow_alerts(None, NOW, SECTORS, TMAS) == {"sectors": {}, "tma": {}}
 
 
