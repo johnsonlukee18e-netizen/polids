@@ -144,6 +144,9 @@ def test_matrix_order(js):
     assert js["matrixEmpty"] == [] and js["maxSpeed"] == [47, 0, 0]
     assert js["forecastFor"] == ["Today, 16:00 UTC", "27.10, 23:00 UTC", "–"]
     assert js["cell"] == ["310/14G26", "GND", "–", "VRB/02", "–"]
+    # pasek ALL: czas prognozy o stałej minimalnej szerokości, więc przełącznik Show colors nie skacze, gdy prognozy
+    # brak ("Forecast for: –")
+    assert re.search(r"\.awl-bar \.awl-for \{ min-width: \d+px; \}", CSS)
 
 
 def test_moved_wind_helpers(js):
