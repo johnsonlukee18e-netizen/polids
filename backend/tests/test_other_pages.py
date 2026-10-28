@@ -22,7 +22,7 @@ FRONTEND = ROOT_DIR / "frontend"
 SEED = json.loads((ROOT_DIR / "data" / "seed" / "regcause.json").read_text("utf-8"))
 # litery przyczyn w kolejności ekranu (jak na zdjęciu PANDORY: A, C, E, potem dalej po literze)
 LETTERS = ["A", "C", "E", "G", "I", "M", "N", "O", "P", "R", "S", "T", "V", "W"]
-# wiersze ze zdjęcia PANDORY (kod, opis, opis IATA)
+# wiersze ze zdjęcia PANDORY (kod, opis, opis IATA); PANDORA ma tekst z wydania 2017, stąd "accident /incident."
 PHOTO = [
     ("AD 89", "Reduction of expected ATC capacity due to an aircraft accident /incident.", "RESTRICTIONS AT AIRPORT OF DEPARTURE"),
     ("AA 83", "Reduction of expected ATC capacity due to an aircraft accident /incident.",
@@ -36,6 +36,27 @@ PHOTO = [
     ("EA 99", "Reduced capacity due to the degradation or non-availability of support equipment at an airport e.g. Fire "
               "Service, De-icing / snow removal equipment or other ground handling equipment.", "OTHER"),
 ]
+# tabela z ATFCM Users Manual 27.0 (aneks D, s. 106-108): litera przyczyny, nazwa kategorii, kody miejsca i numery IATA
+MANUAL = [
+    ("A", "Accident / incident", ["AD 89", "AA 83"]),
+    ("C", "ATC capacity", ["CD 89", "CE 81", "CA 83"]),
+    ("E", "Aerodrome Services", ["ED 99", "EA 99"]),
+    ("G", "Aerodrome capacity", ["GD 89", "GA 83"]),
+    ("I", "ATC industrial action", ["ID 89", "IE 82", "IA 83"]),
+    ("M", "Airspace management", ["MD 89", "ME 82", "MA 83"]),
+    ("N", "Industrial action NON-ATC", ["ND 98", "NA 98"]),
+    ("O", "Other", ["OD 89", "OE 81", "OA 83"]),
+    ("P", "Special event", ["PD 89", "PE 82", "PA 83"]),
+    ("R", "ATC routeings", ["RE 81"]),
+    ("S", "ATC staffing", ["SD 89", "SE 82", "SA 83"]),
+    ("T", "ATC equipment", ["TD 89", "TE 82", "TA 83"]),
+    ("V", "Environmental issue", ["VD 89", "VE 81", "VA 83"]),
+    ("W", "Weather", ["WD 89", "WE 81", "WA 84"]),
+]
+# opisy numerów IATA z tej tabeli
+IATA = {"81": "ATFM due to ATC ENROUTE DEMAND / CAPACITY", "82": "ATFM due to ATC STAFF / EQUIPMENT ENROUTE",
+        "83": "ATFM due to RESTRICTION AT DESTINATION AIRPORT", "84": "ATFM due to WEATHER AT DESTINATION",
+        "89": "RESTRICTIONS AT AIRPORT OF DEPARTURE", "98": "INDUSTRIAL ACTION OUTSIDE OWN AIRLINE", "99": "OTHER"}
 # słowa źródeł, nazw dokumentów i numerów przepisów, których nie ma w napisach tych stron
 PROVENANCE = re.compile(r"Source|source:|EUROCONTROL|VATSIM|vIFF|PANSA|SERA|EASA|\bULC\b|\bAIP\b|ICAO|\bENR\b|Annex|"
                         r"Regulation|923/2012|Manual|according to|based on|data/seed|\bCODA\b|jetway", re.I)
@@ -47,10 +68,11 @@ def _rows():
 
 def test_regcause_seed_shape():
     cats = SEED["categories"]
-    assert set(SEED) == {"_uwaga", "categories"} and len(cats) == 14 and len(_rows()) == 35
+    assert set(SEED) == {"_uwaga", "categories"} and len(cats) == 14 and len(_rows()) == 36
     assert [c["rows"][0]["code"][0] for c in cats] == LETTERS
-    # "Accident / incident" jak na zdjęciu PANDORY, "ATC Capacity" jak w zgłoszeniu
-    assert [c["name"] for c in cats[:3]] == ["Accident / incident", "ATC Capacity", "Aerodrome Services"]
+    # cała tabela z podręcznika: nazwy kategorii jak w nim (i na zdjęciu PANDORY), wszystkie kody, w tym PE 82 i VE 81
+    assert [(c["rows"][0]["code"][0], c["name"], [r["code"] for r in c["rows"]]) for c in cats] == MANUAL
+    assert all(r["iata"] == IATA[r["code"][-2:]] for r in _rows())
     # każdy opis kończy się kropką (jak na zdjęciu)
     assert all(r["description"].endswith(".") for r in _rows()), [r["code"] for r in _rows() if not r["description"].endswith(".")]
     for c in cats:
@@ -65,13 +87,12 @@ def test_regcause_seed_shape():
             assert r["description"].strip() and r["iata"] and r["iata"].strip(), r["code"]
     codes = [r["code"] for r in _rows()]
     assert len(codes) == len(set(codes))
-    # brakujące w źródłach numery IATA uzupełnione (GD 89, GA 83, WE 81), żaden wiersz bez opisu IATA
-    assert {"GD 89", "GA 83", "WE 81"} <= set(codes) and not any(r["iata"] is None for r in _rows())
-    # ten sam numer IATA = ten sam opis
-    by_num = {}
-    for r in _rows():
-        assert by_num.setdefault(r["code"][-2:], r["iata"]) == r["iata"], r["code"]
-    assert [(r["code"], r["description"], r["iata"]) for r in _rows()[:7]] == PHOTO
+    # w kategorii jeden opis, poza ATC capacity: E trasa, D i A lotnisko (w podręczniku "En Route:" i "Airport:")
+    for c in cats:
+        assert len({r["description"] for r in c["rows"]}) == (2 if c["name"] == "ATC capacity" else 1), c["name"]
+    # zgodnie ze zdjęciem PANDORY (ukośnik ze spacjami jak w wydaniu 27.0)
+    slash = lambda t: re.sub(r"\s*/\s*", " / ", t)  # noqa: E731
+    assert [(r["code"], r["description"], r["iata"]) for r in _rows()[:7]] == [(c, slash(d), i) for c, d, i in PHOTO]
 
 
 def test_regcause_endpoint():
@@ -126,7 +147,7 @@ def _text(html):
 def test_regcause_list(js):
     html = js["list"]
     # pasek kategorii na kategorię, wiersz na kod: kod | opis | IATA, w kolejności z pliku; bez stopki i nagłówka kolumn
-    assert html.count('<h3 class="rc-bar">') == 14 and html.count('<div class="rc-row">') == 35
+    assert html.count('<h3 class="rc-bar">') == 14 and html.count('<div class="rc-row">') == 36
     assert re.findall(r'<h3 class="rc-bar">([^<]+)</h3>', html) == [c["name"] for c in SEED["categories"]]
     assert re.findall(r'<span class="rc-code">([^<]+)</span>', html) == [r["code"] for r in _rows()]
     assert ('<div class="rc-row"><span class="rc-code">CD 89</span><span class="rc-text">Demand exceeds declared or expected '
