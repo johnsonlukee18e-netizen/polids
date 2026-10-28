@@ -130,7 +130,7 @@ async def wind_profile(db: Session, get_metars, now: datetime | None = None) -> 
         metar_error = f"METAR unavailable: {describe(exc)}"
     model, model_error = None, None
     try:
-        model = await upperwind.model_profiles([(a.lat, a.lon) for a in ads])
+        model = await upperwind.model_profiles([(a.lat, a.lon) for a in ads], now)
     except UpstreamError as exc:
         # w exc krótki powód (upperwind._fetch), pełny komunikat z adresem w exc.__cause__
         log.warning("AWALON, prognoza: %s", f"{exc} ({exc.__cause__})" if exc.__cause__ else exc)

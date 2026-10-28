@@ -324,9 +324,16 @@ async def model_winds(points: list[tuple[float, float]]) -> list[dict]:
     return await _fetch(points, LEVELS, CACHE_SECONDS, parse_forecast)
 
 
-async def model_profiles(points: list[tuple[float, float]]) -> list[list[dict]]:
+def profile_ttl(now: datetime | None = None) -> int:
+    """Ważność odpowiedzi AWALON w cache: PROFILE_CACHE_SECONDS, ale nie dłużej niż od północy UTC (odpowiedź
+    z forecast_days=1 obejmuje tylko swoją dobę, więc kopia sprzed północy jest od razu nieaktualna)."""
+    now = now or datetime.now(timezone.utc)
+    return max(1, min(PROFILE_CACHE_SECONDS, now.hour * 3600 + now.minute * 60 + now.second))
+
+
+async def model_profiles(points: list[tuple[float, float]], now: datetime | None = None) -> list[list[dict]]:
     """AWALON: godziny doby z wiatrem 10 m i poziomami PROFILE_LEVELS dla punktów [(lat, lon)] jednym zapytaniem
-    (cache 30 min)."""
+    (cache 30 min, bez przechodzenia przez północ UTC)."""
     if not points:
         return []
-    return await _fetch(points, PROFILE_LEVELS, PROFILE_CACHE_SECONDS, parse_profiles)
+    return await _fetch(points, PROFILE_LEVELS, profile_ttl(now), parse_profiles)

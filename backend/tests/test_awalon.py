@@ -98,6 +98,12 @@ def test_one_request_for_all_aerodromes(client, fake):
     assert fake["metar"][0] == list(overview.AERODROMES)
 
 
+def test_cache_does_not_cross_midnight():
+    """Odpowiedź obejmuje tylko swoją dobę UTC: tuż po północy kopia sprzed północy jest nieaktualna."""
+    at = lambda h, m, s=0: datetime(2026, 10, 28, h, m, s, tzinfo=timezone.utc)  # noqa: E731
+    assert [uw.profile_ttl(at(*t)) for t in ((16, 25), (0, 30), (0, 10), (0, 0, 0), (23, 59))] == [1800, 1800, 600, 1, 1800]
+
+
 def test_shape(client, fake):
     d = client.get("/api/meteo/wind-profile").json()
     assert set(d) == {"alts_ft", "valid", "fetched", "model_error", "metar_error", "aerodromes"}
