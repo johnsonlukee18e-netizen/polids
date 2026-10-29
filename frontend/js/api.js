@@ -161,16 +161,19 @@ export function subtabs(root, tabs, opts = {}) {
 }
 
 // Podmenu z literami A–Z (jak w AIRCRAFT / CALLSIGN w PANDORZE): u góry ALL (wszystkie rekordy) na obie kolumny,
-// pod nim litery parami w dwóch równych kolumnach (A B, C D … Y Z). onPick("") = wszystkie.
+// pod nim KEYBOARD (0.13.1, issue #25: klawiatura dotykowa, przełącznik bez data-l, też na obie kolumny), dalej
+// litery parami w dwóch równych kolumnach (A B, C D … Y Z). onPick("") = wszystkie.
 // Kliknięcie litery to krok do cofnięcia: remember(zakładka, "A".."Z" albo "" dla wszystkich); activate(arg)
 // zakładki ustawia literę z adresu przez set() ("" albo brak = ALL). opts.remember = false wyłącza.
+// Zwraca { set, kbd }: kbd to przycisk KEYBOARD dla touchKeyboard(); set() zaznacza tylko przyciski liter i ALL.
 export const LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
 export const letterButtons = () => `<button class="all" data-l="" title="All records">ALL</button>`
+  + `<button class="kbd" data-kbd="" title="Touch keyboard for the search field">KEYBOARD</button>`
   + LETTERS.map((l) => `<button data-l="${l}">${l}</button>`).join("");
 export function letterMenu(root, onPick, opts = {}) {
   const nav = h(`<nav class="submenu letters">${letterButtons()}</nav>`);
   root.append(nav);
-  const set = (l) => nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.l === (l || "")));
+  const set = (l) => nav.querySelectorAll("button[data-l]").forEach((b) => b.classList.toggle("active", b.dataset.l === (l || "")));
   nav.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-l]");
     if (!b) return;
@@ -180,7 +183,77 @@ export function letterMenu(root, onPick, opts = {}) {
     if (tab && opts.remember !== false) remember(tab, b.dataset.l);
   });
   set("");
-  return { set };
+  return { set, kbd: nav.querySelector("button.kbd") };
+}
+
+// Klawiatura dotykowa AIRCRAFT / CALLSIGN (0.13.1, issue #25): cyfry, QWERTY, "-" (EC-135) i rząd CLEAR, SPACE,
+// BACKSPACE. Bez ENTER (wyszukiwanie na bieżąco), bez polskich liter i bez shift (wielkość liter bez znaczenia).
+export const KEYBOARD_ROWS = [[..."1234567890"], [..."QWERTYUIOP"], [..."ASDFGHJKL"], [..."ZXCVBNM-"], ["CLEAR", "SPACE", "BACKSPACE"]];
+// szersze klawisze dolnego rzędu (w szerokościach klawisza: 2 + 5 + 3 = 10, jak rząd cyfr)
+const KEY_WIDE = { CLEAR: "w2", SPACE: "w5", BACKSPACE: "w3" };
+export const keyboardHtml = () => KEYBOARD_ROWS.map((r) => `<div class="tk-row">${r.map((k) =>
+  `<button type="button" class="gbtn tk${KEY_WIDE[k] ? " " + KEY_WIDE[k] : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("")}</div>`).join("");
+
+// Klawisz na tekście z zaznaczeniem [start, end) → { value, caret }. start i end przycinane do 0..długości, zamieniane,
+// gdy start > end; start null/undefined = kursor na końcu tekstu, end null/undefined = bez zaznaczenia (end = start).
+// CLEAR czyści pole, BACKSPACE usuwa zaznaczenie albo znak przed kursorem (na początku bez zmian), SPACE wstawia
+// spację, każdy inny klawisz wstawia siebie (w miejsce zaznaczenia).
+export function applyKey(value, start, end, key) {
+  const v = String(value ?? "");
+  const pos = (x, dflt) => (typeof x === "number" && Number.isFinite(x) ? Math.min(Math.max(0, Math.trunc(x)), v.length) : dflt);
+  let a = pos(start, v.length), b = pos(end, a);
+  if (a > b) [a, b] = [b, a];
+  if (key === "CLEAR") return { value: "", caret: 0 };
+  if (key === "BACKSPACE") {
+    if (a === b && !a) return { value: v, caret: 0 };
+    if (a === b) a -= 1;
+    return { value: v.slice(0, a) + v.slice(b), caret: a };
+  }
+  const ch = key === "SPACE" ? " " : String(key);
+  return { value: v.slice(0, a) + ch + v.slice(b), caret: a + ch.length };
+}
+
+// wybór otwartej klawiatury, jeden klucz dla AIRCRAFT i CALLSIGN: "1" otwarta, "0" zamknięta, "" = jeszcze nie wybrano
+export const KEYBOARD_KEY = "letters.keyboard";
+// Klawiatura pod listą zakładki: input = pole wyszukiwania, button = KEYBOARD z letterMenu (może być null).
+// Klawisz wpisuje w miejscu kursora (pole bez fokusu: na końcu) i wysyła zdarzenie input, więc wyszukiwanie z debounce
+// działa jak przy zwykłym pisaniu; pointerdown bez domyślnej akcji zostawia fokus w polu. Otwarta klawiatura ustawia
+// inputmode=none (bez klawiatury systemu na tablecie, kursor zostaje). KEYBOARD przełącza (nie krok do cofnięcia);
+// bez zapisanego wyboru klawiatura otwarta tylko przy dotykowym wskaźniku (pointer: coarse).
+// Zwraca { el, sync }: el zakładka wstawia na koniec panelu, sync() w activate() ustawia stan wg wyboru (zmienionego
+// może w drugiej zakładce).
+export function touchKeyboard(input, button) {
+  const el = h(`<div class="tkbd" role="group" aria-label="Touch keyboard" hidden>${keyboardHtml()}</div>`);
+  const wanted = () => {
+    const c = choiceGet(KEYBOARD_KEY);
+    return c ? c === "1" : !!globalThis.matchMedia?.("(pointer: coarse)").matches;
+  };
+  const show = (on) => {
+    el.hidden = !on;
+    button?.classList.toggle("active", on);
+    button?.setAttribute("aria-pressed", String(on));
+    if (on) input.inputMode = "none"; else input.removeAttribute("inputmode");
+  };
+  button?.addEventListener("click", () => {
+    const on = el.hidden;
+    choiceSet(KEYBOARD_KEY, on ? "1" : "0");
+    show(on);
+    if (on) input.focus({ preventScroll: true });
+  });
+  el.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]");
+    if (!b) return;
+    const focused = document.activeElement === input;
+    const r = applyKey(input.value, focused ? input.selectionStart : null, focused ? input.selectionEnd : null, b.dataset.k);
+    const changed = r.value !== input.value;
+    input.value = r.value;
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(r.caret, r.caret);
+    if (changed) input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  show(wanted());
+  return { el, sync: () => show(wanted()) };
 }
 
 // Nowy adres w ramce (iframe) bez kroku w historii przeglądarki: zmiana src w załadowanej ramce dodaje wpis, który

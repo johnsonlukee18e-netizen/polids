@@ -1,4 +1,4 @@
-import { api, debounce, esc, h, letterMenu, remember } from "../api.js";
+import { api, debounce, esc, h, letterMenu, remember, touchKeyboard } from "../api.js";
 
 const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
@@ -153,6 +153,9 @@ export default {
       <div class="ac-list"></div>
     </div>`);
     root.append(pane);
+    // 0.13.1: klawiatura dotykowa (KEYBOARD pod ALL) zawsze ostatnia w panelu, pod przewijaną listą
+    const kbd = touchKeyboard(pane.querySelector(".q"), letters.kbd);
+    pane.append(kbd.el);
     const $ = (s) => pane.querySelector(s);
     let rows = [];
     let seq = 0;
@@ -162,7 +165,7 @@ export default {
     const setMaker = (m) => {
       maker = m;
       pane.querySelectorAll(".ac-makers button").forEach((b) => b.classList.toggle("active", b.dataset.m === m));
-      if (m) root.querySelectorAll(".submenu.letters button.active").forEach((b) => b.classList.remove("active"));
+      if (m) root.querySelectorAll(".submenu.letters button[data-l].active").forEach((b) => b.classList.remove("active"));
     };
     const load = async () => {
       const qs = new URLSearchParams({ q: $(".q").value.trim(), prefix: maker ? "" : prefix, maker, wtc: $(".wtc").value,
@@ -248,6 +251,7 @@ export default {
       } else if (mk && MAKERS.some(([k]) => k === mk)) {
         if (mk !== maker) { $(".q").value = ""; setMaker(mk); load(); }
       } else { $(".q").value = arg; prefix = ""; setMaker(""); letters.set(""); load(); }
+      kbd.sync();
       $(".q").focus();
     } };
   },

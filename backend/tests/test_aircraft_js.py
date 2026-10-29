@@ -32,6 +32,7 @@ export const api = async () => [];
 export const debounce = (f) => f;
 export const letterMenu = () => ({ set() {} });
 export const remember = () => {};
+export const touchKeyboard = () => ({ el: {}, sync() {} });
 """
 
 # rekordy jak z /api/aircraft (AT76, A30B z zakresami osiągów, śmigłowiec bez wymiarów)
@@ -244,3 +245,16 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
     (tmp_path / "B738.jpg").write_bytes(b"\xff\xd8\xff")
     assert client.get(f"/api/aircraft/{a['id']}/photo").json() == {"url": "/files/photos/B738.jpg", "credit": "",
                                                                    "page": None}
+
+
+def test_touch_keyboard_hook():
+    """0.13.1 (issue #25): klawiatura dotykowa (KEYBOARD pod ALL, api.js touchKeyboard) jako ostatnie dziecko .ac-pane,
+    pod przewijaną listą; producent zdejmuje zaznaczenie liter, ale nie KEYBOARD; activate() ustawia stan klawiatury
+    wg wspólnego wyboru przed fokusem w polu (test_touch_keyboard.py sprawdza samą klawiaturę)."""
+    assert re.search(r'^import \{[^}]*\btouchKeyboard\b[^}]*\} from "\.\./api\.js";', SRC, re.M)
+    assert 'const kbd = touchKeyboard(pane.querySelector(".q"), letters.kbd);\n    pane.append(kbd.el);' in SRC
+    # dołączona po zbudowaniu panelu (po .ac-list), nic nie jest potem dopisywane na koniec panelu
+    assert SRC.index("root.append(pane);") < SRC.index("pane.append(kbd.el);")
+    assert SRC.count("pane.append(") == 1 and "pane.insertAdjacent" not in SRC
+    assert 'root.querySelectorAll(".submenu.letters button[data-l].active")' in SRC
+    assert re.search(r'kbd\.sync\(\);\n\s+\$\("\.q"\)\.focus\(\);', SRC)
