@@ -187,6 +187,14 @@ export function mountCharts(pane, { icao, name, base, chart = "", onPick = () =>
 
 const EAIP = "eaip";   // id przycisku ca\u0142ej przegl\u0105darki eAIP
 
+// pierwszy widoczny rz\u0105d przewijanego podmenu, przy kt\u00f3rym wida\u0107 rz\u0105d `row`: top = pierwszy widoczny teraz, rows = ile
+// ca\u0142ych rz\u0119d\u00f3w wida\u0107. Rz\u0105d nad widokiem staje na g\u00f3rze, rz\u0105d pod widokiem na dole, rz\u0105d w widoku nic nie zmienia
+export const topRow = (row, top, rows) => {
+  if (row < top) return Math.max(0, row);
+  if (row > top + rows - 1) return Math.max(0, row - Math.max(1, rows) + 1);
+  return top;
+};
+
 // AD CIV / AD MIL / AD VFR: podmenu jak w PANDORZE: "eAIP" (cała przeglądarka index-v2.html pakietu) i przycisk dla
 // każdego lotniska z listy, który otwiera listę map lotniska z PDF-em obok (AD CIV od 0.12.5, issue #18; AD MIL i AD VFR
 // od 0.13.1, issue #25, wcześniej tylko cała przeglądarka). Adres "#adciv/EPWA" (pierwsza mapa) albo "#admil/EPKS/12-5",
@@ -217,11 +225,20 @@ function aipTab(tab) {
         b.title = b.dataset.id === EAIP ? pkg.whole : `${names[b.dataset.id]} \u2013 charts`;
       });
       // wybrany przycisk widoczny w przewijanym podmenu (AD VFR: lotnisko z dołu listy z adresu albo po ←); przy
-      // pierwszym (eAIP) podmenu wraca na samą górę, razem z odstępem nad przyciskiem
+      // pierwszym (eAIP) podmenu wraca na samą górę, razem z odstępem nad przyciskiem. Przewinięcie o całe rzędy
+      // (style.css: podmenu dłuższe niż menu pokazuje tylko całe rzędy), więc rzędy dalej stoją na wysokości rzędów
+      // menu: rząd przycisku liczony od pierwszego przycisku, rząd co wysokość przycisku z marginesami; całe rzędy
+      // w widoku bez paddingu kolumny (0,1 rzędu zapasu na zaokrąglenie clientHeight do pełnych pikseli)
       const reveal = () => {
-        const b = sub.nav.querySelector("button.active");
-        if (b === sub.nav.querySelector("button")) sub.nav.scrollTop = 0;
-        else b?.scrollIntoView({ block: "nearest" });
+        const nav = sub.nav, b = nav.querySelector("button.active"), first = nav.querySelector("button");
+        if (!b) return;
+        if (b === first) { nav.scrollTop = 0; return; }
+        if (nav.scrollHeight <= nav.clientHeight) return;
+        const box = (el) => el.getBoundingClientRect(), bs = getComputedStyle(b), ns = getComputedStyle(nav);
+        const pitch = box(b).height + parseFloat(bs.marginTop) + parseFloat(bs.marginBottom);
+        const rows = Math.floor((nav.clientHeight - parseFloat(ns.paddingTop) - parseFloat(ns.paddingBottom)) / pitch + 0.1);
+        const row = Math.round((box(b).top - box(first).top) / pitch);
+        nav.scrollTop = topRow(row, Math.round(nav.scrollTop / pitch), rows) * pitch;
       };
       return {
         // arg undefined (przycisk menu): zostaje otwarta strona; "" = cały eAIP; "EPWA" = mapy EPWA; "EPWA/2-1" = mapa

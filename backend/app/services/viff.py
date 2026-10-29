@@ -15,7 +15,9 @@ import asyncio
 import json
 import re
 import time
+from bisect import bisect_left
 from datetime import datetime, timedelta, timezone
+from itertools import accumulate
 
 import httpx
 
@@ -350,13 +352,24 @@ def sector_series(tv: str, days: dict, now: datetime, row: dict) -> dict:
     entries: słupek co CHART_STEP minut z liczbą wejść w kolejnych CHART_SPAN minutach, przepustowością godziny
     (z koszyka vIFF tej godziny, bez niego z definicji TV) i regulacją ENR-ENTRIES obowiązującą na początku słupka;
     occupancy: samoloty w sektorze w każdej minucie okna (wejście liczone, minuta wyjścia już nie); hours: godzinowe
-    liczniki vIFF w oknie; peak / peak_at: największa zajętość od teraz do końca okna."""
+    liczniki vIFF w oknie; peak / peak_at: największa zajętość od teraz do końca okna, tylko w rysowanych minutach
+    [teraz, koniec okna) (occupancy ma jeszcze punkt w minucie końca, ale wykres go nie rysuje)."""
     minutes = CHART_HOURS * 60
     now_abs = now.hour * 60 + now.minute
     start = (now.hour - CHART_HOURS_BEFORE) * 60
     end = start + minutes
-    flights = tv_flights(tv, days)
-    occupancy = [sum(1 for f in flights if f["entry"] <= start + m < f["exit"]) for m in range(minutes + 1)]
+    # tylko loty, które mogą się liczyć: w sektorze po początku okna i z wejściem przed końcem ostatniego słupka
+    # (dane to cała doba albo dwie); kolejność po wejściu zostaje, więc słupki liczymy bisekcją
+    flights = [f for f in tv_flights(tv, days) if f["exit"] > start and f["entry"] < end + CHART_SPAN]
+    entry_at = [f["entry"] for f in flights]
+    # zajętość z tablicy różnic: +1 w minucie wejścia, -1 w minucie wyjścia (przycięte do okna), potem suma bieżąca
+    diff = [0] * (minutes + 2)
+    for f in flights:
+        lo, hi = max(f["entry"] - start, 0), min(f["exit"] - start, minutes + 1)
+        if lo < hi:
+            diff[lo] += 1
+            diff[hi] -= 1
+    occupancy = list(accumulate(diff[:minutes + 1]))
     buckets = {}  # minuta początku godziny → koszyk vIFF
     for day, data in days.items():
         for b in (data.get(tv) if isinstance(data, dict) else None) or []:
@@ -377,17 +390,17 @@ def sector_series(tv: str, days: dict, now: datetime, row: dict) -> dict:
     for t in range(start, end, CHART_STEP):
         b = buckets.get(t - t % 60, {})
         entries.append({"from": t - start, "time": _abs_hhmm(t),
-                        "count": sum(1 for f in flights if t <= f["entry"] < t + CHART_SPAN),
+                        "count": bisect_left(entry_at, t + CHART_SPAN) - bisect_left(entry_at, t),
                         "cap": _cap(b.get("entriesCapacity")) or row.get("entries_cap"),
                         "reg": reg_at(entries_reg, t - start)})
-    ahead = occupancy[now_abs - start:]
+    ahead = occupancy[now_abs - start:minutes]   # bez minuty końca okna: wykres jej nie rysuje
     peak = max(ahead) if ahead else 0
     return {"id": tv, "now": _abs_hhmm(now_abs), "start": _abs_hhmm(start), "minutes": minutes, "now_at": now_abs - start,
             "step": CHART_STEP, "span": CHART_SPAN, "entries_cap": row.get("entries_cap"),
             "occupancy_cap": row.get("occupancy_cap"), "entries": entries, "hours": hours, "occupancy": occupancy,
             "entries_reg": entries_reg, "occupancy_reg": occupancy_reg, "peak": peak,
             "peak_at": _abs_hhmm(now_abs + ahead.index(peak)) if ahead else None,
-            "flights": sum(1 for f in flights if f["exit"] > start and f["entry"] < end)}
+            "flights": bisect_left(entry_at, end)}   # loty w oknie (exit > start sprawdzone wyżej)
 
 
 async def sector_chart(tv: str, now: datetime | None = None) -> dict | None:
@@ -413,7 +426,8 @@ async def sector_chart(tv: str, now: datetime | None = None) -> dict | None:
             if d == 0:
                 raise
             days[d] = {}
-    out = sector_series(tv, days, now, row)
+    # szeregi liczone z całej doby (albo dwóch) lotów: poza pętlą zdarzeń, żeby nie wstrzymywać innych zapytań
+    out = await asyncio.to_thread(sector_series, tv, days, now, row)
     out.update({"label": tv_label(tv), "prefix": prefix, "active": row["active"], "restricted": row["restricted"],
                 "regulated": row["regulated"], "scenarios": row["scenarios"], "volumes": row["volumes"]})
     return out
@@ -473,8 +487,14 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
     except (UpstreamError, ValueError):
         defs = []
     load = await _get("/etfms/airspaces", {"filter": prefix, "fromNow": "true", "date": today}) or {}
-    # następna godzina po 23Z jest już jutro
-    nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}) if now.hour == 23 else {}
+    # następna godzina po 23Z jest już jutro; jutrzejsza doba to dodatek (jak w sector_chart): błąd = pusta następna
+    # godzina zamiast błędu całej tabeli FMP i wykresu
+    nxt = {}
+    if now.hour == 23:
+        try:
+            nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}) or {}
+        except (UpstreamError, ValueError):
+            nxt = {}
     try:  # scenariusze też są dodatkiem: każdy błąd = pusta lista
         scns = await scenarios(prefix)
     except Exception:  # noqa: BLE001

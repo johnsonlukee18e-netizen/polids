@@ -304,26 +304,35 @@ export const ADVISORY_FQ = "122.800";
 // --- stos okienek FIR-u sąsiada (0.13.1, issue #25: stary styl strony, podział okienek wg szkicu Marka z
 // data/seed/radio_layout.json). Siatka CSS z kolumn i wierszy szkicu, w których stoją okienka (f.cols, f.rows
 // z /api/radio/board; bez nich – z okienek): kolumna stosu = kolumna szkicu, na przemian rząd liczb (wysokości między
-// kafelkami, k = 0..m) i rząd kafelków (m = liczba wierszy). Połączone okienko zajmuje komórki od swojej pierwszej do
-// ostatniej kolumny i wiersza (także pusty wiersz szkicu między nimi), więc stos nigdy nie zmienia rozmiaru.
+// kafelkami, k = 0..m) i rząd kafelków (m = liczba wierszy). Kolumny i wiersze tylko ze szkicu i z okienek bez łączenia
+// (połączone rozłożone na members z komórkami), więc stos nigdy nie zmienia rozmiaru: połączone okienko zajmuje te
+// kolumny i wiersze stosu, które leżą w jego prostokącie (EDUU_H12_CTR w OSE2 … HVL1, wiersze szkicu 7–12 z pustymi
+// 9 i 10: cztery rzędy kafelków jak bez łączenia, nie sześć).
 // Liczby w kolumnie i, rząd k: nad = kafelek w (i, k-1), pod = kafelek w (i, k); liczy tylko kafelek w swojej pierwszej
 // kolumnie, ten sam nad i pod = zakryte (bez liczby). Tylko pod: jego górna granica; tylko nad: jego dolna; ten sam
-// zakres (EDWW MRZ, MAR, FLG: 285-0): nic między nimi; ta sama granica (nad.lower = pod.upper): jedna liczba; inaczej
+// zakres (EDWW MRZ, MAR, FLG: 285-0; też dwa połączone okienka, EDUU OSE2+OSE1 nad HVL2+HVL1: 660-285): nic
+// między nimi; ta sama granica (nad.lower = pod.upper): jedna liczba; inaczej
 // dwie z kreską między nimi (nowy ciąg okienek: EDUU OSE1 285, HVL2 660). Liczby jak na szkicu i zdjęciu PANDORY (660,
-// 365, 999, 0). Wysokość rzędów liczb stała, z podziału bez łączenia (połączone rozłożone na members z komórkami):
-// l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows, cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek,
-// l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column, grid-row), marks: [{gc, gr, n: [liczby]}]}
+// 365, 999, 0); nad i pod połączonym okienkiem granice jego członków przy tej krawędzi (jak bez łączenia). Wysokość
+// rzędów liczb stała, z podziału bez łączenia: l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows,
+// cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek, l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column,
+// grid-row), marks: [{gc, gr, n: [liczby]}]}
 export function stackGrid(f) {
   const num = (v, d = 0) => (Number(v) > 0 ? Math.round(Number(v)) : d);
   const cellOf = (b) => ({ b, col: num(b?.col, 1), row: num(b?.row, 1), cols: num(b?.cols, 1), rows: num(b?.rows, 1) });
   const boxes = (Array.isArray(f?.boxes) ? f.boxes : []).map(cellOf);
+  // komórki bez łączenia: połączone okienko rozłożone na members, gdy wszyscy mają komórki w jego prostokącie (inaczej
+  // samo okienko); of = okienko na stronie, do którego należy komórka
+  const inside = (x, c) => x.col >= c.col && x.row >= c.row && x.col + x.cols <= c.col + c.cols && x.row + x.rows <= c.row + c.rows;
   const base = boxes.flatMap((c) => {
-    const ms = Array.isArray(c.b.members) ? c.b.members : [];
-    return c.b.merged && ms.length && ms.every((x) => num(x?.col) && num(x?.row)) ? ms.map(cellOf) : [c];
+    const ms = Array.isArray(c.b.members) ? c.b.members : [], cs = ms.map(cellOf);
+    return c.b.merged && ms.length && ms.every((x) => num(x?.col) && num(x?.row)) && cs.every((x) => inside(x, c))
+      ? cs.map((x) => ({ ...x, of: c.b })) : [{ ...c, of: c.b }];
   });
-  // kolumny i wiersze stosu: ze szkicu (część stała) i z okienek (żadne okienko nie wypada poza stos)
+  // kolumny i wiersze stosu: ze szkicu (część stała) i z komórek bez łączenia (żadne okienko nie wypada poza stos);
+  // prostokąt połączonego okienka nie dodaje pustych wierszy szkicu między członkami
   const axis = (fixed, k, s) => [...new Set([...(Array.isArray(fixed) ? fixed.map(Number).filter((v) => v > 0) : []),
-    ...[...base, ...boxes].flatMap((c) => Array.from({ length: c[s] }, (_, i) => c[k] + i))])].sort((a, b) => a - b);
+    ...base.flatMap((c) => Array.from({ length: c[s] }, (_, i) => c[k] + i))])].sort((a, b) => a - b);
   const cols = axis(f?.cols, "col", "cols"), rows = axis(f?.rows, "row", "rows"), m = rows.length;
   const within = (list, v0, n) => list.map((v, i) => (v >= v0 && v < v0 + n ? i : -1)).filter((i) => i >= 0);
   const grid = (list) => {
@@ -336,21 +345,28 @@ export function stackGrid(f) {
     return { occ, placed };
   };
   const up = (t) => Math.round(Number(t.b.upper) || 0), lo = (t) => Math.round(Number(t.b.lower) || 0);
-  const nums = (occ, i, k) => {
+  // granice kafelka t przy jego krawędzi w wierszu r stosu (pierwszym albo ostatnim): z jego komórek bez łączenia
+  // w tym wierszu (najwyższa górna, najniższa dolna), bez nich – samo okienko. Połączone EDUU OSE1 + HVL2 (660-285):
+  // nad nim 365 (OSE1), pod nim 365 (HVL2) jak bez łączenia, nie 365/660 i 285/365 w rzędzie na jedną liczbę
+  const rim = (t, r) => {
+    const cs = st.occ.map((c) => c[r]).filter((s) => s && s.of === t.b);
+    return cs.length ? { ...t, b: { upper: Math.max(...cs.map(up)), lower: Math.min(...cs.map(lo)) } } : t;
+  };
+  const nums = (occ, i, k, at = (t) => t) => {
     const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
     if (aT && aT === bT) return [];
-    const a = aT && aT.c0 === i ? aT : null, b = bT && bT.c0 === i ? bT : null;
+    const a0 = aT && aT.c0 === i ? aT : null, b0 = bT && bT.c0 === i ? bT : null;
+    if (a0 && b0 && up(a0) === up(b0) && lo(a0) === lo(b0)) return [];
+    const a = a0 ? at(a0, k - 1) : null, b = b0 ? at(b0, k) : null;
     if (a && b) return up(a) === up(b) && lo(a) === lo(b) ? [] : lo(a) === up(b) ? [up(b)] : [lo(a), up(b)];
     return a ? [lo(a)] : b ? [up(b)] : [];
   };
   const cur = grid(boxes), st = grid(base), marks = [];
-  const lv = Array.from({ length: m + 1 }, (_, k) => Math.max(0, ...cols.map((_, i) => nums(st.occ, i, k).length)));
-  for (let k = 0; k <= m; k++) {
-    cols.forEach((_, i) => {
-      const n = nums(cur.occ, i, k);
-      if (n.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n });
-    });
-  }
+  // rząd liczb k: wysokość z podziału bez łączenia; po łączeniu liczb nie przybywa (granice członków), max – żeby
+  // żadna liczba nie wyszła poza swój rząd także przy nietypowym połączeniu
+  const now = Array.from({ length: m + 1 }, (_, k) => cols.map((_, i) => nums(cur.occ, i, k, rim)));
+  const lv = now.map((n, k) => Math.max(0, ...cols.map((_, i) => Math.max(nums(st.occ, i, k).length, n[i].length))));
+  now.forEach((n, k) => n.forEach((v, i) => { if (v.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n: v }); }));
   return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
     tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };
 }

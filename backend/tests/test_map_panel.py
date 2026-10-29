@@ -139,3 +139,27 @@ def test_map_css_vis_rules():
     # zwijanie sekcji bez zmian (viff.css, każda .ms-card[data-sec] w MAP)
     viff = (FRONTEND / "css" / "viff.css").read_text("utf-8")
     assert ".mapside .ms-card.shut > :not(h4) { display: none !important; }" in viff
+
+
+def test_tv_chart_not_opened_by_itself():
+    """Okno wykresu TV (lewy dolny róg mapy) domyślnie zamknięte: przy pierwszym wejściu (bez map.viff.sel) żaden TV
+    nie jest wybierany sam (dawniej pierwszy TV aktywnego scenariusza albo najbardziej obciążony); wykres otwiera wybór
+    użytkownika (lista, scenariusz, wejście w sektor w panelu lotu), a zapisany wybór wraca po przeładowaniu."""
+    code = _code("js/tabs/map.js")
+    assert 'let viffSel = store.get("map.viff.sel", null);' in code
+    # jedyne przypisania wyboru: odczyt zapisanego i selectTv (zapis w map.viff.sel)
+    assert re.findall(r"\bviffSel\s*=[^=]", code) == ["viffSel = ", "viffSel = "]
+    select = code.split("const selectTv = (id) => {")[1].split("\n  };")[0]
+    assert "viffSel = id;" in select and 'store.set("map.viff.sel", id);' in select
+    load = code.split("const loadViff = async () => {")[1].split("\n  };")[0]
+    assert "viffSel" not in load and "loadRatio" not in load and ".active)?.tvs" not in load
+    assert "loadRatio" not in code
+    # okno pokazane tylko dla wybranego TV przy włączonym FMP
+    render = code.split("const renderChart = () => {")[1].split("\n  };")[0]
+    assert "const tv = (viffData?.sectors || []).find((t) => t.id === viffSel);" in render
+    assert 'const show = !!tv && $(".viff").checked;' in render
+    assert 'chartEl.style.display = show ? "" : "none";' in render
+    # wybór z listy, ze scenariusza i z panelu lotu, zamknięcie ✕ zapisuje pusty wybór
+    assert '$(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));' in code
+    assert 'if (b) selectTv(b.dataset.tv);' in code
+    assert 'if (e.target.closest(".vf-close")) { selectTv(""); return; }' in code

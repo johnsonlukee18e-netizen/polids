@@ -19,8 +19,10 @@
 .ac-makers .gbtn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
 
 /* tabela typów: stałe szerokości kolumn (table-layout: fixed), więc nie skacze przy pisaniu w polu wyszukiwania;
-   najwyżej 980 px (przy 1600 px bez pustej przerwy między nazwą a silnikami), pełna nazwa ICAO się zawija */
-table.ac-table { width: 100%; max-width: 980px; table-layout: fixed; }
+   najwyżej 980 px (przy 1600 px bez pustej przerwy między nazwą a silnikami), pełna nazwa ICAO się zawija; co
+   najmniej 640 px (stałe kolumny 460 px, na nazwę zostaje 180 px): w wąskim panelu (tablet pionowo) lista
+   .ac-list przewija się w bok, a kolumna nazwy nie znika */
+table.ac-table { width: 100%; min-width: 640px; max-width: 980px; table-layout: fixed; }
 .ac-table th.icao { width: 64px; }
 .ac-table th.mk { width: 200px; }
 .ac-table th.eng { width: 74px; }
@@ -33,7 +35,9 @@ table.ac-table { width: 100%; max-width: 980px; table-layout: fixed; }
 .ac-table tr.ac-rec { cursor: pointer; }
 .ac-table td.icao { font: 15px/1.35 var(--mono); color: #fff; letter-spacing: .3px; white-space: nowrap; }
 .ac-table td.mk { color: #c9d1c9; }
-.ac-table td.name { color: var(--text); }
+/* nazwa łamana na spacjach i łącznikach, w środku słowa tylko wtedy, gdy samo się nie mieści (ciąg nazw
+   rozdzielonych ukośnikiem, np. Astar/Ecureuil/SuperStar, przeglądarka traktuje jak jedno słowo) */
+.ac-table td.name { color: var(--text); overflow-wrap: break-word; }
 .ac-table td.eng, .ac-table td.wtc, .ac-table td.recat { text-align: center; white-space: nowrap; font-family: var(--mono); }
 .ac-table td.eng, .ac-table td.wtc { color: #fff; }
 /* RECAT-EU w kolorze kategorii jak w filtrze (A, B czerwone; C, D żółte; E, F zielone), także w zaznaczonym wierszu

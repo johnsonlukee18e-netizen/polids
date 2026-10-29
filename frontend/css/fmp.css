@@ -6,12 +6,15 @@
 .fmp { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 /* podzakładka z .pane.fill: pasek stoi, przewija się tylko tabela (nagłówek tabeli przyklejony); 0.13.1: obok tabeli
    panel wykresów (.fmp-side), który nie przewija się z tabelą. Szerokość panelu FMP (container query) decyduje, czy
-   panel stoi obok tabeli, czy pod nią (okno węższe niż ok. 1310 px) */
+   panel stoi obok tabeli, czy pod nią (okno węższe niż ok. 1250 px; 1280 px mieści oba obok siebie). Gdy brakuje
+   miejsca, najpierw węższa jest tabela (do 424 px: ok. 403 px treści z nagłówkiem CAPACITY (ENTRIES) w jednej linii
+   i pionowy pasek przewijania do 17 px, bez przewijania w poziomie), a wykresy zostają możliwie szerokie (panel co
+   najmniej 480 px) */
 .pane.fill > .fmp { flex: 1; padding: 12px 16px; container: fmp / inline-size; }
 .pane.fill > .fmp > .fmp-main { flex: 1; min-height: 0; display: flex; gap: 16px; align-items: flex-start; }
-.fmp-main > .fmp-scroll { flex: 0 1 680px; min-width: 440px; max-height: 100%; overflow: auto; }
+.fmp-main > .fmp-scroll { flex: 0 4 680px; min-width: 424px; max-height: 100%; overflow: auto; }
 .fmp-main table.fmp-table { max-width: none; }
-.fmp-side { flex: 1 1 600px; min-width: 520px; max-width: 760px; max-height: 100%; overflow: auto; padding: 6px 10px 8px;
+.fmp-side { flex: 1 1 600px; min-width: 480px; max-width: 760px; max-height: 100%; overflow: auto; padding: 6px 10px 8px;
   background: #000; border: 1px solid #3a3a3a; color: #fff; font: 400 13px/1.35 var(--ui); }
 .fmp-side .fmp-pick { margin: 0; padding: 18px 4px; font-size: 14px; }
 
@@ -91,12 +94,13 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
 .fmc-legend i.fmc-regl { width: 14px; height: 0; border-top: 2px solid #ff5a4a; }
 .fmc-legend .fmc-stat { color: var(--muted); }
 
-/* wąskie okno (okno węższe niż ok. 1310 px: tabela i panel nie mieszczą się obok siebie): panel pod tabelą na całą
-   szerokość, wykresy obok siebie; tabela (szerokość jak do 0.13.0) dostaje resztę wysokości i przewija się sama, a gdy
-   nie starcza miejsca nawet na 120 px tabeli, przewija się cały obszar pod paskiem */
-@container fmp (max-width: 987px) {
+/* wąskie okno (okno węższe niż ok. 1250 px: 424 + 16 + 480 px się nie mieszczą): panel pod tabelą, tej samej
+   szerokości co tabela (do 680 px), wykresy jeden pod drugim (najwyżej 520 px szerokości, żeby napisy osi nie były
+   drobne jak w dwóch kolumnach po ok. 330 px w oknie 1024 px); tabela (szerokość jak do 0.13.0) dostaje resztę
+   wysokości i przewija się sama, a gdy nie starcza miejsca nawet na 120 px tabeli, przewija się cały obszar pod paskiem */
+@container fmp (max-width: 919px) {
   .pane.fill > .fmp > .fmp-main { flex-direction: column; align-items: stretch; gap: 10px; overflow: auto; }
   .fmp-main > .fmp-scroll { flex: 1 1 auto; width: 100%; max-width: 680px; min-width: 0; min-height: 120px; max-height: none; }
-  .fmp-side { flex: none; min-width: 0; max-width: none; max-height: none; overflow: visible; }
-  .fmc-charts { grid-template-columns: 1fr 1fr; }
+  .fmp-side { flex: none; min-width: 0; max-width: 680px; max-height: none; overflow: visible; }
+  .fmc-charts { grid-template-columns: minmax(0, 520px); }
 }

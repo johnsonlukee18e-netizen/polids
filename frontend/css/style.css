@@ -53,9 +53,15 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); ov
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr); }
 /* wysokość przycisku menu i podmenu: 28 px, a w niskim oknie mniej, po równo w obu kolumnach (rzędy dalej na jednej
    wysokości), tak żeby 21 przycisków menu, zegar, logo i użytkownik zmieściły się bez przewijania; najmniej 16 px.
-   --foot-h: zegar 46 + logo 34 (+ użytkownik 66). --btn-h na body, tak jak zmiana --foot-h dla zalogowanego */
-body { --foot-h: 80px;
-  --btn-h: clamp(16px, calc((100vh - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows) - 2 * var(--btn-m)), var(--btn-h-max)); }
+   --foot-h: zegar 46 + logo 34 (+ użytkownik 66). --btn-h na body, tak jak zmiana --foot-h dla zalogowanego.
+   --view-h: widoczna wysokość okna, ta sama co html, body { height: 100% }. Samo 100vh w przeglądarkach na tabletach
+   i telefonach z paskiem adresu to wysokość bez paska (większa niż widoczna, a strona się nie przewija, więc pasek
+   zostaje): przyciski wychodziły za wysokie i EMERGENCY / ADMIN chowały się pod zegarem. 100svh to wysokość z paskiem;
+   100vh zostaje dla przeglądarek bez svh (osobna zmienna: drugie --btn-h z svh wygrywałoby zawsze, także tam, gdzie
+   svh jest nieznane, i przyciski traciłyby wysokość) */
+body { --view-h: 100vh; --foot-h: 80px;
+  --btn-h: clamp(16px, calc((var(--view-h) - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows) - 2 * var(--btn-m)), var(--btn-h-max)); }
+@supports (height: 100svh) { body { --view-h: 100svh; } }
 body:has(#userbox:not([hidden])) { --foot-h: 146px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 /* bez pogrubień także tam, gdzie przeglądarka pogrubia sama (b, strong, nagłówki tabel i stron, grupy w listach
@@ -136,6 +142,32 @@ main { flex: 1; min-width: 0; position: relative; }
 .submenu.letters button { width: auto; }
 .submenu.letters button.all, .submenu.letters button.kbd { grid-column: 1 / -1; }
 .submenu .sep { flex: none; height: calc(var(--btn-h) + 2 * var(--btn-m)); }
+/* menu i podmenu bez widocznych pasków przewijania (pionowego i poziomego): klasyczny pasek (przeglądarki na
+   komputerze) zabierał kolumnie miejsce, przyciski 137 px się nie mieściły i były ucinane z boku. Przewijanie kółkiem
+   myszy, palcem i klawiaturą bez zmian; w poziomie kolumna się nie przewija. Menu przewija się tylko w oknie, w którym
+   21 rzędów nie mieści się nawet po 16 px */
+.menu nav, .submenu { overflow-x: hidden; scrollbar-width: none; }
+.menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }
+/* podmenu dłuższe niż menu (więcej niż --menu-rows = 21 rzędów, czyli elementów kolumny flex; litery mają po dwa
+   w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby każdy widoczny
+   rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu (w paddingu byłoby
+   widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do ostatniego, który mieści się
+   nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też całe rzędy. Przewijanie
+   (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap, margines przycisku nad
+   rzędem). 22 = --menu-rows + 1 */
+.submenu:not(.letters):has(> :nth-child(22)) {
+  max-height: calc(var(--menu-rows) * (var(--btn-h) + 2 * var(--btn-m))); margin-block: var(--col-pad); padding-block: 0;
+  scroll-snap-type: y mandatory; }
+@supports (height: mod(5px, 3px)) {
+  .submenu:not(.letters):has(> :nth-child(22)) { max-height: calc(var(--view-h) - var(--topbar-h) - 2 * var(--col-pad)
+    - mod(var(--view-h) - var(--topbar-h) - 2 * var(--col-pad), var(--btn-h) + 2 * var(--btn-m))); }
+}
+.submenu:not(.letters):has(> :nth-child(22)) > * { scroll-snap-align: start; }
+.submenu:not(.letters):has(> :nth-child(22)) > button { scroll-margin-top: var(--btn-m); }
+/* w marginesie nad pierwszym i pod ostatnim całym rzędem kolumna wygląda jak każde podmenu (tło i kreska z prawej
+   od góry do dołu okna): rysuje je zakładka */
+.view:has(> .submenu:not(.letters) > :nth-child(22)) {
+  background: linear-gradient(to right, #050605 calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), transparent 0); }
 
 .pane { flex: 1; min-width: 0; overflow: auto; padding: 12px 16px; }
 .pane.fill { padding: 0; overflow: hidden; display: flex; flex-direction: column; }

@@ -233,6 +233,19 @@ def test_keyboard_css_look():
     hover = re.search(r"@media \(hover: hover\) \{(.*?)\n\}", css, re.S).group(1)
     assert ".tkbd .tk:hover" in hover and css.count(":hover") == 1
     assert ".tkbd .tk:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }" in css
+    # klawiatura mieści się w panelu przy każdej szerokości (tablet pionowo: panel węższy niż 601 px): safe center
+    # zamiast center (nadmiar nigdy w lewo pod podmenu), najwyżej szerokość panelu, klawisze węższe wg cqw panelu
+    kbd = re.search(r"(?m)^\.tkbd \{([^}]*)\}", css).group(1)
+    assert "align-self: safe center;" in kbd and "max-width: 100%;" in kbd and "align-self: center" not in kbd
+    assert ".ac-pane, .cs-pane { container-type: inline-size; }" in css
+    fit = re.search(r"(?m)^\.ac-pane > \.tkbd, \.cs-pane > \.tkbd \{ --tk-w: min\((\d+)px, "
+                    r"calc\(\(100cqw - (\d+)px\) / 10\)\); \}", css)
+    assert fit, "--tk-w wg szerokości panelu"
+    # 10 klawiszy + stała = cała klawiatura: 9 odstępów, padding i ramka z obu stron (z reguły .tkbd)
+    gap = float(re.search(r"--tk-gap: ([\d.]+)px;", kbd).group(1))
+    pad = float(re.search(r"(?<![-\w])padding: ([\d.]+)px;", kbd).group(1))
+    border = float(re.search(r"(?<![-\w])border: ([\d.]+)px solid", kbd).group(1))
+    assert float(fit.group(1)) == widths[0] and float(fit.group(2)) == 9 * gap + 2 * pad + 2 * border == 41
     # zielony klawisz z reguły .gbtn (ten sam gradient i ramka co przyciski menu)
     assert re.search(r"(?m)^\.gbtn, \.menu nav button, \.submenu button \{[^}]*linear-gradient\(#45a832, #2f8a22\)",
                      (FRONTEND / "css" / "style.css").read_text("utf-8"))

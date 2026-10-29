@@ -392,10 +392,18 @@ def test_menu_fits_low_windows():
 
     rows = int(re.search(r"--menu-rows: (\d+);", css).group(1))
     assert rows == len(_menu_buttons()) == 21
-    assert ("--btn-h: clamp(16px, calc((100vh - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows)"
+    assert ("--btn-h: clamp(16px, calc((var(--view-h) - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows)"
             " - 2 * var(--btn-m)), var(--btn-h-max)); }") in css
     # --btn-h na body, tam gdzie zalogowany użytkownik zmienia --foot-h (na :root byłaby liczona ze stałą --foot-h)
-    assert re.search(r"(?m)^body \{ --foot-h: 80px;\s+--btn-h: clamp", css)
+    assert re.search(r"(?m)^body \{ --view-h: 100vh; --foot-h: 80px;\s+--btn-h: clamp", css)
+    # runda 17 (przegląd): wysokość z widocznej części okna, nie z samego 100vh. W Chrome na Androidzie (i innych
+    # przeglądarkach z paskiem adresu) 100vh to okno bez paska, a strona się nie przewija, więc pasek zostaje: 1280x800
+    # z paskiem (widać 744 px) dawało 26,84 px zamiast 24,19 i EMERGENCY / ADMIN wychodziły pod zegar. Osobna zmienna:
+    # 100vh dla przeglądarek bez svh, 100svh (okno z paskiem, tyle co html, body { height: 100% }) w @supports; drugie
+    # --btn-h z svh obok pierwszego wygrywałoby zawsze, także tam, gdzie svh jest nieznane
+    assert "@supports (height: 100svh) { body { --view-h: 100svh; } }" in css
+    assert css.count("--btn-h:") == 1 and "100vh" not in css.replace("--view-h: 100vh;", "", 1)
+    assert "html, body { height: 100%; margin: 0; }" in css
     assert "body:has(#userbox:not([hidden])) { --foot-h: 146px; }" in css
     assert ".menu nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }" in css
     # stałe wysokości dołu menu: zegar z AIRAC + logo = --foot-h bez użytkownika, + użytkownik = z użytkownikiem
@@ -413,14 +421,21 @@ def test_menu_fits_low_windows():
     def btn_h(vh, foot):
         return min(max(h_min, (vh - topbar - 2 * pad - foot) / rows - 2 * m), h_max)
 
+    def fits(view, foot, h):   # pasek, padding, 21 rzędów i dół menu w widocznej części okna
+        return topbar + 2 * pad + rows * (h + 2 * m) + foot <= view + 1e-9
+
     for vh in (560, 600, 657, 768, 900):
         for foot in (80, 146):
             h = btn_h(vh, foot)
             assert h >= h_min
-            if h > h_min:   # mieści się bez przewijania: pasek, padding, 21 rzędów, dół menu
-                assert topbar + 2 * pad + rows * (h + 2 * m) + foot <= vh + 1e-9, (vh, foot, h)
+            if h > h_min:   # mieści się bez przewijania
+                assert fits(vh, foot, h), (vh, foot, h)
     assert btn_h(900, 80) == btn_h(900, 146) == btn_h(768, 80) == 28
     assert 25 < btn_h(768, 146) < 26 and btn_h(600, 146) >= 16 and btn_h(657, 146) > 20
+    # tablet 1280x800 z paskiem adresu: widać 744 px (svh), 100vh = 800. Z widocznej wysokości menu się mieści, z 100vh
+    # nie (26,84 px, 56 px za dużo)
+    assert 24.1 < btn_h(744, 146) < 24.2 and fits(744, 146, btn_h(744, 146))
+    assert 26.8 < btn_h(800, 146) < 26.9 and not fits(744, 146, btn_h(800, 146))
 
 
 def test_logo_at_bottom_above_user():

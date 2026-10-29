@@ -219,7 +219,8 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   let sel = cleanTv(start), chart = null, chartAt = 0, cseq = 0, reveal = !!sel;
   const visible = () => root.isConnected && root.offsetParent !== null;
   const rowOf = (id) => (data ? fmpRows(data).find((r) => r.id === id) || null : null);
-  const showRow = () => { reveal = false; box.querySelector("tr.sel")?.scrollIntoView?.({ block: "nearest" }); };
+  const keepRow = () => box.querySelector("tr.sel")?.scrollIntoView?.({ block: "nearest" });
+  const showRow = () => { reveal = false; keepRow(); };
   // zaznaczenie wiersza bez rysowania tabeli od nowa (dymki i przewinięcie zostają)
   const mark = () => {
     box.querySelectorAll("tr[data-tv]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.tv === sel));
@@ -250,7 +251,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   // wykres wybranego sektora; spóźniona odpowiedź dla poprzedniego wyboru nic nie rysuje (cseq); błąd odświeżenia
   // zostawia ostatni wykres z komunikatem w nagłówku
   const loadChart = async () => {
-    const my = ++cseq, id = sel;
+    const my = ++cseq, id = sel, fresh = chart?.id !== id;
     if (!id) { chart = null; chartAt = 0; side.innerHTML = fmpPickHtml(); return; }
     if (chart?.id !== id) side.innerHTML = fmpWaitHtml(id, rowOf(id));
     try {
@@ -258,6 +259,9 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
       if (dead || my !== cseq) return;
       chart = c; chartAt = Date.now();
       draw(fmpChartHtml(c, rowOf(id)));
+      // w wąskim oknie wykresy stoją pod tabelą i ją skracają: nowo wybrany wiersz zostaje widoczny (odświeżenie co
+      // minutę nie przewija)
+      if (fresh) keepRow();
     } catch (e) {
       if (dead || my !== cseq) return;
       chartAt = Date.now();

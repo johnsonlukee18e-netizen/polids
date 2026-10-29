@@ -1,5 +1,5 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
-import { chartHtml, delayClass, listRow, loadRatio, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
+import { chartHtml, delayClass, listRow, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
 import { AC_LABEL_GAP, FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, acLabelSpot, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates,
   colorFor, controllerRows, drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
@@ -1221,11 +1221,9 @@ function mainMap(ctx) {
     $(".vf-card").classList.toggle("off", !$(".viff").checked);  // wyłączony vIFF: bez scenariuszy i listy TV
     if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
     try {
+      // 0.13.1 (issue #25): bez zapisanego wyboru żaden TV nie jest wybierany sam, więc okno wykresu zostaje zamknięte;
+      // wykres otwiera dopiero wybór TV przez użytkownika (zapisany w map.viff.sel i przywracany przy następnym wejściu)
       viffData = await api("/api/viff/sectors");
-      // pierwszy raz: pierwszy TV aktywnego scenariusza, a bez niego najbardziej obciążony
-      if (viffSel === null && viffData.sectors.length) {
-        viffSel = viffData.scenarios?.find((x) => x.active)?.tvs[0]?.id || [...viffData.sectors].sort((a, b) => loadRatio(b) - loadRatio(a))[0].id;
-      }
       $(".viff-info").textContent = `${viffData.sectors.length} TV · ${plural(viffData.scenarios?.length || 0, "scenario", "scenarios")} · as of ${viffData.now.slice(0, 2)}:${viffData.now.slice(2)}Z`;
     } catch (e) {
       viffData = null;

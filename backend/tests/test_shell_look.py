@@ -450,7 +450,7 @@ def test_one_button_size_everywhere():
     shell = re.compile(r"#tabs|\.menu nav|\.submenu")
     sized = {sel for sel, body in _rules(STYLE) if shell.search(sel) and size.search(body)}
     assert sized == {".gbtn, .menu nav button, .submenu button", ".menu nav button, .submenu button", ".menu nav",
-                     ".menu nav button.back", ".submenu", ".submenu.letters button", ".submenu .sep"}, sized
+                     ".menu nav button.back", ".submenu", ".submenu.letters button", ".submenu .sep", LONG}, sized
     assert _rule(STYLE, ".menu nav button.back").strip() == "font-size: 22px;"
     # inne arkusze nie zmieniają wielkości przycisków menu ani podmenu (coordination.css: tylko letter-spacing i rogi)
     for path in sorted((FRONTEND / "css").glob("*.css")):
@@ -476,3 +476,59 @@ def test_letters_half_width_and_rows():
     letter = (col_w - 1 - 2 * tok["--col-pad"]) / 2 - 2 * tok["--btn-m"]
     assert letter == 67 and 2 * letter + 2 * tok["--btn-m"] == tok["--btn-w"] == 137
     assert ".submenu .sep { flex: none; height: calc(var(--btn-h) + 2 * var(--btn-m)); }" in _nocomments(STYLE)
+
+
+# podmenu dłuższe niż menu (AD VFR): selektor z style.css
+LONG = ".submenu:not(.letters):has(> :nth-child(22))"
+
+
+def test_submenus_without_scrollbars():
+    """Runda 17: AD VFR (69 lotnisk i eAIP, jedyne przewijane podmenu) w przeglądarce z klasycznymi paskami (Chromium
+    bez --hide-scrollbars, 1600x900, #advfr/EPPZ) miało pasek pionowy i poziomy, a przyciski 137 px były ucięte z boku
+    (clientWidth 134 przy 149 px treści). Menu i podmenu bez widocznych pasków (scrollbar-width i ::-webkit-scrollbar dla
+    Safari i starszego Chrome), bez przewijania w poziomie; kółko myszy i palec przewijają dalej (overflow-y: auto)."""
+    css = _nocomments(STYLE)
+    assert ".menu nav, .submenu { overflow-x: hidden; scrollbar-width: none; }" in css
+    assert ".menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }" in css
+    assert "overflow-y: auto;" in _rule(STYLE, ".submenu") and "overflow-y: auto;" in _rule(STYLE, ".menu nav")
+    # żadna inna reguła dla samych kolumn nie przywraca paska ani nie wyłącza przewijania
+    columns = {".menu nav", ".submenu", ".submenu.letters", LONG}
+    for sel, body in _rules(STYLE):
+        if columns & {part.strip() for part in sel.split(",")}:
+            assert not re.search(r"scrollbar-width: (?!none)|overflow(-y)?: (hidden|visible|scroll)", body), (sel, body)
+
+
+def test_long_submenu_scrolls_whole_rows():
+    """Runda 17: przewinięte AD VFR wychodziło z siatki 31 px menu (issue #25: każdy rząd podmenu na wysokości rzędu
+    menu obok). Podmenu dłuższe niż --menu-rows rzędów (22 = 21 + 1 elementów kolumny; litery mają po dwa w rzędzie)
+    pokazuje tylko całe rzędy: margines zamiast paddingu u góry i u dołu (w paddingu widać było 3 px przycisków spoza
+    widoku), wysokość do ostatniego całego rzędu nad dołem okna (mod(); bez mod() 21 rzędów), przewijanie zatrzymuje się
+    na początku rzędu (scroll-snap), aip.js przewija o całe rzędy. Pod ostatnim rzędem kolumnę (tło, kreska z prawej)
+    rysuje zakładka. Playwright (scrolltest.py, prawdziwe paski): kółko, dotyk i adres przy 1600x900, 1366x768,
+    1366x657 z użytkownikiem i bez: bez paska, bez ułamków przycisków w widoku, przewinięcie w całych rzędach."""
+    css = _nocomments(STYLE)
+    rows = int(re.search(r"--menu-rows: (\d+);", css).group(1))
+    assert LONG == f".submenu:not(.letters):has(> :nth-child({rows + 1}))"
+    long = _rule(STYLE, LONG)
+    pitch = "var(--btn-h) + 2 * var(--btn-m)"
+    assert f"max-height: calc(var(--menu-rows) * ({pitch}));" in long
+    assert "margin-block: var(--col-pad);" in long and "padding-block: 0;" in long
+    assert "scroll-snap-type: y mandatory;" in long and "scroll-padding" not in long
+    full = "var(--view-h) - var(--topbar-h) - 2 * var(--col-pad)"
+    assert (f"@supports (height: mod(5px, 3px)) {{\n  {LONG} {{ max-height: calc({full}\n    - mod({full}, {pitch})); }}\n}}"
+            in css)
+    # początek rzędu: margines nad przyciskiem (1,5 px) i odstęp (.sep) bez marginesu
+    assert f"{LONG} > * {{ scroll-snap-align: start; }}" in css
+    assert f"{LONG} > button {{ scroll-margin-top: var(--btn-m); }}" in css
+    # kolumna pod ostatnim rzędem jak .submenu: to samo tło i ta sama kreska z prawej (1 px z --col-w)
+    sub = _rule(STYLE, ".submenu")
+    assert "background: #050605;" in sub and "border-right: 1px solid var(--line);" in sub
+    view = _rule(STYLE, ".view:has(> .submenu:not(.letters) > :nth-child(22))")
+    assert ("background: linear-gradient(to right, #050605 calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), "
+            "transparent 0);") in view
+    # widać całe rzędy: R x 31 px przy 28 px; w oknie 1366x657 (rząd 26,1875 px) do ostatniego całego rzędu
+    for view_h, pitch_px in ((900, 31), (768, 31), (657, 26.1875)):
+        col = view_h - 18 - 9
+        visible = col - col % pitch_px
+        assert abs(visible / pitch_px - round(visible / pitch_px)) < 1e-9 and col - visible < pitch_px
+

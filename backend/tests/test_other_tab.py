@@ -568,3 +568,42 @@ def test_subtabs_first_option(tmp_path):
     for name in ("none", "bad"):
         o = out[name]
         assert o["start"] == "a" and o["unknown"] == "a" and o["pathEmpty"] == "a" and o["pathUnknown"] == "a", name
+
+
+def test_fmp_charts_beside_table_at_1280():
+    """0.13.1 (issue #25): wykresy ENTRY / OCC po prawej stronie tabeli FMP także w oknie 1280 px (1280x720, 1280x800).
+    Obszar FMP = okno minus kolumny menu i podmenu (--col-w z style.css) i boczne marginesy .fmp; pod tabelę panel
+    schodzi dopiero, gdy nie mieści się najwęższa tabela (treść ok. 403 px z nagłówkiem w jednej linii i pionowy pasek
+    przewijania do 17 px), odstęp i najwęższy panel, przy którym napisy wykresu (viewBox 600 px, 11 px) mają >= 8 px."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "fmp.css").read_text("utf-8"), flags=re.S)
+    base, narrow = css.split("@container fmp", 1)
+
+    def px(pat, src=base):
+        return int(re.search(pat, src).group(1))
+
+    table_min = px(r"\.fmp-main > \.fmp-scroll \{[^}]*\bmin-width: (\d+)px")
+    side_min = px(r"\.fmp-side \{[^}]*\bmin-width: (\d+)px")
+    gap = px(r"\.pane\.fill > \.fmp > \.fmp-main \{[^}]*\bgap: (\d+)px")
+    pad = px(r"\.pane\.fill > \.fmp \{[^}]*\bpadding: \d+px (\d+)px")
+    bp = px(r"^ \(max-width: (\d+)px\)", narrow)
+    assert table_min + gap + side_min == bp + 1, "próg container query = najwęższy układ obok siebie"
+    assert table_min >= 403 + 17
+    style = (FRONTEND / "css" / "style.css").read_text("utf-8")
+
+    def var(name):
+        return float(re.search(rf"--{name}: ([\d.]+)px;", style).group(1))
+
+    assert "--col-w: calc(var(--btn-w) + 2 * var(--btn-m) + 2 * var(--col-pad) + 1px);" in style
+    col_w = var("btn-w") + 2 * var("btn-m") + 2 * var("col-pad") + 1
+    assert col_w == 150
+    # najwęższe okno z wykresami obok tabeli: ok. 1252 px (zapas na pionowy pasek strony przy 1280 px)
+    assert bp + 1 + 2 * col_w + 2 * pad <= 1280 - 20
+    # panel: padding 10 px i ramka 1 px z każdej strony; wykres w viewBox o szerokości W z fmp.js
+    w = int(re.search(r"const W = (\d+),", (FRONTEND / "js" / "fmp.js").read_text("utf-8")).group(1))
+    assert "padding: 6px 10px 8px;" in base.split(".fmp-side {", 1)[1].split("}", 1)[0]
+    assert (side_min - 22) / w * 11 >= 8
+    # tabela zwęża się pierwsza (większy flex-shrink), panel wykresów zostaje szerszy
+    assert ".fmp-main > .fmp-scroll { flex: 0 4 680px;" in base and ".fmp-side { flex: 1 1 600px;" in base
+    # wąskie okno: wykresy jeden pod drugim (bez dwóch kolumn po ok. 330 px w oknie 1024 px), panel jak tabela
+    assert ".fmc-charts { grid-template-columns: minmax(0, 520px); }" in narrow and "1fr 1fr" not in css
+    assert re.search(r"\.fmp-side \{[^}]*max-width: 680px;", narrow)

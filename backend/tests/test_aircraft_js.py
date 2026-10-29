@@ -375,6 +375,16 @@ def test_css_table():
     table = _css_rule("table.ac-table")
     assert "table-layout: fixed;" in table and "max-width: 980px;" in table
     assert "nowrap" in _css_rule(".ac-table td.icao") and "nowrap" not in _css_rule(".ac-table td.name")
+    # w wąskim panelu (tablet pionowo) kolumna nazwy nie znika: tabela co najmniej 640 px (lista przewija się w bok),
+    # na nazwę zostaje co najmniej 160 px poza stałymi kolumnami; nazwa łamana na spacjach, nie po jednej literze
+    floor = re.search(r"min-width: (\d+)px;", table)
+    assert floor, "table.ac-table bez min-width"
+    floor = float(floor.group(1))
+    fixed = sum(float(re.search(r"width: (\d+)px;", _css_rule(f".ac-table th.{c}")).group(1))
+                for c in ("icao", "mk", "eng", "wtc", "recat"))
+    assert floor == 640 and fixed == 460 and floor - fixed >= 160
+    assert "overflow: auto;" in _css_rule(".ac-list")
+    assert "overflow-wrap: break-word;" in _css_rule(".ac-table td.name")
     # RECAT-EU w kolorze kategorii, także w zaznaczonym wierszu
     for k, color in (("A", "#ff6a5a"), ("B", "#ff6a5a"), ("C", "var(--yellow)"), ("D", "var(--yellow)"),
                      ("E", "var(--ok)"), ("F", "var(--ok)")):

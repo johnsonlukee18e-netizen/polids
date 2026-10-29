@@ -1,12 +1,14 @@
 """OTHER › FMP (0.13.1, issue #25): wykresy ENTRY i OCC wybranego sektora. Backend: loty jednego traffic volume
 z całodobowych /etfms/airspaces (tv_flights), regulacje jako przedziały minut (reg_spans), szeregi wykresów
-(sector_series), sector_chart z atrapą vIFF i endpoint GET /api/viff/sectors/{tv} (400 / 404 / 502 / 200).
+(sector_series: szczyt tylko z rysowanych minut, zgodność z liczeniem wprost), sector_chart z atrapą vIFF, jutrzejsza
+doba jako dodatek także o 23Z (sectors() i wykres) i endpoint GET /api/viff/sectors/{tv} (400 / 404 / 502 / 200).
 Frontend w Node: entrySvg / occSvg / fmpChartHtml (klasy obciążenia, przygaszona przeszłość, linia "teraz",
 przepustowość i regulacja, dymki, oś przez północ, escapowanie), cleanTv, fmpHtml z wybranym wierszem i zachowanie
 mountFmp na atrapie DOM (wybór z adresu, klik, drugi klik, ✕, spóźniona odpowiedź, błąd odświeżenia, destroy)."""
 import asyncio
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -135,7 +137,62 @@ def test_sector_series():
     assert not any(e["occupancy"]) and e["peak"] == 0 and e["peak_at"] == "1310" and e["flights"] == 0
 
 
-def _fake(calls, fail=(), days=None):
+def _hour(h, *flights):
+    return {"hour": h, "flights": [[cs, a, b, a, b, True] for cs, a, b in flights]}
+
+
+def test_sector_series_peak_drawn_minutes():
+    # szczyt tylko z rysowanych minut [teraz, 1700): pięć wejść dokładnie o 1700 (minuta końca okna, poza wykresem)
+    # nie ustawia peak / peak_at, choć punkt occupancy[300] nadal jest w odpowiedzi
+    late = {"EP-BH": [_hour("13", ("ONE", "1315", "1320")),
+                      _hour("17", *[(f"END{i}", "1700", "1710") for i in range(5)])]}
+    c = viff.sector_series("EP-BH", {0: late}, NOW, ROW)
+    occ = c["occupancy"]
+    assert len(occ) == 301 and occ[300] == 5 and max(occ[:300]) == 1
+    assert (c["peak"], c["peak_at"], c["flights"]) == (1, "1315", 1)
+    # ostatnia rysowana minuta (1659) liczy się do szczytu
+    edge = {"EP-BH": [_hour("16", *[(f"E{i}", "1659", "1710") for i in range(3)])]}
+    c = viff.sector_series("EP-BH", {0: edge}, NOW, ROW)
+    assert (c["peak"], c["peak_at"], c["occupancy"][299], c["flights"]) == (3, "1659", 3, 3)
+
+
+def _slow_series(tv, days, now):
+    """Wzorzec: zajętość, słupki E60/20, liczba lotów i szczyt liczone wprost, minuta po minucie po wszystkich lotach."""
+    start = (now.hour - viff.CHART_HOURS_BEFORE) * 60
+    minutes = viff.CHART_HOURS * 60
+    end = start + minutes
+    fl = viff.tv_flights(tv, days)
+    occ = [sum(1 for f in fl if f["entry"] <= start + m < f["exit"]) for m in range(minutes + 1)]
+    counts = [sum(1 for f in fl if t <= f["entry"] < t + viff.CHART_SPAN) for t in range(start, end, viff.CHART_STEP)]
+    ahead = occ[now.hour * 60 + now.minute - start:minutes]
+    return occ, counts, sum(1 for f in fl if f["exit"] > start and f["entry"] < end), max(ahead), ahead.index(max(ahead))
+
+
+def _random_day(rng, n):
+    hm = lambda m: f"{m % 1440 // 60:02d}{m % 60:02d}"  # noqa: E731
+    buckets = {}
+    for i in range(n):
+        e = rng.randrange(1440)
+        x = e + rng.choice([rng.randrange(1, 90), rng.randrange(1, 400), 0, 800])   # także wyjście "przed" wejściem
+        t = [f"R{i % (n // 2 + 1)}", hm(e), hm(x), *([hm(e), hm(x)] if rng.random() < .8 else ["", ""]), True]
+        for h in {e // 60, x // 60 if x < 1440 else e // 60}:
+            buckets.setdefault(h, []).append(t)
+    return {"EP-BH": [{"hour": f"{h:02d}", "flights": f} for h, f in sorted(buckets.items())]}
+
+
+def test_sector_series_matches_direct_count():
+    # zawężenie lotów do okna, tablica różnic i bisekcja dają to samo co liczenie wprost po całych dobach
+    rng = random.Random(25)
+    for _ in range(40):
+        now = at(rng.randrange(24), rng.randrange(60))
+        days = {d: _random_day(rng, rng.choice([0, 5, 40, 120])) for d in (-1, 0, 1) if d == 0 or rng.random() < .6}
+        c = viff.sector_series("EP-BH", days, now, ROW)
+        occ, counts, flights, peak, peak_from_now = _slow_series("EP-BH", days, now)
+        assert c["occupancy"] == occ and [e["count"] for e in c["entries"]] == counts and c["flights"] == flights, now
+        assert c["peak"] == peak and c["peak_at"] == viff._abs_hhmm(now.hour * 60 + now.minute + peak_from_now), now
+
+
+def _fake(calls, fail=(), days=None, load=None, exc=UpstreamError):
     days = days or {"2026-10-05": DAY}
 
     async def get(path, params=None, ttl=None):
@@ -145,10 +202,10 @@ def _fake(calls, fail=(), days=None):
             return []
         if path == "/etfms/airspaces":
             if "fromNow" in params:   # sectors(): bieżąca doba od teraz
-                return {}
+                return load or {}
             calls.append(params["date"])
             if params["date"] in fail:
-                raise UpstreamError("timeout")
+                raise exc("timeout")
             return days.get(params["date"], {})
         raise ValueError(path)
     return get
@@ -178,10 +235,42 @@ def test_sector_chart_service():
         viff._get = _fake(calls, fail=("2026-10-05",), days={"2026-10-06": TODAY_0})
         c = run(viff.sector_chart("EP-BH", at(0, 10, 6)))
         assert c["start"] == "2300" and c["flights"] == 2 and c["occupancy"][0] == 0
+        # błąd jutrzejszej doby także o 23Z (sectors() pobiera ją dla następnej godziny): wykres z dzisiejszych danych
+        for exc in (UpstreamError, ValueError):
+            for h in (21, 23):
+                calls.clear()
+                viff._get = _fake(calls, fail=("2026-10-06",), exc=exc)
+                c = run(viff.sector_chart("EP-BH", at(h)))
+                assert c is not None and c["start"] == f"{h - 1}00", (exc, h)
+                assert calls == (["2026-10-06"] if h == 23 else []) + ["2026-10-05", "2026-10-06"], (exc, h)
         # błąd dzisiejszej doby: UpstreamError (router: 502)
         viff._get = _fake(calls, fail=("2026-10-05",))
         with pytest.raises(UpstreamError):
             run(viff.sector_chart("EP-BH", NOW))
+    finally:
+        viff._get = viff_get
+
+
+def test_sectors_tomorrow_optional():
+    # o 23Z następna godzina tabeli FMP jest z jutrzejszej doby; jej błąd = pusta następna godzina, nie błąd całej tabeli
+    load = {"EP-BH": [{"hour": "23", "entriesCount": 4, "flights": [["A1", "2320", "2330", "2320", "2330", True]]}]}
+    nxt = {"EP-BH": [{"hour": "00", "entriesCount": 7, "flights": [["B2", "0005", "0015", "0005", "0015", False]]}]}
+    viff_get = viff._get
+    try:
+        calls = []
+        viff._get = _fake(calls, days={"2026-10-06": nxt}, load=load)
+        row = next(s for s in run(viff.sectors("EP", at(23)))["sectors"] if s["id"] == "EP-BH")
+        assert calls == ["2026-10-06"] and [h["entries"] for h in row["hours"]] == [4, 7]
+        for exc in (UpstreamError, ValueError):
+            viff._get = _fake(calls, fail=("2026-10-06",), days={"2026-10-06": nxt}, load=load, exc=exc)
+            d = run(viff.sectors("EP", at(23)))
+            row = next(s for s in d["sectors"] if s["id"] == "EP-BH")
+            assert {s["id"] for s in d["sectors"]} == {"EP-BH", "EP-DM"} and [h["entries"] for h in row["hours"]] == [4], exc
+            assert [f["callsign"] for f in row["flights"]] == ["A1"] and row["active"] is True, exc
+        # przed 23Z jutrzejsza doba nie jest potrzebna
+        calls.clear()
+        run(viff.sectors("EP", at(22)))
+        assert calls == []
     finally:
         viff._get = viff_get
 
@@ -214,6 +303,20 @@ def test_sector_endpoint(client):
     viff._get = down
     r = client.get("/api/viff/sectors/EP-BH")
     assert r.status_code == 502 and r.json()["detail"] == "Flow data unavailable"
+
+
+def test_sector_endpoints_at_23z_without_tomorrow(client, monkeypatch):
+    # 23:10, jutrzejsza doba niedostępna: tabela FMP i wykres odpowiadają 200 (bez lotów po północy), nie 502
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return at(23)
+    monkeypatch.setattr(viff, "datetime", Clock)
+    viff._get = _fake([], fail=("2026-10-06",))
+    r = client.get("/api/viff/sectors/EP-BH")
+    assert r.status_code == 200 and (r.json()["start"], r.json()["now"]) == ("2200", "2310")
+    r = client.get("/api/viff/sectors")
+    assert r.status_code == 200 and r.json()["now"] == "2310" and {s["id"] for s in r.json()["sectors"]} == {"EP-BH", "EP-DM"}
 
 
 # --- frontend w Node
@@ -466,7 +569,9 @@ def test_fmp_page_behaviour(tmp_path):
     assert o["late"] == ["EP-WATMA", ["EP-BH", "EP-WATMA"], ["EP-WATMA"]]
     picks, sel, side, open_, urls = o["toggle"]
     assert picks == ["EP-BH", "EP-WATMA", ""] and sel == [] and "Click a sector" in side and not open_ and urls == []
-    assert o["addr"] == [["EP-BH", "EP-WATMA", ""], ["EP-DM"], "EP-DM", ["EP-DM", "EP-DM"]]
+    # przewinięcia do wiersza: tabela z adresu, pierwszy wykres każdego nowego wyboru (EP-DM, EP-WATMA; spóźniony EP-BH
+    # nic nie rysuje), wybór z adresu i jego wykres; scrollIntoView({block: "nearest"}) przy widocznym wierszu nic nie robi
+    assert o["addr"] == [["EP-BH", "EP-WATMA", ""], ["EP-DM"], "EP-DM", ["EP-DM", "EP-DM", "EP-WATMA", "EP-DM", "EP-DM"]]
     assert o["refreshUrls"] == ["/api/viff/sectors", "/api/viff/sectors/EP-DM"]
     assert o["refreshErr"] == ["EP-DM", True, True]
     assert o["close"] == [["EP-BH", "EP-WATMA", "", ""], [], True]

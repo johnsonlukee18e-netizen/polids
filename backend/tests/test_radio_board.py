@@ -1,5 +1,6 @@
 """RADIO jako jedna strona (runda 10): GET /api/radio/board, część stała z radioboard.py i czyste funkcje
 frontend/js/radioboard.js (Node)."""
+import itertools
 import json
 import os
 import re
@@ -580,6 +581,14 @@ console.log(JSON.stringify({
     return {
       edww: sg({ cols: [2], rows: [5, 9, 11], boxes: [B("MRZ", 2, 5, 285, 0), B("MAR", 2, 9, 285, 0), B("FLG", 2, 11, 285, 0)] }),
       eduu: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: eduu }),
+      // jedno stanowisko w ciągu okienek EDUU (EDUU_H12_CTR we wszystkich czterech; OSE1 + HVL2 i ciągi z nimi): połączone
+      // okienko jak z merge_boxes – prostokąt przez puste wiersze szkicu 9 i 10, granice od najwyższej do najniższej
+      eduuMerged: [[0, 1, 2, 3], [1, 2], [0, 1, 2], [1, 2, 3]].map((ix) => {
+        const ms = ix.map((i) => eduu[i]), r0 = ms[0].row, r1 = ms[ms.length - 1].row;
+        const mg = B(ms.map((b) => b.id).join("+"), 3, r0, Math.max(...ms.map((b) => b.upper)), Math.min(...ms.map((b) => b.lower)),
+          { rows: r1 - r0 + 1, merged: true, members: ms });
+        return sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [...eduu.filter((b) => b.row < r0), mg, ...eduu.filter((b) => b.row > r1)] });
+      }),
       // HVL2 + HVL1 jednego stanowiska: jedno okienko na dwa wiersze, rozmiar stosu bez zmian
       hvl: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [eduu[0], eduu[1],
         B("HVL2+HVL1", 3, 11, 660, 285, { rows: 2, merged: true, members: [eduu[2], eduu[3]] })] }),
@@ -678,6 +687,19 @@ def test_js_layout_helpers(js):
     h = st["hvl"]
     assert h["rows"] == u["rows"] and h["tiles"][2] == ["HVL2+HVL1", "1 / 2", "6 / 9"]
     assert h["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "9", 285]]
+    # EDUU_H12_CTR we wszystkich czterech: jeden kafelek przez puste wiersze szkicu 9 i 10 – te same tory stosu co bez
+    # łączenia (dawniej 13 zamiast 9, stos o dwa rzędy kafelków wyższy); OSE1 + HVL2 i ciągi z nimi: nad i pod połączonym
+    # granica jego członka przy krawędzi (365), nie dwie liczby (365/660, 285/365) w rzędzie na jedną
+    full, ose_hvl, ose3, hvl3 = em = st["eduuMerged"]
+    for g in em:
+        assert (g["ncols"], g["nrows"], g["cols"], g["rows"]) == (u["ncols"], u["nrows"], u["cols"], u["rows"]), g
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "1 / 2", "2 / 9"]] and full["marks"] == [["1", "1", 660], ["1", "9", 285]]
+    assert ose_hvl["tiles"] == [["OSE2", "1 / 2", "2 / 3"], ["OSE1+HVL2", "1 / 2", "4 / 7"], ["HVL1", "1 / 2", "8 / 9"]]
+    assert ose_hvl["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "7", 365], ["1", "9", 285]]
+    assert ose3["tiles"][0] == ["OSE2+OSE1+HVL2", "1 / 2", "2 / 7"] and ose3["marks"] == [["1", "1", 660], ["1", "7", 365],
+                                                                                          ["1", "9", 285]]
+    assert hvl3["tiles"][1] == ["OSE1+HVL2+HVL1", "1 / 2", "4 / 9"] and hvl3["marks"] == [["1", "1", 660], ["1", "3", 365],
+                                                                                          ["1", "9", 285]]
     # ESAA: dwie kolumny, liczby osobno w każdej (do lewej w swojej kolumnie)
     assert st["esaa"]["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 365], ["2", "3", 365], ["1", "5", 195],
                                    ["2", "5", 0]]
@@ -703,6 +725,61 @@ def test_js_layout_helpers(js):
     assert js["bottom"]["y"] + js["bottom"]["h"] == pytest.approx(400)  # MID przy dolnej krawędzi
     assert js["path"] == "M0.0,0.0L10.0,0.0L10.0,10.0Z"
     assert js["bbox"] == [-1, 0, 2, 5]
+
+
+STACK_ALL_SCRIPT = r"""
+import fs from "fs";
+const rb = await import(process.argv[2]);
+const cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify(cases.map((c) => {
+  const g = rb.stackGrid(c);
+  return { fir: c.fir, on: c.on, cols: g.cols, rows: g.rows, tiles: g.tiles.map((t) => [t.b.id, t.gr]),
+    over: g.marks.filter((k) => k.n.length > Number(g.rows[Number(k.gr) - 1].slice(1))).map((k) => [k.gc, k.gr, ...k.n]),
+    marks: g.marks.map((k) => [k.gc, k.gr, ...k.n]) };
+})));
+"""
+
+
+def test_js_stack_size_fixed_all_merges(tmp_path):
+    """0.13.1: stos sąsiada nie zmienia rozmiaru przy żadnym łączeniu okienek – merge_boxes na okienkach z seeda (każde
+    okienko FIR-u z łączeniem bez nikogo albo u jednego z dwóch stanowisk) i stackGrid strony: te same tory co bez
+    nikogo, żadna liczba poza swoim rzędem. EDUU_H12_CTR we wszystkich czterech okienkach EDUU łączy je przez puste
+    wiersze szkicu 9 i 10 (dawniej stos o dwa rzędy kafelków wyższy, strona skakała przy logowaniu)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    lay = rb.layout_static(json.loads((ROOT_DIR / "data" / "seed" / "radio_layout.json").read_text("utf-8")), {})
+    cases = []
+    for f in lay["firs"]:
+        if not (f["merge"] and f["fir"] in rb.MERGE_FIRS):
+            continue
+        for own in itertools.product((None, "A_CTR", "B_CTR"), repeat=len(f["boxes"])):
+            bs = [{**b, "owner": o, "staffed": bool(o), "frequency": None, "key": o and f"cs:{o}"}
+                  for b, o in zip(f["boxes"], own)]
+            cases.append({"fir": f["fir"], "on": [f"{b['id']}={b['owner']}" for b in bs if b["owner"]], "cols": f["cols"],
+                          "rows": f["rows"], "boxes": rb.merge_boxes(bs, lay["occupied"], f["fir"])})
+    data = tmp_path / "cases.json"
+    data.write_text(json.dumps(cases), "utf-8")
+    (tmp_path / "radioboard.mjs").write_text((FRONTEND / "js" / "radioboard.js").read_text("utf-8"), "utf-8")
+    script = tmp_path / "all.mjs"
+    script.write_text(STACK_ALL_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (tmp_path / "radioboard.mjs").as_uri(), str(data)], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    base = {g["fir"]: g for g in out if not g["on"]}
+    assert set(base) == set(rb.MERGE_FIRS) and len(out) == len(cases) > 400
+    # łączenie naprawdę zachodzi (także przez puste wiersze szkicu EDUU), a stos zawsze ma tory jak bez nikogo
+    assert sum(any(b["merged"] for b in c["boxes"]) for c in cases) > 200
+    full = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=A_CTR", "HVL1=A_CTR"])
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "2 / 9"]] and full["rows"] == base["EDUU"]["rows"]
+    # dwa połączone okienka o tym samym zakresie (660-285) jedno nad drugim: nic między nimi, jak EDWW 285-0
+    pair = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=B_CTR", "HVL1=B_CTR"])
+    assert [t[0] for t in pair["tiles"]] == ["OSE2+OSE1", "HVL2+HVL1"] and pair["rows"] == base["EDUU"]["rows"]
+    assert pair["marks"] == [["1", "1", 660], ["1", "9", 285]], pair["marks"]
+    changed = [f"{g['fir']} {g['on']}" for g in out if (g["cols"], g["rows"]) != (base[g["fir"]]["cols"], base[g["fir"]]["rows"])]
+    assert changed == []
+    assert [(g["fir"], g["on"], g["over"]) for g in out if g["over"]] == []
 
 
 
@@ -1048,8 +1125,10 @@ console.log(JSON.stringify({
   berNone: radio.berlinHtml({}),
   berNet: radio.berlinHtml({ ...ber, config: "EAST", preferred: true, tip: "" }, { ...x, net: false }),
   berUnknown: radio.berlinHtml({ ...ber, config: null, source: "UNKNOWN", preferred: false, tip: "ATIS unknown: no network data" }),
-  evil: radio.nbStackHtml(evil, { ...x, sel: null }) + radio.indicatorHtml({ id: "<b>", tip: "<i>", value: "<s>", positions: [] }, x)
-    + radio.berlinHtml({ config: "<b>", tip: "<i>" }),
+  // dymki wskaźnika i BERLIN: tekst, którego zwykły kod strony nigdy nie ma (<em>), z wyjściem z atrybutu (">)
+  evil: radio.nbStackHtml(evil, { ...x, sel: null })
+    + radio.indicatorHtml({ id: "<b>", tip: '"><em>x</em>', value: "<s>", positions: [{ callsign: '"><em>c', name: "<em>n" }] }, x)
+    + radio.berlinHtml({ config: "<b>", tip: '"><em>y</em>' }),
 }));
 """
 
@@ -1157,6 +1236,13 @@ def test_js_neighbour_boxes(tmp_path):
     ev = out["evil"]
     assert "<img" not in ev and "<i>t" not in ev and "<s>" not in ev and "<u>" not in ev and "<b>" not in ev
     assert "&lt;img src=x&gt;" in ev and "&lt;b&gt;" in ev
+    # dymek wskaźnika i BERLIN (tekst z ATIS EDDB z sieci): tip i zalogowani tylko jako tekst w data-rt, bez wyjścia
+    # z atrybutu; <em> – nie z <i> liczb między kafelkami (markHtml)
+    assert "<em" not in ev and '"><em' not in ev
+    assert ('<div class="rb-indc" data-rt="&lt;b&gt;: &quot;&gt;&lt;em&gt;x&lt;/em&gt;\n&quot;&gt;&lt;em&gt;c'
+            ' \u2013 &lt;em&gt;n"><div class="rb-ind">&lt;b&gt;</div>') in ev
+    assert re.search(r'<div class="rb-indc rb-ber" data-rt="BERLIN: [^"<>]*\n&quot;&gt;&lt;em&gt;y&lt;/em&gt;">'
+                     r'<div class="rb-blbl">BERLIN</div><div class="rb-bln">&lt;b&gt;</div></div>$', ev)
 
 
 LBL_SCRIPT = r"""
