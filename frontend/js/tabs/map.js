@@ -56,8 +56,12 @@ const OTH_HEAD = { fis: "FIS", atz: "ATZ / TRA", oth: "other" };
 // samej kolejności nie pokazujemy (0.12.6, Marek: bez hierarchii w opisie przestrzeni)
 const CHAIN_KINDS = ["tma", "cta", "ctr"];
 const LEVELS = [15, 50, 100, 200, 300, 370];
+// Przełączniki widoczności spoza warstw przestrzeni (0.13.1, issue #25: wszystkie ustawienia wyświetlania w sekcji
+// Visibility settings): klasa pola → domyślnie; zapamiętane razem z warstwami w map.air
+const VIS_SW = { traffic: true, atc: true, aeros: true, navaids: false, ndbs: false, vfrs: false, fixes: false, airways: false, labels: true };
+const VIS_PTS = ["navaids", "ndbs", "vfrs", "fixes", "airways", "labels"];
 
-// Legenda w zakładkach (zwinięta domyślnie razem z całą sekcją).
+// Legenda w zakładkach (sekcja zwinięta domyślnie jak wszystkie sekcje panelu).
 // Etykieta samolotu (zakładka Ruch): wzór jak w PEGASUS_21, ten sam HTML co w okienku na mapie (p21Html z airspace.js)
 const P21_SAMPLE = p21Html({ callsign: "DOM004", groundspeed: 248, altitude: 5300, vs: 300, aircraft: "DC10", wake: "H", arrival: "EPWA" });
 const LEGEND = [
@@ -89,7 +93,7 @@ const LEGEND = [
     <p class="lgx-note">Hover a badge to see who is online (also who published the ATIS, text line by line).
       Hover a position label with a frequency (sector, TMA, neighbour): controller details.
       <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">ACC sector map ↗</a></p>`],
-  ["viff", "Capacity", () => [
+  ["viff", "FMP", () => [
     lg(`<span class="swatch viff"></span>`, "area of the TV in the chart"), lg(`<span class="vs-chip on">ACTIVE</span>`, "scenario / TV active"),
     lg(`<span class="vf-bar"><i class="ok" style="width:60%"></i></span>`, "load &lt; 90 %"), lg(`<span class="vf-bar"><i class="near" style="width:95%"></i></span>`, "90–100 %"),
     lg(`<span class="vf-bar"><i class="over" style="width:100%"></i></span>`, "over capacity"), lg(`<span class="vf-bar"><i class="nolim" style="width:40%"></i></span>`, "no limit"),
@@ -154,33 +158,48 @@ function relation(p, adIdx) {
 
 // Widok MAP: duża mapa z panelem bocznym
 function mainMap(ctx) {
-  const AIRST = store.get("map.air", {});  // przełączniki przestrzeni, poziom
+  // map.air: wszystkie przełączniki sekcji Visibility settings (warstwy przestrzeni, poziom, ruch, plakietki, punkty
+  // i drogi) poza podkładem (map.base) i nakładką lotniczą (bez zapisu: wymaga klucza)
+  const AIRST = store.get("map.air", {});
   const airOn = (id, d) => (typeOf(AIRST[id]) === typeOf(d) ? AIRST[id] : d);
+  const visOn = (id) => airOn(id, VIS_SW[id]);
   const pane = h(`<div class="pane fill"><div class="mapwrap">
     <div class="mapside">
       <div class="ms-head"><b>MAP</b>
         <button class="btn ms-hide" title="Hide panel">«</button></div>
-      <section class="ms-card" data-sec="traffic">
-        <h4>Traffic</h4>
-        ${sw("traffic", "aircraft", true, PLANE_SVG)}
+      <section class="ms-card as-card vis-card" data-sec="vis">
+        <h4>Visibility settings <span class="vis-sum"></span></h4>
+        <div class="vis-sub">Traffic</div>
+        ${sw("traffic", "aircraft", visOn("traffic"), PLANE_SVG)}
         <div class="ac-key" title="aircraft colour: departure from an EP** aerodrome, arrival to EP**, transit through FIR EPWW (or no flight plan in FIR EPWW)"><span>${plane("dep")}departure</span><span>${plane("arr")}arrival</span><span>${plane("trn")}transit</span></div>
-        ${sw("atc", "online controllers: aerodrome badges (smaller for neighbours)", true, `<span class="ab ab-twr">T</span>`)}
+        ${sw("atc", "online controllers: aerodrome badges (smaller for neighbours)", visOn("atc"), `<span class="ab ab-twr">T</span>`)}
         <div class="atc-info hint"></div>
         <div class="traffic-info hint"></div>
-      </section>
-      <section class="ms-card as-card" data-sec="air">
-        <h4>Airspace</h4>
+        <div class="vis-sub">Airspace</div>
         <div class="as-lvl">
           <span class="flbox">FL<input type="number" class="field fl" value="${esc(airOn("fl", 300))}" min="0" max="660" step="5"></span>
           <label class="sw"><input type="checkbox" class="allfl" ${airOn("all", false) ? "checked" : ""}><span>all levels</span></label>
         </div>
         <div class="as-pre">${LEVELS.map((v) => `<button data-fl="${v}" title="FL${String(v).padStart(3, "0")}">${String(v).padStart(3, "0")}</button>`).join("")}</div>
         ${AIR.map((a) => `<div class="as-row">${sw("air-" + a.id, a.label, airOn(a.id, a.on), a.sym)}
-          <button class="pk-btn" data-air="${a.id}" title="Choose sectors to show">all ▾</button></div>
+          <button class="pk-btn" data-air="${a.id}" title="Choose sectors to show">all \u25be</button></div>
           <div class="pk" data-air="${a.id}" hidden></div>`).join("")}
         ${sw("online", "staffing by online controllers", airOn("online", true), `<span class="swatch on"></span>`)}
         ${sw("firs", "FIR boundaries", airOn("firs", true), `<span class="swatch fir"></span>`)}
         <div class="sector-info hint"></div>
+        <div class="vis-sub">Points and airways</div>
+        ${sw("aeros", "aerodromes", visOn("aeros"), `<i data-sym="aerodrome"></i>`)}
+        ${sw("navaids", "VOR / DME", visOn("navaids"), `<i data-sym="vor"></i>`)}
+        ${sw("ndbs", "NDB", visOn("ndbs"), `<i data-sym="ndb"></i>`)}
+        ${sw("vfrs", "VFR points <small>(zoom \u2265 8)</small>", visOn("vfrs"), `<i data-sym="vfr"></i>`)}
+        ${sw("fixes", "FIX points <small>(zoom \u2265 8)</small>", visOn("fixes"), `<i data-sym="fix"></i>`)}
+        ${sw("airways", "airways <small>(zoom \u2265 7)</small>", visOn("airways"), `<span class="swatch awy"></span>`)}
+        ${sw("labels", "point names", visOn("labels"))}
+        <div class="vis-sub">Basemap</div>
+        <div class="seg">${[["dark", "dark"], ["light", "light"], ["white", "white"], ["osm", "streets"]]
+          .map(([v, l]) => `<button data-base="${v}" class="${v === "dark" ? "on" : ""}">${l}</button>`).join("")}</div>
+        ${sw("openaip", "aviation overlay")}
+        <div class="hint openaip-note"></div>
       </section>
       <section class="ms-card pos-card" data-sec="pos">
         <h4>Positions <span class="pos-sum"></span></h4>
@@ -197,29 +216,12 @@ function mainMap(ctx) {
         <div class="route-info hint"></div>
       </section>
       <section class="ms-card vf-card" data-sec="viff">
-        <h4>Sector capacity</h4>
+        <h4>FMP</h4>
         ${sw("viff", "traffic and capacity for the next hour", true, `<span class="swatch viff"></span>`)}
         <div class="vs-list"></div>
         <div class="vs-sub">All sectors (traffic volumes)</div>
         <select class="field viff-tv"><option value="">choose a sector…</option></select>
         <div class="viff-info hint"></div>
-      </section>
-      <section class="ms-card" data-sec="points">
-        <h4>Points and airways</h4>
-        ${sw("aeros", "aerodromes", true, `<i data-sym="aerodrome"></i>`)}
-        ${sw("navaids", "VOR / DME", false, `<i data-sym="vor"></i>`)}
-        ${sw("ndbs", "NDB", false, `<i data-sym="ndb"></i>`)}
-        ${sw("vfrs", "VFR points <small>(zoom ≥ 8)</small>", false, `<i data-sym="vfr"></i>`)}
-        ${sw("fixes", "FIX points <small>(zoom ≥ 8)</small>", false, `<i data-sym="fix"></i>`)}
-        ${sw("airways", "airways <small>(zoom ≥ 7)</small>", false, `<span class="swatch awy"></span>`)}
-        ${sw("labels", "point names", true)}
-      </section>
-      <section class="ms-card" data-sec="base">
-        <h4>Basemap</h4>
-        <div class="seg">${[["dark", "dark"], ["light", "light"], ["white", "white"], ["osm", "streets"]]
-          .map(([v, l]) => `<button data-base="${v}" class="${v === "dark" ? "on" : ""}">${l}</button>`).join("")}</div>
-        ${sw("openaip", "aviation overlay")}
-        <div class="hint openaip-note"></div>
       </section>
       <section class="ms-card lgx" data-sec="legend">
         <h4>Legend</h4>
@@ -242,6 +244,8 @@ function mainMap(ctx) {
     ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
     traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map), viff: L.layerGroup().addTo(map),
   };
+  // lotniska wyłączone przy poprzedniej wizycie (map.air)
+  if (!$(".aeros").checked) map.removeLayer(layers.ads);
   let openaip = null;
   const panes = atcPanes(map);
   const timers = [];
@@ -254,15 +258,20 @@ function mainMap(ctx) {
   });
   paintLegend();
 
-  // Sekcje panelu zwijane kliknięciem w nagłówek (stan w localStorage); legenda i Pozycje domyślnie zwinięte
-  const secs = store.get("map.sections", {});
+  // Sekcje panelu zwijane kliknięciem w nagłówek. 0.13.1 (issue #25, Marek): wszystkie domyślnie zwinięte; zapisane są
+  // tylko rozwinięte (map.open). Dawny map.sections (Ruch, Przestrzeń, Trasa… rozwinięte domyślnie) pomijamy, żeby
+  // po aktualizacji panel u każdego startował zwinięty
+  const open = new Set(store.get("map.open", []).filter((k) => typeof k === "string"));
   pane.querySelectorAll(".ms-card[data-sec]").forEach((c) => {
     const k = c.dataset.sec;
-    c.classList.toggle("shut", typeof secs[k] === "boolean" ? secs[k] : k === "legend" || k === "pos");
+    c.classList.toggle("shut", !open.has(k));
     const h4 = c.querySelector("h4");
     h4.classList.add("ms-tog");
     h4.title = "Collapse / expand";
-    h4.addEventListener("click", () => { secs[k] = c.classList.toggle("shut"); store.set("map.sections", secs); });
+    h4.addEventListener("click", () => {
+      if (c.classList.toggle("shut")) open.delete(k); else open.add(k);
+      store.set("map.open", [...open]);
+    });
   });
   const legendTab = (k) => {
     k = LEGEND.some(([x]) => x === k) ? k : LEGEND[0][0];
@@ -397,9 +406,11 @@ function mainMap(ctx) {
     drawTraffic();
     trafficInfo();
   }).catch(() => loadAtc());
+  // saveAir zdefiniowane niżej: wywołanie dopiero przy zmianie przełącznika
   $(".aeros").addEventListener("change", (e) => {
     if (e.target.checked) layers.ads.addTo(map);
     else map.removeLayer(layers.ads);
+    saveAir();
     relabel();
   });
 
@@ -439,7 +450,8 @@ function mainMap(ctx) {
     });
   };
   const saveAir = () => {
-    store.set("map.air", { ...air, fl: parseInt($(".fl").value || "0", 10), all: $(".allfl").checked, online: $(".online").checked, firs: $(".firs").checked });
+    store.set("map.air", { ...air, fl: parseInt($(".fl").value || "0", 10), all: $(".allfl").checked, online: $(".online").checked, firs: $(".firs").checked,
+      ...Object.fromEntries(Object.keys(VIS_SW).map((k) => [k, $("." + k).checked])) });
     store.set("map.pick", Object.fromEntries(AIR.map((a) => [a.id, pick[a.id] ? [...pick[a.id]] : null])));
   };
   const level = () => ($(".allfl").checked ? null : Math.max(0, Math.min(660, parseInt($(".fl").value || "0", 10))) * 100);
@@ -1092,11 +1104,13 @@ function mainMap(ctx) {
   $(".pos-q").addEventListener("input", () => { ssSet("map.pos.q", $(".pos-q").value); renderPos(); });
   $(".pos-reset").addEventListener("click", () => applyPos({ base: "online", ovr: {} }));
   $(".pos-none").addEventListener("click", () => applyPos({ base: "none", ovr: {} }));
-  // przełączniki i poziom
+  // przełączniki i poziom; rysowany poziom także w nagłówku Visibility settings (widoczny przy zwiniętej sekcji)
   const syncFl = () => {
     const all = $(".allfl").checked;
     $(".fl").disabled = all;
     pane.querySelectorAll(".as-pre button").forEach((b) => b.classList.toggle("on", !all && +b.dataset.fl === parseInt($(".fl").value || "0", 10)));
+    const lv = level();
+    $(".vis-sum").textContent = lv === null ? "all levels" : fl(lv);
   };
   let flT = 0;
   const onLevel = () => { clearTimeout(flT); flT = setTimeout(() => { syncFl(); saveAir(); drawAirspace(); }, 200); };
@@ -1264,7 +1278,7 @@ function mainMap(ctx) {
     drawAds();
     declutter();  // plakietki rysowane po przestrzeni: etykiety od nowa
   }
-  $(".atc").addEventListener("change", loadAtc);
+  $(".atc").addEventListener("change", () => { saveAir(); loadAtc(); });
   every(30000, loadAtc);
 
   // --- trasa: gruba linia z obwódką (czytelna na każdym podkładzie), punkty jako symbole z nazwą w ramce
@@ -1525,7 +1539,7 @@ function mainMap(ctx) {
     drawTraffic();
     if (viffData) renderChart();  // ADEP/ADES/typ w tabeli lotów wykresu
   };
-  $(".traffic").addEventListener("change", loadTraffic);
+  $(".traffic").addEventListener("change", () => { saveAir(); loadTraffic(); });
   map.on("moveend", drawTraffic);
   every(30000, () => $(".traffic").checked && loadTraffic());
 
@@ -1556,7 +1570,7 @@ function mainMap(ctx) {
   };
   map.on("moveend", loadVisible);
   map.on("zoomend", drawAds);
-  ["navaids", "ndbs", "vfrs", "fixes", "airways", "labels"].forEach((c) => $("." + c).addEventListener("change", loadVisible));
+  VIS_PTS.forEach((c) => $("." + c).addEventListener("change", () => { saveAir(); loadVisible(); }));
 
   // --- trasa wpisana ręcznie
   $(".show-route").addEventListener("click", async () => {

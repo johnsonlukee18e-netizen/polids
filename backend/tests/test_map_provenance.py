@@ -73,7 +73,9 @@ def test_map_texts_without_provenance(name):
 
 def test_map_functional_names():
     code = _code("js/tabs/map.js")
-    for text in ('"FIR boundaries"', "<h4>Traffic</h4>", "<h4>Sector capacity</h4>", '["viff", "Capacity", () => [',
+    # 0.13.1 (issue #25): Traffic jako podtytuł w Visibility settings, Sector capacity → FMP (sekcja i zakładka legendy)
+    for text in ('"FIR boundaries"', '<div class="vis-sub">Traffic</div>', "<h4>Visibility settings", "<h4>FMP</h4>",
+                 '["viff", "FMP", () => [',
                  ">ACC sector map ↗</a>", '"aviation overlay"', '["osm", "streets"]', "Sector entries <span>",
                  "Flight history <span>", '<div class="fd-sec">Position</div>', '<div class="fd-sec">Flight</div>',
                  '"FIR boundary (separate switch)"', "Hover an aircraft: label; click: flight details and route."):
