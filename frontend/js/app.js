@@ -22,13 +22,14 @@ import admin from "./tabs/admin.js";
 const TABS = { home, about, radio, meteo, awalon, aerodrome, adciv, admil, advfr, inop, callsign, aircraft, map, coordination,
   conversion, sytop, aup, other, emergency, admin };
 // stare adresy zakładek przeniesionych do podmenu: #docs/<plik> → OTHER › DOCS (#other/docs/<plik>);
-// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER › PHRASEOLOGY;
+// bez arg (link #docs, navigate("docs")) OTHER zostaje w swoim stanie, z otwartym dokumentem; #phraseology → OTHER
+// w swoim stanie (do 0.13.0 podzakładka PHRASEOLOGY, usunięta w 0.13.1, issue #25; za pierwszym razem DOCS);
 // #checklist/<id> → OTHER › CHECKLIST z tą checklistą, #checklist i kafelek w ABOUT (bez arg) → pierwsza checklista;
 // 0.13.0: zakładki STRIP nie ma, #strip/<ICAO> → AERODROME › <ICAO> › TRAFFIC (DMAN/AMAN), samo #strip → AERODROME;
 // #squawk/<kod> → OTHER › SQUAWK z tym kodem, samo #squawk → OTHER › SQUAWK
 const MOVED = {
   docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],
-  phraseology: () => ["other", "phraseology"],
+  phraseology: () => ["other", undefined],
   checklist: (arg) => ["other", arg ? "checklist/" + arg : "checklist"],
   strip: (arg) => ["aerodrome", /^[A-Za-z]{4}$/.test(arg || "") ? arg.toUpperCase() + "/dman" : arg],
   squawk: (arg) => ["other", arg ? "squawk/" + arg : "squawk"],

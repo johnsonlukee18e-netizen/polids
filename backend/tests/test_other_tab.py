@@ -1,7 +1,8 @@
 """OTHER (0.12.6, issue #21): CHECKLIST jako podzakładka OTHER (adresy, przekierowania, checklisty w drugim podmenu),
 nowa checklista TIPS FOR CONTROLLERS (punkty bez "...AKCJA", numerowane) i napisy bez źródeł danych w OTHER,
 EMERGENCY i na stronie offline. 0.13.0 (issue #23): 18 podzakładek alfabetycznie (tabela stron w other.js), domyślnie
-DOCS, zaślepki, SQUAWK, FLIGHT PLAN i FMP w OTHER z adresami #other/<id>[/<stan>]."""
+DOCS, zaślepki, SQUAWK, FLIGHT PLAN i FMP w OTHER z adresami #other/<id>[/<stan>]. 0.13.1 (issue #25): 17 podzakładek
+(bez PHRASEOLOGY), napisy podmenu w jednej linijce, sektor FMP z wykresami w adresie (#other/fmp/<TV>)."""
 import json
 import re
 import shutil
@@ -62,7 +63,7 @@ PROVENANCE = re.compile(r"Source:|source:|vatiris|minsulander|data/seed|Learning
                         r"\bfrom eAIP|PANSA|according to|based on", re.I)
 
 
-@pytest.mark.parametrize("name", ["js/tabs/other.js", "js/checklist.js", "js/phraseology.js", "js/tabs/emergency.js",
+@pytest.mark.parametrize("name", ["js/tabs/other.js", "js/checklist.js", "js/tabs/emergency.js",
                                   "js/squawk.js", "js/regcause.js", "js/vfrminima.js",
                                   "offline.html", "index.html", "login.html"])
 def test_no_provenance_in_ui(name):
@@ -83,7 +84,7 @@ def test_lvp_tip_without_source():
 def test_other_files_in_english():
     """Napisy po angielsku; polskie znaki tylko w komentarzach w osobnych linijkach (nie po kodzie)."""
     polish = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
-    for name in ("js/tabs/other.js", "js/checklist.js", "js/phraseology.js", "js/tabs/emergency.js", "sw.js",
+    for name in ("js/tabs/other.js", "js/checklist.js", "js/tabs/emergency.js", "sw.js",
                  "js/squawk.js", "js/regcause.js", "js/vfrminima.js"):
         src = (FRONTEND / name).read_text("utf-8")
         bad = [line.strip() for line in src.splitlines() if polish.search(line) and not line.strip().startswith("//")]
@@ -113,8 +114,8 @@ const html = {
   proc: chk.checklistHtml(proc, { n1: "DLH1 \"x\"" }),
 };
 
-// --- OTHER: podzakładki i adresy (podmenu, DOCS, PHRASEOLOGY, CHECKLIST, SQUAWK, FLIGHT PLAN, FMP, REGCAUSE i
-// VFR MINIMA zastąpione atrapami)
+// --- OTHER: podzakładki i adresy (podmenu, DOCS, CHECKLIST, SQUAWK, FLIGHT PLAN, FMP, REGCAUSE i VFR MINIMA
+// zastąpione atrapami)
 const root = {};
 const view = other.mount(root, { config: { links: {} } });
 const sub = globalThis.__sub;
@@ -136,7 +137,8 @@ step("docs", () => view.activate("docs"));
 step("menu", () => view.activate(undefined));
 step("subtab", () => sub.click("checklist"));
 step("bare", () => view.activate("checklist"));
-step("phraseology", () => view.activate("phraseology"));
+// 0.13.1: dawna podzakładka PHRASEOLOGY (stary adres #other/phraseology) = nieznane id
+step("phraseology-old", () => view.activate("phraseology"));
 step("loa", () => view.activate("docs/LOA/x.pdf"));
 step("squawk", () => view.activate("squawk/7700"));
 step("squawk-again", () => view.activate("squawk/7600"));
@@ -150,6 +152,15 @@ step("squawk-return", () => sub.click("squawk"));
 step("squawk-bare", () => view.activate("squawk"));
 step("fmp", () => view.activate("fmp"));
 step("fmp-menu", () => view.activate(undefined));
+// 0.13.1: sektor z wykresami w adresie (#other/fmp/<TV>), klik w wiersz (onPick), zamknięcie, zły adres
+step("fmp-addr", () => view.activate("fmp/ep-bh"));
+step("fmp-pick", () => last("fmp").opts.onPick("EP-DM"));
+step("fmp-close", () => last("fmp").opts.onPick(""));
+step("fmp-bad", () => view.activate("fmp/x y"));
+step("fmp-pick2", () => last("fmp").opts.onPick("EP-WATMA"));
+step("fmp-away", () => { sub.click("holding"); sub.click("fmp"); });
+step("fmp-other", () => { sub.click("ia"); view.activate("fmp/EP-GDTMA"); });
+step("fmp-menu2", () => view.activate(undefined));
 step("fp-return", () => sub.click("flight-plan"));
 step("regcause", () => view.activate("regcause"));
 step("vfr", () => view.activate("vfr-minima"));
@@ -241,16 +252,16 @@ def js(tmp_path_factory):
     (stubs / "api.mjs").write_text(API_STUB, "utf-8")
     (stubs / "checklist.mjs").write_text(CHK_STUB, "utf-8")
     (stubs / "docs.mjs").write_text(DOCS_STUB, "utf-8")
-    (stubs / "phraseology.mjs").write_text("export function mountPhraseology() {}\n", "utf-8")
     for mod, (fn, kind) in PAGES.items():
         (stubs / f"{mod}.mjs").write_text(PAGE_STUB % {"fn": fn, "kind": kind}, "utf-8")
-    # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js
-    fp_src = (FRONTEND / "js" / "flightplan.js").read_text("utf-8")
-    clean = next(line for line in fp_src.splitlines() if line.startswith("export const cleanCallsign = "))
-    with open(stubs / "flightplan.mjs", "a", encoding="utf-8") as f:
-        f.write(clean + "\n")
+    # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js, a id sektora FMP prawdziwą funkcją z fmp.js
+    for mod, fn in (("flightplan", "cleanCallsign"), ("fmp", "cleanTv")):
+        src = (FRONTEND / "js" / f"{mod}.js").read_text("utf-8")
+        clean = next(line for line in src.splitlines() if line.startswith(f"export const {fn} = "))
+        with open(stubs / f"{mod}.mjs", "a", encoding="utf-8") as f:
+            f.write(clean + "\n")
     src = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
-    for mod in ("api", "checklist", "docs", "phraseology", *PAGES):
+    for mod in ("api", "checklist", "docs", *PAGES):
         assert f'"../{mod}.js"' in src, mod
         src = src.replace(f'"../{mod}.js"', f'"./stubs/{mod}.mjs"')
     (d / "other.mjs").write_text(src + '\nglobalThis.__future = FUTURE;\n', "utf-8")
@@ -317,32 +328,34 @@ def test_other_subtab_switching(js):
     # "#other/checklist" bez id: pierwsza checklista
     bare = _step(js, "bare")
     assert bare["mounts"][-1]["picks"] == [""] and bare["log"] == [["remember", "other", "checklist", False]]
-    phr = _step(js, "phraseology")
-    assert phr["sub"] == "phraseology" and phr["mounts"][-1]["dead"] is True
-    assert phr["log"] == [["remember", "other", "phraseology", False]]
+    # 0.13.1: #other/phraseology (podzakładki już nie ma) = nieznane id: DOCS z pierwszym dokumentem
+    phr = _step(js, "phraseology-old")
+    assert phr["sub"] == "docs" and phr["mounts"][-1]["dead"] is True and phr["docs"][-1]["start"] == ""
+    assert phr["log"] == [["remember", "other", "docs", False]]
     # LOA z dawnego adresu DOCS dalej do COORDINATION
     assert _step(js, "loa")["log"] == [["navigate", "coordination", "docs/LOA/x.pdf"]]
 
 
 OTHER_LABELS = ["4P", "AFTN", "BOMB PHONE", "BRAKING ACTION", "CHECKLIST", "DOCS", "FLIGHT PLAN", "FMP", "HOLDING", "IA",
-                "LIGHT GUN", "METEO", "NATO WEATHER", "PHRASEOLOGY", "POSITION", "REGCAUSE", "SQUAWK", "VFR MINIMA"]
+                "LIGHT GUN", "METEO", "NATO WEATHER", "POSITION", "REGCAUSE", "SQUAWK", "VFR MINIMA"]
 PLACEHOLDERS = ["4p", "aftn", "bomb-phone", "braking-action", "holding", "ia", "light-gun", "meteo", "nato-weather",
                 "position"]
 FUTURE = "This function will be available in the future."
 
 
 def test_other_submenu_order_and_default(js):
-    """0.13.0 (issue #23): 18 podzakładek alfabetycznie jak w PANDORZE (BRAKING, nie BREAKING), każda na całą
-    wysokość; OTHER bez adresu otwiera się na DOCS (jak do 0.12.6), nie na pierwszej w kolumnie (4P)."""
+    """0.13.0 (issue #23): podzakładki alfabetycznie jak w PANDORZE (BRAKING, nie BREAKING), każda na całą
+    wysokość; OTHER bez adresu otwiera się na DOCS (jak do 0.12.6), nie na pierwszej w kolumnie (4P). 0.13.1 (issue
+    #25): 17 podzakładek bez PHRASEOLOGY, napisy w jednej linijce (przyciski podmenu 137 x 28)."""
     tabs = js["initial"]["tabs"]
-    assert OTHER_LABELS == sorted(OTHER_LABELS)
-    # dwa słowa w dwóch linijkach jak w podmenu PANDORY (przycisk z white-space: pre-line), jedno słowo bez zmian
-    assert [label for _, label, _ in tabs] == [x.replace(" ", "\n") for x in OTHER_LABELS]
-    assert [label for _, label, _ in tabs if "\n" in label] == ["BOMB\nPHONE", "BRAKING\nACTION", "FLIGHT\nPLAN",
-                                                                "LIGHT\nGUN", "NATO\nWEATHER", "VFR\nMINIMA"]
+    assert OTHER_LABELS == sorted(OTHER_LABELS) and len(OTHER_LABELS) == 17
+    assert [label for _, label, _ in tabs] == OTHER_LABELS
+    assert not any("\n" in label for _, label, _ in tabs)
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert '.replace(" ", "\\n")' not in other and "label: p.label, fill: true" in other
     assert [i for i, _, _ in tabs] == ["4p", "aftn", "bomb-phone", "braking-action", "checklist", "docs", "flight-plan",
-                                        "fmp", "holding", "ia", "light-gun", "meteo", "nato-weather", "phraseology",
-                                        "position", "regcause", "squawk", "vfr-minima"]
+                                        "fmp", "holding", "ia", "light-gun", "meteo", "nato-weather", "position",
+                                        "regcause", "squawk", "vfr-minima"]
     assert all(fill for _, _, fill in tabs)
     assert js["initial"]["sub"] == "docs" and js["initial"]["docs"] == [""]
 
@@ -398,6 +411,26 @@ def test_other_flight_plan_and_fmp_addresses(js):
     assert fmp["sub"] == "fmp" and len(fmp["fmp"]) == 1 and fmp["log"] == [["remember", "other", "fmp", False]]
     menu = _step(js, "fmp-menu")
     assert menu["fmp"][0]["calls"] == [["activate", "<menu>"]] and menu["log"] == [["remember", "other", "fmp", False]]
+    # 0.13.1: "#other/fmp/ep-bh" przy otwartym FMP: sektor (wielkimi literami) do otwartej strony, bez rysowania od nowa
+    addr = _step(js, "fmp-addr")
+    assert len(addr["fmp"]) == 1 and addr["fmp"][0]["calls"][-1] == ["activate", "EP-BH"]
+    assert addr["log"] == [["remember", "other", "fmp/EP-BH", False]]
+    # klik w wiersz = krok historii z sektorem; drugi klik w ten sam wiersz albo ✕ (onPick("")) = adres bez sektora
+    assert _step(js, "fmp-pick")["log"] == [["remember", "other", "fmp/EP-DM", False]]
+    assert _step(js, "fmp-close")["log"] == [["remember", "other", "fmp", False]]
+    # zły id sektora w adresie: wykresy zamknięte, adres poprawiony
+    bad = _step(js, "fmp-bad")
+    assert bad["fmp"][0]["calls"][-1] == ["activate", ""] and bad["log"] == [["remember", "other", "fmp", False]]
+    # przejście przez inną podzakładkę: FMP rysowane od nowa z ostatnim sektorem
+    away = _step(js, "fmp-away")
+    assert len(away["fmp"]) == 2 and away["fmp"][0]["dead"] is True and away["fmp"][1]["start"] == "EP-WATMA"
+    assert away["log"] == [["remember", "other", "holding", False], ["remember", "other", "fmp/EP-WATMA", False]]
+    # adres z sektorem z innej podzakładki: FMP od razu z tym sektorem
+    oth = _step(js, "fmp-other")
+    assert len(oth["fmp"]) == 3 and oth["fmp"][2]["start"] == "EP-GDTMA" and oth["fmp"][2]["calls"] == []
+    assert oth["log"][-1] == ["remember", "other", "fmp/EP-GDTMA", False]
+    menu2 = _step(js, "fmp-menu2")
+    assert menu2["fmp"][2]["calls"] == [["activate", "<menu>"]] and menu2["log"] == [["remember", "other", "fmp/EP-GDTMA", False]]
     # powrót do FLIGHT PLAN: FMP zniszczone, ostatni znak
     ret = _step(js, "fp-return")
     assert ret["fmp"][0]["dead"] is True and ret["fp"][-1]["start"] == "LOT1"

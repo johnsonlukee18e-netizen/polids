@@ -20,11 +20,12 @@ MENU = ["home", "radio", "meteo", "awalon", "aerodrome", "adciv", "admil", "advf
         "coordination", "conversion", "sytop", "aup", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AWALON", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
           "COORDINATION", "CONVERSION", "SYT OP", "AUP", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
-# 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>)
+# 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>); 0.13.1 (issue #25): bez
+# PHRASEOLOGY
 OTHER_SUBS = [("4p", "4P"), ("aftn", "AFTN"), ("bomb-phone", "BOMB PHONE"), ("braking-action", "BRAKING ACTION"),
               ("checklist", "CHECKLIST"), ("docs", "DOCS"), ("flight-plan", "FLIGHT PLAN"), ("fmp", "FMP"),
               ("holding", "HOLDING"), ("ia", "IA"), ("light-gun", "LIGHT GUN"), ("meteo", "METEO"),
-              ("nato-weather", "NATO WEATHER"), ("phraseology", "PHRASEOLOGY"), ("position", "POSITION"),
+              ("nato-weather", "NATO WEATHER"), ("position", "POSITION"),
               ("regcause", "REGCAUSE"), ("squawk", "SQUAWK"), ("vfr-minima", "VFR MINIMA")]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
@@ -66,7 +67,7 @@ def test_docs_moved_to_other():
     DOKUMENTY."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
     assert '  docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],' in MOVED_SRC
-    assert '  phraseology: () => ["other", "phraseology"],' in MOVED_SRC
+    assert '  phraseology: () => ["other", undefined],' in MOVED_SRC
     assert "if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);" in APP
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { isCoordFile, mountDocs } from "../docs.js";' in other and "soon(" not in other
@@ -91,14 +92,27 @@ def test_docs_moved_to_other():
     assert 'navigate("other"' not in radio
 
 
-def test_phraseology_moved_to_other():
-    """0.12.3: PHRASEOLOGY nie jest już w menu, tylko podzakładką OTHER po DOCS (#other/phraseology); stary adres
-    #phraseology przekierowuje app.js."""
-    assert "phraseology" not in MENU and not (FRONTEND / "js" / "tabs" / "phraseology.js").exists()
-    phr = (FRONTEND / "js" / "phraseology.js").read_text("utf-8")
-    assert "export function mountPhraseology(pane, ctx)" in phr and "/api/embed-check/phraseology" in phr
-    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
-    assert 'import { mountPhraseology } from "../phraseology.js";' in other
+def _code(src):
+    """Kod JS bez komentarzy (/* */ i // od początku linii albo po spacji)."""
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return re.sub(r"(^|\s)//.*$", r"\1", src, flags=re.M)
+
+
+def test_phraseology_removed():
+    """0.13.1 (issue #25): PHRASEOLOGY usunięta (do 0.13.0 podzakładka OTHER, do 0.12.2 osobna zakładka): bez modułu,
+    bez podzakładki, bez adresu w /api/config i bez sprawdzania osadzania. Stary adres #phraseology otwiera OTHER
+    w jego stanie (MOVED bez podzakładki), #other/phraseology to nieznane id (DOCS)."""
+    assert "phraseology" not in MENU and not (FRONTEND / "js" / "phraseology.js").exists()
+    assert not (FRONTEND / "js" / "tabs" / "phraseology.js").exists()
+    other = _code((FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8"))
+    assert "phraseology" not in other.lower()
+    for path in (FRONTEND / "js").rglob("*.js"):
+        code = _code(path.read_text("utf-8"))
+        assert "embed-check/phraseology" not in code and "links.phraseology" not in code, path.name
+    assert "phraseology_url" not in (ROOT_DIR / "backend" / "app" / "config.py").read_text("utf-8")
+    system = (ROOT_DIR / "backend" / "app" / "routers" / "system.py").read_text("utf-8")
+    assert '"phraseology"' not in system and "phraseology_url" not in system
+    assert '  phraseology: () => ["other", undefined],' in MOVED_SRC
 
 
 def test_checklist_moved_to_other():
@@ -273,7 +287,8 @@ def test_hash_roundtrip(js):
 def test_moved_docs(js):
     # bez arg OTHER zostaje w swoim stanie (otwarty dokument), "" = pierwszy dokument, plik = ten PDF
     assert js["moved"] == [["other", None], ["other", "docs"], ["other", "docs/LOA/LOA EPWW EDMM (AIRAC 2602).pdf"]]
-    assert js["phraseology"] == ["other", "phraseology"]
+    # 0.13.1: bez PHRASEOLOGY stary adres otwiera OTHER w jego stanie (undefined w JSON = null)
+    assert js["phraseology"] == ["other", None]
     # CHECKLIST: bez arg i "" = pierwsza checklista w OTHER › CHECKLIST, id = ta checklista
     assert js["checklist"] == [["other", "checklist"], ["other", "checklist"], ["other", "checklist/close-position"]]
     # STRIP: bez arg AERODROME w swoim stanie, "" = domyślny ekran, ICAO = TRAFFIC (DMAN/AMAN) tego lotniska, reszta

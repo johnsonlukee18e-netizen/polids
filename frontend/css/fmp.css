@@ -4,9 +4,16 @@
    tło znaczyło tylko "aktywny". Zwykła grubość pisma, ostre krawędzie, bez cieni; układ bez czcionki o stałej szerokości
    (cyfry w kolumnach wyrównane przez tabular-nums). */
 .fmp { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-/* podzakładka z .pane.fill: pasek stoi, przewija się tylko tabela (nagłówek tabeli przyklejony) */
-.pane.fill > .fmp { flex: 1; padding: 12px 16px; }
-.pane.fill > .fmp > .fmp-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* podzakładka z .pane.fill: pasek stoi, przewija się tylko tabela (nagłówek tabeli przyklejony); 0.13.1: obok tabeli
+   panel wykresów (.fmp-side), który nie przewija się z tabelą. Szerokość panelu FMP (container query) decyduje, czy
+   panel stoi obok tabeli, czy pod nią (okno węższe niż ok. 1310 px) */
+.pane.fill > .fmp { flex: 1; padding: 12px 16px; container: fmp / inline-size; }
+.pane.fill > .fmp > .fmp-main { flex: 1; min-height: 0; display: flex; gap: 16px; align-items: flex-start; }
+.fmp-main > .fmp-scroll { flex: 0 1 680px; min-width: 440px; max-height: 100%; overflow: auto; }
+.fmp-main table.fmp-table { max-width: none; }
+.fmp-side { flex: 1 1 600px; min-width: 520px; max-width: 760px; max-height: 100%; overflow: auto; padding: 6px 10px 8px;
+  background: #000; border: 1px solid #3a3a3a; color: #fff; font: 400 13px/1.35 var(--ui); }
+.fmp-side .fmp-pick { margin: 0; padding: 18px 4px; font-size: 14px; }
 
 .fmp-bar { flex: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; min-height: 18px; }
 .fmp-info { font-size: 13px; }
@@ -17,7 +24,8 @@
 table.fmp-table { width: 100%; max-width: 680px; border-collapse: collapse; font: 400 17px/1.3 var(--sans);
   font-variant-numeric: tabular-nums; color: #fff; }
 table.fmp-table th { position: sticky; top: 0; z-index: 1; padding: 4px 12px; background: #000; color: #fff; text-align: left;
-  font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; border-bottom: 1px solid #3a3a3a; cursor: help; }
+  font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; border-bottom: 1px solid #3a3a3a; cursor: help;
+  white-space: nowrap; }
 table.fmp-table td { padding: 2px 12px; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
 table.fmp-table th + th, table.fmp-table td + td { border-left: 1px solid #262626; }
 table.fmp-table th:first-child, table.fmp-table td.fmp-sec { width: 130px; }
@@ -26,10 +34,69 @@ table.fmp-table tr.on td { background: #484848; }
 table.fmp-table tr.off td { background: #000; }
 table.fmp-table tr.on:hover td { background: #575757; }
 table.fmp-table tr.off:hover td { background: var(--row-hover); }
-table.fmp-table td.fmp-sec { letter-spacing: .4px; cursor: help; }
-table.fmp-table td.fmp-num { cursor: help; }
+table.fmp-table td.fmp-sec { letter-spacing: .4px; }
+/* 0.13.1: klik w wiersz otwiera wykresy; wybrany wiersz zielony (wewnętrzne linie, bez cienia na zewnątrz) */
+table.fmp-table tbody tr { cursor: pointer; }
+table.fmp-table tr.sel td, table.fmp-table tr.sel:hover td { background: #1d4d15; box-shadow: inset 0 1px 0 #5fd23a, inset 0 -1px 0 #5fd23a; }
+table.fmp-table tr.sel td:first-child { box-shadow: inset 3px 0 0 #5fd23a, inset 0 1px 0 #5fd23a, inset 0 -1px 0 #5fd23a; }
 /* obciążenie: żółte od 90 % przepustowości, czerwone powyżej; regulacja teraz: id sektora czerwone */
 table.fmp-table td.fmp-num.near { color: var(--yellow); }
 table.fmp-table td.fmp-num.over, table.fmp-table td.fmp-sec.reg { color: #ff5a4a; }
 /* przepustowość z regulacji obowiązującej teraz (w nawiasie): czerwona jak id regulowanego sektora */
 table.fmp-table .fmp-regcap { color: #ff5a4a; }
+
+/* --- 0.13.1 (issue #25): wykresy ENTRY i OCC wybranego sektora w stylu wykresów NM: nagłówek (kod, opis, ACTIVE,
+   ✕), przepustowość i regulacje, dwa wykresy SVG na wspólnej osi czasu, legenda. Kolory obciążenia jak na MAP
+   (zielony < 90 %, żółty 90–100 %, czerwony powyżej, niebieski bez limitu), przepustowość przerywana różowa,
+   regulacja czerwona ciągła, "teraz" biała kropkowana */
+.fmc-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; padding-bottom: 4px; border-bottom: 1px solid #3a3a3a; }
+.fmc-code { font: 400 20px/1.2 var(--ui); letter-spacing: .4px; color: #fff; }
+.fmc-code.reg { color: #ff5a4a; }
+.fmc-desc { color: var(--text); font-size: 14px; }
+.fmc-chip { padding: 0 5px; border: 1px solid #5a5a5a; color: var(--muted); font-size: 11px; letter-spacing: .6px; }
+.fmc-chip.on { background: #484848; border-color: #8a8a8a; color: #fff; }
+.fmc-msg { font-size: 12px; }
+.fmc-close { margin-left: auto; align-self: center; padding: 0 7px; background: transparent; border: 1px solid #5a5a5a; border-radius: 0;
+  color: var(--muted); font: 400 13px/20px var(--ui); cursor: pointer; }
+.fmc-close:hover { color: #fff; border-color: #fff; }
+.fmc-meta { margin: 4px 0 2px; color: var(--muted); font-size: 12px; }
+.fmc-regtxt { color: #ff5a4a; }
+.fmc-empty, .fmc-wait, .fmc-err { margin: 6px 0 0; font-size: 13px; }
+.fmc-charts { display: grid; gap: 0 16px; }
+.fmc-title { margin: 8px 0 0; color: #fff; font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; }
+.fmc-title span { margin-left: 6px; color: var(--muted); font-size: 12px; font-variant: normal; letter-spacing: 0; }
+.fmc-svg { display: block; width: 100%; height: auto; margin-top: 4px; }
+.fmc-svg text { font: 400 11px var(--ui); fill: #bdbdbd; text-anchor: middle; }
+.fmc-svg text.end { text-anchor: end; }
+.fmc-svg .fmc-val { fill: #fff; font-size: 10px; }
+.fmc-svg .fmc-grid { stroke: #222; }
+.fmc-svg .fmc-base { stroke: #5a5a5a; }
+.fmc-svg .fmc-now { stroke: #fff; stroke-width: 1; stroke-dasharray: 2 2; }
+.fmc-svg rect.fmc-ok { fill: #3fb950; }
+.fmc-svg rect.fmc-near { fill: var(--yellow); }
+.fmc-svg rect.fmc-over { fill: #ff5a4a; }
+.fmc-svg rect.fmc-nolim { fill: #4a7bd0; }
+.fmc-svg rect.past { opacity: .45; }
+.fmc-svg .fmc-cap { stroke: #ff5cc8; stroke-width: 1.6; stroke-dasharray: 5 3; }
+.fmc-svg .fmc-reg { stroke: #ff5a4a; stroke-width: 2; }
+.fmc-svg .fmc-capt { fill: #ff5cc8; text-anchor: start; }
+.fmc-svg .fmc-capt.reg { fill: #ff5a4a; }
+.fmc-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: center; margin-top: 6px; font-size: 11px; color: var(--text); }
+.fmc-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
+.fmc-legend i.fmc-ok { background: #3fb950; }
+.fmc-legend i.fmc-near { background: var(--yellow); }
+.fmc-legend i.fmc-over { background: #ff5a4a; }
+.fmc-legend i.fmc-nolim { background: #4a7bd0; }
+.fmc-legend i.fmc-capl { width: 14px; height: 0; border-top: 2px dashed #ff5cc8; }
+.fmc-legend i.fmc-regl { width: 14px; height: 0; border-top: 2px solid #ff5a4a; }
+.fmc-legend .fmc-stat { color: var(--muted); }
+
+/* wąskie okno (okno węższe niż ok. 1310 px: tabela i panel nie mieszczą się obok siebie): panel pod tabelą na całą
+   szerokość, wykresy obok siebie; tabela (szerokość jak do 0.13.0) dostaje resztę wysokości i przewija się sama, a gdy
+   nie starcza miejsca nawet na 120 px tabeli, przewija się cały obszar pod paskiem */
+@container fmp (max-width: 987px) {
+  .pane.fill > .fmp > .fmp-main { flex-direction: column; align-items: stretch; gap: 10px; overflow: auto; }
+  .fmp-main > .fmp-scroll { flex: 1 1 auto; width: 100%; max-width: 680px; min-width: 0; min-height: 120px; max-height: none; }
+  .fmp-side { flex: none; min-width: 0; max-width: none; max-height: none; overflow: visible; }
+  .fmc-charts { grid-template-columns: 1fr 1fr; }
+}

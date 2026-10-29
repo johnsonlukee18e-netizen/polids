@@ -33,6 +33,19 @@ async def sectors(prefix: str = Query("", pattern="^[A-Za-z]{0,2}$")):
     return await _call(viff.sectors(prefix or None))
 
 
+@router.get("/sectors/{tv}")
+async def sector(tv: str):
+    """Jeden traffic volume do wykresów ENTRY i OCC w OTHER › FMP (0.13.1): wejścia w 60 min co 20 min i samoloty
+    w sektorze minuta po minucie od pełnej godziny przed bieżącą do +5 h, z przepustowością i regulacjami. Id jak
+    EP-BH albo ED-EDWW-ALR (kilka myślników), wielkość liter dowolna."""
+    if not re.fullmatch(r"[A-Za-z]{2}-[A-Za-z0-9-]{1,20}", tv):
+        raise HTTPException(400, "Sector id = prefix and name, e.g. EP-BH")
+    c = await _call(viff.sector_chart(tv))
+    if c is None:
+        raise HTTPException(404, f"No flow data for sector {tv.upper()}")
+    return c
+
+
 @router.get("/flight/{callsign}")
 async def flight(callsign: str):
     """Jeden lot z vIFF (jak szczegóły lotu w NM UI): EOBT/TOBT/TSAT/CTOT, regulacja, status CDM, trasa,

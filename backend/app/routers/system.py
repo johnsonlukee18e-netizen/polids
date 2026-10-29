@@ -28,7 +28,7 @@ async def config():
         "links": {
             **await eaip.resolved_links(today),
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
-            "phraseology": settings.phraseology_url, "performance_db": settings.performance_db_url,
+            "performance_db": settings.performance_db_url,
         },
         "openaip_api_key": settings.openaip_api_key,
         "carto_api_key": settings.carto_api_key.strip(),
@@ -36,8 +36,9 @@ async def config():
     }
 
 
-EMBED_LINKS = {"phraseology": "phraseology_url", "inop": "inop_url", "aip_ifr": "aip_ifr_url", "aip_vfr": "aip_vfr_url",
-               "aip_mil": "aip_mil_url", "performance_db": "performance_db_url"}
+# 0.13.1: bez PHRASEOLOGY (podzakładka usunięta, /api/embed-check/phraseology = 404 jak każdy nieznany link)
+EMBED_LINKS = {"inop": "inop_url", "aip_ifr": "aip_ifr_url", "aip_vfr": "aip_vfr_url", "aip_mil": "aip_mil_url",
+               "performance_db": "performance_db_url"}
 
 
 @router.get("/embed-check/{link}")
