@@ -14,6 +14,7 @@ from backend.app.config import ROOT_DIR
 
 FRONTEND = ROOT_DIR / "frontend"
 METEO = (FRONTEND / "js" / "tabs" / "meteo.js").read_text("utf-8")
+METARFMT = (FRONTEND / "js" / "metarfmt.js").read_text("utf-8")
 CSS = (FRONTEND / "css" / "meteoimg.css").read_text("utf-8")
 TURB_BASE = "https://aviation-api.imgw.pl/image/TURBULENCJE/gify_LOTN07_TURB_DWD_statkirejsowe/Turb11000."
 # adres RADAR sprzed rundy 10 (bez zmian)
@@ -98,8 +99,10 @@ def js(tmp_path_factory):
     (d / "solar.mjs").write_text((FRONTEND / "js" / "solar.js").read_text("utf-8"), "utf-8")
     # mapa QNH (qnhmap.js, z Leafletem) poza testem: zaślepka
     (d / "qnhmap.mjs").write_text("export const qnhMap = () => ({ destroy() {} });\n", "utf-8")
+    # 0.13.1: kolory i opisy METAR/TAF w metarfmt.js (importuje api.js)
+    (d / "metarfmt.mjs").write_text(METARFMT.replace('"./api.js"', '"./api.mjs"'), "utf-8")
     (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"').replace('"../solar.js"', '"./solar.mjs"')
-                                 .replace('"../qnhmap.js"', '"./qnhmap.mjs"'), "utf-8")
+                                 .replace('"../qnhmap.js"', '"./qnhmap.mjs"').replace('"../metarfmt.js"', '"./metarfmt.mjs"'), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "meteo.mjs").as_uri()], capture_output=True, text=True, timeout=60)
