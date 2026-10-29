@@ -1,6 +1,7 @@
 """0.12.3: CALLSIGN › ALL („Wszystkie rekordy”) pobiera najwyżej LIMIT znaków wywoławczych (w bazie ~7000). Obcięta lista
 nie może udawać pełnej: licznik mówi „first N shown” i podpowiada literę albo wyszukiwanie, jak AIRCRAFT.
-Zakładka montowana w Node z zastępczym api.js (h, api, letterMenu), bez przeglądarki."""
+Zakładka montowana w Node z zastępczym api.js (h, api, letterMenu, touchKeyboard), bez przeglądarki.
+0.13.1 (issue #25): klawiatura dotykowa (KEYBOARD pod ALL) na końcu panelu, przewija się tylko lista (.cs-list)."""
 import json
 import shutil
 import subprocess
@@ -19,11 +20,20 @@ export let TOTAL = 0;
 export const setTotal = (n) => { TOTAL = n; };
 const el = () => ({ textContent: "", innerHTML: "", value: "", addEventListener() {}, focus() {} });
 const parts = { ".q": el(), ".cat": el(), ".count": el(), "tbody": el() };
-export const pane = { querySelector: (s) => parts[s] };
+export const appended = [];
+export const pane = { querySelector: (s) => parts[s], append: (x) => appended.push(x) };
 export const h = () => pane;
 export const esc = (s) => String(s ?? "");
 export const debounce = (f) => f;
-export const letterMenu = () => ({ set() {} });
+// przycisk KEYBOARD z letterMenu i klawiatura: zapis wywołań (pole, przycisk) i sync()
+export const KBD = { name: "kbd-button" };
+export const letterMenu = () => ({ set() {}, kbd: KBD });
+export const keyboards = [];
+export const touchKeyboard = (input, button) => {
+  const k = { el: { name: "tkbd" }, syncs: 0, sync() { k.syncs++; } };
+  keyboards.push({ inputIsQ: input === parts[".q"], buttonIsKbd: button === KBD, k });
+  return k;
+};
 export async function api(url) {
   calls.push(url);
   const limit = Number(new URL(url, "http://x").searchParams.get("limit"));
@@ -45,6 +55,10 @@ for (const total of [6969, 1000, 999, 3]) {
   out[total] = stub.pane.querySelector(".count").textContent;
 }
 out.calls = stub.calls;
+const tab2 = tab.mount(root);
+tab2.activate(undefined);
+out.keyboards = stub.keyboards.map(({ inputIsQ, buttonIsKbd, k }) => ({ inputIsQ, buttonIsKbd, syncs: k.syncs }));
+out.appended = stub.appended.map((x) => x.name);
 console.log(JSON.stringify(out));
 """
 
@@ -80,3 +94,16 @@ def test_limit_in_request_matches_hint(js):
     # ta sama stała w zapytaniu i w podpowiedzi; serwer przyjmuje do 2000 (routers/callsigns.py)
     assert js["calls"] and all("&limit=1000" in u and u.startswith("/api/callsigns?") for u in js["calls"])
     assert "const LIMIT = 1000;" in SRC and "&limit=${LIMIT}" in SRC
+
+
+def test_touch_keyboard_last_in_pane(js):
+    """Jedna klawiatura na montowanie, dla pola wyszukiwania i przycisku KEYBOARD, dołączona na końcu panelu (po liście);
+    activate() ustawia jej stan wg wspólnego wyboru (sync) przed fokusem w polu."""
+    assert len(js["keyboards"]) == 5 and all(k["inputIsQ"] and k["buttonIsKbd"] for k in js["keyboards"])
+    assert js["appended"] == ["tkbd"] * 5
+    assert [k["syncs"] for k in js["keyboards"]] == [0, 0, 0, 0, 1]
+    assert 'import { api, debounce, esc, h, letterMenu, touchKeyboard } from "../api.js";' in SRC
+    assert '<div class="pane cs-pane">' in SRC
+    assert '<div class="cs-list"><table class="data callsigns">' in SRC and "</tbody></table></div>\n    </div>`);" in SRC
+    assert "const kbd = touchKeyboard(q, letters.kbd);\n    pane.append(kbd.el);" in SRC
+    assert "kbd.sync();\n      q.focus();" in SRC

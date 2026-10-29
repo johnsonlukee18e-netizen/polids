@@ -1,0 +1,26 @@
+/* Klawiatura dotykowa AIRCRAFT / CALLSIGN (0.13.1, issue #25): przycisk KEYBOARD pod ALL otwiera ją na dole panelu,
+   pod przewijaną listą (pole wyszukiwania u góry i klawisze na dole zawsze widoczne). Zielone klawisze PANDORY
+   (.gbtn), ostre krawędzie, bez cieni i poświaty, napisy zwykłej grubości. Klawisz 56 x 44 px z odstępem 3 px,
+   w niskim oknie (od 820 px w dół) 40 px wysokości. Rzędy na środku: 10, 10, 9, 8 klawiszy i dolny rząd
+   CLEAR (2) + SPACE (5) + BACKSPACE (3) szerokości rzędu cyfr. */
+.tkbd { --tk-w: 56px; --tk-h: 44px; --tk-gap: 3px; flex: none; align-self: center; display: flex; flex-direction: column;
+  gap: var(--tk-gap); padding: 6px; background: #050605; border: 1px solid var(--line); border-radius: 0; }
+/* display: flex wyżej przykrywa [hidden] przeglądarki (jak kiedyś przycisk ADMIN) */
+.tkbd[hidden] { display: none; }
+.tk-row { display: flex; justify-content: center; gap: var(--tk-gap); }
+/* touch-action: manipulation: bez powiększania podwójnym stuknięciem i bez opóźnienia kliknięcia na tablecie */
+.tkbd .tk { flex: none; width: var(--tk-w); height: var(--tk-h); margin: 0; padding: 0; border-radius: 0; font: 18px/1 var(--ui);
+  letter-spacing: 0; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; }
+.tkbd .tk.w2 { width: calc(2 * var(--tk-w) + var(--tk-gap)); font-size: 13px; }
+.tkbd .tk.w3 { width: calc(3 * var(--tk-w) + 2 * var(--tk-gap)); font-size: 13px; }
+.tkbd .tk.w5 { width: calc(5 * var(--tk-w) + 4 * var(--tk-gap)); font-size: 13px; }
+/* podświetlenie pod myszą tylko tam, gdzie jest mysz (po stuknięciu palcem klawisz nie zostaje podświetlony) */
+@media (hover: hover) {
+  .tkbd .tk:hover { background: linear-gradient(#52bd3c, #36992a); }
+}
+/* wciśnięty klawisz jasnozielony z ciemnym napisem, jak aktywny przycisk menu */
+.tkbd .tk:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+@media (max-height: 820px) {
+  .tkbd { --tk-h: 40px; }
+}

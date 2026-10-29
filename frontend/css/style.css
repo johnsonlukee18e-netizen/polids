@@ -30,6 +30,15 @@
   --sans: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
   --menu-lime: #ccff66;   /* napis SYT OP w menu (jasnozielony jak w PANDORZE) */
   --topbar-h: 18px;       /* pasek Reload | Brighter | Darker u góry ekranu */
+  /* 0.13.1 (issue #25): każdy przycisk menu i podmenu 137 x 28 px z marginesem 1,5 px z każdej strony (3 px między
+     przyciskami, rząd co 31 px), kolumny menu i podmenu po 150 px. Wspólne miary także dla innych zakładek (przyciski
+     producentów AIRCRAFT, warstwy RADIO): --btn-h-max to pełna wysokość, --btn-h (na body) wysokość w tym oknie */
+  --btn-w: 137px;
+  --btn-h-max: 28px;
+  --btn-m: 1.5px;
+  --col-pad: 4.5px;
+  --col-w: calc(var(--btn-w) + 2 * var(--btn-m) + 2 * var(--col-pad) + 1px);
+  --menu-rows: 21;        /* ← i 20 zakładek z ADMIN (index.html) */
   --head: #111611;        /* pasek tytułu panelu */
   --head-line: #243024;
   --row: #0a0c0a;
@@ -42,6 +51,12 @@ html, body { height: 100%; margin: 0; }
 /* pasek u góry na całą szerokość, pod nim menu (lewa kolumna) i zakładki (main); pasek offline (.srv-off) jest fixed */
 body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); overflow: hidden; display: grid;
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr); }
+/* wysokość przycisku menu i podmenu: 28 px, a w niskim oknie mniej, po równo w obu kolumnach (rzędy dalej na jednej
+   wysokości), tak żeby 21 przycisków menu, zegar, logo i użytkownik zmieściły się bez przewijania; najmniej 16 px.
+   --foot-h: zegar 46 + logo 34 (+ użytkownik 66). --btn-h na body, tak jak zmiana --foot-h dla zalogowanego */
+body { --foot-h: 80px;
+  --btn-h: clamp(16px, calc((100vh - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows) - 2 * var(--btn-m)), var(--btn-h-max)); }
+body:has(#userbox:not([hidden])) { --foot-h: 146px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 /* bez pogrubień także tam, gdzie przeglądarka pogrubia sama (b, strong, nagłówki tabel i stron, grupy w listach
    wyboru: optgroup w polach Position na HOME, w OVERVIEW i COORDINATION) */
@@ -68,81 +83,64 @@ a { color: var(--green-text); }
 .menu nav button.active, .submenu button.active {
   background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06;
 }
-/* menu główne ciaśniej niż podmenu: 22 przyciski + logo, zegar i użytkownik (także ADMIN) mieszczą się bez przewijania
-   od 900 px wysokości. Wszystkie przyciski ciasno, z tym samym odstępem 2 px (od 820 px w dół 1 px), także EMERGENCY
-   i ADMIN (0.13.0, jak na zdjęciu PANDORY) */
-.menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }
+/* 0.13.1 (issue #25): menu i każde podmenu z przyciskami jednej wielkości: 137 x 28 px, margines 1,5 px z każdej
+   strony (3 px między przyciskami), kolumny po 150 px z tym samym paddingiem u góry, więc pierwszy przycisk podmenu
+   stoi na wysokości pierwszego przycisku menu, a każdy następny na wysokości następnego. Jedyny wyjątek: litery
+   AIRCRAFT / CALLSIGN, pół szerokości (dwie w rzędzie, razem 137 px jak ALL), ta sama wysokość. Napis w jednej linijce
+   (w 137 px mieści się każdy, także BRAKING ACTION), tekst na środku przycisku. Wysokość --btn-h (body) */
+.menu nav button, .submenu button {
+  flex: none; width: var(--btn-w); height: var(--btn-h); margin: var(--btn-m); padding: 0 4px;
+  line-height: calc(var(--btn-h) - 2px);
+}
 /* SYT OP jasnozielonym napisem jak w PANDORZE; aktywny ma ciemny napis jak każdy aktywny przycisk */
 .menu nav button[data-tab="sytop"]:not(.active) { color: var(--menu-lime); }
 /* display:block wyżej przykrywa [hidden] przeglądarki: ADMIN (hidden dla nie-administratorów) zajmował miejsce w menu */
 .menu nav button[hidden] { display: none; }
-/* Niskie okno (poniżej 900 px; laptop 1366x768 z paskami przeglądarki to 600-657 px): przyciski menu w kolumnie flex
-   zmniejszają się po równo, gdy wszystkie się nie mieszczą, więc całe menu (z EMERGENCY i ADMIN) i zegar z AIRAC są
-   widoczne bez przewijania do 600 px wysokości, także z zalogowanym użytkownikiem. Gdy się mieszczą, mają wysokość jak
-   dotąd (28,8 px = 5 + 16,8 + 5 + ramka; od 820 px w dół 24,8 px): wysokość zamiast pionowego paddingu i linia 14 px,
-   więc tekst zostaje na środku przycisku także przy 16 px (przy paddingu przepełniony przycisk spychał tekst w dół).
-   0.13.0: pasek u góry zabiera 18 px, a EMERGENCY i ADMIN nie mają już dodatkowego odstępu. */
-@media (max-height: 899px) {
-  .menu nav { display: flex; flex-direction: column; }
-  #tabs button { flex: 0 1 auto; height: 28.8px; min-height: 16px; padding-top: 0; padding-bottom: 0; line-height: 14px; }
-}
-@media (max-height: 820px) {
-  #tabs button { height: 24.8px; margin-bottom: 1px; }
-}
-.menu nav button.back { font-size: 22px; line-height: 16.8px; }
+.menu nav button.back { font-size: 22px; }
 .menu nav button.back:disabled { opacity: .35; cursor: default; background: linear-gradient(#45a832, #2f8a22); }
 .menu nav button.red { background: linear-gradient(#c8372d, #9c241c); border-color: #5c120d; }
 .menu nav button.red.active { background: linear-gradient(#ff5a4a, #e0302a); color: #fff; }
 
-.menu { width: 150px; flex: none; background: #050605; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; }
-.menu nav { flex: 1; overflow-y: auto; }
-.menu .brand { display: block; padding: 4px 4px 5px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
-.menu .brand img { display: block; width: 100%; height: auto; max-height: 40px; object-fit: contain; }
-.clockbox { text-align: center; padding: 8px 0 4px; border-top: 1px solid var(--line); }
-.clock { font: 20px var(--mono); color: #fff; }
-.userbox { text-align: center; padding: 6px 0 2px; border-top: 1px solid var(--line); font-size: 12px; }
+/* lewe menu: przyciski od góry (← na wysokości pierwszego przycisku podmenu), na dole zegar z AIRAC, pod nim logo
+   (0.13.1, issue #25: logo na samym dole, nad informacjami o użytkowniku) i zalogowany użytkownik; bez użytkownika
+   logo jest ostatnie. Zegar, logo i użytkownik mają stałą wysokość (--foot-h), bo z niej liczona jest --btn-h */
+.menu { width: var(--col-w); flex: none; background: #050605; border-right: 1px solid var(--line); padding: var(--col-pad);
+  display: flex; flex-direction: column; }
+.menu nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.clockbox { flex: none; height: 46px; margin: 0 var(--btn-m); text-align: center; padding: 3px 0 0; border-top: 1px solid var(--line); overflow: hidden; }
+.clock { font: 20px/24px var(--mono); color: #fff; }
+.clockbox .hint { line-height: 16px; }
+.menu .brand { flex: none; display: block; height: 34px; margin: 0 var(--btn-m); padding: 4px 0 3px; border-top: 1px solid var(--line); }
+.menu .brand img { display: block; width: 100%; height: 26px; object-fit: contain; }
+.userbox { flex: none; height: 66px; margin: 0 var(--btn-m); text-align: center; padding: 4px 0 0; border-top: 1px solid var(--line);
+  font-size: 12px; line-height: 16px; overflow: hidden; }
 .userbox .who { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .userbox .dev { color: var(--yellow); }
-.userbox form { margin: 4px 0 0; }
-.userbox button { width: 100%; padding: 3px 6px; background: none; border: 1px solid var(--line); border-radius: 0;
-  color: var(--muted); font-size: 11px; cursor: pointer; }
+.userbox form { margin: 3px 0 0; }
+.userbox button { width: 100%; padding: 2px 6px; background: none; border: 1px solid var(--line); border-radius: 0;
+  color: var(--muted); font-size: 11px; line-height: 15px; cursor: pointer; }
 .userbox button:hover { color: var(--text); border-color: var(--green); }
-/* zalogowany administrator na 1366x768: zegar i użytkownik ciaśniej, żeby ADMIN nie chował się pod zegarem
-   (po regułach wyżej, bo te same selektory) */
-@media (max-height: 820px) {
-  .clockbox { padding: 4px 0 2px; }
-  .clock { font-size: 18px; }
-  .userbox { padding-top: 4px; }
-  .userbox form { margin-top: 2px; }
-}
 
 main { flex: 1; min-width: 0; position: relative; }
 .view { position: absolute; inset: 0; display: none; }
 .view.active { display: flex; }
-/* podmenu 140 px (0.13.0: w Arialu PHRASEOLOGY nie mieścił się w 130 px): napis, który się nie mieści, schodzi do drugiej
-   linijki jak w PANDORZE; "\n" w nazwie podzakładki łamie ją w tym miejscu (pre-line), tak OTHER ma każde dwa słowa
-   w dwóch linijkach (BOMB / PHONE, BRAKING / ACTION). Przyciski
-   równej wysokości jak dotąd (34,9 px), tekst na środku, dwie linijki po 15 px mieszczą się w tej samej wysokości */
-.submenu { width: 140px; flex: none; padding: 6px; background: #050605; border-right: 1px solid var(--line); overflow-y: auto; }
-.submenu button { height: 34.9px; padding: 0 4px; line-height: 15px; white-space: pre-line; text-overflow: clip; }
-/* AIRCRAFT / CALLSIGN: ALL na całą szerokość, pod nim 26 liter w 13 rzędach po dwie (A B … Y Z) */
-.submenu.letters { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; align-content: start; width: 100px; }
-.submenu.letters button { margin: 0; }
-.submenu.letters button.all { grid-column: 1 / -1; }
-.submenu .sep { height: 10px; }
-/* niskie okno: długie podmenu (METEO 15, EMERGENCY 18, OTHER 18 przycisków) w kolumnie flex zmniejszają się po równo jak
-   menu główne zamiast się przewijać, najwyżej do 28 px (dwie linijki po 13 px); przewijają się dopiero, gdy i tak się
-   nie mieszczą (OTHER 18: do ok. 580 px wysokości okna). Siatka liter AIRCRAFT / CALLSIGN (nie dotyczy jej :not) i odstępy .sep bez zmian. */
-@media (max-height: 899px) {
-  .submenu:not(.letters) { display: flex; flex-direction: column; }
-  .submenu:not(.letters) > button { flex: 0 1 auto; min-height: 28px; margin-bottom: 2px; line-height: 13px; }
-  .submenu:not(.letters) > .sep { flex: none; }
-}
+/* podmenu tej samej szerokości co menu (150 px) i z tym samym paddingiem: rzędy podmenu na wysokości rzędów menu.
+   Kolumna flex: pionowe marginesy przycisków się nie łączą w jeden (3 px między przyciskami jak w menu). Odstęp (.sep)
+   to jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu */
+.submenu { width: var(--col-w); flex: none; padding: var(--col-pad); background: #050605; border-right: 1px solid var(--line);
+  overflow-y: auto; display: flex; flex-direction: column; }
+/* AIRCRAFT / CALLSIGN: ALL i pod nim KEYBOARD (klawiatura dotykowa) na całą szerokość jak każdy przycisk podmenu,
+   pod nimi 26 liter w 13 rzędach po dwie (A B … Y Z): litera to połowa przycisku (2 x 67 px + 3 px = 137 px), ta sama
+   wysokość i ten sam margines; siatka bez odstępu (gap), bo odstęp 3 px dają marginesy, rzędy co 31 px jak w menu */
+.submenu.letters { display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
+.submenu.letters button { width: auto; }
+.submenu.letters button.all, .submenu.letters button.kbd { grid-column: 1 / -1; }
+.submenu .sep { flex: none; height: calc(var(--btn-h) + 2 * var(--btn-m)); }
 
 .pane { flex: 1; min-width: 0; overflow: auto; padding: 12px 16px; }
 .pane.fill { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 iframe.embed { flex: 1; border: 0; width: 100%; background: #fff; }
-/* pasek nad ramką (AD CIV/MIL/VFR, INOP, PHRASEOLOGY): jedna linia, adres i uwaga skracane wielokropkiem */
+/* pasek nad ramką (AD CIV/MIL/VFR, INOP): jedna linia, adres i uwaga skracane wielokropkiem */
 .toolbar.embed-bar { flex-wrap: nowrap; }
 .embed-bar > .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .embed-bar > .hint:not(.mono) { flex-shrink: 0; }   /* skracany jest tylko adres, uwaga zostaje czytelna */
@@ -527,6 +525,11 @@ dl.props dd { margin: 0; font-family: var(--mono); }
 /* METEO: TAF w liniach, mapa QNH jak w PANDORZE */
 .wx .cont { display: inline-block; padding-left: 58px; }
 
+/* CALLSIGN (0.13.1): pole wyszukiwania u góry i klawiatura dotykowa pod listą zawsze widoczne, przewija się tylko
+   tabela (nagłówek przyklejony w .cs-list) */
+.cs-pane { display: flex; flex-direction: column; gap: 8px; }
+.cs-pane > .toolbar { margin-bottom: 0; }
+.cs-list { flex: 1; min-height: 0; overflow: auto; }
 /* CALLSIGN: kod ICAO i callsign najważniejsze, operator i kraj mniejsze */
 table.callsigns td.icao { font: 20px var(--mono); color: #fff; width: 90px; }
 table.callsigns td.tel { font: 20px var(--mono); color: var(--yellow); }
