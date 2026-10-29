@@ -1,15 +1,15 @@
 // RADIO (jedna strona jak w PANDORZE): czyste funkcje bez DOM – adres (warstwy i przekrój LOW), rzutowanie map,
-// układ etykiet bez nakładania się, siatka strony wg szkicu (0.13.0: kolumny, komórki, przyciski, napisy okienek).
+// układ etykiet bez nakładania się, siatka stosu okienek sąsiada (0.13.1: kafelki i wysokości między nimi wg szkicu).
 // Testowane w Node (test_radio_board.py).
 
 // Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
 export const LAYERS = [
-  { id: "atis", label: "ATIS", tip: "ATIS bar of Polish aerodromes at the top (online with the information letter)" },
+  { id: "atis", label: "ATIS", tip: "ATIS of Polish aerodromes at the top, next to the configuration boxes (online with the information letter)" },
   { id: "low", label: "LOW", tip: "ACC sectors on the left preview: LOW" },
   { id: "mid", label: "MID", tip: "ACC sectors on the small preview: MID" },
   { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH" },
-  { id: "app", label: "APP", tip: "TMAs and APP frequencies, neighbour TMAs at the FIR border (on the LOW preview)" },
-  { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies, neighbour CTRs at the FIR border (on the LOW preview)" },
+  { id: "app", label: "APP", tip: "TMAs and APP frequencies; of the neighbours only the Ostrava (LKMT) and Berlin (EDDB) TMAs (on the LOW preview)" },
+  { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies of FIR EPWW (on the LOW preview)" },
   { id: "twra", label: "TWR/A", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
   { id: "fis", label: "FIS", tip: "FIS areas and Warszawa Information frequencies (on the LOW preview)" },
 ];
@@ -301,30 +301,60 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
 // UNICOM: FIR sąsiada bez nikogo online w sektorach przy granicy (linia pod nazwą FIR-u)
 export const ADVISORY_FQ = "122.800";
 
-// --- siatka strony wg szkicu Marka (0.13.0, data/seed/radio_layout.json; komórki col/row od 1, jak linie siatki CSS)
-// Kolumny o stałej szerokości, żeby zmiana danych (łączenie okienek, dłuższy wskaźnik, ATIS) nigdy nie przesuwała
-// strony: rodzaj kolumny z części stałej (grid.tracks): box = okienka, wskaźniki, BERLIN; btn = przyciski warstw
-// i podgląd MID; name = same nazwy FIR-ów (z linią ADVISORY); reszta (podglądy LOW i HIGH) dzieli wolne miejsce.
-const TRACK = { box: "var(--rb-bw)", btn: "var(--rb-hw)", name: "var(--rb-nw)" };
-export const gridTracks = (kinds) => (kinds || []).map((k) => TRACK[k] || "minmax(0, 1fr)").join(" ");
-// miejsce w siatce {col, row, cols?, rows?} → wartość grid-area
-export function gridArea(c) {
-  const n = (v, d) => Math.max(1, Math.round(Number(v) || d));
-  return `${n(c?.row, 1)} / ${n(c?.col, 1)} / span ${n(c?.rows, 1)} / span ${n(c?.cols, 1)}`;
-}
-// rzędy przycisków warstw z części stałej (buttons: {col, rows: {id: rząd}}): [{col, row, ids}] od góry, w rzędzie
-// w kolejności LAYERS (LOW MID HIGH w jednym rzędzie); warstwa bez rzędu – bez przycisku
-export function buttonRows(buttons) {
-  const by = new Map();
-  LAYER_IDS.forEach((id) => {
-    const r = Number(buttons?.rows?.[id]);
-    if (!r) return;
-    if (!by.has(r)) by.set(r, { col: Number(buttons.col) || 1, row: r, ids: [] });
-    by.get(r).ids.push(id);
+// --- stos okienek FIR-u sąsiada (0.13.1, issue #25: stary styl strony, podział okienek wg szkicu Marka z
+// data/seed/radio_layout.json). Siatka CSS z kolumn i wierszy szkicu, w których stoją okienka (f.cols, f.rows
+// z /api/radio/board; bez nich – z okienek): kolumna stosu = kolumna szkicu, na przemian rząd liczb (wysokości między
+// kafelkami, k = 0..m) i rząd kafelków (m = liczba wierszy). Połączone okienko zajmuje komórki od swojej pierwszej do
+// ostatniej kolumny i wiersza (także pusty wiersz szkicu między nimi), więc stos nigdy nie zmienia rozmiaru.
+// Liczby w kolumnie i, rząd k: nad = kafelek w (i, k-1), pod = kafelek w (i, k); liczy tylko kafelek w swojej pierwszej
+// kolumnie, ten sam nad i pod = zakryte (bez liczby). Tylko pod: jego górna granica; tylko nad: jego dolna; ten sam
+// zakres (EDWW MRZ, MAR, FLG: 285-0): nic między nimi; ta sama granica (nad.lower = pod.upper): jedna liczba; inaczej
+// dwie z kreską między nimi (nowy ciąg okienek: EDUU OSE1 285, HVL2 660). Liczby jak na szkicu i zdjęciu PANDORY (660,
+// 365, 999, 0). Wysokość rzędów liczb stała, z podziału bez łączenia (połączone rozłożone na members z komórkami):
+// l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows, cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek,
+// l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column, grid-row), marks: [{gc, gr, n: [liczby]}]}
+export function stackGrid(f) {
+  const num = (v, d = 0) => (Number(v) > 0 ? Math.round(Number(v)) : d);
+  const cellOf = (b) => ({ b, col: num(b?.col, 1), row: num(b?.row, 1), cols: num(b?.cols, 1), rows: num(b?.rows, 1) });
+  const boxes = (Array.isArray(f?.boxes) ? f.boxes : []).map(cellOf);
+  const base = boxes.flatMap((c) => {
+    const ms = Array.isArray(c.b.members) ? c.b.members : [];
+    return c.b.merged && ms.length && ms.every((x) => num(x?.col) && num(x?.row)) ? ms.map(cellOf) : [c];
   });
-  return [...by.values()].sort((a, b) => a.row - b.row);
+  // kolumny i wiersze stosu: ze szkicu (część stała) i z okienek (żadne okienko nie wypada poza stos)
+  const axis = (fixed, k, s) => [...new Set([...(Array.isArray(fixed) ? fixed.map(Number).filter((v) => v > 0) : []),
+    ...[...base, ...boxes].flatMap((c) => Array.from({ length: c[s] }, (_, i) => c[k] + i))])].sort((a, b) => a - b);
+  const cols = axis(f?.cols, "col", "cols"), rows = axis(f?.rows, "row", "rows"), m = rows.length;
+  const within = (list, v0, n) => list.map((v, i) => (v >= v0 && v < v0 + n ? i : -1)).filter((i) => i >= 0);
+  const grid = (list) => {
+    const occ = cols.map(() => Array(m).fill(null));
+    const placed = list.map((c) => {
+      const ci = within(cols, c.col, c.cols), ri = within(rows, c.row, c.rows);
+      return { ...c, c0: ci[0], c1: ci[ci.length - 1], r0: ri[0], r1: ri[ri.length - 1] };
+    });
+    placed.forEach((t) => { for (let i = t.c0; i <= t.c1; i++) for (let k = t.r0; k <= t.r1; k++) occ[i][k] ||= t; });
+    return { occ, placed };
+  };
+  const up = (t) => Math.round(Number(t.b.upper) || 0), lo = (t) => Math.round(Number(t.b.lower) || 0);
+  const nums = (occ, i, k) => {
+    const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
+    if (aT && aT === bT) return [];
+    const a = aT && aT.c0 === i ? aT : null, b = bT && bT.c0 === i ? bT : null;
+    if (a && b) return up(a) === up(b) && lo(a) === lo(b) ? [] : lo(a) === up(b) ? [up(b)] : [lo(a), up(b)];
+    return a ? [lo(a)] : b ? [up(b)] : [];
+  };
+  const cur = grid(boxes), st = grid(base), marks = [];
+  const lv = Array.from({ length: m + 1 }, (_, k) => Math.max(0, ...cols.map((_, i) => nums(st.occ, i, k).length)));
+  for (let k = 0; k <= m; k++) {
+    cols.forEach((_, i) => {
+      const n = nums(cur.occ, i, k);
+      if (n.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n });
+    });
+  }
+  return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
+    tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };
 }
-// granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0"
+// granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0" (dymek połączonego okienka)
 export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round(Number(b?.lower) || 0)}`;
 // granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
 const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
@@ -344,9 +374,9 @@ export function tipPos(cx, cy, w, h, vw, vh) {
     top: Math.round(Math.max(TIP_GAP, Math.min(top, vh - TIP_GAP - h))), flipX, flipY };
 }
 
-// Panel LOA (kliknięcie nazwy FIR-u): po tej stronie klikniętego FIR-u, gdzie jest więcej miejsca, i nie szerszy niż
-// to miejsce, żeby nazwa i okienka tego FIR-u zostały widoczne (drugie kliknięcie nazwy zamyka panel; ESAA, LKAA, LZBB
-// i UMKK stoją blisko środka strony). x0, x1 = lewa i prawa krawędź nazwy i okienek FIR-u w siatce, W = szerokość
+// Panel LOA (kliknięcie nagłówka stosu sąsiada): po tej stronie klikniętego stosu, gdzie jest więcej miejsca, i nie
+// szerszy niż to miejsce, żeby nagłówek i okienka tego FIR-u zostały widoczne (drugie kliknięcie zamyka panel; ESAA,
+// LKAA, LZBB i UMKK stoją blisko środka strony). x0, x1 = lewa i prawa krawędź stosu FIR-u w siatce strony, W = szerokość
 // siatki (px). Najwyżej LOA_MAX px i LOA_FRAC siatki, nie węższy niż LOA_MIN px (wtedy może zasłonić część FIR-u).
 // Wynik {left: panel przy lewej krawędzi siatki, width}
 export const LOA_MAX = 1120, LOA_FRAC = 0.72, LOA_MIN = 420, LOA_GAP = 8;

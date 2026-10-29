@@ -197,7 +197,7 @@ def _board_stamp(db: Session, positions: dict) -> tuple:
     """Stan danych tablicy (ok. 2 ms): import plików (ImportLog), zawartość tabel sektorów (liczba, granice pionowe,
     długość list OWNER i geometrii – import kasuje tabelę i wstawia ją od nowa z tymi samymi id; sektory sąsiadów
     tylko z listami OWNER, do kolejności kafelków), stanowiska, ownership.json, kafelki sąsiadów z VACS
-    (vacs_epww.json), granice VATSpy i układ strony (radio_layout.json). Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
+    (vacs_epww.json), granice VATSpy i podział okienek sąsiadów (radio_layout.json). Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
     pobiera wtedy geometrię jeszcze raz)."""
     def tbl(*cols):  # liczba wierszy i sumy kolumn jednej tabeli
         return tuple(db.execute(select(func.count(), *[func.total(c) for c in cols])).one())
@@ -261,7 +261,7 @@ def _build_static(db: Session, positions: dict) -> dict:
     # same FIR-y (bez sektorów VATSpy typu ESMM-7), żeby tło było lekkie
     frame = [{"id": f["properties"]["id"], "geometry": f["geometry"]} for f in firs.get("features", [])
              if "-" not in f["properties"]["id"] and f["properties"]["id"] != "EPWW" and _in_frame(f["geometry"])]
-    # układ strony wg szkicu (okienka FIR-ów, wskaźniki, BERLIN); brak pliku = strona bez okienek
+    # podział okienek FIR-ów sąsiednich wg szkicu i wskaźniki u góry; brak pliku = strona bez okienek
     layout = _seed_or_empty("radio_layout.json")
     return radioboard.build_static(own=own, epww_slices=epww, vacs_tiles=vacs if isinstance(vacs, list) else [],
                                    positions=positions, coords=coords, border_geom=border, firs_geo=frame,
@@ -332,12 +332,12 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     EPWW, FIR-y w tle, wycinki ACC, TMA, CTR, FIS) – strona trzyma ją, dopóki `ver` się nie zmieni (np. po imporcie).
     Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (EPWW: same ID; okienka sąsiadów bez
     częstotliwości i bez ADVISORY, bo nie wiadomo, czy ktoś tam jest).
-    Od 0.13.0 (układ wg szkicu Marka, data/seed/radio_layout.json): `grid` (siatka 13 × 21, przyciski, prostokąty
-    podglądów, miejsce stanu danych i legendy),
-    `firs` (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu okienek jednego stanowiska), `indicators`
-    (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST z ATIS EDDB, bez ATIS wg wiatru z METAR),
-    `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %; `ok=false` = brak danych vIFF) i `plates`
-    (plakietki APP i TWR tylko dla zalogowanych). Stosy sąsiadów (`stacks`) zastąpiły okienka `firs`."""
+    Podział okienek sąsiadów wg szkicu Marka (data/seed/radio_layout.json): `firs` (stosy okienek FIR-ów sąsiednich
+    po łączeniu okienek jednego stanowiska; `map`/`at` = przy którym podglądzie i z której strony stoi stos, `cols`/
+    `rows` = stały podział stosu), `indicators` (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST z ATIS
+    EDDB, bez ATIS wg wiatru z METAR), `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %; `ok=false` =
+    brak danych vIFF) i `plates` (plakietki APP i TWR tylko dla zalogowanych). Od 0.13.1 (stary styl strony) bez siatki
+    strony `grid`; na podglądach z sąsiadów tylko sektory ACC i TMA Ostrawy i Berlina (`geo.nb`)."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
     merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}
