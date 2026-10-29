@@ -69,11 +69,6 @@ class Settings(BaseSettings):
     inop_url: str = "https://om.plvacc.pl/"
     imgw_url: str = "https://awiacja.imgw.pl/"
     sectors_url: str = "https://plvacc.pl/acc-sectors/"
-    # Frazeologia: "Say Again? The Phraseology Database" w trybie pełnoekranowym (link od Marka, runda 5)
-    phraseology_url: str = ("https://learningzone.eurocontrol.int/ilp/pages/media-wbtfullscreen.jsf?mediaId=5453741"
-                            "&mediaName=Say+Again%3F+The+Phraseology+Database+%5BATC-PHRA%5D&mediaLanguage=English%20(GB)"
-                            "&catalogId=230552&wbtPath=https://learningzone.eurocontrol.int/ilp/customs/PHRA/Default.aspx"
-                            "&aspectStyle=&aspectControlled=&openMode=same-page")
     performance_db_url: str = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.aspx"
 
     # Mapa: podkład lotniczy. OpenAIP wymaga darmowego klucza API (https://www.openaip.net)

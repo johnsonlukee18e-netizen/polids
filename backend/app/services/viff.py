@@ -261,6 +261,164 @@ def sector_load(tv: str, buckets: list[dict], now: datetime, horizon: int = 60) 
                          "airborne": f["airborne"]} for f in ahead]}
 
 
+# --- OTHER › FMP (0.13.1, issue #25): wykresy ENTRY i OCC jednego traffic volume z całodobowych /etfms/airspaces.
+# ENTRY = wejścia w kolejnych 60 min liczone co 20 min (E60/20, tę miarę regulują ENR-ENTRIES) wobec przepustowości
+# na godzinę; OCC = samoloty w sektorze minuta po minucie wobec progu zajętości (ENR-OCCUPANCY). Okno od pełnej godziny
+# przed bieżącą do +5 h (o 13:02: 12:00-17:00), więc zawsze co najmniej 3 h naprzód (CTOT najwyżej 3 h po TTOT).
+CHART_HOURS_BEFORE, CHART_HOURS = 1, 5
+CHART_STEP, CHART_SPAN = 20, 60
+# przejście przez sektor dłuższe niż 12 h to nie lot, tylko mieszanka czasów (wyliczone wejście po planowanym
+# wyjściu); taki lot liczymy jak minutę w sektorze
+_MAX_TRANSIT = 720
+
+
+def _abs_hhmm(m: int) -> str:
+    """Minuty od dzisiejszej 00:00 (także ujemne i po północy) → 'HHMM'."""
+    m %= 1440
+    return f"{m // 60:02d}{m % 60:02d}"
+
+
+def tv_flights(tv: str, days: dict) -> list[dict]:
+    """Loty jednego TV z całodobowych danych /etfms/airspaces: days = {przesunięcie doby (-1, 0, 1): odpowiedź}.
+    Wejście i wyjście w minutach od dzisiejszej 00:00 (wczoraj ujemne, jutro od 1440). Czasy wyliczone, a bez nich
+    planowane (jak sector_load); doba wejścia z godziny koszyka jak w flight_profile (w koszyku 00 wejście 2355 jest
+    z poprzedniej doby). Lot przez pełną godzinę jest w dwóch koszykach (i tuż po północy w dwóch dobach): jeden wpis
+    na znak i minutę wejścia."""
+    found: dict[tuple, dict] = {}
+    for day, data in days.items():
+        buckets = data.get(tv) if isinstance(data, dict) else None
+        for b in buckets if isinstance(buckets, list) else []:
+            if not isinstance(b, dict):
+                continue
+            hour = _int(b.get("hour"))
+            for t in b.get("flights") or []:
+                if not isinstance(t, list) or len(t) < 3:
+                    continue
+                entry = (hhmm(t[3]) if len(t) > 3 else None) or hhmm(t[1])
+                exit_ = (hhmm(t[4]) if len(t) > 4 else None) or hhmm(t[2])
+                if not entry:
+                    continue
+                e = day * 1440 + _mins(entry)
+                if hour is not None and hour < 24:  # najbliżej godziny koszyka (przejście przez północ)
+                    e += round((day * 1440 + hour * 60 - e) / 1440) * 1440
+                dur = (_mins(exit_) - _mins(entry)) % 1440 if exit_ else 0
+                x = e + (dur if 0 < dur <= _MAX_TRANSIT else 1)
+                found[(str(t[0]), e)] = {"callsign": str(t[0]), "entry": e, "exit": x,
+                                         "airborne": bool(t[5]) if len(t) > 5 else None}
+    return sorted(found.values(), key=lambda f: (f["entry"], f["callsign"]))
+
+
+def _reg_value(value) -> int | None:
+    """Wartość regulacji jak w regulated_caps: liczba albo napis z cyfr, większa od zera (bez True/False)."""
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def reg_spans(restrictions, kind: str, lo: int, hi: int) -> list[dict]:
+    """Regulacje jednego rodzaju ("entries" albo "occupancy") jako przedziały minut okna lo..hi (minuty od dzisiejszej
+    00:00): [{from, to, value, start, end}], from/to względem lo, [from, to). Koniec włącznie jak restriction_active
+    (1400-1600 obowiązuje jeszcze o 1600), okno może przechodzić przez północ (2200-0200). Regulacje vIFF nie mają
+    daty, więc obowiązują codziennie: wczoraj, dziś i jutro, przycięte do okna."""
+    out = []
+    for r in restrictions if isinstance(restrictions, list) else []:
+        if not isinstance(r, dict) or _REG_KIND.get(str(r.get("type") or "").upper()) != kind:
+            continue
+        value, start, end = _reg_value(r.get("value")), hhmm(r.get("start")), hhmm(r.get("end"))
+        if value is None or not start or not end:
+            continue
+        a, b = _mins(start), _mins(end) + 1
+        if b <= a:
+            b += 1440
+        for d in (-1, 0, 1):
+            x, y = max(lo, d * 1440 + a), min(hi, d * 1440 + b)
+            if x < y:
+                out.append({"from": x - lo, "to": y - lo, "value": value, "start": start, "end": end})
+    return sorted(out, key=lambda s: (s["from"], s["value"]))
+
+
+def reg_at(spans: list[dict], m: int) -> int | None:
+    """Najniższa wartość regulacji obowiązującej w minucie m okna (None = brak regulacji)."""
+    vals = [s["value"] for s in spans if s["from"] <= m < s["to"]]
+    return min(vals) if vals else None
+
+
+def sector_series(tv: str, days: dict, now: datetime, row: dict) -> dict:
+    """Szeregi wykresów ENTRY i OCC jednego TV (czysta funkcja, testy bez sieci). row = wiersz TV z sectors()
+    (entries_cap, occupancy_cap, restrictions): ta sama przepustowość i te same regulacje co w tabeli FMP.
+
+    entries: słupek co CHART_STEP minut z liczbą wejść w kolejnych CHART_SPAN minutach, przepustowością godziny
+    (z koszyka vIFF tej godziny, bez niego z definicji TV) i regulacją ENR-ENTRIES obowiązującą na początku słupka;
+    occupancy: samoloty w sektorze w każdej minucie okna (wejście liczone, minuta wyjścia już nie); hours: godzinowe
+    liczniki vIFF w oknie; peak / peak_at: największa zajętość od teraz do końca okna."""
+    minutes = CHART_HOURS * 60
+    now_abs = now.hour * 60 + now.minute
+    start = (now.hour - CHART_HOURS_BEFORE) * 60
+    end = start + minutes
+    flights = tv_flights(tv, days)
+    occupancy = [sum(1 for f in flights if f["entry"] <= start + m < f["exit"]) for m in range(minutes + 1)]
+    buckets = {}  # minuta początku godziny → koszyk vIFF
+    for day, data in days.items():
+        for b in (data.get(tv) if isinstance(data, dict) else None) or []:
+            hour = _int(b.get("hour")) if isinstance(b, dict) else None
+            if hour is not None and hour < 24:
+                buckets[day * 1440 + hour * 60] = b
+    hours = []
+    for k in range(CHART_HOURS):
+        b = buckets.get(start + k * 60, {})
+        hours.append({"hour": _abs_hhmm(start + k * 60)[:2], "entries": b.get("entriesCount"),
+                      "entries_cap": _cap(b.get("entriesCapacity")), "peak": b.get("peakCount"),
+                      "peak_cap": _cap(b.get("peakCapacity"))})
+    rs = row.get("restrictions")
+    # regulacje w minutach okna; słupek ENTRY bierze regulację obowiązującą na jego początku
+    entries_reg = reg_spans(rs, "entries", start, end)
+    occupancy_reg = reg_spans(rs, "occupancy", start, end)
+    entries = []
+    for t in range(start, end, CHART_STEP):
+        b = buckets.get(t - t % 60, {})
+        entries.append({"from": t - start, "time": _abs_hhmm(t),
+                        "count": sum(1 for f in flights if t <= f["entry"] < t + CHART_SPAN),
+                        "cap": _cap(b.get("entriesCapacity")) or row.get("entries_cap"),
+                        "reg": reg_at(entries_reg, t - start)})
+    ahead = occupancy[now_abs - start:]
+    peak = max(ahead) if ahead else 0
+    return {"id": tv, "now": _abs_hhmm(now_abs), "start": _abs_hhmm(start), "minutes": minutes, "now_at": now_abs - start,
+            "step": CHART_STEP, "span": CHART_SPAN, "entries_cap": row.get("entries_cap"),
+            "occupancy_cap": row.get("occupancy_cap"), "entries": entries, "hours": hours, "occupancy": occupancy,
+            "entries_reg": entries_reg, "occupancy_reg": occupancy_reg, "peak": peak,
+            "peak_at": _abs_hhmm(now_abs + ahead.index(peak)) if ahead else None,
+            "flights": sum(1 for f in flights if f["exit"] > start and f["entry"] < end)}
+
+
+async def sector_chart(tv: str, now: datetime | None = None) -> dict | None:
+    """Wykresy ENTRY i OCC jednego traffic volume (GET /api/viff/sectors/{tv}); None, gdy vIFF nie zna TV.
+    Aktywność, przepustowość i regulacje z sectors() (te same co w tabeli FMP; zapytania vIFF są w cache), ruch
+    z całodobowych /etfms/airspaces jak w flight() (ten sam klucz cache). Dzisiejsza doba jest wymagana (błąd =
+    UpstreamError, router: 502); wczoraj (o 00Z okno zaczyna się o 23Z) i jutro (od 20Z) przy błędzie = brak lotów."""
+    tv = tv.upper()
+    prefix = tv.split("-")[0]
+    now = now or datetime.now(timezone.utc)
+    base = await sectors(prefix, now)
+    row = next((s for s in base["sectors"] if s["id"] == tv), None)
+    if row is None:
+        return None
+    start = (now.hour - CHART_HOURS_BEFORE) * 60
+    last = start + CHART_HOURS * 60 - CHART_STEP + CHART_SPAN - 1   # ostatnia minuta wejść liczona w słupkach
+    days = {}
+    for d in range(start // 1440, last // 1440 + 1):
+        params = {"filter": prefix, "date": (now + timedelta(days=d)).date().isoformat()}
+        try:
+            days[d] = await _get("/etfms/airspaces", params, ttl=60) or {}
+        except (UpstreamError, ValueError):
+            if d == 0:
+                raise
+            days[d] = {}
+    out = sector_series(tv, days, now, row)
+    out.update({"label": tv_label(tv), "prefix": prefix, "active": row["active"], "restricted": row["restricted"],
+                "regulated": row["regulated"], "scenarios": row["scenarios"], "volumes": row["volumes"]})
+    return out
+
+
 # --- scenariusze: zestawy traffic volumes włączane, gdy są online (albo zarezerwowane) określone stanowiska
 
 def _hm(value) -> str | None:

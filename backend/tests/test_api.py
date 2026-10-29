@@ -38,7 +38,9 @@ def test_frontend_and_config(client):
     assert settings.name in client.get("/").text
     cfg = client.get("/api/config").json()
     assert cfg["links"]["inop"].startswith("https://om.plvacc.pl")
-    assert "learningzone.eurocontrol.int" in cfg["links"]["phraseology"] and "carto_api_key" in cfg
+    assert "carto_api_key" in cfg and "performance_db" in cfg["links"]
+    # 0.13.1 (issue #25): bez PHRASEOLOGY: ani adresu w konfiguracji, ani sprawdzania osadzania
+    assert "phraseology" not in cfg["links"] and client.get("/api/embed-check/phraseology").status_code == 404
     assert "inop_hide_footer_px" not in cfg
 
 
