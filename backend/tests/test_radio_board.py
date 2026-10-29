@@ -1,5 +1,6 @@
 """RADIO jako jedna strona (runda 10): GET /api/radio/board, część stała z radioboard.py i czyste funkcje
 frontend/js/radioboard.js (Node)."""
+import itertools
 import json
 import os
 import re
@@ -204,7 +205,14 @@ def test_board_neighbour_firs(board):
     lay = json.loads((ROOT_DIR / "data" / "seed" / "radio_layout.json").read_text("utf-8"))
     assert [f["fir"] for f in board["firs"]] == [f["fir"] for f in lay["firs"]]
     assert {f["fir"] for f in board["firs"]} == {s["fir"] for s in rb.STACKS}
-    assert all(set(s) == {"fir", "title"} for s in rb.STACKS)
+    # 0.13.1: stosy znów ze stroną i miejscem jak w 0.12.6 (LOW po lewej: zachód, północ, południe; HIGH po prawej)
+    assert all(set(s) == {"fir", "title", "map", "at"} for s in rb.STACKS)
+    assert {s["fir"]: (s["map"], s["at"]) for s in rb.STACKS} == {
+        "ESAA": ("left", "n"), "EDWW": ("left", "nw"), "EDUU": ("left", "w"), "EDMM": ("left", "sw"), "LKAA": ("left", "s"),
+        "UMKK": ("right", "n"), "EYVL": ("right", "ne"), "UMMV": ("right", "e"), "UKLV": ("right", "se"), "LZBB": ("right", "s")}
+    assert all((f["map"], f["at"]) == next((s["map"], s["at"]) for s in rb.STACKS if s["fir"] == f["fir"]) and f["cols"]
+               and f["rows"] for f in board["firs"])
+    assert {f["fir"]: (f["cols"], f["rows"]) for f in board["firs"]}["LKAA"] == ([5, 6], [19, 20, 21])
     assert not any(t in fmp for f in lay["firs"] for b in f["boxes"] for t in b["tiles"])
     st = {f["fir"]: f for f in board["firs"]}
     for f in board["firs"]:
@@ -251,21 +259,26 @@ def test_board_geo(client):
 
 
 def test_board_neighbour_areas(client):
-    """0.12.5 (Marek): na podglądach sektory ACC sąsiadów (wg poziomu podglądu, jak EPWW) i TMA/CTR lotnisk sąsiadów
-    przy granicy FIR EPWW (LZTT, LKMT, EDDB); obsadzone wg pierwszego stanowiska online z listy OWNER (d.nb)."""
+    """0.12.5 (Marek): na podglądach sektory ACC sąsiadów (wg poziomu podglądu, jak EPWW) i TMA lotnisk sąsiadów
+    przy granicy FIR EPWW; obsadzone wg pierwszego stanowiska online z listy OWNER (d.nb). 0.13.1 (issue #25: „TWR
+    wyświetlaj jedynie dla EPWW”, „Tak samo APP, zostaw tylko w EPWW oraz LKMT i EDDB”): bez CTR sąsiadów, z TMA
+    sąsiadów tylko Ostrawa (LKMT) i Berlin (EDDB)."""
     d = client.get("/api/radio/board?geo=1").json()
     nb = d["geo"]["nb"]
     assert nb and len({a["id"] for a in nb}) == len(nb)
-    assert {a["kind"] for a in nb} == {"acc", "app", "twr"}
+    assert {a["kind"] for a in nb} == {"acc", "app"}
     for a in nb:
         assert set(a) == {"id", "fir", "name", "kind", "lo", "hi", "geometry"} and a["lo"] < a["hi"] <= rb.TOP_FT
         assert a["geometry"]["type"] == "MultiPolygon" and a["geometry"]["coordinates"], a["name"]
     acc_firs = {a["fir"] for a in nb if a["kind"] == "acc" and a["lo"] <= 30000 < a["hi"]}
     assert {"EDWW", "EDMM", "ESAA", "LKAA", "LZBB", "EYVL", "UMKK", "UKLV", "UMMV"} <= acc_firs  # UMMV z pliku EPWW
     names = {a["name"] for a in nb if a["kind"] != "acc"}
-    # Poprad (TWR z TMA), Ostrawa (APP), Berlin (APP przy granicy), Lwów (APP), Kaliningrad (APP)
-    assert {"LZTT_CTR", "LZTT_TMA3", "LKMT_TMA1", "LKMT_CTR", "EDWWDBAN1", "EDWWDBAS1", "UKLL_TMA",
-            "KALININGRAD TMA L"} <= names
+    # Ostrawa (APP) i Berlin (APP przy granicy); bez Popradu, Lwowa, Kaliningradu, Drezna (SAS) i bez żadnego CTR
+    assert {"LKMT_TMA1", "EDWWDBAN1", "EDWWDBAS1"} <= names
+    assert not names & {"LZTT_CTR", "LZTT_TMA3", "LKMT_CTR", "UKLL_TMA", "KALININGRAD TMA L"}
+    assert not any(n.startswith(("EDMMSAS", "LZTT", "LZZI", "LKPR", "LKPD", "UKLL", "UKLU", "UMBB")) for n in names)
+    assert {a["fir"] for a in nb if a["kind"] == "app"} == {"LKAA", "EDWW"}
+    assert rb.NB_APP_KEEP == ("LKMT", "EDDB")
     # w głąb kraju nie: CTR Berlina i Pragi, TMA Pragi z dala od granicy
     assert not names & {"EDDBTWRN", "EDDBTWRS", "LKPR24_TMA1_ARR_P1"}
     assert not any(a["name"].startswith(("TECH ", "T-")) for a in nb)
@@ -274,6 +287,22 @@ def test_board_neighbour_areas(client):
     flg = {a["id"] for a in nb if a["name"].startswith("EDWWFLG")}
     assert flg and flg <= set(d["nb"])
     assert "nb" in client.get("/api/radio/board").json()  # stan obsady przy każdym odświeżeniu, geometria raz
+
+
+def test_nb_areas_keep_only_lkmt_eddb_tma():
+    """0.13.1: nb_areas – sektory ACC sąsiadów zawsze, TMA tylko stanowisk Ostrawy (LKMT) i Berlina (EDDB) przy
+    granicy, CTR sąsiadów (twr) nigdy; filtr po pierwszym stanowisku z kolejności (TMA Berlina to EDWWDB*)."""
+    def sl(fir, name, owners, x=18.0, y=49.9, d=0.2):
+        sq = [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]]
+        return {"fir": fir, "name": name, "lo": 0, "hi": 9500, "owners": owners, "geom": {"type": "Polygon", "coordinates": sq}}
+
+    border = {"type": "Polygon", "coordinates": [[[17.0, 50.0], [20.0, 50.0], [20.0, 52.0], [17.0, 52.0], [17.0, 50.0]]]}
+    got = rb.nb_areas([sl("LZBB", "LZTT_CTR", ["LZTT_TWR"]), sl("LZBB", "LZTT_TMA3", ["LZTT_APP"]),
+                       sl("LKAA", "LKMT_TMA1", ["LKMT_APP", "LKAA_CTR"]), sl("LKAA", "LKMT_CTR", ["LKMT_TWR", "LKMT_APP"]),
+                       sl("EDWW", "EDWWDBAN1", ["EDDB_N_APP", "EDDB_APP"]), sl("EDMM", "EDMMSAS1", ["EDDC_SAS_APP"]),
+                       sl("UKLV", "UKLL_TMA", ["UKLL_APP"]), sl("LKAA", "LKAAE", ["LKAA_CTR"])], border)
+    assert [(a["name"], a["kind"]) for a in got] == [("LKAAE", "acc"), ("LKMT_TMA1", "app"), ("EDWWDBAN1", "app")]
+    assert [a["id"] for a in got] == ["n0", "n1", "n2"]
 
 
 def test_board_version_and_reimport(client):
@@ -541,12 +570,40 @@ console.log(JSON.stringify({
     EKDK_CTR: { callsign: "EKDK_CTR" }, EPWA_ATIS: { callsign: "EPWA_ATIS" }, EPWA_APP: { callsign: "EPWA_APP" } }),
   bboxes: [rb.bboxOrDefault(rb.bboxOf({ type: "MultiPolygon", coordinates: [] })), rb.bboxOrDefault([14, 49, 24, 55]), rb.EPWW_BBOX],
   advisory: rb.ADVISORY_FQ,
-  // siatka strony: szerokości kolumn wg rodzaju, miejsca w siatce, wiersze przycisków warstw
-  tracks: [rb.gridTracks(["box", "btn", "name", "map", "bogus"]), rb.gridTracks(null)],
-  areas: [rb.gridArea({ col: 3, row: 7, cols: 1, rows: 2 }), rb.gridArea({ col: 8, row: 16, rows: 6 }), rb.gridArea(null),
-    rb.gridArea({ col: "4", row: 0.4, cols: -2, rows: "x" })],
-  brows: [rb.buttonRows({ col: 8, rows: { fis: 14, twra: 12, high: 6, low: 6, mid: 6, atis: 5, app: 8, twr: 10, bogus: 3 } }),
-    rb.buttonRows({ col: 8, rows: { low: 6, atis: 0 } }), rb.buttonRows(null)],
+  // stos okienek sąsiada (0.13.1): kolumny i wiersze szkicu, wysokości między kafelkami (stackGrid)
+  stacks: (() => {
+    const B = (id, col, row, upper, lower, o = {}) => ({ id, col, row, cols: 1, rows: 1, upper, lower, ...o });
+    const sg = (f) => { const g = rb.stackGrid(f);
+      return { ...g, tiles: g.tiles.map((t) => [t.b.id, t.gc, t.gr]), marks: g.marks.map((x) => [x.gc, x.gr, ...x.n]) }; };
+    const eduu = [B("OSE2", 3, 7, 660, 365), B("OSE1", 3, 8, 365, 285), B("HVL2", 3, 11, 660, 365), B("HVL1", 3, 12, 365, 285)];
+    const lkaa = [B("NU", 5, 19, 660, 305), B("SU", 6, 19, 660, 305), B("NL", 5, 20, 305, 125), B("SL", 6, 20, 305, 125),
+      B("MT", 6, 21, 125, 0)];
+    return {
+      edww: sg({ cols: [2], rows: [5, 9, 11], boxes: [B("MRZ", 2, 5, 285, 0), B("MAR", 2, 9, 285, 0), B("FLG", 2, 11, 285, 0)] }),
+      eduu: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: eduu }),
+      // jedno stanowisko w ciągu okienek EDUU (EDUU_H12_CTR we wszystkich czterech; OSE1 + HVL2 i ciągi z nimi): połączone
+      // okienko jak z merge_boxes – prostokąt przez puste wiersze szkicu 9 i 10, granice od najwyższej do najniższej
+      eduuMerged: [[0, 1, 2, 3], [1, 2], [0, 1, 2], [1, 2, 3]].map((ix) => {
+        const ms = ix.map((i) => eduu[i]), r0 = ms[0].row, r1 = ms[ms.length - 1].row;
+        const mg = B(ms.map((b) => b.id).join("+"), 3, r0, Math.max(...ms.map((b) => b.upper)), Math.min(...ms.map((b) => b.lower)),
+          { rows: r1 - r0 + 1, merged: true, members: ms });
+        return sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [...eduu.filter((b) => b.row < r0), mg, ...eduu.filter((b) => b.row > r1)] });
+      }),
+      // HVL2 + HVL1 jednego stanowiska: jedno okienko na dwa wiersze, rozmiar stosu bez zmian
+      hvl: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [eduu[0], eduu[1],
+        B("HVL2+HVL1", 3, 11, 660, 285, { rows: 2, merged: true, members: [eduu[2], eduu[3]] })] }),
+      esaa: sg({ cols: [5, 6], rows: [5, 6], boxes: [B("9", 5, 5, 660, 365), B("6", 6, 5, 660, 365), B("8", 5, 6, 365, 195),
+        B("7", 6, 6, 365, 0)] }),
+      // LKAA_CTR wszędzie: prostokąt 2 × 3 (z pustą komórką pod NL), wysokość rzędów liczb jak bez łączenia
+      lkaa: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("LKAA", 5, 19, 660, 0, { cols: 2, rows: 3, merged: true, members: lkaa })] }),
+      lkaa0: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: lkaa }),
+      edmm: sg({ cols: [2, 3], rows: [15], boxes: [B("MEI", 2, 15, 315, 165), B("SPE1", 3, 15, 660, 315)] }),
+      // bez cols/rows z /api/radio/board (stara część stała): z okienek; złe wartości → 1
+      fallback: sg({ boxes: [{ id: "A", col: 1, row: 1, upper: 200, lower: 100 }, { id: "B", col: "1", row: 3, upper: 100, lower: 0 },
+        { id: "C", col: -4, row: "x", upper: 50, lower: 0 }] }),
+      empty: [sg({ boxes: [] }), sg(null)],
+    };
+  })(),
   // granice okienka jak na szkicu (górna-dolna; połączone – suma granic); dymek: od dolnej do górnej
   limText: [{ upper: 660, lower: 365 }, { upper: 999, lower: 0 }, { upper: 660, lower: 95 }, null].map(rb.limText),
   limTip: [{ upper: 660, lower: 365 }, { upper: 999, lower: 0 }, { upper: 285, lower: 0 }, { upper: 125, lower: 55 }].map(rb.limTip),
@@ -615,16 +672,51 @@ def test_js_layout_helpers(js):
     assert js["counted"] == 3  # alias_of (EKDK) liczony raz, ATIS nie
     assert js["bboxes"][0] is None and js["bboxes"][1] == [14, 49, 24, 55] and len(js["bboxes"][2]) == 4
     assert js["advisory"] == "122.800"
-    # kolumny siatki: okienka, przyciski i nazwy FIR-ów stałej szerokości (zmiana danych nie przesuwa strony), podglądy
-    # dzielą resztę; nieznany rodzaj = podgląd
-    assert js["tracks"] == ["var(--rb-bw) var(--rb-hw) var(--rb-nw) minmax(0, 1fr) minmax(0, 1fr)", ""]
-    assert js["areas"] == ["7 / 3 / span 2 / span 1", "16 / 8 / span 6 / span 1", "1 / 1 / span 1 / span 1",
-                           "1 / 4 / span 1 / span 1"]
-    # przyciski warstw: wiersze z seedu, w wierszu kolejność LAYER_IDS (LOW MID HIGH), bez wiersza i nieznane pominięte
-    assert js["brows"][0] == [{"col": 8, "row": 5, "ids": ["atis"]}, {"col": 8, "row": 6, "ids": ["low", "mid", "high"]},
-                              {"col": 8, "row": 8, "ids": ["app"]}, {"col": 8, "row": 10, "ids": ["twr"]},
-                              {"col": 8, "row": 12, "ids": ["twra"]}, {"col": 8, "row": 14, "ids": ["fis"]}]
-    assert js["brows"][1] == [{"col": 8, "row": 6, "ids": ["low"]}] and js["brows"][2] == []
+    # 0.13.1 stos sąsiada (stackGrid): kolumna stosu = kolumna szkicu, na przemian rząd liczb i rząd kafelków;
+    # wysokości między kafelkami (liczby jak na szkicu), ten sam zakres sąsiadów – bez liczby między nimi
+    st = js["stacks"]
+    e = st["edww"]
+    assert (e["ncols"], e["nrows"], e["cols"], e["rows"]) == (1, 7, ["t"], ["l1", "t", "l0", "t", "l0", "t", "l1"])
+    assert e["tiles"] == [["MRZ", "1 / 2", "2 / 3"], ["MAR", "1 / 2", "4 / 5"], ["FLG", "1 / 2", "6 / 7"]]
+    assert e["marks"] == [["1", "1", 285], ["1", "7", 0]]
+    # EDUU: wspólna granica jedną liczbą, nowy ciąg (285 pod OSE1, 660 nad HVL2) dwiema
+    u = st["eduu"]
+    assert u["rows"] == ["l1", "t", "l1", "t", "l2", "t", "l1", "t", "l1"]
+    assert u["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "7", 365], ["1", "9", 285]]
+    # połączone HVL2 + HVL1: jeden kafelek na dwa wiersze, bez liczby w środku, rzędy liczb bez zmian
+    h = st["hvl"]
+    assert h["rows"] == u["rows"] and h["tiles"][2] == ["HVL2+HVL1", "1 / 2", "6 / 9"]
+    assert h["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "9", 285]]
+    # EDUU_H12_CTR we wszystkich czterech: jeden kafelek przez puste wiersze szkicu 9 i 10 – te same tory stosu co bez
+    # łączenia (dawniej 13 zamiast 9, stos o dwa rzędy kafelków wyższy); OSE1 + HVL2 i ciągi z nimi: nad i pod połączonym
+    # granica jego członka przy krawędzi (365), nie dwie liczby (365/660, 285/365) w rzędzie na jedną
+    full, ose_hvl, ose3, hvl3 = em = st["eduuMerged"]
+    for g in em:
+        assert (g["ncols"], g["nrows"], g["cols"], g["rows"]) == (u["ncols"], u["nrows"], u["cols"], u["rows"]), g
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "1 / 2", "2 / 9"]] and full["marks"] == [["1", "1", 660], ["1", "9", 285]]
+    assert ose_hvl["tiles"] == [["OSE2", "1 / 2", "2 / 3"], ["OSE1+HVL2", "1 / 2", "4 / 7"], ["HVL1", "1 / 2", "8 / 9"]]
+    assert ose_hvl["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "7", 365], ["1", "9", 285]]
+    assert ose3["tiles"][0] == ["OSE2+OSE1+HVL2", "1 / 2", "2 / 7"] and ose3["marks"] == [["1", "1", 660], ["1", "7", 365],
+                                                                                          ["1", "9", 285]]
+    assert hvl3["tiles"][1] == ["OSE1+HVL2+HVL1", "1 / 2", "4 / 9"] and hvl3["marks"] == [["1", "1", 660], ["1", "3", 365],
+                                                                                          ["1", "9", 285]]
+    # ESAA: dwie kolumny, liczby osobno w każdej (do lewej w swojej kolumnie)
+    assert st["esaa"]["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 365], ["2", "3", 365], ["1", "5", 195],
+                                   ["2", "5", 0]]
+    # LKAA bez łączenia (jak na zdjęciu PANDORY): MT pod SL (ta sama granica 125), pod NL jego dolna granica, 0 pod MT
+    l0 = st["lkaa0"]
+    assert l0["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 305], ["2", "3", 305], ["1", "5", 125],
+                           ["2", "5", 125], ["2", "7", 0]]
+    # LKAA_CTR: jeden kafelek 2 × 3, liczby tylko nad nim i pod nim w pierwszej kolumnie, stos tego samego rozmiaru
+    lk = st["lkaa"]
+    assert lk["tiles"] == [["LKAA", "1 / 3", "2 / 7"]] and lk["marks"] == [["1", "1", 660], ["1", "7", 0]]
+    assert (lk["ncols"], lk["nrows"], lk["rows"]) == (l0["ncols"], l0["nrows"], l0["rows"]) == (2, 7, ["l1", "t", "l1", "t", "l1", "t", "l1"])
+    # EDMM: MEI i SPE1 w jednym wierszu
+    assert st["edmm"]["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315]]
+    fb = st["fallback"]
+    assert (fb["ncols"], fb["nrows"]) == (1, 5) and fb["tiles"][0] == ["A", "1 / 2", "2 / 3"]
+    assert fb["tiles"][1] == ["B", "1 / 2", "4 / 5"] and fb["tiles"][2] == ["C", "1 / 2", "2 / 3"]
+    assert st["empty"] == [{"ncols": 0, "nrows": 1, "cols": [], "rows": ["l0"], "tiles": [], "marks": []}] * 2
     assert js["limText"] == ["660-365", "999-0", "660-95", "0-0"]
     assert js["limTip"] == ["FL365–FL660", "GND–UNL", "GND–FL285", "FL055–FL125"]
     a, b, box = js["proj"]["a"], js["proj"]["b"], js["proj"]["box"]
@@ -635,12 +727,68 @@ def test_js_layout_helpers(js):
     assert js["bbox"] == [-1, 0, 2, 5]
 
 
+STACK_ALL_SCRIPT = r"""
+import fs from "fs";
+const rb = await import(process.argv[2]);
+const cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify(cases.map((c) => {
+  const g = rb.stackGrid(c);
+  return { fir: c.fir, on: c.on, cols: g.cols, rows: g.rows, tiles: g.tiles.map((t) => [t.b.id, t.gr]),
+    over: g.marks.filter((k) => k.n.length > Number(g.rows[Number(k.gr) - 1].slice(1))).map((k) => [k.gc, k.gr, ...k.n]),
+    marks: g.marks.map((k) => [k.gc, k.gr, ...k.n]) };
+})));
+"""
+
+
+def test_js_stack_size_fixed_all_merges(tmp_path):
+    """0.13.1: stos sąsiada nie zmienia rozmiaru przy żadnym łączeniu okienek – merge_boxes na okienkach z seeda (każde
+    okienko FIR-u z łączeniem bez nikogo albo u jednego z dwóch stanowisk) i stackGrid strony: te same tory co bez
+    nikogo, żadna liczba poza swoim rzędem. EDUU_H12_CTR we wszystkich czterech okienkach EDUU łączy je przez puste
+    wiersze szkicu 9 i 10 (dawniej stos o dwa rzędy kafelków wyższy, strona skakała przy logowaniu)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    lay = rb.layout_static(json.loads((ROOT_DIR / "data" / "seed" / "radio_layout.json").read_text("utf-8")), {})
+    cases = []
+    for f in lay["firs"]:
+        if not (f["merge"] and f["fir"] in rb.MERGE_FIRS):
+            continue
+        for own in itertools.product((None, "A_CTR", "B_CTR"), repeat=len(f["boxes"])):
+            bs = [{**b, "owner": o, "staffed": bool(o), "frequency": None, "key": o and f"cs:{o}"}
+                  for b, o in zip(f["boxes"], own)]
+            cases.append({"fir": f["fir"], "on": [f"{b['id']}={b['owner']}" for b in bs if b["owner"]], "cols": f["cols"],
+                          "rows": f["rows"], "boxes": rb.merge_boxes(bs, lay["occupied"], f["fir"])})
+    data = tmp_path / "cases.json"
+    data.write_text(json.dumps(cases), "utf-8")
+    (tmp_path / "radioboard.mjs").write_text((FRONTEND / "js" / "radioboard.js").read_text("utf-8"), "utf-8")
+    script = tmp_path / "all.mjs"
+    script.write_text(STACK_ALL_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (tmp_path / "radioboard.mjs").as_uri(), str(data)], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    base = {g["fir"]: g for g in out if not g["on"]}
+    assert set(base) == set(rb.MERGE_FIRS) and len(out) == len(cases) > 400
+    # łączenie naprawdę zachodzi (także przez puste wiersze szkicu EDUU), a stos zawsze ma tory jak bez nikogo
+    assert sum(any(b["merged"] for b in c["boxes"]) for c in cases) > 200
+    full = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=A_CTR", "HVL1=A_CTR"])
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "2 / 9"]] and full["rows"] == base["EDUU"]["rows"]
+    # dwa połączone okienka o tym samym zakresie (660-285) jedno nad drugim: nic między nimi, jak EDWW 285-0
+    pair = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=B_CTR", "HVL1=B_CTR"])
+    assert [t[0] for t in pair["tiles"]] == ["OSE2+OSE1", "HVL2+HVL1"] and pair["rows"] == base["EDUU"]["rows"]
+    assert pair["marks"] == [["1", "1", 660], ["1", "9", 285]], pair["marks"]
+    changed = [f"{g['fir']} {g['on']}" for g in out if (g["cols"], g["rows"]) != (base[g["fir"]]["cols"], base[g["fir"]]["rows"])]
+    assert changed == []
+    assert [(g["fir"], g["on"], g["over"]) for g in out if g["over"]] == []
+
+
 
 LAYOUT_SCRIPT = r"""
 // podgląd LOW (FL300) jak na ekranie 1366×768, 1600×900 i 1920×1080: etykiety ACC, plakietki APP i TWR (tylko
 // zalogowani, plates z /api/radio/board) i FIS zbudowane funkcją strony previewItems i ułożone przez placeLabels
 // z labelOpts; znaczniki (linie, kropki) z marksSvg. Rozmiary odmian z tekstu (znak 0,6 em: bezszeryfowa zwykła
-// mieści się w tym z zapasem), panel, wolne pole i tytuł zmierzone w przeglądarce (0.13.0, siatka wg szkicu).
+// mieści się w tym z zapasem), panel, wolne pole i tytuł zmierzone w przeglądarce (0.13.1: trzy kolumny jak w 0.12.6,
+// wolne pole = projekcja między stosami sąsiadów; demo, #radio/atis,low,mid,high,app,twra,fis/fl300).
 // Sektory ACC (runda 12): jedna etykieta na stanowisko (accGroups, suma wycinków polygon-clipping z vendor/)
 import fs from "fs";
 import { createRequire } from "module";
@@ -653,9 +801,9 @@ console.warn = () => {};
 // panel LOW: W, H, wolne pole (projekcja) i tytuł z suwakiem [x, y, w, h]; f, fa = --rb-f plakietek APP/TWR/FIS
 // i sektorów ACC
 const SCREENS = {
-  1366: { W: 339, H: 346, free: [5, 25, 331, 318], title: [4, 3, 277, 20], f: 10, fa: 13.2 },
-  1600: { W: 406, H: 407, free: [5, 25, 398, 379], title: [4, 3, 297, 20], f: 11.2, fa: 15.8 },
-  1920: { W: 497, H: 492, free: [5, 25, 489, 464], title: [4, 3, 324, 20], f: 13, fa: 18 },
+  1366: { W: 486, H: 702, free: [143, 130, 339, 405], title: [204, 131, 277, 20], f: 10, fa: 11 },
+  1600: { W: 583, H: 830, free: [163, 146, 416, 498], title: [281, 147, 297, 20], f: 11.2, fa: 12.8 },
+  1920: { W: 717, H: 1010, free: [184, 167, 529, 630], title: [388, 168, 324, 20], f: 13, fa: 15 },
 };
 const SETS = { twr: ["low", "twr"], apptwr: ["low", "app", "twr"], all: ["low", "app", "twra", "fis"] };
 const shortId = (id) => String(id).replace(/ (?:APP|DEP|TWR|FIS)$/, "");
@@ -941,8 +1089,8 @@ const x = { who: (cs) => `${cs} ${FQ[cs]} – Jonas`, pos: (cs) => `${cs} ${FQ[c
   sel: "EYVL", net: true };
 const box = (id, upper, lower, col, row, cs, owner = null, o = {}) => ({ id, label: id, col, row, cols: 1, rows: 1, upper, lower,
   callsign: cs, chain: [cs], owner, staffed: !!owner, frequency: owner ? FQ[owner] : null,
-  members: [{ id, upper, lower, callsign: cs }], merged: false, ...o });
-const eyvl = (boxes, o = {}) => ({ fir: "EYVL", title: "VILNIUS", name: { col: 13, row: 3, cols: 1, rows: 1 }, merge: true,
+  members: [{ id, upper, lower, callsign: cs, col, row, cols: 1, rows: 1 }], merged: false, ...o });
+const eyvl = (boxes, o = {}) => ({ fir: "EYVL", title: "VILNIUS", map: "right", at: "ne", merge: true, cols: [12], rows: [3, 4, 5, 6],
   staffed: boxes.some((b) => b.owner), advisory: !boxes.some((b) => b.owner), online: [], boxes, ...o });
 const U = box("U", 660, 365, 12, 3, "EYVL_U_CTR"), M = box("M", 365, 335, 12, 4, "EYVL_M_CTR");
 const L = box("L", 335, 225, 12, 5, "EYVL_CTR"), E = box("E", 225, 95, 12, 6, "EYVL_E_CTR");
@@ -950,44 +1098,47 @@ const merged = { id: "U+M+L+E", label: "L", col: 12, row: 3, cols: 1, rows: 4, u
   chain: ["EYVL_CTR"], owner: "EYVL_CTR", staffed: true, frequency: "133.305", merged: true,
   members: [U, M, L, E].map((b) => b.members[0]) };
 const on = [{ callsign: "EYVL_CTR", position: "EYVL_CTR", frequency: "133.305", name: "Jonas" }];
-const eduu = { fir: "EDUU", title: "RHEIN", name: { col: 3, row: 6, cols: 1, rows: 1 }, merge: true, staffed: true,
+const eduu = { fir: "EDUU", title: "RHEIN", map: "left", at: "w", merge: true, cols: [3], rows: [7, 8], staffed: true,
   advisory: false, online: [{ callsign: "EDUU_O22_CTR", position: "EDUU_O22_CTR", frequency: "135.255", name: "Max" }],
   boxes: [box("OSE2", 660, 365, 3, 7, "EDUU_O22_CTR", "EDUU_O22_CTR"), box("OSE1", 365, 285, 3, 8, "EDUU_O12_CTR")] };
-const ummv = { fir: "UMMV", title: "MINSK", name: { col: 13, row: 9, cols: 1, rows: 1 }, merge: false, staffed: true,
+const ummv = { fir: "UMMV", title: "MINSK", map: "right", at: "e", merge: false, cols: [12], rows: [9], staffed: true,
   advisory: false, online: [{ callsign: "UMBB_TWR", position: "UMBB_TWR", frequency: "118.500", name: "Ivan" },
     { callsign: "UMMV_W_CTR", position: "UMMV_W_CTR", frequency: "135.700", name: "Olga" }],
   boxes: [box("ACC", 660, 75, 12, 9, "UMMV_CTR", "UMMV_W_CTR", { label: "ACC" })] };
-const ind = { id: "APP WA", tip: "Warszawa APP configuration: HL = one APP, H+L = two (with N APP), 2H+L = three (with S APP), +D = director (F APP)", col: 3, row: 1, value: "2H+L",
+const ind = { id: "APP WA", tip: "Warszawa APP configuration: HL = one APP, H+L = two (with N APP), 2H+L = three (with S APP), +D = director (F APP)", value: "2H+L",
   positions: [{ callsign: "EPWA_APP", position: "EPWA_APP", frequency: "128.805", name: "Ala" }] };
-const ber = { col: 1, row: 6, box: { col: 1, row: 7, cols: 2 }, config: "EAST", preferred: false, tip: "ATIS EDDB: RWY 06L/06R" };
-const evil = { fir: "<b>", title: "<i>t</i>", name: { col: 1, row: 1 }, advisory: false, online: [{ callsign: "<u>", frequency: "1", name: "<s>x</s>" }],
+const ber = { config: "EAST", preferred: false, tip: "ATIS EDDB: RWY 06L/06R" };
+const evil = { fir: "<b>", title: "<i>t</i>", advisory: false, online: [{ callsign: "<u>", frequency: "1", name: "<s>x</s>" }],
   boxes: [box("<img src=x>", 660, 0, 1, 2, "A_CTR", "A_CTR", { frequency: "<s>1</s>" })] };
 console.log(JSON.stringify({
-  off: radio.firHtml(eyvl([U, M, L, E]), x),
-  part: radio.firHtml(eyvl([U, M, L, E].map((b) => (b === U ? { ...U, owner: "EYVL_U_CTR", staffed: true, frequency: "132.280" } : b)),
+  off: radio.nbStackHtml(eyvl([U, M, L, E]), x),
+  part: radio.nbStackHtml(eyvl([U, M, L, E].map((b) => (b === U ? { ...U, owner: "EYVL_U_CTR", staffed: true, frequency: "132.280" } : b)),
     { online: [{ callsign: "EYVL_U_CTR", position: "EYVL_U_CTR", frequency: "132.280", name: "Ona" }] }), { ...x, sel: null }),
-  merged: radio.firHtml(eyvl([merged], { online: on }), x),
-  eduu: radio.firHtml(eduu, { ...x, sel: null }),
-  ummv: radio.firHtml(ummv, { ...x, sel: null }),
-  nonet: radio.firHtml(eyvl([U, M, L, E], { advisory: false }), { ...x, net: false }),
-  side: [eyvl([U]), eduu, ummv, { name: { col: 5, row: 4, cols: 2 }, boxes: [box("6", 660, 365, 6, 5, "X")] }, {}].map(radio.nameSide),
+  merged: radio.nbStackHtml(eyvl([merged], { online: on }), x),
+  eduu: radio.nbStackHtml(eduu, { ...x, sel: null }),
+  ummv: radio.nbStackHtml(ummv, { ...x, sel: null }),
+  nonet: radio.nbStackHtml(eyvl([U, M, L, E], { advisory: false }), { ...x, net: false }),
+  marks: [{ gc: "1", gr: "5", n: [285, 660] }, { gc: "2", gr: "1", n: [999] }, { gc: "1", gr: "7", n: [0] }].map(radio.markHtml),
   ind: radio.indicatorHtml(ind, x), indNone: radio.indicatorHtml({ ...ind, value: "0", positions: [] }, x),
   indNet: radio.indicatorHtml({ ...ind, value: "0", positions: [] }, { ...x, net: false }),
   ber: radio.berlinHtml(ber), berPref: radio.berlinHtml({ ...ber, config: "WEST", preferred: true, tip: "" }),
-  berNone: radio.berlinHtml({ col: 1, row: 6 }),
+  berNone: radio.berlinHtml({}),
   berNet: radio.berlinHtml({ ...ber, config: "EAST", preferred: true, tip: "" }, { ...x, net: false }),
   berUnknown: radio.berlinHtml({ ...ber, config: null, source: "UNKNOWN", preferred: false, tip: "ATIS unknown: no network data" }),
-  evil: radio.firHtml(evil, { ...x, sel: null }) + radio.indicatorHtml({ id: "<b>", tip: "<i>", col: 1, row: 1, value: "<s>",
-    positions: [] }, x) + radio.berlinHtml({ col: 1, row: 6, config: "<b>", tip: "<i>" }),
+  // dymki wskaźnika i BERLIN: tekst, którego zwykły kod strony nigdy nie ma (<em>), z wyjściem z atrybutu (">)
+  evil: radio.nbStackHtml(evil, { ...x, sel: null })
+    + radio.indicatorHtml({ id: "<b>", tip: '"><em>x</em>', value: "<s>", positions: [{ callsign: '"><em>c', name: "<em>n" }] }, x)
+    + radio.berlinHtml({ config: "<b>", tip: '"><em>y</em>' }),
 }));
 """
 
 
 def test_js_neighbour_boxes(tmp_path):
-    """Okienka sąsiadów, wskaźniki i BERLIN w RADIO (tabs/radio.js firHtml, indicatorHtml, berlinHtml): napis okienka
-    jak na szkicu ("OSE2 660-365"), częstotliwość tylko w obsadzonym; połączone okienko na swoich komórkach z nazwą
-    połączonego; cały FIR bez nikogo → ADVISORY 122.800 pod nazwą FIR-u; błąd sieci → bez ADVISORY i bez zer; dane
-    przez esc()."""
+    """Stosy sąsiadów, wskaźniki i BERLIN w RADIO (tabs/radio.js nbStackHtml, tileHtml, markHtml, indicatorHtml,
+    berlinHtml). 0.13.1 (issue #25): stary styl – nagłówek „FIR NAZWA”, kafelek to samo ID w rogu i częstotliwość
+    (tylko obsadzony), wysokości między kafelkami (liczby jak na szkicu), stos stałego rozmiaru (linia ADVISORY zawsze
+    na miejscu, napis tylko, gdy w całym FIR-ze nikogo); połączone okienko na swoich komórkach; błąd sieci → bez
+    ADVISORY i bez zer; wskaźniki i BERLIN bez miejsc w siatce; dane przez esc()."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -1001,37 +1152,51 @@ def test_js_neighbour_boxes(tmp_path):
     out = json.loads(r.stdout)
     freqs = re.compile(r"\d{3}\.\d{3}")
     shown = {k: re.sub(r'data-rt="[^"]*"', "", h) for k, h in out.items() if isinstance(h, str)}  # bez dymków
+    def marks(h):
+        return re.findall(r'<div class="rb-bd" style="grid-column: (\d+); grid-row: (\d+)"[^>]*><i>(\d+)</i>'
+                          r'(?:<span class="rb-sep"></span><i>(\d+)</i>)?</div>', h)
+
+    def rows(h):
+        return re.search(r"grid-template-rows: ([^\"]+)\"", h).group(1)
+
     off = out["off"]
-    # nikt z EYVL online: ADVISORY raz pod nazwą, żadnej innej częstotliwości, okienka z ID i granicami
-    assert shown["off"].count("ADVISORY 122.800") == 1 and '<span class="rb-unfq">ADVISORY 122.800</span>' in off
+    # nikt z EYVL online: ADVISORY raz pod nagłówkiem, żadnej innej częstotliwości, kafelki z samym ID, bez granic
+    assert shown["off"].count("ADVISORY 122.800") == 1 and '<div class="rb-unicom">ADVISORY 122.800</div>' in off
     assert freqs.findall(shown["off"]) == ["122.800"]
     assert off.count('class="rb-box off"') == 4 and 'class="rb-fq"' not in off
-    assert '<span class="rb-bt"><span class="rb-id">U</span> <span class="rb-lim">660-365</span></span>' in off
-    assert re.findall(r'class="rb-lim">([^<]+)<', off) == ["660-365", "365-335", "335-225", "225-95"]
-    # nazwa FIR-u: żółta, obok okienek (side), zaznaczona przy otwartym LOA, klawiatura i data-fir do panelu LOA
-    assert 'class="rb-fir side sel" role="button" tabindex="0" data-fir="EYVL" data-title="VILNIUS"' in off
-    assert 'style="grid-area: 3 / 13 / span 1 / span 1"' in off and 'data-box="E" style="grid-area: 6 / 12 / span 1 / span 1"' in off
+    assert '<span class="rb-id">U</span></div>' in off and "660-365" not in shown["off"] and "rb-lim" not in off
+    # wysokości między kafelkami: jedna liczba na wspólnej granicy, nad pierwszym górna, pod ostatnim dolna
+    assert marks(off) == [("1", "1", "660", ""), ("1", "3", "365", ""), ("1", "5", "335", ""), ("1", "7", "225", ""),
+                          ("1", "9", "95", "")]
+    assert 'data-box="U" style="grid-column: 1 / 2; grid-row: 2 / 3"' in off
+    assert 'data-box="E" style="grid-column: 1 / 2; grid-row: 8 / 9"' in off
+    assert "grid-template-columns: var(--rb-tw); grid-template-rows: var(--rb-lv1) var(--rb-th) var(--rb-lv1)" in off
+    # nagłówek: żółty kod FIR-u i nazwa, zaznaczony przy otwartym LOA, klawiatura i data-fir do panelu LOA
+    assert ('<div class="rb-nb" data-fir="EYVL"><div class="rb-nbh sel" role="button" tabindex="0" data-title="VILNIUS"'
+            in off) and '<span class="rb-nbc">EYVL</span> VILNIUS</div>' in off
     assert "Nobody online – ADVISORY 122.800" in off and "Click: LOA EPWW – EYVL" in off
+    assert "Numbers between the boxes: vertical limits (FL)" in off
     assert off.count("Now: unstaffed – ADVISORY 122.800") == 4
     assert "EYVL U · FL365–FL660\nPosition: EYVL_U_CTR 132.280\nNow: unstaffed – ADVISORY 122.800" in off
-    # część obsadzona: częstotliwość tylko w tym okienku, bez ADVISORY, w pozostałych samo "Now: unstaffed"
+    # część obsadzona: częstotliwość tylko w tym kafelku, linia ADVISORY pusta (stos tej samej wysokości)
     part = out["part"]
-    assert "ADVISORY" not in part and part.count('class="rb-box on"') == 1 and part.count('class="rb-fq"') == 1
-    assert '<span class="rb-fq">132.280</span>' in part and part.count("Now: unstaffed") == 3
-    assert "Online: EYVL_U_CTR 132.280 – Ona" in part and 'class="rb-fir side"' in part
-    # połączone: jedno okienko na czterech komórkach, nazwa połączonego (L) i suma granic, w dymku okienka w środku
+    assert "ADVISORY" not in part and '<div class="rb-unicom"></div>' in part
+    assert part.count('class="rb-box on"') == 1 and part.count('class="rb-fq"') == 1
+    assert '<span class="rb-id">U</span><span class="rb-fq">132.280</span>' in part and part.count("Now: unstaffed") == 3
+    assert "Online: EYVL_U_CTR 132.280 – Ona" in part and 'class="rb-nbh" role="button"' in part
+    assert rows(part) == rows(off)
+    # połączone: jeden kafelek na czterech wierszach, ID połączonego (L), granice tylko nad nim i pod nim i w dymku
     mg = out["merged"]
     assert mg.count('class="rb-box') == 1 and 'class="rb-box on mrg"' in mg and 'data-box="U+M+L+E"' in mg
-    assert 'style="grid-area: 3 / 12 / span 4 / span 1"' in mg
-    assert re.search(r'<span class="rb-id">L</span> <span class="rb-lim">660-95</span>', mg)
-    assert '<span class="rb-fq">133.305</span>' in mg and "Now: EYVL_CTR 133.305 – Jonas" in mg
+    assert 'style="grid-column: 1 / 2; grid-row: 2 / 9"' in mg and rows(mg) == rows(off)
+    assert '<span class="rb-id">L</span><span class="rb-fq">133.305</span>' in mg and "Now: EYVL_CTR 133.305 – Jonas" in mg
     assert "Merged: U 660-365, M 365-335, L 335-225, E 225-95" in mg and "Position:" not in mg
-    assert "EYVL L · FL095–FL660" in mg
-    # EDUU: nazwa nad okienkami; OSE2 obsadzone, OSE1 nie (bez ADVISORY: ktoś z FIR-u jest)
+    assert "EYVL L · FL095–FL660" in mg and marks(mg) == [("1", "1", "660", ""), ("1", "9", "95", "")]
+    # EDUU: OSE2 obsadzone, OSE1 nie (bez ADVISORY: ktoś z FIR-u jest)
     ed = out["eduu"]
-    assert 'class="rb-fir" role="button"' in ed and "<span>OSE2</span>" not in ed
-    assert re.search(r'<span class="rb-id">OSE2</span> <span class="rb-lim">660-365</span></span><span class="rb-fq">135.255</span>', ed)
-    assert "OSE1" in ed and ed.count('class="rb-fq"') == 1 and "ADVISORY" not in ed
+    assert '<span class="rb-id">OSE2</span><span class="rb-fq">135.255</span>' in ed and '<span class="rb-id">OSE1</span></div>' in ed
+    assert ed.count('class="rb-fq"') == 1 and "ADVISORY" not in ed and '<div class="rb-unicom"></div>' in ed
+    assert marks(ed) == [("1", "1", "660", ""), ("1", "3", "365", ""), ("1", "5", "285", "")]
     assert "Also online" not in ed  # tylko okienko na cały FIR wymienia pozostałych zalogowanych
     # UMMV: jedno okienko na FIR – w dymku także wieża (UMBB TWR), która go nie obsługuje
     um = out["ummv"]
@@ -1040,32 +1205,44 @@ def test_js_neighbour_boxes(tmp_path):
     # błąd sieci: nie wiadomo, czy ktoś jest online – bez ADVISORY, bez częstotliwości
     nn = out["nonet"]
     assert "ADVISORY" not in nn and 'class="rb-fq"' not in nn and nn.count("Now: no data") == 4 and "Online: no data" in nn
-    assert out["side"] == [True, False, True, False, True]
-    # wskaźnik: żółta nazwa w swojej komórce, szare pole z wartością pod nią; w dymku znaczenie i zalogowani
+    # dwie liczby z kreską (nowy ciąg okienek), UNL i GND w dymku liczby
+    m2, m999, m0 = out["marks"]
+    assert m2 == ('<div class="rb-bd" style="grid-column: 1; grid-row: 5" data-rt="FL285: lower limit of the box above\n'
+                  'FL660: upper limit of the box below"><i>285</i><span class="rb-sep"></span><i>660</i></div>')
+    assert 'data-rt="UNL"><i>999</i></div>' in m999 and 'style="grid-column: 2; grid-row: 1"' in m999
+    assert 'data-rt="GND"><i>0</i></div>' in m0
+    # wskaźnik: mała żółta nazwa nad małym szarym polem z wartością, bez miejsca w siatce; w dymku znaczenie i zalogowani
     ind = out["ind"]
-    assert '<div class="rb-ind" style="grid-area: 1 / 3 / span 1 / span 1"' in ind and ">APP WA</div>" in ind
+    assert ind.startswith('<div class="rb-indc" data-rt="APP WA: ') and "grid-area" not in ind
     # wartość w rb-indt: za długa (ACC GAT) od początku z wielokropkiem na końcu, nie ucięta z obu stron
-    assert '<div class="rb-indv" style="grid-area: 2 / 3 / span 1 / span 1"' in ind and '<span class="rb-indt">2H+L</span></div>' in ind
+    assert '<div class="rb-ind">APP WA</div><div class="rb-indv"><span class="rb-indt">2H+L</span></div></div>' in ind
     assert "APP WA: Warszawa APP configuration: HL = one APP, H+L = two (with N APP), 2H+L = three (with S APP), +D = director (F APP)\nEPWA_APP 128.805 – Ala" in ind
     assert ">0</span></div>" in out["indNone"] and "Nobody online" in out["indNone"]
     assert ">–</span></div>" in out["indNet"] and ">0</span></div>" not in out["indNet"] and "Now: no data" in out["indNet"]
-    # BERLIN: szare pole z konfiguracją; czerwony napis (pref), gdy z ATIS nie wiadomo, który pas
+    # BERLIN: takie samo małe pole jak wskaźniki; czerwony napis (pref), gdy z ATIS nie wiadomo, który pas
     ber, pref = out["ber"], out["berPref"]
-    assert '<div class="rb-blbl" style="grid-area: 6 / 1 / span 1 / span 1"' in ber and ">BERLIN</div>" in ber
-    assert '<div class="rb-bln" style="grid-area: 7 / 1 / span 1 / span 2"' in ber and ">EAST</div>" in ber
+    assert ber.startswith('<div class="rb-indc rb-ber" data-rt=') and "grid-area" not in ber
+    assert '<div class="rb-blbl">BERLIN</div><div class="rb-bln">EAST</div></div>' in ber
     assert "ATIS EDDB: RWY 06L/06R" in ber and "Red text" not in ber
-    assert 'class="rb-bln pref"' in pref and ">WEST</div>" in pref and "Red text: preferred configuration" in pref
-    assert 'class="rb-bln" style="grid-area: 7 / 1 / span 1 / span 2"' in out["berNone"] and ">–</div>" in out["berNone"]
+    assert '<div class="rb-bln pref">WEST</div>' in pref and "Red text: preferred configuration" in pref
+    assert '<div class="rb-bln">–</div>' in out["berNone"]
     # bez danych o zalogowanych: kreska jak we wskaźnikach, nie czerwona konfiguracja z wiatru
     for k in ("berNet", "berUnknown"):
-        assert 'class="rb-bln" style=' in out[k] and ">–</div>" in out[k] and "Red text" not in out[k], k
+        assert '<div class="rb-bln">–</div>' in out[k] and "Red text" not in out[k], k
         assert "ATIS unknown: no network data" in out[k], k
     # dymki mówią, co to jest, nie skąd są dane
     for key, h in out.items():
         assert not re.search(r"Coverage order|coverage order|VACS|VATSIM|VATSpy|\.ese|›", str(h)), key
     ev = out["evil"]
-    assert "<img" not in ev and "<i>" not in ev and "<s>" not in ev and "<u>" not in ev and "<b>" not in ev
+    assert "<img" not in ev and "<i>t" not in ev and "<s>" not in ev and "<u>" not in ev and "<b>" not in ev
     assert "&lt;img src=x&gt;" in ev and "&lt;b&gt;" in ev
+    # dymek wskaźnika i BERLIN (tekst z ATIS EDDB z sieci): tip i zalogowani tylko jako tekst w data-rt, bez wyjścia
+    # z atrybutu; <em> – nie z <i> liczb między kafelkami (markHtml)
+    assert "<em" not in ev and '"><em' not in ev
+    assert ('<div class="rb-indc" data-rt="&lt;b&gt;: &quot;&gt;&lt;em&gt;x&lt;/em&gt;\n&quot;&gt;&lt;em&gt;c'
+            ' \u2013 &lt;em&gt;n"><div class="rb-ind">&lt;b&gt;</div>') in ev
+    assert re.search(r'<div class="rb-indc rb-ber" data-rt="BERLIN: [^"<>]*\n&quot;&gt;&lt;em&gt;y&lt;/em&gt;">'
+                     r'<div class="rb-blbl">BERLIN</div><div class="rb-bln">&lt;b&gt;</div></div>$', ev)
 
 
 LBL_SCRIPT = r"""
@@ -1383,21 +1560,32 @@ def test_frontend_imports_resolve():
 
 
 def test_layer_column_buttons_fit_label():
-    """Runda 14 (przegląd): "TWR/ATIS" w jednej trzeciej rzędu LOW MID HIGH był ucięty przy 1280–1600 px. 0.13.0: każdy
-    rząd środkowej kolumny (ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS) w swojej komórce siatki; przycisk szeroki na
-    jedną trzecią kolumny, ale nie mniej niż napis z odstępem po bokach (sprawdzone w przeglądarce: scrollWidth ≤
-    clientWidth przy 1366×768, 1600×900, 1920×1080 i 1366×600). Włączona warstwa – kolorem, bez pogrubienia."""
+    """Runda 14 (przegląd): "TWR/ATIS" w jednej trzeciej rzędu LOW MID HIGH był ucięty przy 1280–1600 px. 0.13.1
+    (issue #25, środkowa kolumna jak w 0.12.6): przyciski 137 × 28 z marginesem 1,5 px (liczby w radio.css), w kolumnie
+    0.12.6 szerokie na jedną trzecią kolumny (najwyżej 137 px), ale nie mniej niż napis z odstępem po bokach (sprawdzone
+    w przeglądarce przy 1366×768 i 1600×900). Włączona warstwa – kolorem, bez pogrubienia."""
     css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
-    body = re.search(r"\.rb-brow button \{([^}]*)\}", css).group(1)
-    assert "flex: 0 0 calc((100% - 8px) / 3)" in body and "min-width: max-content" in body
-    assert re.search(r"padding: \d+px [1-9]\d*px", body)  # odstęp po bokach napisu
+    grid = re.search(r"\.rb-btns \{([^}]*)\}", css).group(1)
+    assert "grid-template-columns: repeat(3, minmax(0, calc(137px + 3px)))" in grid
+    body = re.search(r"\.rb-btns button \{([^}]*)\}", css).group(1)
+    assert "width: calc(100% - 3px)" in body and "min-width: max-content" in body
+    assert "height: 28px" in body and "margin: 1.5px" in body
+    assert re.search(r"padding: 0 [1-9]\d*px", body)  # odstęp po bokach napisu
     assert "border-radius: 0" in body and "font: 400 " in body
-    on = re.search(r"\.rb-brow button\.on \{([^}]*)\}", css).group(1)
+    on = re.search(r"\.rb-btns button\.on \{([^}]*)\}", css).group(1)
     assert "background:" in on and "color:" in on and "font-weight" not in on
     # cała strona RADIO zwykłą grubością, czcionką bezszeryfową (układ nie zależy od czcionki o stałej szerokości)
     assert not re.search(r"font-weight:\s*(?:bold|[5-9]00)|font:\s*(?:bold|[5-9]00)\b|var\(--mono\)", css)
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     assert "font-weight" not in radio and re.search(r"\.rb b, \.rb strong[^{]*\{ font-weight: 400; \}", css)  # <b> też zwykłą
-    # ATIS: pasek stałej wysokości, wyłączony chowa tylko treść (podglądy nie zmieniają rozmiaru)
-    assert re.search(r"\.rb-atis \{[^}]*height: calc\(", css) and ".rb-atis.off .rb-atis-in { visibility: hidden; }" in css
+    # ATIS (0.13.1): bez osobnego paska – w górnym rzędzie na prawo od wskaźników, stałej wysokości; wyłączony chowa
+    # tylko treść (wskaźniki i podglądy się nie przesuwają)
+    assert re.search(r"\.rb-atis \{[^}]*flex: 1 1 auto;[^}]*height: \d+px", css)
+    assert ".rb-atis.off .rb-atis-in { visibility: hidden; }" in css
+    assert '<div class="rb-cfg"><div class="rb-inds"></div><div class="rb-atis"' in radio
+    # wskaźniki dużo mniejsze niż w 0.13.0 (93 × 38): pole 60 × 20; kafelek stosu stałego rozmiaru bez granic na nim
+    ind = re.search(r"\.rb-indv, \.rb-bln \{([^}]*)\}", css).group(1)
+    assert "width: 60px" in ind and "height: 20px" in ind
+    assert "--rb-tw: calc(var(--rb-f) * 4.7 + 10px)" in css and "--rb-th: calc(var(--rb-f) * 1.75 + 7px)" in css
+    assert not re.search(r"rb-lim|rb-brow|rb-cells|rb-fir\b|\.laid|container-type", css)
     assert "noatis" not in css and "noatis" not in radio

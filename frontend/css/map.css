@@ -3,6 +3,15 @@
    0.12.5 (Marek): ostre krawędzie jak w systemach PAŻP (border-radius 0 poza kropkami), mniejsze symbole na mapie,
    etykiety samolotów jak w PEGASUS_21 (0.12.6: tylko po najechaniu). */
 
+/* --- VISIBILITY SETTINGS (0.13.1, issue #25): wszystkie ustawienia wyświetlania w jednej sekcji panelu; podtytuły grup
+   (Traffic, Airspace, Points and airways, Basemap) jak "All sectors" w FMP, bez zwijania, z cienką linią nad grupą.
+   Tylko pod .vis-card: .mapwrap, .mapside i .ms-card są też w AD CIV (lista kart lotniska) */
+.vis-card .vis-sub { margin: 8px 0 3px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--muted);
+  font: 10px/1.2 var(--ui); letter-spacing: .8px; text-transform: uppercase; }
+.vis-card > h4 + .vis-sub { margin-top: 0; padding-top: 0; border-top: 0; }
+/* rysowany poziom w nagłówku (jak liczba stanowisk w Positions) */
+.vis-card .vis-sum { margin-left: auto; color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 11px; }
+
 /* --- poziom i przełączniki przestrzeni */
 .as-card .as-lvl { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; }
 .as-card .as-lvl .sw { padding: 0; font-size: 12px; }

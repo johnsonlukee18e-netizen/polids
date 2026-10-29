@@ -64,6 +64,7 @@ console.log(JSON.stringify({
   f18: fp.field18(plan.remarks), eq: fp.equipment(plan.aircraft_icao), eqFaa: fp.equipment("B738/L"),
   rows: v.fmpRows(sectors), empty: v.fmpRows({ prefix: "EP", now: "1430", sectors: [] }),
   fmpHtml: fmp.fmpHtml(sectors), fmpEmpty: fmp.fmpHtml({ sectors: [] }), info: fmp.fmpInfo(sectors),
+  fmpSel: fmp.fmpHtml(sectors, "EP-BH"),
   pair: [[18, 45], [null, 45], [18, null], [null, null], [0, 0]].map(([a, b]) => v.pairText(a, b)),
   capOf: [[45, null], [null, 30], [45, 30], [30, 45], [null, null]].map(([a, b]) => v.capOf(a, b)),
   now: v.tvNow(sectors.sectors[3], "1430"),
@@ -228,6 +229,10 @@ def test_fmp_html(js):
     assert '<td class="fmp-num over" title="21 aircraft in the sector now' in h and '<td class="fmp-num near"' in h
     assert '<td class="fmp-sec reg"' in h and ">&lt;X&gt;</td>" in h and "<X>" not in h
     assert js["fmpEmpty"] == '<p class="hint fmp-empty">No sectors.</p>'
+    # 0.13.1: wybrany sektor (wykresy po prawej) = wiersz z klasą sel, reszta bez zmian
+    sel = js["fmpSel"]
+    assert sel.count(' sel"') == 1 and '<tr class="on sel" data-tv="EP-BH">' in sel
+    assert re.findall(r'<tr class="(on|off)" data-tv="([^"]+)">', sel) == trs[1:]
     assert js["info"] == "1430Z \u00b7 4 of 11 active (grey rows)"
 
 
@@ -293,9 +298,11 @@ def test_contract_exports():
     assert "activate(arg)" in fp and "focus," in fp and "destroy()" in fp and "export function fplHtml(d)" in fp
     assert 'from "./strips.js"' not in fp and "removeEventListener(ONLINE_EVENT" in fp and "clearInterval" in fp
     fmp = (JS / "fmp.js").read_text("utf-8")
-    assert "export function mountFmp(pane)" in fmp and "activate()" in fmp and "destroy()" in fmp
+    assert 'export function mountFmp(pane, { start = "", onPick = () => {} } = {})' in fmp
+    assert "activate(arg)" in fmp and "destroy()" in fmp
     assert "removeEventListener(ONLINE_EVENT" in fmp and "clearInterval(timer)" in fmp
-    assert 'api("/api/viff/sectors")' in fmp
+    # 0.13.1: tabela z /api/viff/sectors, wykresy wybranego sektora z /api/viff/sectors/<TV>
+    assert 'api("/api/viff/sectors")' in fmp and "api(`/api/viff/sectors/${encodeURIComponent(id)}`)" in fmp
 
 
 # --- zachowanie strony (atrapa DOM w Node): odświeżenie, 404, zły znak, fokus

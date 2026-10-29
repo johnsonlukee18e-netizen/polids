@@ -1,0 +1,34 @@
+/* Klawiatura dotykowa AIRCRAFT / CALLSIGN (0.13.1, issue #25): przycisk KEYBOARD pod ALL otwiera ją na dole panelu,
+   pod przewijaną listą (pole wyszukiwania u góry i klawisze na dole zawsze widoczne). Zielone klawisze PANDORY
+   (.gbtn), ostre krawędzie, bez cieni i poświaty, napisy zwykłej grubości. Klawisz 56 x 44 px z odstępem 3 px,
+   w niskim oknie (od 820 px w dół) 40 px wysokości. Rzędy na środku: 10, 10, 9, 8 klawiszy i dolny rząd
+   CLEAR (2) + SPACE (5) + BACKSPACE (3) szerokości rzędu cyfr. */
+.tkbd { --tk-w: 56px; --tk-h: 44px; --tk-gap: 3px; flex: none; align-self: safe center; max-width: 100%;
+  display: flex; flex-direction: column; gap: var(--tk-gap); padding: 6px; background: #050605;
+  border: 1px solid var(--line); border-radius: 0; }
+/* w wąskim panelu (tablet pionowo, okno węższe niż ok. 933 px) klawisze węższe, wszystkie o tyle samo, więc rzędy
+   (także CLEAR + SPACE + BACKSPACE) dalej równe rzędowi cyfr i cała klawiatura mieści się w panelu: 10 klawiszy
+   + 41 px = 9 odstępów po 3 px, padding 2 x 6 px i ramka 2 x 1 px; od ok. 933 px szerokości okna 56 px jak wyżej.
+   Jednostka cqw liczona od panelu zakładki (container-type niżej); safe center: gdyby klawiatura była jednak szersza,
+   wystaje w prawo, gdzie da się ją przewinąć, a nie w lewo pod podmenu */
+.ac-pane, .cs-pane { container-type: inline-size; }
+.ac-pane > .tkbd, .cs-pane > .tkbd { --tk-w: min(56px, calc((100cqw - 41px) / 10)); }
+/* display: flex wyżej przykrywa [hidden] przeglądarki (jak kiedyś przycisk ADMIN) */
+.tkbd[hidden] { display: none; }
+.tk-row { display: flex; justify-content: center; gap: var(--tk-gap); }
+/* touch-action: manipulation: bez powiększania podwójnym stuknięciem i bez opóźnienia kliknięcia na tablecie */
+.tkbd .tk { flex: none; width: var(--tk-w); height: var(--tk-h); margin: 0; padding: 0; border-radius: 0; font: 18px/1 var(--ui);
+  letter-spacing: 0; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; }
+.tkbd .tk.w2 { width: calc(2 * var(--tk-w) + var(--tk-gap)); font-size: 13px; }
+.tkbd .tk.w3 { width: calc(3 * var(--tk-w) + 2 * var(--tk-gap)); font-size: 13px; }
+.tkbd .tk.w5 { width: calc(5 * var(--tk-w) + 4 * var(--tk-gap)); font-size: 13px; }
+/* podświetlenie pod myszą tylko tam, gdzie jest mysz (po stuknięciu palcem klawisz nie zostaje podświetlony) */
+@media (hover: hover) {
+  .tkbd .tk:hover { background: linear-gradient(#52bd3c, #36992a); }
+}
+/* wciśnięty klawisz jasnozielony z ciemnym napisem, jak aktywny przycisk menu */
+.tkbd .tk:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+@media (max-height: 820px) {
+  .tkbd { --tk-h: 40px; }
+}

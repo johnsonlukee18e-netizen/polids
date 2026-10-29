@@ -173,3 +173,125 @@ def ad2_page(icao: str, charts=None) -> str:
             + head("2.25", "VISUAL SEGMENT SURFACE (VSS) PENETRATION")
             + "<tr><td><p>No penetrations.</p></td></tr>\n</tbody></table>\n"
             '<a href="BChart.html">BChart.html</a></body></html>')
+
+
+# --- 0.13.1 (issue #25): strony AD 4 eAIP MIL i VFR (AIRAC AMDT 11-26). Ten sam generator stron co AD 2 w IFR: tabela
+# układu, tabela map "Charts | Pages" w komórce, w wierszu tytuł i odnośnik z samą ikoną PDF-u. MIL: sekcja AD 4.24,
+# PDF-y w podkatalogach serii z zerem (02, 06, 08 ...). VFR: sekcja AD 4.13 "CHARTS RELATED TO THE AERODROME", PDF-y
+# bez podkatalogu (EPBC) albo w podkatalogach bez zera (EPML: 2, 3, 4). Tytuły EPKS, EPBC, EPML i EPGE jak w eAIP
+# (sprawdzone 2026-10-29); EPDE i EPTM: tytuły ze zmianą poprawki (skreślone i wstawione numery dróg startowych).
+PKG4 = {"MIL": "https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2011-26_2026_10_29/",
+        "VFR": "https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2011-26_2026_10_29/"}
+
+
+def page4_url(icao: str, pkg: str) -> str:
+    return PKG4[pkg] + f"eAIP/AD%204%20{icao}%201-en-GB.html"
+
+
+def pdf4(icao: str, folder: str, page: str, pkg: str) -> str:
+    """Odnośnik jak na stronie AD 4 (względny, ze spacją w "AIP MIL" / "AIP VFR"; folder "" = bez podkatalogu)."""
+    sub = f"{folder}/" if folder else ""
+    return f"../documents/Root_WePub/AIP {pkg}/AD/{icao}/{sub}AD_4_{icao}_{page}.pdf"
+
+
+def docs4(icao: str, folder: str, page: str, pkg: str) -> str:
+    sub = f"{folder}/" if folder else ""
+    return PKG4[pkg] + f"documents/Root_WePub/AIP%20{pkg}/AD/{icao}/{sub}AD_4_{icao}_{page}.pdf"
+
+
+HMA_DEP = "HIGHLY MANOEUVRABLE MILITARY AIRCRAFT DEPARTURE CHART"
+HMA_ARR = "HIGHLY MANOEUVRABLE MILITARY AIRCRAFT ARRIVAL CHART"
+DEL = '<span class="AmdtDeletedAIRAC">{}</span>'
+INS = '<span class="AmdtInsertedAIRAC">{}</span>'
+
+# (tytuł, katalog, strona, oczekiwana krótka nazwa, oczekiwany rodzaj)
+MIL_EPKS = [
+    ("EPKS - AERODROME CHART - ICAO", "02", "2-1", "AERODROME", "ADC"),
+    ("EPKS - AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 11, RWY 29)", "06", "6-1", "OBSTACLE TYPE A RWY 11/29", "OBST"),
+    (f"EPKS - {HMA_DEP} - RWY 11", "08", "8-1", "RWY 11 SID HMA", "SID"),
+    (f"EPKS - {HMA_DEP} - RWY 29", "08", "8-5", "RWY 29 SID HMA", "SID"),
+    (f"EPKS - {HMA_ARR} - RWY 11", "10", "10-1", "RWY 11 STAR HMA", "STAR"),
+    (f"EPKS - {HMA_ARR} - RWY 29", "10", "10-5", "RWY 29 STAR HMA", "STAR"),
+    (f"EPKS - {IAC} (ILS z or LOC z) RWY 29 (CAT A/B/C/D/E)", "12", "12-1", "RWY 29 ILS Z / LOC Z", "IAC"),
+    (f"EPKS - {IAC} (ILS y or LOC y) RWY 29 (CAT A/B/C/D/E)", "12", "12-3", "RWY 29 ILS Y / LOC Y", "IAC"),
+    (f"EPKS - {IAC} (NDB) RWY 29 (CAT A/B/C/D/E)", "12", "12-5", "RWY 29 NDB", "IAC"),
+    (f"EPKS - {IAC} (TACAN) RWY 11 (CAT A/B/C/D/E)", "12", "12-7", "RWY 11 TACAN", "IAC"),
+    (f"EPKS - {IAC} (TACAN) RWY 29 (CAT A/B/C/D/E)", "12", "12-9", "RWY 29 TACAN", "IAC"),
+    (f"EPKS - {IAC} (PAR) RWY 11 (CAT A/B/C/D/E)", "12", "12-11", "RWY 11 PAR", "IAC"),
+    (f"EPKS - {IAC} (PAR) RWY 29 (CAT A/B/C/D/E)", "12", "12-13", "RWY 29 PAR", "IAC"),
+    ("EPKS - VISUAL OPERATION CHART", "13", "13-1", "VISUAL OPERATION", "VFR"),
+]
+
+# EPDE: drogi startowe 12/30 zmienione w poprawce na 11/29 (skreślone w <span class="AmdtDeletedAIRAC"> albo <del>)
+MIL_EPDE = [
+    ("EPDE - AERODROME CHART - ICAO", "02", "2-1", "AERODROME", "ADC"),
+    (f"EPDE - AERODROME OBSTACLE CHART - ICAO TYPE A (RWY {DEL.format('12, ')}{INS.format('11, ')}RWY {DEL.format('30)')}"
+     f"{INS.format('29)')}", "06", "6-1", "OBSTACLE TYPE A RWY 11/29", "OBST"),
+    (f"EPDE - {IAC} (ILS z or LOC z) RWY <del>30</del> <ins>29</ins> (CAT A/B/C/D/E)", "12", "12-1", "RWY 29 ILS Z / LOC Z",
+     "IAC"),
+    (f"EPDE - {IAC} (TACAN z) RWY {DEL.format('12')} {INS.format('11')} (CAT A/B/C/D/E)", "12", "12-11", "RWY 11 TACAN Z",
+     "IAC"),
+    (f"EPDE - {IAC} (TACAN y) RWY {DEL.format('12')} {INS.format('11')} (CAT A/B/C/D/E)", "12", "12-13", "RWY 11 TACAN Y",
+     "IAC"),
+    (f"EPDE - {IAC} (PAR) RWY {DEL.format('12')} {INS.format('11')} (CAT A/B/C/D/E)", "12", "12-19", "RWY 11 PAR", "IAC"),
+    ("EPDE - VISUAL OPERATION CHART", "13", "13-1", "VISUAL OPERATION", "VFR"),
+]
+
+# EPTM: śmigłowce (CAT H), mapa przeszkód bez przedrostka lotniska
+MIL_EPTM = [
+    ("EPTM - AERODROME CHART - ICAO", "02", "2-1", "AERODROME", "ADC"),
+    ("AERODROME OBSTACLE CHART - ICAO TYPE A (RWY 11, RWY 29)", "06", "6-1", "OBSTACLE TYPE A RWY 11/29", "OBST"),
+    (f"EPTM - {IAC} (NDB) RWY 29 (CAT A,H)", "12", "12-1", "RWY 29 NDB", "IAC"),
+    (f"EPTM - {IAC} (TACAN) RWY 11 (CAT A,H)", "12", "12-3", "RWY 11 TACAN", "IAC"),
+    (f"EPTM - {IAC} (PAR) RWY 11 (CAT A)", "12", "12-7", "RWY 11 PAR", "IAC"),
+    ("EPTM - VISUAL OPERATION CHART", "13", "13-1", "VISUAL OPERATION", "VFR"),
+]
+
+# VFR: mapa lotniska (bez "- ICAO", czasem bez przedrostka) i dwie mapy operacji VFR w skali 1:50 000 i 1:250 000
+VFR_EPBC = [
+    ("AERODROME CHART", "", "2-1", "AERODROME", "ADC"),
+    ("EPBC - VISUAL OPERATION CHART (1: 50 000)", "", "3-1", "VISUAL OPERATION 1:50 000", "VFR"),
+    ("EPBC - VISUAL OPERATION CHART (1: 250 000)", "", "4-1", "VISUAL OPERATION 1:250 000", "VFR"),
+]
+VFR_EPML = [
+    ("EPML - AERODROME CHART", "2", "2-1", "AERODROME", "ADC"),
+    ("EPML - VISUAL OPERATION CHART (1: 50 000)", "3", "3-1", "VISUAL OPERATION 1:50 000", "VFR"),
+    ("EPML - VISUAL OPERATION CHART (1: 250 000)", "4", "4-1", "VISUAL OPERATION 1:250 000", "VFR"),
+]
+VFR_EPGE = [("EPGE - VISUAL OPERATION CHART (1: 250 000)", "4", "4-1", "VISUAL OPERATION 1:250 000", "VFR")]
+
+# (lotnisko, pakiet) -> mapy
+PAGES4 = {("EPKS", "MIL"): MIL_EPKS, ("EPDE", "MIL"): MIL_EPDE, ("EPTM", "MIL"): MIL_EPTM,
+          ("EPBC", "VFR"): VFR_EPBC, ("EPML", "VFR"): VFR_EPML, ("EPGE", "VFR"): VFR_EPGE}
+
+
+def chart_rows4(icao: str, charts, pkg: str) -> str:
+    rows = "".join(
+        f'<tr><td class="colsep"><p>{title}</p></td><td class="colsep">'
+        f'<a href="{pdf4(icao, folder, page, pkg)}" target="_blank"><img src="../images/application_pdf.png"></a></td></tr>\n'
+        for title, folder, page, *_ in charts)
+    return ('<table class="AmdtTable" width="100%"><thead><tr><th>Charts</th><th>Pages</th></tr></thead>\n'
+            f"<tbody>\n{rows}</tbody></table>")
+
+
+def ad4_page(icao: str, pkg: str, charts=None) -> str:
+    """Strona AD 4 lotniska MIL (mapy w AD 4.24, ostatnia sekcja AD 4.25) albo VFR (mapy w AD 4.13, ostatnia sekcja)."""
+    charts = PAGES4[(icao, pkg)] if charts is None else charts
+
+    def head(section, name):
+        return (f'<tr><td>&#160;</td></tr><tr><td><ul><li><b id="{icao}-AD-{section}">{icao} AD {section} {name}</b>'
+                '</li></ul></td></tr><tr><td>&#160;</td></tr>\n')
+
+    if pkg == "MIL":
+        body = (head("4.23", "ADDITIONAL INFORMATION") + "<tr><td><p>Bird hazard: see AD 4.24.</p></td></tr>\n"
+                + head("4.24", "AERONAUTICAL CHARTS RELATED TO AN AERODROME")
+                + f"<tr><td>{chart_rows4(icao, charts, pkg)}</td></tr>\n"
+                + head("4.25", "VISUAL SEGMENT SURFACE (VSS) PENETRATION") + "<tr><td><p>NIL</p></td></tr>\n")
+    else:
+        body = (head("4.12", "ADDITIONAL INFORMATION") + "<tr><td><p>PPR 24 HR.</p></td></tr>\n"
+                + head("4.13", "CHARTS RELATED TO THE AERODROME")
+                + f"<tr><td>{chart_rows4(icao, charts, pkg)}</td></tr>\n")
+    return (f'<html><head><title>AD 4 {icao}</title></head><body>\n<a href="TChart.html">TChart.html</a>\n'
+            '<table class="layout" width="100%"><tbody>\n'
+            + head("4.1", "AERODROME LOCATION INDICATOR AND NAME") + f"<tr><td><p>{icao}</p></td></tr>\n"
+            + body + '</tbody></table>\n<a href="BChart.html">BChart.html</a></body></html>')

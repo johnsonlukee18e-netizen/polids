@@ -1,6 +1,7 @@
 import { api, BASEMAPS, esc, frameGo, h, splitTaf, subtabs, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
 import { CIVIL_ALT, SR_ALT, latLonTxt, nightRings, subsolarPoint, sunElevation, sunState, wrapLon } from "../solar.js";
 import { qnhMap } from "../qnhmap.js";
+import { MODE_KEY, wxMode, wxTable } from "../metarfmt.js";
 
 // listy domyślne alfabetycznie (wyniki i tak są sortowane po ICAO)
 const PL_CIV = "EPBY EPGD EPKK EPKT EPLB EPLL EPMO EPPO EPRA EPRZ EPSC EPSY EPWA EPWR EPZG";
@@ -37,18 +38,34 @@ export function wxLines(kind, raw) {
 // lista stacji w polu: wielkie litery, bez powtórzeń, alfabetycznie (także lista zapamiętana w starszej wersji)
 const normIds = (s) => [...new Set(String(s || "").toUpperCase().split(/[\s,;]+/).filter(Boolean))].sort().join(" ");
 
+// METAR i TAF jak strona METAR w PANDORZE (0.13.1): tabela stacja | komunikat w kolorach grup, zjawiska z opisem
+// [EN / PL], u góry COLOURED / MONO (wybór zapamiętany w przeglądarce, wspólny dla pięciu list; metarfmt.js)
 function wxList(kind, defaults, key) {
   return (pane) => {
-    pane.append(h(`<div>
-      <div class="toolbar">
-        <input type="text" class="ids" size="80" value="${esc(normIds(lsGet(key) || defaults))}">
+    pane.append(h(`<div class="mtr">
+      <div class="toolbar mtr-bar">
+        <span class="mt-mode"><button data-mode="coloured" title="Groups in colour">COLOURED</button><button data-mode="mono"
+          title="All text in one colour">MONO</button></span>
+        <input type="text" class="ids" value="${esc(normIds(lsGet(key) || defaults))}">
         <button class="btn primary go">Show</button>
         <label class="sc"><input type="checkbox" class="auto" checked> refresh every 2 min</label>
         <span class="hint upd"></span>
       </div>
-      <div class="wx"></div>
+      <div class="mtr-list"></div>
     </div>`));
     const $ = (s) => pane.querySelector(s);
+    const wrap = $(".mtr");
+    const setMode = (m) => {
+      wrap.classList.toggle("mono", m === "mono");
+      wrap.querySelectorAll(".mt-mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+    };
+    setMode(wxMode(lsGet(MODE_KEY)));
+    $(".mt-mode").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-mode]");
+      if (!b) return;
+      lsSet(MODE_KEY, b.dataset.mode);
+      setMode(b.dataset.mode);
+    });
     // dead: podzakładka zamknięta w trakcie pobierania (np. szybkie przejście na TURB); pane zostaje w DOM i trafia do
     // następnej podzakładki, więc spóźniona odpowiedź nie może do niego pisać
     let dead = false;
@@ -60,15 +77,15 @@ function wxList(kind, defaults, key) {
         // METAR i TAF alfabetycznie po ICAO (odpowiedź też sortujemy, gdyby backend zmienił kolejność)
         const rows = (await api(`/api/meteo/${kind}?ids=${encodeURIComponent(ids.split(" ").join(","))}`)).sort((a, b) => a.icao.localeCompare(b.icao));
         if (dead) return;
-        $(".wx").innerHTML = rows.map((r) => `<div class="row">${r.raw ? wxLines(kind, r.raw) : `<span class="st">${esc(r.icao)}</span> <span class="nil">NIL</span>`}</div>`).join("");
+        $(".mtr-list").innerHTML = wxTable(kind, rows, { decode: true });
         $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
-      } catch (e) { if (!dead) $(".wx").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+      } catch (e) { if (!dead) $(".mtr-list").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
     };
     $(".go").addEventListener("click", load);
     $(".ids").addEventListener("keydown", (e) => e.key === "Enter" && load());
     const timer = setInterval(() => $(".auto")?.checked && load(), 120000);
     // serwer wrócił (okno run.bat uruchomione ponownie): komunikat błędu od razu zastępują dane
-    const online = () => $(".wx .error") && load();
+    const online = () => $(".mtr-list .error") && load();
     window.addEventListener(ONLINE_EVENT, online);
     load();
     return { destroy: () => { dead = true; clearInterval(timer); window.removeEventListener(ONLINE_EVENT, online); } };

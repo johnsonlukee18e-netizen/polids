@@ -1,4 +1,4 @@
-import { api, debounce, esc, h, letterMenu } from "../api.js";
+import { api, debounce, esc, h, letterMenu, touchKeyboard } from "../api.js";
 
 const CATEGORY = { CARGO: "CARGO", MIL: "MILITARY" };
 // najwięcej wierszy na raz (ALL to ~7000 znaków wywoławczych): pełna lista = obcięta, z podpowiedzią jak w AIRCRAFT
@@ -8,16 +8,19 @@ export default {
   mount(root) {
     let prefix = "";
     const letters = letterMenu(root, (l) => { prefix = l; load(); });
-    const pane = h(`<div class="pane">
+    // 0.13.1: pole wyszukiwania u góry i klawiatura dotykowa na dole zostają na miejscu, przewija się tylko lista
+    const pane = h(`<div class="pane cs-pane">
       <div class="toolbar">
         <input type="search" class="q" placeholder="Search: ICAO code, callsign, operator, country…" size="46" autofocus>
         <select class="cat"><option value="">All</option><option value="CARGO">CARGO only</option><option value="MIL">MILITARY only</option></select>
         <span class="hint count"></span>
       </div>
-      <table class="data callsigns"><thead><tr><th>ICAO</th><th>Callsign</th><th>Operator</th><th>Country</th><th>Info</th></tr></thead><tbody></tbody></table>
+      <div class="cs-list"><table class="data callsigns"><thead><tr><th>ICAO</th><th>Callsign</th><th>Operator</th><th>Country</th><th>Info</th></tr></thead><tbody></tbody></table></div>
     </div>`);
     root.append(pane);
     const q = pane.querySelector(".q");
+    const kbd = touchKeyboard(q, letters.kbd);
+    pane.append(kbd.el);
     const body = pane.querySelector("tbody");
     let seq = 0;
     const load = async () => {
@@ -40,6 +43,7 @@ export default {
     // #callsign/A: litera z adresu (← i Wstecz), "" = wszystkie; przycisk menu (arg undefined) zostawia bieżącą
     return { activate: (arg) => {
       if (arg !== undefined && /^[A-Z]?$/.test(arg) && arg !== prefix) { prefix = arg; letters.set(arg); load(); }
+      kbd.sync();
       q.focus();
     } };
   },

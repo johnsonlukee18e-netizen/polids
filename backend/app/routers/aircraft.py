@@ -25,22 +25,29 @@ def _dict(a: AircraftType) -> dict:
     return {k: getattr(a, k) for k in FIELDS}
 
 
-# Przyciski producentów u góry AIRCRAFT (?maker=). Nazwy producenta w bazie bywają różne: "Airbus Industrie",
-# "McDonnell-Douglas", "Mcdonnell Douglas", "Aérospatiale/Alenia (ATR)", "Reims-Cessna"... Dlatego najpierw zgrubnie
-# w SQL (LIKE po producencie i modelu), potem dokładnie wyrażeniem na nazwie bez diakrytyków i znaków przestankowych.
+# Przyciski producentów u góry AIRCRAFT (?maker=), 0.13.1 (issue #25): AIRBUS, BOEING, BOMBARDIER, EMBRAER, GA (dawne
+# MCDONNELL, ATR i CESSNA usunięte, Cessna jest w GA; stary klucz to 400). Nazwy producenta w bazie bywają różne:
+# "Airbus Industrie", "Reims-Cessna", "Gates Learjet"... Dlatego najpierw zgrubnie w SQL (LIKE po producencie i modelu),
+# potem dokładnie wyrażeniem na nazwie bez diakrytyków i znaków przestankowych.
 # like: fragmenty do LIKE; maker / model: wyrażenia dla producenta / modelu; icao: kody typów pewne niezależnie od nazwy.
 MAKERS = {
+    # A220 (BCS1, BCS3, dawniej Bombardier CSeries) ma w bazie producenta AIRBUS, więc zostaje tutaj
     "airbus": {"like": ["airbus"], "maker": r"\bairbus\b"},
+    # razem z Boeing Vertol, Sikorsky-Boeing i Bell-Boeing (V-22)
     "boeing": {"like": ["boeing"], "maker": r"\bboeing\b"},
+    # Bombardier: także Canadair (CRJ, Challenger, CL-415), Learjet (też Gates Learjet) i Dash 8 (DH8A–DH8D, w bazie
+    # De Havilland Canada; inne typy De Havilland Canada, np. DHC-6, nie)
+    "bombardier": {"like": ["bombardier", "canadair", "learjet"], "maker": r"\bbombardier\b|\bcanadair\b|\blearjet\b",
+                   "icao": {"DH8A", "DH8B", "DH8C", "DH8D"}},
     "embraer": {"like": ["embraer"], "maker": r"\bembraer\b"},
-    # McDonnell Douglas razem z Douglas (DC-3…DC-9) i McDonnell (F-4) sprzed połączenia
-    "mcdonnell": {"like": ["donnell", "douglas"], "maker": r"\bmc ?donnell\b|\bdouglas\b"},
-    # ATR: także "Avions de Transport Régional", "Aerospatiale/Alenia", model "ATR 72-600" i kody ATR 42 / ATR 72
-    "atr": {"like": ["atr", "alenia", "transport regional"],
-            "maker": r"\batr\b|avions de transport regional|aerospatiale.*alenia|alenia.*aerospatiale",
-            "model": r"^atr( |\d|$)", "icao": {"AT43", "AT44", "AT45", "AT46", "AT72", "AT73", "AT75", "AT76"}},
-    # Cessna: także Reims-Cessna i Textron Aviation z modelem "Cessna …" / "Citation …"
-    "cessna": {"like": ["cessna", "citation"], "maker": r"\bcessna\b", "model": r"\b(cessna|citation)\b"},
+    # GA (lotnictwo ogólne): wszystkie typy producentów Pilatus, Diamond, Cessna (też Reims-Cessna i Textron Aviation
+    # z modelem "Cessna …" / "Citation …"), Piper, Robinson, Bell, Tecnam oraz Aero AT-3 po kodzie AAT3 (producent
+    # AERO to też Aero Commander i L-39, a "AT3" w bazie to wojskowy AIDC AT-3). Diamond tylko po producencie
+    # (model "MU-300 Diamond" Mitsubishi to nie Diamond); Bell tylko sam BELL (Bell-Boeing zostaje w BOEING,
+    # Bell-Agusta i Bellanca poza GA)
+    "ga": {"like": ["pilatus", "diamond", "cessna", "citation", "piper", "robinson", "bell", "tecnam"],
+           "maker": r"\b(pilatus|diamond|cessna|piper|robinson|tecnam)\b|^bell( helicopters?)?( textron)?$",
+           "model": r"\b(cessna|citation)\b", "icao": {"AAT3"}},
 }
 
 

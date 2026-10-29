@@ -1,7 +1,8 @@
 """0.13.0 (issue #23): wygląd PANDORY w powłoce. Wąski pasek u góry na całą szerokość (Reload | Brighter | Darker),
-cała aplikacja czcionką bezszeryfową zwykłej grubości (decyzja właściciela: "cały program", także --mono), menu
-ciasno z tym samym odstępem (EMERGENCY i ADMIN też), SYT OP jasnozielony, podmenu 140 px z napisami w dwóch linijkach
-i zmniejszaniem w niskim oknie. Logika paska (topbar.js) uruchamiana w Node z atrapą DOM."""
+cała aplikacja czcionką bezszeryfową zwykłej grubości (decyzja właściciela: "cały program", także --mono), SYT OP
+jasnozielony. 0.13.1 (issue #25): każdy przycisk menu i podmenu 137 x 28 px z marginesem 1,5 px (litery AIRCRAFT /
+CALLSIGN pół szerokości), rzędy podmenu na wysokości rzędów menu, w niskim oknie jedna wysokość --btn-h dla obu kolumn.
+Logika paska (topbar.js) uruchamiana w Node z atrapą DOM."""
 import json
 import re
 import shutil
@@ -31,11 +32,9 @@ def _rule(css, selector):
     return m.group(1)
 
 
-def _media(css, query):
-    """Treść wszystkich bloków @media o tym warunku (style.css ma ich kilka: menu, podmenu), sklejona."""
-    out, head = [], f"@media ({query}) {{"
-    i = css.find(head)
-    assert i >= 0, query
+def _media_blocks(css, prefix="@media (max-height"):
+    """Treść każdego bloku @media zaczynającego się od prefix (lista, w kolejności w arkuszu)."""
+    out, i = [], css.find(prefix)
     while i >= 0:
         depth, j = 0, css.index("{", i)
         for k in range(j, len(css)):
@@ -43,8 +42,17 @@ def _media(css, query):
             if not depth:
                 out.append(css[j + 1:k])
                 break
-        i = css.find(head, k)
-    return "\n".join(out)
+        i = css.find(prefix, k)
+    return out
+
+
+def _rules(css):
+    """Wszystkie reguły (selektor, treść) bez komentarzy, także te w blokach @media (najbardziej wewnętrzne)."""
+    return [(sel.strip(), body) for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", _nocomments(css))]
+
+
+def _px(text):
+    return float(re.fullmatch(r"([\d.]+)px", text.strip()).group(1))
 
 
 # --- pasek u góry ---------------------------------------------------------------------------------------------------
@@ -389,14 +397,16 @@ def test_menu_labels_uppercase_normal_weight():
 
 
 def test_menu_equal_gaps():
-    """Wszystkie przyciski menu ciasno z tym samym odstępem (2 px, od 820 px w dół 1 px), EMERGENCY i ADMIN bez
-    dodatkowego odstępu (Playwright: odstępy {2} i {1} przy 1600x900, 1366x768, 657, 600 i 1280x560)."""
+    """Wszystkie przyciski menu z tym samym odstępem (0.13.1: margines 1,5 px z każdej strony, 3 px między przyciskami),
+    EMERGENCY i ADMIN bez dodatkowego odstępu i bez własnej wielkości."""
     css = _nocomments(STYLE)
     assert "margin-top" not in _rule(STYLE, ".menu nav button.red")
     assert "margin-top" not in _rule(STYLE, ".menu nav button.admin")
-    assert not re.search(r"#tabs button\.(red|admin)", css)
-    assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
-    assert "#tabs button { height: 24.8px; margin-bottom: 1px; }" in _media(css, "max-height: 820px")
+    assert not re.search(r"#tabs button", css)
+    shared = _rule(STYLE, ".menu nav button, .submenu button")
+    assert "margin: var(--btn-m);" in shared and "margin-bottom" not in shared
+    # wspólna reguła po regule bazowej (.gbtn, …: margin 0 0 3px) o tej samej szczegółowości, więc to ona obowiązuje
+    assert css.index(".menu nav button, .submenu button {") > css.index(".gbtn, .menu nav button, .submenu button {")
 
 
 def test_sytop_label_light_green():
@@ -406,27 +416,119 @@ def test_sytop_label_light_green():
     assert '<button data-tab="sytop">SYT OP</button>' in INDEX
 
 
-def test_submenu_fits_long_labels_and_low_windows():
-    """Podmenu 140 px: PHRASEOLOGY mieści się w Arialu (110,7 px przy 117 px treści), dłuższe dwa słowa schodzą do
-    drugiej linijki (BRAKING / ACTION) w tej samej wysokości przycisku. W niskim oknie długie podmenu (OTHER 18,
-    EMERGENCY 18, METEO 15) zmniejszają się jak menu główne: Playwright 18 przycisków przy 1366x600 po 29,7 px bez
-    przewijania; siatka liter i odstępy .sep bez zmian."""
+def test_one_button_size_everywhere():
+    """0.13.1 (issue #25): "Rozmiar wszystkich przycisków powinien wynosić 137 x 28 wraz z marginem 1.5 dla każdego
+    przycisku. Rozmiary mają być JEDNAKOWE." Jedna reguła dla menu i każdego podmenu: 137 x --btn-h (28 px, w niskim
+    oknie mniej, po równo w obu kolumnach), margines 1,5 px z każdej strony, napis w jednej linijce na środku. Obie
+    kolumny po 150 px z paddingiem 4,5 px, więc pierwszy przycisk podmenu stoi na wysokości pierwszego przycisku menu
+    (Playwright, check_align.py: 0 problemów przy 1600x900, 1366x768 i 1366x657, z użytkownikiem i bez)."""
     css = _nocomments(STYLE)
+    root = _rule(STYLE, ":root")
+    for decl in ("--btn-w: 137px;", "--btn-h-max: 28px;", "--btn-m: 1.5px;", "--col-pad: 4.5px;",
+                 "--col-w: calc(var(--btn-w) + 2 * var(--btn-m) + 2 * var(--col-pad) + 1px);"):
+        assert decl in root, decl
+    tok = {k: _px(v) for k, v in re.findall(r"(--btn-w|--btn-h-max|--btn-m|--col-pad): ([\d.]+px);", root)}
+    col_w = tok["--btn-w"] + 2 * tok["--btn-m"] + 2 * tok["--col-pad"] + 1   # + prawa ramka kolumny
+    assert col_w == 150 and tok["--btn-w"] == 137 and tok["--btn-h-max"] == 28
+    # odstęp między przyciskami 3 px (marginesy w kolumnie flex się nie łączą), rząd co 31 px
+    assert 2 * tok["--btn-m"] == 3 and tok["--btn-h-max"] + 2 * tok["--btn-m"] == 31
+    shared = _rule(STYLE, ".menu nav button, .submenu button")
+    for decl in ("flex: none;", "width: var(--btn-w);", "height: var(--btn-h);", "margin: var(--btn-m);", "padding: 0 4px;",
+                 "line-height: calc(var(--btn-h) - 2px);"):
+        assert decl in shared, decl
+    for sel in (".menu", ".submenu"):
+        rule = _rule(STYLE, sel)
+        assert "width: var(--col-w);" in rule and "padding: var(--col-pad);" in rule, sel
+        assert re.search(r"display: flex;\s+flex-direction: column;", rule), sel
+    assert "display: flex; flex-direction: column;" in _rule(STYLE, ".menu nav")
+    # bez dawnych wyjątków: żadnego @media (max-height) dla menu, podmenu, zegara i użytkownika, bez dwóch linijek
+    for block in _media_blocks(css):
+        assert not re.search(r"#tabs|\.menu|\.submenu|\.clockbox|\.userbox|\.brand", block), block
+    assert "pre-line" not in css and "34.9px" not in css and "140px" not in css
+    # w style.css wielkość przycisków menu i podmenu ustawiają tylko te reguły (wspólna po bazowej .gbtn, …)
+    size = re.compile(r"(?<![\w-])(?:(?:min-|max-)?(?:width|height)|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|line-height|font-size|font)\s*:")
+    shell = re.compile(r"#tabs|\.menu nav|\.submenu")
+    sized = {sel for sel, body in _rules(STYLE) if shell.search(sel) and size.search(body)}
+    assert sized == {".gbtn, .menu nav button, .submenu button", ".menu nav button, .submenu button", ".menu nav",
+                     ".menu nav button.back", ".submenu", ".submenu.letters button", ".submenu .sep", LONG}, sized
+    assert _rule(STYLE, ".menu nav button.back").strip() == "font-size: 22px;"
+    # inne arkusze nie zmieniają wielkości przycisków menu ani podmenu (coordination.css: tylko letter-spacing i rogi)
+    for path in sorted((FRONTEND / "css").glob("*.css")):
+        if path.name == "style.css":
+            continue
+        bad = [sel for sel, body in _rules(path.read_text("utf-8")) if shell.search(sel) and size.search(body)]
+        assert not bad, (path.name, bad)
+
+
+def test_letters_half_width_and_rows():
+    """Jedyny wyjątek z issue #25: litery AIRCRAFT / CALLSIGN pół szerokości przycisku i tej samej wysokości. ALL
+    i KEYBOARD na całą szerokość (137 px), pod nimi litery parami; odstęp .sep w podmenu (METEO, AWALON, AD CIV) to
+    jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu."""
+    letters = _rule(STYLE, ".submenu.letters")
+    assert "display: grid;" in letters and "grid-template-columns: 1fr 1fr;" in letters
+    # bez własnej szerokości i bez gap: kolumna jak każde podmenu (150 px), odstęp 3 px dają marginesy przycisków
+    assert "width" not in letters and "gap" not in letters
+    assert _rule(STYLE, ".submenu.letters button").strip() == "width: auto;"
+    assert "grid-column: 1 / -1;" in _rule(STYLE, ".submenu.letters button.all, .submenu.letters button.kbd")
+    root = _rule(STYLE, ":root")
+    tok = {k: _px(v) for k, v in re.findall(r"(--btn-w|--btn-m|--col-pad): ([\d.]+px);", root)}
+    col_w = 150
+    letter = (col_w - 1 - 2 * tok["--col-pad"]) / 2 - 2 * tok["--btn-m"]
+    assert letter == 67 and 2 * letter + 2 * tok["--btn-m"] == tok["--btn-w"] == 137
+    assert ".submenu .sep { flex: none; height: calc(var(--btn-h) + 2 * var(--btn-m)); }" in _nocomments(STYLE)
+
+
+# podmenu dłuższe niż menu (AD VFR): selektor z style.css
+LONG = ".submenu:not(.letters):has(> :nth-child(22))"
+
+
+def test_submenus_without_scrollbars():
+    """Runda 17: AD VFR (69 lotnisk i eAIP, jedyne przewijane podmenu) w przeglądarce z klasycznymi paskami (Chromium
+    bez --hide-scrollbars, 1600x900, #advfr/EPPZ) miało pasek pionowy i poziomy, a przyciski 137 px były ucięte z boku
+    (clientWidth 134 przy 149 px treści). Menu i podmenu bez widocznych pasków (scrollbar-width i ::-webkit-scrollbar dla
+    Safari i starszego Chrome), bez przewijania w poziomie; kółko myszy i palec przewijają dalej (overflow-y: auto)."""
+    css = _nocomments(STYLE)
+    assert ".menu nav, .submenu { overflow-x: hidden; scrollbar-width: none; }" in css
+    assert ".menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }" in css
+    assert "overflow-y: auto;" in _rule(STYLE, ".submenu") and "overflow-y: auto;" in _rule(STYLE, ".menu nav")
+    # żadna inna reguła dla samych kolumn nie przywraca paska ani nie wyłącza przewijania
+    columns = {".menu nav", ".submenu", ".submenu.letters", LONG}
+    for sel, body in _rules(STYLE):
+        if columns & {part.strip() for part in sel.split(",")}:
+            assert not re.search(r"scrollbar-width: (?!none)|overflow(-y)?: (hidden|visible|scroll)", body), (sel, body)
+
+
+def test_long_submenu_scrolls_whole_rows():
+    """Runda 17: przewinięte AD VFR wychodziło z siatki 31 px menu (issue #25: każdy rząd podmenu na wysokości rzędu
+    menu obok). Podmenu dłuższe niż --menu-rows rzędów (22 = 21 + 1 elementów kolumny; litery mają po dwa w rzędzie)
+    pokazuje tylko całe rzędy: margines zamiast paddingu u góry i u dołu (w paddingu widać było 3 px przycisków spoza
+    widoku), wysokość do ostatniego całego rzędu nad dołem okna (mod(); bez mod() 21 rzędów), przewijanie zatrzymuje się
+    na początku rzędu (scroll-snap), aip.js przewija o całe rzędy. Pod ostatnim rzędem kolumnę (tło, kreska z prawej)
+    rysuje zakładka. Playwright (scrolltest.py, prawdziwe paski): kółko, dotyk i adres przy 1600x900, 1366x768,
+    1366x657 z użytkownikiem i bez: bez paska, bez ułamków przycisków w widoku, przewinięcie w całych rzędach."""
+    css = _nocomments(STYLE)
+    rows = int(re.search(r"--menu-rows: (\d+);", css).group(1))
+    assert LONG == f".submenu:not(.letters):has(> :nth-child({rows + 1}))"
+    long = _rule(STYLE, LONG)
+    pitch = "var(--btn-h) + 2 * var(--btn-m)"
+    assert f"max-height: calc(var(--menu-rows) * ({pitch}));" in long
+    assert "margin-block: var(--col-pad);" in long and "padding-block: 0;" in long
+    assert "scroll-snap-type: y mandatory;" in long and "scroll-padding" not in long
+    full = "var(--view-h) - var(--topbar-h) - 2 * var(--col-pad)"
+    assert (f"@supports (height: mod(5px, 3px)) {{\n  {LONG} {{ max-height: calc({full}\n    - mod({full}, {pitch})); }}\n}}"
+            in css)
+    # początek rzędu: margines nad przyciskiem (1,5 px) i odstęp (.sep) bez marginesu
+    assert f"{LONG} > * {{ scroll-snap-align: start; }}" in css
+    assert f"{LONG} > button {{ scroll-margin-top: var(--btn-m); }}" in css
+    # kolumna pod ostatnim rzędem jak .submenu: to samo tło i ta sama kreska z prawej (1 px z --col-w)
     sub = _rule(STYLE, ".submenu")
-    assert "width: 140px;" in sub and "overflow-y: auto;" in sub
-    btn = _rule(STYLE, ".submenu button")
-    height = float(re.search(r"height: ([\d.]+)px;", btn).group(1))
-    line = float(re.search(r"line-height: ([\d.]+)px;", btn).group(1))
-    assert "white-space: pre-line;" in btn and "padding: 0 4px;" in btn and height >= 2 * line + 2
-    assert "display: grid;" in _rule(STYLE, ".submenu.letters") and ".submenu .sep { height: 10px; }" in css
-    low = _media(css, "max-height: 899px")
-    assert ".submenu:not(.letters) { display: flex; flex-direction: column; }" in low
-    m = re.search(r"\.submenu:not\(\.letters\) > button \{([^}]*)\}", low).group(1)
-    min_h = float(re.search(r"min-height: ([\d.]+)px;", m).group(1))
-    low_line = float(re.search(r"line-height: ([\d.]+)px;", m).group(1))
-    gap = float(re.search(r"margin-bottom: ([\d.]+)px;", m).group(1))
-    assert "flex: 0 1 auto;" in m and min_h >= 2 * low_line + 2
-    assert ".submenu:not(.letters) > .sep { flex: none; }" in low
-    # 18 przycisków (OTHER po 0.13.0) w najniższym wariancie mieszczą się w 1366x600 pod paskiem u góry
-    topbar = float(re.search(r"--topbar-h: ([\d.]+)px;", css).group(1))
-    assert 18 * (min_h + gap) <= 600 - topbar - 12
+    assert "background: #050605;" in sub and "border-right: 1px solid var(--line);" in sub
+    view = _rule(STYLE, ".view:has(> .submenu:not(.letters) > :nth-child(22))")
+    assert ("background: linear-gradient(to right, #050605 calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), "
+            "transparent 0);") in view
+    # widać całe rzędy: R x 31 px przy 28 px; w oknie 1366x657 (rząd 26,1875 px) do ostatniego całego rzędu
+    for view_h, pitch_px in ((900, 31), (768, 31), (657, 26.1875)):
+        col = view_h - 18 - 9
+        visible = col - col % pitch_px
+        assert abs(visible / pitch_px - round(visible / pitch_px)) < 1e-9 and col - visible < pitch_px
+

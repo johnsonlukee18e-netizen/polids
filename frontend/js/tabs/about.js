@@ -1,6 +1,7 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["29.10.2026", "0.13.1 \u2013 per issue #25: one button size, 137 x 28 px, in the menu and every submenu with level rows, the logo at the bottom; a touch keyboard for the search in AIRCRAFT and CALLSIGN; AIRCRAFT: makers AIRBUS, BOEING, BOMBARDIER, EMBRAER and GA, a compact table with one row per type, a click opens the photo, dimensions and weights; RADIO back to the old three-column page, the neighbour boxes divided as in the sketch, smaller tiles and configuration boxes, ATIS beside the configuration, of the neighbours only the Ostrava and Berlin TMAs on the previews; AD MIL and AD VFR with aerodrome buttons and chart lists as in AD CIV; MAP: all display settings in one VISIBILITY SETTINGS section, all sections collapsed at first, sector capacity now called FMP; OTHER without PHRASEOLOGY, ENTRY and OCC charts per FMP sector; METEO: METAR and TAF coloured as in PANDORA, weather decoded in English and Polish, COLOURED / MONO switch."],
   ["28.10.2026", "0.13.0 \u2013 per issue #23: a thin bar across the top with Reload (reloads and comes back to the same screen), Brighter and Darker (brightness of the whole screen, two steps either way, kept in the browser); the whole program in a plain sans-serif font at normal weight, nothing in bold, as in PANDORA; menu buttons tight and evenly spaced, EMERGENCY too; SYT OP in light green. The STRIP tab is gone: old strip links open AERODROME \u203a TRAFFIC of that aerodrome."],
   ["28.10.2026", "AWALON: new tab with the wind from the surface to 10 000 ft every 1000 ft over the 15 AD 2 aerodromes \u2013 all of them in one table, and for each aerodrome a wind profile chart, a profile table with gusts and the runway winds. METEO \u203a WIND is now only the Windy wind map."],
   ["28.10.2026", "RADIO: one page after the layout sketch \u2013 a fixed ATIS bar (hiding ATIS no longer moves the page), configuration indicators ACC GAT (letters of the ACC sectors online, ALL and ALH in full), APP WA (HL, H+L, 2H+L, +D for the director) and APP GD, APP KK and APP PO (number of active APP frequencies), BERLIN WEST or EAST from the EDDB ATIS (red when it comes from the wind), neighbour sector boxes with their limits that merge when one controller works them (EDUU, EDMM, ESAA, EYVL, LZBB and LKAA, never EDWW), red sectors and TMAs for a flow restriction or occupancy above 80 % of capacity, APP and TWR plates only for stations online (one per controller when APP is split, as at EPWA or EPKK), hover windows of a fixed size kept away from the screen edge."],
@@ -77,16 +78,16 @@ const CHANGES = [
 
 const TILES = [
   ["aerodrome", "AERODROME", "FIR EPWW overview, aerodrome lists of EPWW and neighbours, the aerodrome on one screen: METAR, wind, runways, ATIS, NOTAM, AWOS, TRAFFIC (DMAN/AMAN)."],
-  ["meteo", "METEO", "METAR and TAF of aerodromes, wind map, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
+  ["meteo", "METEO", "Coloured METAR and TAF as in PANDORA with weather decoded in English and Polish, wind map, radar, GAMET, SIGWX, icing, regional QNH map, satellite, turbulence, sun."],
   ["awalon", "AWALON", "Wind from the surface to 10 000 ft every 1000 ft over the 15 AD 2 aerodromes: all in one table, a profile chart and runway winds for each aerodrome."],
-  ["map", "MAP", "Traffic with labels on hover, airspace at the selected level, TMA/CTR, sector capacity and flight details."],
-  ["radio", "RADIO", "One page laid out as in PANDORA: ATIS bar, ACC and APP indicators, BERLIN runway configuration, EPWW LOW/MID/HIGH previews with APP/TWR/FIS layers, neighbour sector boxes and red flow alerts; a neighbour FIR name opens its LOA."],
+  ["map", "MAP", "Traffic with labels on hover, airspace at the selected level, TMA/CTR, FMP and flight details; all display settings in one Visibility settings section."],
+  ["radio", "RADIO", "One page as in PANDORA: configuration indicators and ATIS in one row at the top, EPWW LOW/MID/HIGH previews with APP/TWR/FIS layers, neighbour stacks with the levels between the boxes, BERLIN runway configuration and red flow alerts; a neighbour stack header opens its LOA."],
   ["coordination", "COORDINATION", "LoA and LOP: transfers by point and position, documents as PDF."],
   ["sytop", "SYT OP", "Active NOTAMs of FIR EPWW and the main aerodromes."],
-  ["callsign", "CALLSIGN", "Airline radiotelephony callsigns."],
-  ["aircraft", "AIRCRAFT", "ICAO aircraft types by manufacturer with their values in boxes: wake turbulence categories, performance, dimensions, photos."],
+  ["callsign", "CALLSIGN", "Airline radiotelephony callsigns, with a touch keyboard for the search."],
+  ["aircraft", "AIRCRAFT", "ICAO aircraft types in a compact table: ICAO code, manufacturer, name, engines, WTC and RECAT-EU. Click a type for its photo, dimensions, weights and performance. Buttons for Airbus, Boeing, Bombardier, Embraer and general aviation. Touch keyboard for the search."],
   ["conversion", "CONVERSION", "Unit conversion: pressure, height, FL at QNH, speed, Mach; UTC and Poland LT clocks."],
-  ["other", "OTHER", "Flight plan by callsign, FMP traffic volumes, delay codes (REGCAUSE), SSR codes (SQUAWK), VFR minima, documents, phraseology and checklists."],
+  ["other", "OTHER", "Flight plan by callsign, FMP traffic volumes with entry and occupancy charts, delay codes (REGCAUSE), SSR codes (SQUAWK), VFR minima, documents and checklists."],
   ["emergency", "EMERGENCY", "ASSIST and emergency checklists."],
 ];
 

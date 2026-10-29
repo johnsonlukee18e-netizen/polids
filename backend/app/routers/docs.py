@@ -33,3 +33,22 @@ async def aerodrome_charts(icao: str):
     if icao not in eaip.AD2_AERODROMES:
         raise HTTPException(404, f"Aerodrome charts: no charts for {icao}")
     return await eaip.aerodrome_charts(icao)
+
+
+# 0.13.1 (issue #25): AD CIV / AD MIL / AD VFR w jednym adresie; /charts/<ICAO> zostaje jako AD CIV (IFR)
+AIP_OF = {"ifr": "aip_ifr", "mil": "aip_mil", "vfr": "aip_vfr"}
+
+
+@router.get("/charts/{aip}/{icao}")
+async def package_charts(aip: str, icao: str):
+    """Mapy lotniska z bieżącej poprawki eAIP IFR (AD 2.24), MIL (AD 4.24) albo VFR (AD 4.13), odpowiedź jak
+    /charts/<ICAO>. Tylko lotniska z listy pakietu (eaip.AERODROMES): inny kod EPxx nie trafia do PAŻP."""
+    link = AIP_OF.get(aip.strip().lower())
+    if link is None:
+        raise HTTPException(404, "Aerodrome charts: unknown AIP (ifr, mil or vfr)")
+    icao = icao.strip().upper()
+    if not EP_ICAO.fullmatch(icao):
+        raise HTTPException(400, "Aerodrome charts: ICAO code of a Polish aerodrome (EP + 2 letters)")
+    if icao not in eaip.AERODROMES[link]:
+        raise HTTPException(404, f"Aerodrome charts: no charts for {icao}")
+    return await eaip.aerodrome_charts(icao, link=link)

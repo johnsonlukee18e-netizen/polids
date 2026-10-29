@@ -20,11 +20,12 @@ MENU = ["home", "radio", "meteo", "awalon", "aerodrome", "adciv", "admil", "advf
         "coordination", "conversion", "sytop", "aup", "other", "about", "emergency", "admin"]
 LABELS = ["?", "RADIO", "METEO", "AWALON", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
           "COORDINATION", "CONVERSION", "SYT OP", "AUP", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
-# 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>)
+# 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>); 0.13.1 (issue #25): bez
+# PHRASEOLOGY
 OTHER_SUBS = [("4p", "4P"), ("aftn", "AFTN"), ("bomb-phone", "BOMB PHONE"), ("braking-action", "BRAKING ACTION"),
               ("checklist", "CHECKLIST"), ("docs", "DOCS"), ("flight-plan", "FLIGHT PLAN"), ("fmp", "FMP"),
               ("holding", "HOLDING"), ("ia", "IA"), ("light-gun", "LIGHT GUN"), ("meteo", "METEO"),
-              ("nato-weather", "NATO WEATHER"), ("phraseology", "PHRASEOLOGY"), ("position", "POSITION"),
+              ("nato-weather", "NATO WEATHER"), ("position", "POSITION"),
               ("regcause", "REGCAUSE"), ("squawk", "SQUAWK"), ("vfr-minima", "VFR MINIMA")]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
@@ -66,7 +67,7 @@ def test_docs_moved_to_other():
     DOKUMENTY."""
     assert not (FRONTEND / "js" / "tabs" / "docs.js").exists() and "docs" not in MENU
     assert '  docs: (arg) => ["other", arg === undefined ? undefined : arg ? "docs/" + arg : "docs"],' in MOVED_SRC
-    assert '  phraseology: () => ["other", "phraseology"],' in MOVED_SRC
+    assert '  phraseology: () => ["other", undefined],' in MOVED_SRC
     assert "if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);" in APP
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert 'import { isCoordFile, mountDocs } from "../docs.js";' in other and "soon(" not in other
@@ -91,14 +92,27 @@ def test_docs_moved_to_other():
     assert 'navigate("other"' not in radio
 
 
-def test_phraseology_moved_to_other():
-    """0.12.3: PHRASEOLOGY nie jest już w menu, tylko podzakładką OTHER po DOCS (#other/phraseology); stary adres
-    #phraseology przekierowuje app.js."""
-    assert "phraseology" not in MENU and not (FRONTEND / "js" / "tabs" / "phraseology.js").exists()
-    phr = (FRONTEND / "js" / "phraseology.js").read_text("utf-8")
-    assert "export function mountPhraseology(pane, ctx)" in phr and "/api/embed-check/phraseology" in phr
-    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
-    assert 'import { mountPhraseology } from "../phraseology.js";' in other
+def _code(src):
+    """Kod JS bez komentarzy (/* */ i // od początku linii albo po spacji)."""
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return re.sub(r"(^|\s)//.*$", r"\1", src, flags=re.M)
+
+
+def test_phraseology_removed():
+    """0.13.1 (issue #25): PHRASEOLOGY usunięta (do 0.13.0 podzakładka OTHER, do 0.12.2 osobna zakładka): bez modułu,
+    bez podzakładki, bez adresu w /api/config i bez sprawdzania osadzania. Stary adres #phraseology otwiera OTHER
+    w jego stanie (MOVED bez podzakładki), #other/phraseology to nieznane id (DOCS)."""
+    assert "phraseology" not in MENU and not (FRONTEND / "js" / "phraseology.js").exists()
+    assert not (FRONTEND / "js" / "tabs" / "phraseology.js").exists()
+    other = _code((FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8"))
+    assert "phraseology" not in other.lower()
+    for path in (FRONTEND / "js").rglob("*.js"):
+        code = _code(path.read_text("utf-8"))
+        assert "embed-check/phraseology" not in code and "links.phraseology" not in code, path.name
+    assert "phraseology_url" not in (ROOT_DIR / "backend" / "app" / "config.py").read_text("utf-8")
+    system = (ROOT_DIR / "backend" / "app" / "routers" / "system.py").read_text("utf-8")
+    assert '"phraseology"' not in system and "phraseology_url" not in system
+    assert '  phraseology: () => ["other", undefined],' in MOVED_SRC
 
 
 def test_checklist_moved_to_other():
@@ -273,7 +287,8 @@ def test_hash_roundtrip(js):
 def test_moved_docs(js):
     # bez arg OTHER zostaje w swoim stanie (otwarty dokument), "" = pierwszy dokument, plik = ten PDF
     assert js["moved"] == [["other", None], ["other", "docs"], ["other", "docs/LOA/LOA EPWW EDMM (AIRAC 2602).pdf"]]
-    assert js["phraseology"] == ["other", "phraseology"]
+    # 0.13.1: bez PHRASEOLOGY stary adres otwiera OTHER w jego stanie (undefined w JSON = null)
+    assert js["phraseology"] == ["other", None]
     # CHECKLIST: bez arg i "" = pierwsza checklista w OTHER › CHECKLIST, id = ta checklista
     assert js["checklist"] == [["other", "checklist"], ["other", "checklist"], ["other", "checklist/close-position"]]
     # STRIP: bez arg AERODROME w swoim stanie, "" = domyślny ekran, ICAO = TRAFFIC (DMAN/AMAN) tego lotniska, reszta
@@ -363,50 +378,73 @@ def test_square_native_controls_and_no_drop_shadows():
     assert ".leaflet-tooltip, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-bar, .leaflet-control-layers { box-shadow: none; }" in css
 
 
-def _media(css, query):
-    """Treść bloku @media (query) { ... } (jeden poziom zagnieżdżenia)."""
-    i = css.index(f"@media ({query}) {{")
-    depth, j = 0, css.index("{", i)
-    for k in range(j, len(css)):
-        depth += {"{": 1, "}": -1}.get(css[k], 0)
-        if not depth:
-            return css[j + 1:k]
-    raise AssertionError(query)
-
-
 def test_menu_fits_low_windows():
     """Runda 14 (audyt): przy 1366x657 (laptop 1366x768) lewe menu się przewijało, a EMERGENCY chował się do połowy pod
-    zegarem. Poniżej 900 px przyciski menu są w kolumnie flex i zmniejszają się po równo (do min-height), więc wszystkie
-    przyciski z EMERGENCY i ADMIN oraz zegar z AIRAC mieszczą się bez przewijania do 600 px wysokości, także z
-    zalogowanym użytkownikiem (Playwright: 1366x600 → 20,5 px na przycisk, z użytkownikiem 17,6 px). Od 900 px wygląd
-    bez zmian (reguły bez @media nietknięte). 0.12.6: bez CHECKLIST (w OTHER) jeden przycisk mniej. 0.13.0: bez STRIP
-    i SQUAWK (w OTHER), z AWALON; pasek u góry (18 px) w budżecie, EMERGENCY i ADMIN bez dodatkowego odstępu; Playwright 1366x600 z użytkownikiem:
-    21 przycisków po 19 px, 22 po 18,1 px, bez przewijania menu."""
+    zegarem. 0.13.1 (issue #25): przyciski 137 x 28 px z marginesem 1,5 px (rząd co 31 px), a gdy 21 rzędów menu
+    (← … EMERGENCY, ADMIN) z zegarem, logo i użytkownikiem się nie mieści, jedna wysokość --btn-h (na body) zmniejsza
+    po równo przyciski menu i każdego podmenu (najmniej 16 px), więc rzędy obu kolumn dalej stoją na jednej wysokości.
+    Budżet zawsze liczy 21 rzędów (także bez ADMIN), pasek u góry (18 px) i stałe wysokości zegara, logo i użytkownika
+    (Playwright: 1366x768 z użytkownikiem 25,33 px, 1366x657 23,19 / 20,05 px, bez przewijania menu)."""
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
-    low, lower = _media(css, "max-height: 899px"), _media(css, "max-height: 820px")
-    assert ".menu nav { display: flex; flex-direction: column; }" in low
-    btn = re.search(r"#tabs button \{([^}]*)\}", low).group(1)
-    assert "flex: 0 1 auto" in btn and "padding-top: 0; padding-bottom: 0" in btn
-    height = float(re.search(r"(?<![-\w])height: ([\d.]+)px", btn).group(1))
-    min_h = float(re.search(r"min-height: ([\d.]+)px", btn).group(1))
-    line = float(re.search(r"line-height: ([\d.]+)px", btn).group(1))
-    # wysokość bez ściskania jak przy paddingu 5 px (od 900 px), linia mieści się w najniższym przycisku (tekst na środku)
-    assert height == 5 + 14 * 1.2 + 5 + 2 and line <= min_h - 2
-    assert re.search(r"#tabs button \{ height: 24\.8px; margin-bottom: 1px; \}", lower)   # 3 + 16,8 + 3 + ramka
-    # 0.13.0: wszystkie przyciski z tym samym odstępem (margin-bottom 2 px, od 820 px 1 px), EMERGENCY i ADMIN też
-    assert "margin-top" not in low and "margin-top" not in lower
-    assert ".menu nav button { padding: 5px 6px; margin-bottom: 2px; line-height: 1.2; }" in css
-    assert ".menu nav { flex: 1; overflow-y: auto; }" in css
-    # budżet 600 px (pomiary Playwright przy 1366x600): pasek u góry 18 px, logo z paddingiem menu 45,5 px, zegar
-    # z AIRAC 49,8 px, użytkownik z wylogowaniem 66 px; przyciski (← ... EMERGENCY, ADMIN) w najniższym wariancie,
-    # liczone z index.html, i zapas na jeszcze jeden (22)
-    topbar = float(re.search(r"--topbar-h: ([\d.]+)px;", css).group(1))
-    n = len(_menu_buttons())
-    assert 20 <= n <= 22
-    for count in (n, 22):
-        margins = count * 1
-        for user in (0, 66):
-            nav = 600 - topbar - 45.5 - 49.8 - user - 6
-            assert count * min_h + margins <= nav, (count, user, nav)
-    # kolejność: niskie okno przed 820 px (te same selektory, niższe okno nadpisuje)
-    assert css.index("@media (max-height: 899px)") < css.index("@media (max-height: 820px)")
+
+    def px(pattern):
+        return float(re.search(pattern, css).group(1))
+
+    rows = int(re.search(r"--menu-rows: (\d+);", css).group(1))
+    assert rows == len(_menu_buttons()) == 21
+    assert ("--btn-h: clamp(16px, calc((var(--view-h) - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows)"
+            " - 2 * var(--btn-m)), var(--btn-h-max)); }") in css
+    # --btn-h na body, tam gdzie zalogowany użytkownik zmienia --foot-h (na :root byłaby liczona ze stałą --foot-h)
+    assert re.search(r"(?m)^body \{ --view-h: 100vh; --foot-h: 80px;\s+--btn-h: clamp", css)
+    # runda 17 (przegląd): wysokość z widocznej części okna, nie z samego 100vh. W Chrome na Androidzie (i innych
+    # przeglądarkach z paskiem adresu) 100vh to okno bez paska, a strona się nie przewija, więc pasek zostaje: 1280x800
+    # z paskiem (widać 744 px) dawało 26,84 px zamiast 24,19 i EMERGENCY / ADMIN wychodziły pod zegar. Osobna zmienna:
+    # 100vh dla przeglądarek bez svh, 100svh (okno z paskiem, tyle co html, body { height: 100% }) w @supports; drugie
+    # --btn-h z svh obok pierwszego wygrywałoby zawsze, także tam, gdzie svh jest nieznane
+    assert "@supports (height: 100svh) { body { --view-h: 100svh; } }" in css
+    assert css.count("--btn-h:") == 1 and "100vh" not in css.replace("--view-h: 100vh;", "", 1)
+    assert "html, body { height: 100%; margin: 0; }" in css
+    assert "body:has(#userbox:not([hidden])) { --foot-h: 146px; }" in css
+    assert ".menu nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }" in css
+    # stałe wysokości dołu menu: zegar z AIRAC + logo = --foot-h bez użytkownika, + użytkownik = z użytkownikiem
+    clock = px(r"(?m)^\.clockbox \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
+    brand = px(r"(?m)^\.menu \.brand \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
+    user = px(r"(?m)^\.userbox \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
+    assert (clock, brand, user) == (46, 34, 66) and clock + brand == 80 and clock + brand + user == 146
+    # treść mieści się w tych wysokościach: ramka + padding 3 + zegar 24 + AIRAC 16; ramka + 4 + logo 26 + 3
+    assert ".clock { font: 20px/24px var(--mono); color: #fff; }" in css and ".clockbox .hint { line-height: 16px; }" in css
+    assert 1 + 3 + 24 + 16 <= clock and 1 + 4 + 26 + 3 <= brand
+    assert ".menu .brand img { display: block; width: 100%; height: 26px; object-fit: contain; }" in css
+    topbar = px(r"--topbar-h: ([\d.]+)px;")
+    pad, m, h_max, h_min = px(r"--col-pad: ([\d.]+)px;"), px(r"--btn-m: ([\d.]+)px;"), px(r"--btn-h-max: ([\d.]+)px;"), 16
+
+    def btn_h(vh, foot):
+        return min(max(h_min, (vh - topbar - 2 * pad - foot) / rows - 2 * m), h_max)
+
+    def fits(view, foot, h):   # pasek, padding, 21 rzędów i dół menu w widocznej części okna
+        return topbar + 2 * pad + rows * (h + 2 * m) + foot <= view + 1e-9
+
+    for vh in (560, 600, 657, 768, 900):
+        for foot in (80, 146):
+            h = btn_h(vh, foot)
+            assert h >= h_min
+            if h > h_min:   # mieści się bez przewijania
+                assert fits(vh, foot, h), (vh, foot, h)
+    assert btn_h(900, 80) == btn_h(900, 146) == btn_h(768, 80) == 28
+    assert 25 < btn_h(768, 146) < 26 and btn_h(600, 146) >= 16 and btn_h(657, 146) > 20
+    # tablet 1280x800 z paskiem adresu: widać 744 px (svh), 100vh = 800. Z widocznej wysokości menu się mieści, z 100vh
+    # nie (26,84 px, 56 px za dużo)
+    assert 24.1 < btn_h(744, 146) < 24.2 and fits(744, 146, btn_h(744, 146))
+    assert 26.8 < btn_h(800, 146) < 26.9 and not fits(744, 146, btn_h(800, 146))
+
+
+def test_logo_at_bottom_above_user():
+    """0.13.1 (issue #25): "Przenieś logo aplikacji na sam dół bocznego paska, nad informacjami użytkownika." Kolejność
+    w menu: przyciski, zegar z AIRAC, logo, użytkownik; bez zalogowanego użytkownika logo jest ostatnie. Odnośnik do HOME
+    bez zmian."""
+    menu = INDEX[INDEX.index('<aside class="menu">'):INDEX.index("</aside>")]
+    order = [menu.index(x) for x in ('<nav id="tabs">', "</nav>", '<div class="clockbox">', '<a class="brand" href="#home"',
+                                     '<div id="userbox" class="userbox" hidden></div>')]
+    assert order == sorted(order) and menu.count('class="brand"') == 1
+    assert re.search(r'<a class="brand" href="#home"[^>]*><img src="/static/icons/polids-logo-bez-podpisu.svg" alt="PolIDS"></a>\s*'
+                     r'<div id="userbox"', menu)

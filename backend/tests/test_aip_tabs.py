@@ -1,7 +1,11 @@
 """0.12.3 (issue #13): AD CIV z podmenu: "eAIP" (cała przeglądarka) i przycisk dla każdego lotniska AD 2, który otwiera
 w tej samej ramce stronę AD 2 lotniska z tej samej poprawki AIRAC co skonfigurowany link (adres "#adciv/EPWA").
 0.12.5 (issue #18): przycisk lotniska otwiera listę map lotniska (AD 2.24, GET /api/docs/charts/<ICAO>) z PDF-em obok
-zamiast opisu tekstowego; adres "#adciv/EPWA/2-1" = wybrana mapa; strona AD 2 zostaje jako przycisk "AD 2 TEXT ↗"."""
+zamiast opisu tekstowego; adres "#adciv/EPWA/2-1" = wybrana mapa; strona AD 2 zostaje jako przycisk "AD 2 TEXT ↗".
+0.13.1 (issue #25): AD MIL i AD VFR tak samo (jedna fabryka aipTab, tabela AIP): 15 lotnisk wojskowych i 69 lotnisk VFR
+z części AD 4 swojego pakietu, mapy z AD 4.24 / AD 4.13 (GET /api/docs/charts/<ifr|mil|vfr>/<ICAO>), przycisk
+"AD 4 TEXT ↗", adresy "#admil/EPKS/12-5", "#advfr/EPBC"; wybrany przycisk przewijany do widoku w długim podmenu
+(o całe rzędy, rzędy dalej na wysokości rzędów menu)."""
 import json
 import re
 import shutil
@@ -47,6 +51,20 @@ console.log(JSON.stringify({
     .map(([k, id]) => aip.kindAfterPick(charts, k, id)),
   pickEmpty: aip.kindAfterPick([], "ADC", "2-1"),
   tips: charts.map(aip.chartTip),
+  // 0.13.1: AD MIL i AD VFR
+  mil: aip.AD_MIL,
+  vfr: aip.AD_VFR,
+  pkgs: Object.fromEntries(Object.entries(aip.AIP).map(([k, p]) => [k, { link: p.link, api: p.api, part: p.part,
+    charts: p.charts, text: p.text, n: p.list.length, whole: p.whole }])),
+  lists: [aip.AIP.adciv.list === aip.AD2, aip.AIP.admil.list === aip.AD_MIL, aip.AIP.advfr.list === aip.AD_VFR],
+  vfrPage: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2011-26_2026_10_29/index-v2.html", "EPBC", 4),
+  milPage: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2011-26_2026_10_29", "EPKS", 4),
+  vfrSection: aip.chartsSectionUrl("https://x.test/eAIP/AD%204%20EPBC%201-en-GB.html", "EPBC", "4.13"),
+  milArgs: ["epks/12-5", "EPKS", "EPWA", "EPBC", " EPDE/2-1 ", ""].map((a) => aip.aipArg(aip.AD_MIL, a)),
+  vfrArgs: [" EPBC ", "epzw/3-1", "EPKS", "EPWA/2-1"].map((a) => aip.aipArg(aip.AD_VFR, a)),
+  // pierwszy widoczny rząd: [rząd przycisku, pierwszy widoczny teraz, ile rzędów widać]
+  topRows: [[5, 0, 10], [9, 0, 10], [10, 0, 10], [12, 0, 10], [3, 5, 10], [5, 5, 10], [70, 0, 28], [0, 3, 28], [2, 40, 28],
+    [45, 40, 1], [45, 40, 0], [-1, 2, 10]].map(([r, t, n]) => aip.topRow(r, t, n)),
 }));
 """
 
@@ -124,22 +142,71 @@ def test_chart_list(js):
 
 
 def test_tabs_wiring():
-    # AD CIV: podmenu (subtabs) z eAIP, odstępem i lotniskami, adres przez activate + remember; MIL i VFR bez zmian
-    assert "export const adciv = {" in AIP
-    assert 'remember("adciv", cur === EAIP ? "" : charts?.current() ? `${cur}/${charts.current()}` : cur);' in AIP
+    # AD CIV / AD MIL / AD VFR (0.13.1): jedna fabryka, podmenu (subtabs) z eAIP, odstępem i lotniskami pakietu, adres
+    # przez activate + remember zakładki
+    for tab in ("adciv", "admil", "advfr"):
+        assert f'export const {tab} = aipTab("{tab}");' in AIP
+    assert "const frame = " not in AIP and "frame(" not in AIP
+    assert 'remember(tab, cur === EAIP ? "" : charts?.current() ? `${cur}/${charts.current()}` : cur);' in AIP
     assert '{ id: EAIP, label: "eAIP", fill: true, render: page(base) },' in AIP and "{ sep: true }," in AIP
-    assert 'export const admil = frame("aip_mil");' in AIP and 'export const advfr = frame("aip_vfr");' in AIP
-    assert "ctx.config.links.aip_ifr" in AIP
-    # 0.12.5: przycisk lotniska = lista map (AD 2.24) z backendu, nie strona AD 2 z opisem tekstowym
+    assert "...pkg.list.map(([icao]) => ({ id: icao, label: icao, fill: true, render: chartsPage(icao) }))," in AIP
+    assert "const base = ctx.config.links[pkg.link];" in AIP and "const a = aipArg(pkg.list, arg);" in AIP
+    # 0.12.5: przycisk lotniska = lista map z backendu (0.13.1: z pakietem w adresie), nie strona AD 2 z opisem
     assert "render: chartsPage(icao)" in AIP and "render: page(aeroPageUrl(base, icao))" not in AIP
-    assert "api(`/api/docs/charts/${icao}`)" in AIP and 'onPick: (id) => remember("adciv", `${icao}/${id}`)' in AIP
-    assert "const text = aeroPageUrl(base, icao);" in AIP and ">AD 2 TEXT ↗</a>" in AIP
-    assert "${esc(icao)} · CHARTS</h4>" in AIP
+    assert "api(`/api/docs/charts/${pkg.api}/${icao}`)" in AIP and "onPick: (id) => remember(tab, `${icao}/${id}`)" in AIP
+    assert "const text = aeroPageUrl(base, icao, pkg.part);" in AIP and ">AD ${pkg.part} TEXT \\u2197</a>" in AIP
+    # pamięć list map osobno dla pakietu (ten sam kod lotniska w dwóch pakietach nie dzieli listy)
+    assert "const key = `${pkg.api}/${icao}`;" in AIP and "cache.get(key)" in AIP and "cache.get(icao)" not in AIP
+    assert "${esc(icao)} \\u00b7 CHARTS</h4>" in AIP
+    # długie podmenu AD VFR (69 lotnisk): wybrany przycisk przewijany do widoku przy każdym activate, o całe rzędy
+    # (scrollTop = pierwszy widoczny rząd x rząd przycisku z marginesami), nie scrollIntoView (pół rzędu przy krawędzi)
+    act = AIP[AIP.index("activate(arg) {"):AIP.index("export const adciv = ")]
+    assert "          reveal();\n" in act and "scrollIntoView" not in AIP[AIP.index("const reveal = "):AIP.index("activate(arg) {")]
+    assert "nav.scrollTop = topRow(row, Math.round(nav.scrollTop / pitch), rows) * pitch;" in AIP
+    assert "const pitch = box(b).height + parseFloat(bs.marginTop) + parseFloat(bs.marginBottom);" in AIP
     css = (FRONTEND / "css" / "coordination.css").read_text("utf-8")
     assert ".chl-row {" in css and ".chl-list {" in css
-    assert '.view[data-tab="adciv"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .chl-row, .chl-kd) { border-radius: 0; }' in css
-    # inop.js i phraseology.js biorą pasek nad ramką stąd
+    assert ('.view:is([data-tab="adciv"], [data-tab="admil"], [data-tab="advfr"]) :is(.btn, .gbtn, .field, .ms-card, '
+            '.ms-card h4, .chl-row,\n  .chl-kd) { border-radius: 0; }') in css
+    # inop.js (i do 0.13.0 phraseology.js) biorą pasek nad ramką stąd
     assert "export function embedBar(pane)" in AIP
+
+
+def test_packages(js):
+    """0.13.1: tabela AIP: link w /api/config, pakiet w adresie listy map, część AIP, sekcja map, lista lotnisk."""
+    assert js["pkgs"] == {
+        "adciv": {"link": "aip_ifr", "api": "ifr", "part": 2, "charts": "2.24", "text": "2.1–AD 2.25", "n": 15,
+                  "whole": "The whole eAIP IFR (table of contents)"},
+        "admil": {"link": "aip_mil", "api": "mil", "part": 4, "charts": "4.24", "text": "4.1–AD 4.25", "n": 15,
+                  "whole": "The whole eAIP MIL (table of contents)"},
+        "advfr": {"link": "aip_vfr", "api": "vfr", "part": 4, "charts": "4.13", "text": "4.1–AD 4.13", "n": 69,
+                  "whole": "The whole eAIP VFR (table of contents)"},
+    }
+    assert js["lists"] == [True, True, True]
+    mil, vfr = dict(js["mil"]), dict(js["vfr"])
+    assert list(mil) == sorted(mil) and list(vfr) == sorted(vfr) and len(mil) == 15 and len(vfr) == 69
+    assert mil["EPKS"] == "POZNAŃ/Krzesiny" and mil["EPLY"] == "ŁĘCZYCA" and vfr["EPBC"] == "WARSZAWA - BABICE"
+    assert vfr["EPJS"] == "JEŻÓW SUDECKI k/Jeleniej Góry" and all(mil.values()) and all(vfr.values())
+    assert not set(mil) & set(vfr) and not (set(mil) | set(vfr)) & {i for i, _ in js["ad2"]}
+
+
+def test_mil_vfr_pages_and_args(js):
+    assert js["vfrPage"] == ("https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2011-26_2026_10_29/eAIP/"
+                             "AD%204%20EPBC%201-en-GB.html")
+    assert js["milPage"] == ("https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2011-26_2026_10_29/eAIP/"
+                             "AD%204%20EPKS%201-en-GB.html")
+    assert js["vfrSection"] == "https://x.test/eAIP/AD%204%20EPBC%201-en-GB.html#:~:text=EPBC%20AD%204.13"
+    none = {"icao": "", "chart": ""}
+    # lotnisko z listy zakładki; lotnisko innego pakietu = cały eAIP
+    assert js["milArgs"] == [{"icao": "EPKS", "chart": "12-5"}, {"icao": "EPKS", "chart": ""}, none, none,
+                             {"icao": "EPDE", "chart": "2-1"}, none]
+    assert js["vfrArgs"] == [{"icao": "EPBC", "chart": ""}, {"icao": "EPZW", "chart": "3-1"}, none, none]
+
+
+def test_top_row(js):
+    """0.13.1 (issue #25): przewijane podmenu (AD VFR) zawsze o całe rzędy, żeby rzędy stały na wysokości rzędów
+    menu: rząd w widoku nic nie zmienia, rząd nad widokiem staje na górze, rząd pod widokiem na dole; nigdy poniżej 0."""
+    assert js["topRows"] == [0, 0, 1, 3, 3, 5, 43, 0, 2, 45, 45, 0]
 
 
 def test_kind_filter_survives_redraw(js):
@@ -162,5 +229,229 @@ def test_no_provenance_notes():
     code = "\n".join(line for line in AIP.splitlines() if not line.lstrip().startswith("//"))
     for text in ("PANSA", "Charts from AD 2.24", "from eAIP", "in eAIP", "AIRAC amendment", "chl-src", "(AD 2.24)`"):
         assert text not in code, text
-    assert "Loading the chart list…" in AIP and "Chart list unavailable: " in AIP
-    assert ">AD 2.24 ↗</a>" in AIP and ">AD 2 TEXT ↗</a>" in AIP
+    assert "Loading the chart list\\u2026" in AIP and "Chart list unavailable: " in AIP
+    assert ">AD ${pkg.charts} \\u2197</a>" in AIP and ">AD ${pkg.part} TEXT \\u2197</a>" in AIP
+    assert 'title="Aerodrome charts section (AD ${pkg.charts})"' in AIP
+
+
+def test_aip_js_ascii_code():
+    """0.13.1: w kodzie tabs/aip.js (poza komentarzami w osobnych linijkach) tylko ASCII: nazwy lotnisk i znaki
+    typograficzne jako \\u0141, \\u2013, \\u2197 itd."""
+    bad = [line.strip() for line in AIP.splitlines() if re.search(r"[^\x00-\x7F]", line) and not line.strip().startswith("//")]
+    assert not bad, bad
+
+
+# --- 0.13.1: zakładki z fabryki aipTab na atrapie api.js (subtabs, api, remember, h): który pakiet, który adres listy
+# map, co trafia do historii, przewinięcie podmenu do wybranego lotniska, pamięć list osobno dla pakietu
+STUB_API = r"""
+export const log = { api: [], remember: [], frames: [], pages: [], scrolled: [] };
+// getComputedStyle jak w przeglądarce: marginesy przycisków i padding podmenu z atrapy
+globalThis.getComputedStyle = (el) => el.css;
+export const RESP = {};
+const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
+const part = (sel) => ({ sel, innerHTML: "", hidden: true, href: "", title: "", textContent: "", attrs: {},
+  getAttribute(k) { return this.attrs[k] ?? null; }, scrollIntoView() {} });
+export function h(html) {
+  const parts = {};
+  return { html, querySelector: (s) => (parts[s] ??= part(s)), addEventListener() {} };
+}
+export function frameGo(frame, url) { frame.attrs.src = url; log.frames.push(url); return frame; }
+export function iframeWithFallback(pane, url) { log.pages.push(url); }
+export function remember(tab, arg) { log.remember.push([tab, arg]); }
+export function api(url) { log.api.push(url); return Promise.resolve(RESP[url] ?? { page: "", charts: [], error: "HTTP 404" }); }
+export const newPane = () => {
+  const pane = { classes: [], classList: { add: (c) => pane.classes.push(c) }, append(el) { pane.el = el; },
+    querySelector: () => ({ classList: { add() {} }, querySelectorAll: () => [] }) };
+  return pane;
+};
+export function subtabs(root, tabs, opts = {}) {
+  // geometria jak w style.css przy 28 px: rząd co 31 px (28 + 2 x 1,5 px), kolumna z paddingiem 4,5 px od y = 18;
+  // podmenu dłuższe niż 21 rzędów bez paddingu, z 21 całymi rzędami w widoku; scrollTop zapisywany w log.scrolled
+  const long = tabs.length > 21, pad = long ? 0 : 4.5;
+  let top = 0;
+  const buttons = tabs.map((t, i) => [t, i]).filter(([t]) => !t.sep).map(([t, i]) => ({ dataset: { id: t.id }, title: "",
+    active: false, css: { marginTop: "1.5px", marginBottom: "1.5px" },
+    getBoundingClientRect: () => ({ top: 18 + pad + 1.5 + 31 * i - top, height: 28 }) }));
+  const nav = { buttons, seps: tabs.filter((t) => t.sep).length, querySelectorAll: () => buttons,
+    querySelector: (s) => (s === "button.active" ? buttons.find((b) => b.active) ?? null : s === "button" ? buttons[0] : null),
+    css: { paddingTop: `${pad}px`, paddingBottom: `${pad}px` }, clientHeight: long ? 21 * 31 : 2 * pad + 21 * 31,
+    scrollHeight: 2 * pad + 31 * tabs.length,
+    get scrollTop() { return top; }, set scrollTop(v) { top = v; log.scrolled.push(v); } };
+  let cur = null, page = null;
+  const show = (id) => {
+    page?.destroy?.();
+    const t = tabs.find((x) => !x.sep && x.id === id) || tabs[0];
+    cur = t.id;
+    buttons.forEach((b) => { b.active = b.dataset.id === cur; });
+    root.pane = newPane();
+    page = t.render(root.pane) || null;
+  };
+  root.nav = nav;
+  root.arg = opts.arg;
+  show(tabs[0].id);
+  return { nav, pane: {}, show, current: () => cur };
+}
+"""
+
+TAB_SCRIPT = r"""
+const stub = await import(process.argv[2]);
+const aip = await import(process.argv[3]);
+const { log, RESP } = stub;
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const reset = () => Object.values(log).forEach((a) => a.splice(0));
+const chart = (pkg, icao, id, kind) => ({ id, page: `AD 4 ${icao} ${id}`, title: id, full: id, kind,
+  url: `https://x.test/${pkg}/AD_4_${icao}_${id}.pdf` });
+RESP["/api/docs/charts/mil/EPKS"] = { icao: "EPKS", page: "https://x.test/mil/eAIP/AD%204%20EPKS%201-en-GB.html",
+  error: null, charts: [chart("mil", "EPKS", "2-1", "ADC"), chart("mil", "EPKS", "12-5", "IAC")] };
+RESP["/api/docs/charts/mil/EPZZ"] = { icao: "EPZZ", page: "", error: null, charts: [chart("mil", "EPZZ", "2-1", "ADC")] };
+RESP["/api/docs/charts/vfr/EPZZ"] = { icao: "EPZZ", page: "", error: null, charts: [chart("vfr", "EPZZ", "3-1", "VFR")] };
+const links = { aip_ifr: "https://x.test/ifr/index-v2.html", aip_mil: "https://x.test/mil/index-v2.html",
+  aip_vfr: "https://x.test/vfr/index-v2.html" };
+const ctx = { config: { links } };
+const el = (root) => root.pane.el;
+const out = {};
+
+// AD MIL: start na całym eAIP MIL, lotnisko i mapa z adresu, zmiana mapy, lotnisko spoza listy, powrót z pamięci
+const mil = {};
+const tm = aip.admil.mount(mil, ctx);
+out.milStart = { pages: [...log.pages], ids: mil.nav.buttons.map((b) => b.dataset.id), seps: mil.nav.seps,
+  titles: [mil.nav.buttons[0].title, mil.nav.buttons.find((b) => b.dataset.id === "EPKS").title],
+  args: ["eaip", "EPKS"].map(mil.arg) };
+reset();
+tm.activate("epks/12-5");
+await tick();
+out.milEpks = { api: [...log.api], remember: [...log.remember], scrolled: [...log.scrolled], classes: mil.pane.classes,
+  open: el(mil).querySelector(".chl-open").textContent, viewer: el(mil).querySelector(".viewer").attrs.src,
+  html: el(mil).html };
+reset();
+tm.activate("EPKS/2-1");
+out.milPick = { api: [...log.api], remember: [...log.remember], viewer: el(mil).querySelector(".viewer").attrs.src };
+reset();
+tm.activate("EPWA");
+mil.nav.scrollTop = 500;
+tm.activate("EPWA");
+out.milForeign = { pages: [...log.pages], remember: [...log.remember], active: mil.nav.querySelector("button.active").dataset.id,
+  top: mil.nav.scrollTop, scrolled: [...log.scrolled] };
+reset();
+tm.activate("EPKS");
+out.milBack = { api: [...log.api], remember: [...log.remember], viewer: el(mil).querySelector(".viewer").attrs.src };
+reset();
+tm.activate("EPDE");
+await tick();
+out.milError = { api: [...log.api], list: el(mil).querySelector(".chl-list").innerHTML,
+  viewer: el(mil).querySelector(".viewer").attrs.src };
+
+// AD VFR: 69 lotnisk, lotnisko z dołu listy przewijane do widoku o całe rzędy
+reset();
+const vfr = {};
+const tv = aip.advfr.mount(vfr, ctx);
+out.vfrStart = { pages: [...log.pages], n: vfr.nav.buttons.length, last: vfr.nav.buttons.at(-1).dataset.id,
+  ids: vfr.nav.buttons.map((b) => b.dataset.id) };
+reset();
+tv.activate("EPZW");
+await tick();
+out.vfrEpzw = { api: [...log.api], remember: [...log.remember], scrolled: [...log.scrolled], html: el(vfr).html };
+// z dołu w górę (EPBC: rząd nad widokiem), rząd w widoku (EPKI), w dół (EPPZ), przycisk menu (bez arg), cały eAIP
+out.vfrSeq = ["EPBC", "EPKI", "EPPZ", undefined, ""].map((a) => { reset(); tv.activate(a); return [...log.scrolled]; });
+
+// AD CIV bez zmian w zachowaniu: lista z IFR, AD 2 TEXT
+reset();
+const civ = {};
+const tc = aip.adciv.mount(civ, ctx);
+out.civStart = { pages: [...log.pages], n: civ.nav.buttons.length };
+tc.activate("EPWA/2-1");
+out.civEpwa = { api: [...log.api], remember: [...log.remember], html: el(civ).html };
+
+// pamięć list map: klucz pakiet/ICAO
+reset();
+const p = () => stub.newPane();
+const a = p(), b = p(), c = p();
+aip.mountCharts(a, { icao: "EPZZ", name: "x", base: links.aip_mil, pkg: aip.AIP.admil });
+await tick();
+aip.mountCharts(b, { icao: "EPZZ", name: "x", base: links.aip_vfr, pkg: aip.AIP.advfr });
+await tick();
+aip.mountCharts(c, { icao: "EPZZ", name: "x", base: links.aip_mil, pkg: aip.AIP.admil });
+out.cache = { api: [...log.api], viewers: [a, b, c].map((x) => x.el.querySelector(".viewer").attrs.src) };
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.fixture(scope="module")
+def tabs(tmp_path_factory):
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    d = tmp_path_factory.mktemp("tabs")
+    (d / "api.mjs").write_text(STUB_API, "utf-8")
+    (d / "aip.mjs").write_text(AIP.replace('"../api.js"', '"./api.mjs"'), "utf-8")
+    script = d / "run.mjs"
+    script.write_text(TAB_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(script), (d / "api.mjs").as_uri(), (d / "aip.mjs").as_uri()],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_admil_tab(tabs):
+    start = tabs["milStart"]
+    # start: cały eAIP MIL, potem odstęp i 15 lotnisk wojskowych w kolejności AD 1.3; dymki z nazwą lotniska
+    assert start["pages"] == ["https://x.test/mil/index-v2.html"] and start["seps"] == 1
+    assert start["ids"][:3] == ["eaip", "EPCE", "EPDA"] and len(start["ids"]) == 16 and start["ids"][-1] == "EPTM"
+    assert start["titles"] == ["The whole eAIP MIL (table of contents)", "POZNAŃ/Krzesiny – charts"]
+    assert start["args"] == ["", "EPKS"]
+    # "#admil/EPKS/12-5": lista z /api/docs/charts/mil/EPKS, mapa 12-5 w podglądzie, krok historii zakładki admil
+    e = tabs["milEpks"]
+    assert e["api"] == ["/api/docs/charts/mil/EPKS"] and e["remember"] == [["admil", "EPKS/12-5"]]
+    # AD MIL (17 rzędów) mieści się w kolumnie: bez przewijania
+    assert e["scrolled"] == [] and e["classes"] == ["chl-pane"]
+    assert e["open"] == "AD 4 EPKS 12-5 PDF ↗" and e["viewer"] == "https://x.test/mil/AD_4_EPKS_12-5.pdf"
+    assert ">AD 4 TEXT ↗</a>" in e["html"] and "(AD 4.1–AD 4.25)" in e["html"] and "EPKS · CHARTS" in e["html"]
+    assert 'href="https://x.test/mil/eAIP/AD%204%20EPKS%201-en-GB.html"' in e["html"] and "POZNAŃ/Krzesiny" in e["html"]
+    # inna mapa tego lotniska: bez ponownego pobrania listy
+    assert tabs["milPick"] == {"api": [], "remember": [["admil", "EPKS/2-1"]], "viewer": "https://x.test/mil/AD_4_EPKS_2-1.pdf"}
+    # lotnisko spoza AD MIL (EPWA): cały eAIP MIL
+    # (podmenu na samą górę: przycisk eAIP z odstępem nad nim; drugie activate tego samego adresu bez nowej strony)
+    assert tabs["milForeign"] == {"pages": ["https://x.test/mil/index-v2.html"], "remember": [["admil", ""], ["admil", ""]],
+                                  "active": "eaip", "top": 0, "scrolled": [0, 500, 0]}
+    # powrót do EPKS: lista z pamięci, pierwsza mapa
+    assert tabs["milBack"] == {"api": [], "remember": [["admil", "EPKS/2-1"]], "viewer": "https://x.test/mil/AD_4_EPKS_2-1.pdf"}
+    # brak listy: komunikat, przycisk sekcji AD 4.24 i strona AD 4 lotniska w podglądzie
+    err = tabs["milError"]
+    page = "https://x.test/mil/eAIP/AD%204%20EPDE%201-en-GB.html"
+    assert err["api"] == ["/api/docs/charts/mil/EPDE"] and err["viewer"] == page
+    assert "Chart list unavailable: HTTP 404." in err["list"] and ">AD 4.24 ↗</a>" in err["list"]
+    assert f'href="{page}#:~:text=EPDE%20AD%204.24"' in err["list"]
+
+
+def test_advfr_tab(tabs):
+    start = tabs["vfrStart"]
+    ids = start.pop("ids")
+    assert start == {"pages": ["https://x.test/vfr/index-v2.html"], "n": 70, "last": "EPZW"}
+    row = {icao: ids.index(icao) + 1 for icao in ids[1:]}   # rząd 0: eAIP, rząd 1: odstęp
+    assert (row["EPBA"], row["EPZW"]) == (2, 70)
+    e = tabs["vfrEpzw"]
+    # ostatnie z 69 lotnisk VFR: przewinięcie o całe rzędy (atrapa: 21 rzędów w widoku, rząd co 31 px), EPZW w ostatnim
+    # widocznym rzędzie; lista z /api/docs/charts/vfr/EPZW
+    assert e["api"] == ["/api/docs/charts/vfr/EPZW"] and e["remember"] == [["advfr", "EPZW"]]
+    assert e["scrolled"] == [(70 - 21 + 1) * 31]
+    # EPBC nad widokiem: na górze; EPKI w widoku (rzędy 3-23): bez zmiany; EPPZ pod widokiem: na dole; przycisk menu
+    # (bez arg): bez zmiany; cały eAIP: na samą górę
+    assert row["EPBC"] == 3 and 3 <= row["EPKI"] <= 23 < row["EPPZ"]
+    assert tabs["vfrSeq"] == [[3 * 31], [3 * 31], [(row["EPPZ"] - 20) * 31], [(row["EPPZ"] - 20) * 31], [0]]
+    assert ">AD 4 TEXT ↗</a>" in e["html"] and "(AD 4.1–AD 4.13)" in e["html"] and "ZAWISZYN" in e["html"]
+
+
+def test_adciv_tab_unchanged(tabs):
+    assert tabs["civStart"] == {"pages": ["https://x.test/ifr/index-v2.html"], "n": 16}
+    e = tabs["civEpwa"]
+    assert e["api"] == ["/api/docs/charts/ifr/EPWA"] and e["remember"] == [["adciv", "EPWA/2-1"]]
+    assert ">AD 2 TEXT ↗</a>" in e["html"] and "(AD 2.1–AD 2.25)" in e["html"]
+    assert 'href="https://x.test/ifr/eAIP/AD%202%20EPWA%201-en-GB.html"' in e["html"]
+
+
+def test_chart_cache_per_package(tabs):
+    # ten sam kod lotniska w AD MIL i AD VFR: dwie listy; drugie otwarcie w AD MIL z pamięci
+    assert tabs["cache"] == {"api": ["/api/docs/charts/mil/EPZZ", "/api/docs/charts/vfr/EPZZ"],
+                             "viewers": ["https://x.test/mil/AD_4_EPZZ_2-1.pdf", "https://x.test/vfr/AD_4_EPZZ_3-1.pdf",
+                                         "https://x.test/mil/AD_4_EPZZ_2-1.pdf"]}
