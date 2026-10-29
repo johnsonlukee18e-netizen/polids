@@ -193,11 +193,17 @@ async def resolved_url(link: str, today: date | None = None) -> str:
 # i ikona z odnośnikiem do PDF-u .../documents/Root_WePub/AIP IFR/AD/EPZG/02/AD_2_EPZG_2-1.pdf. Serwer pobiera tę stronę
 # (kilka MB przy EPWA), wyciąga wiersze z PDF-ami map lotniska i trzyma wynik w pamięci (strona zmienia się z AIRAC).
 # 0.12.6 (issue #21): tabela map stoi w komórce tabeli układu całej strony; jeden wpis na mapę z krótką nazwą.
+# 0.13.1 (issue #25): tak samo AD MIL i AD VFR. Lotniska wojskowe i VFR są w części AD 4 swojego pakietu (eaipmil,
+# eaipvfr): strona eAIP/AD 4 EPKS 1-en-GB.html tej samej poprawki co index-v2.html pakietu, mapy w tabeli AD 4.24 (MIL,
+# układ jak AD 2 w IFR) albo AD 4.13 (VFR, "CHARTS RELATED TO THE AERODROME"), PDF-y AD_4_EPKS_2-1.pdf w
+# .../AIP MIL/AD/EPKS/02/ albo .../AIP VFR/AD/EPBC/ (bez podkatalogu) i .../AIP VFR/AD/EPML/2/. Ten sam generator stron,
+# więc ten sam parser: inna jest tylko część AIP (AD 2 / AD 4) i numeracja serii map w VFR.
 CHARTS_TTL = 6 * 3600        # s: lista map z poprawki (adres strony zawiera katalog poprawki)
 CHARTS_FAIL_TTL = 120        # s: po błędzie pobrania ponowna próba najwcześniej po 2 min (bez zapytań co kliknięcie)
 CHARTS_MAX_BYTES = 25 * 1024 * 1024
-CHART_FILE = re.compile(r"AD_2_([A-Z]{4})_(\d+)-(\d+)\.pdf$", re.I)
-PAGE_LABEL = re.compile(r"(?:AD\s*2\s+[A-Z]{4}\s+)?\d+\s*-\s*\d+", re.I)   # kolumna "Pages": "AD 2 EPZG 2-1" albo "2-1"
+# PDF mapy: część AIP (2 albo 4), lotnisko, seria i strona ("AD_4_EPKS_12-5.pdf")
+CHART_FILE = re.compile(r"AD_([24])_([A-Z]{4})_(\d+)-(\d+)\.pdf$", re.I)
+PAGE_LABEL = re.compile(r"(?:AD\s*[24]\s+[A-Z]{4}\s+)?\d+\s*-\s*\d+", re.I)   # kolumna "Pages": "AD 2 EPZG 2-1" albo "2-1"
 # rodzaj mapy z pełnego tytułu (kolejność ma znaczenie: "PRECISION APPROACH TERRAIN CHART" to mapa terenu, nie podejścia,
 # "VISUAL APPROACH CHART" i "VFR ARRIVAL AND DEPARTURE ROUTES" to mapy VFR, nie procedury według przyrządów).
 # 0.12.6 (issue #21): mapa lotniska (ADC) i mapy postojowe (APDC) osobno: EPWA ma sześć map postojowych.
@@ -211,26 +217,43 @@ CHART_KINDS = (("OBST", ("OBSTACLE", "TERRAIN")),
 # tytuł bez słów z CHART_KINDS (albo numer strony zamiast tytułu): rodzaj z numeru serii w nazwie PDF-u (AD_2_EPWA_8-1:
 # seria 8), numeracja jednakowa na wszystkich lotniskach eAIP IFR; serie 9 (mapa obszaru), 11 i 14 (ptaki) zostają OTHER
 SERIES_KINDS = {2: "ADC", 3: "ADC", 4: "APDC", 5: "ADC", 6: "OBST", 7: "OBST", 8: "SID", 10: "STAR", 12: "IAC", 13: "VFR"}
+# eAIP MIL numeruje serie jak IFR (2 mapa lotniska, 6 przeszkody, 8 odloty, 10 dolotowe, 12 podejścia, 13 VOC);
+# eAIP VFR inaczej: 2 mapa lotniska, 3 mapa operacji VFR 1:50 000, 4 mapa operacji VFR 1:250 000
+VFR_SERIES_KINDS = {2: "ADC", 3: "VFR", 4: "VFR"}
+# link w /api/config -> (część AIP ze stroną lotniska i mapami: AD 2 / AD 4, numeracja serii map)
+AIP_PARTS = {"aip_ifr": (2, SERIES_KINDS), "aip_mil": (4, SERIES_KINDS), "aip_vfr": (4, VFR_SERIES_KINDS)}
 # odnośnik do PDF-u mapy dowolnego lotniska (tabela z takim odnośnikiem nie jest częścią komórki, w której stoi)
-CHART_PDF = re.compile(r"AD_2_[A-Z]{4}_\d+-\d+\.pdf", re.I)
+CHART_PDF = re.compile(r"AD_[24]_[A-Z]{4}_\d+-\d+\.pdf", re.I)
 
 # lotniska z częścią AD 2 eAIP IFR (AD 1.3, AIRAC AMDT 10-26); ta sama lista co AD2 w frontend/js/tabs/aip.js.
 # Inny kod EPxx nie trafia do PAŻP (każdy dawałby pobranie strony, której nie ma).
 AD2_AERODROMES = ("EPBY", "EPGD", "EPKK", "EPKT", "EPLB", "EPLL", "EPMO", "EPPO", "EPRA", "EPRZ", "EPSC", "EPSY", "EPWA",
                   "EPWR", "EPZG")
-_charts: dict[str, tuple[float, dict]] = {}          # adres strony AD 2 -> (ważny do, wynik)
+# 0.13.1: lotniska wojskowe (AD 1.3 eAIP MIL, część MIL AD 4) i lotniska VFR (AD 1 eAIP VFR, część AD 4), AIRAC AMDT
+# 11-26; te same listy co AD_MIL i AD_VFR w frontend/js/tabs/aip.js. Trzy listy są rozłączne (AD 1.3 eAIP IFR: 99 =
+# 15 AD 2 + 15 MIL AD 4 + 69 VFR AD 4).
+MIL_AERODROMES = ("EPCE", "EPDA", "EPDE", "EPIR", "EPKS", "EPLK", "EPLY", "EPMB", "EPMI", "EPMM", "EPOK", "EPPR", "EPPW",
+                  "EPSN", "EPTM")
+VFR_AERODROMES = ("EPBA", "EPBC", "EPBH", "EPBK", "EPBO", "EPCD", "EPEL", "EPGE", "EPGI", "EPGL", "EPGY", "EPIN", "EPJG",
+                  "EPJS", "EPKA", "EPKC", "EPKE", "EPKG", "EPKH", "EPKI", "EPKM", "EPKO", "EPKP", "EPKR", "EPKW", "EPKX",
+                  "EPLI", "EPLR", "EPLS", "EPLU", "EPML", "EPMR", "EPMX", "EPMY", "EPNC", "EPNL", "EPNT", "EPOD", "EPOM",
+                  "EPOP", "EPPB", "EPPG", "EPPI", "EPPK", "EPPL", "EPPT", "EPPZ", "EPRD", "EPRG", "EPRJ", "EPRP", "EPRU",
+                  "EPSA", "EPSD", "EPSK", "EPSL", "EPSS", "EPST", "EPSU", "EPSW", "EPTO", "EPWK", "EPWS", "EPWT", "EPZA",
+                  "EPZE", "EPZP", "EPZR", "EPZW")
+AERODROMES = {"aip_ifr": AD2_AERODROMES, "aip_mil": MIL_AERODROMES, "aip_vfr": VFR_AERODROMES}
+_charts: dict[str, tuple[float, dict]] = {}          # adres strony AD 2 / AD 4 -> (ważny do, wynik)
 _charts_inflight: dict[str, asyncio.Task] = {}
 
 
-def aerodrome_page_url(base: str, icao: str) -> str:
-    """Strona AD 2 lotniska z tej samej poprawki co index-v2.html (jak aeroPageUrl w tabs/aip.js); adres katalogu
-    bez "/" na końcu traktujemy jak katalog; ?query i #fragment odpadają."""
+def aerodrome_page_url(base: str, icao: str, part: int = 2) -> str:
+    """Strona AD 2 (part 4: AD 4) lotniska z tej samej poprawki co index-v2.html (jak aeroPageUrl w tabs/aip.js); adres
+    katalogu bez "/" na końcu traktujemy jak katalog; ?query i #fragment odpadają."""
     parts = urlsplit(base)
     path = parts.path
     if not path.endswith("/") and not re.search(r"\.[a-z0-9]+$", path, re.I):
         path += "/"
     root = urlunsplit((parts.scheme, parts.netloc, path, "", ""))
-    return urljoin(root, quote(f"eAIP/AD 2 {icao} 1-en-GB.html"))
+    return urljoin(root, quote(f"eAIP/AD {part} {icao} 1-en-GB.html"))
 
 
 def chart_kind(title: str) -> str:
@@ -489,9 +512,10 @@ def _glued(text: str, icao: str) -> bool:
     return len(re.findall(rf"\b{icao}\s*[-–]\s", text, flags=re.I)) > 1
 
 
-def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
+def parse_charts(html: str, page_url: str, icao: str, part: int = 2, series: dict | None = None) -> list[dict]:
     """Mapy lotniska ze strony AD 2: odnośniki do PDF-ów AD_2_<ICAO>_<n>-<m>.pdf (tabela AD 2.24), jeden wpis na mapę,
-    najpierw z tabel (w kolejności strony), potem spoza tabel, bez powtórzeń adresu.
+    najpierw z tabel (w kolejności strony), potem spoza tabel, bez powtórzeń adresu. part 4: strona AD 4 eAIP MIL / VFR
+    (tabela AD 4.24 / AD 4.13, PDF-y AD_4_<ICAO>_...), series: numeracja serii map pakietu (domyślnie SERIES_KINDS).
 
     Tytuł: komórka tytułu wiersza z odnośnikiem (bez przedrostka "<ICAO> - "). Wiersz bez tytułu (odnośnik w tabeli
     zagnieżdżonej w komórce) bierze tytuł wiersza nadrzędnego tylko wtedy, gdy ten nie zawiera innych wierszy z tytułem
@@ -499,9 +523,9 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
     tytułu po przedrostku lotniska albo liniach (_split_titles), inaczej wspólny tytuł (rowspan: kilka PDF-ów jednej
     mapy). Bez tytułu: title odnośnika, alt obrazka, tekst odnośnika spoza tabeli, numer strony "AD 2 EPWA 2-1".
 
-    Wpis: id "2-1" (numer z nazwy pliku, bez zer z przodu, 08-1 → 8-1), page "AD 2 EPWA 2-1", full (pełny tytuł),
-    title (krótka nazwa, short_names), kind (ADC, APDC, SID, STAR, IAC, VFR, OBST, OTHER: z tytułu, a gdy tytuł nic
-    nie mówi, z numeru serii, SERIES_KINDS), url."""
+    Wpis: id "2-1" (numer z nazwy pliku, bez zer z przodu, 08-1 → 8-1), page "AD 2 EPWA 2-1" ("AD 4 EPKS 12-5"),
+    full (pełny tytuł), title (krótka nazwa, short_names), kind (ADC, APDC, SID, STAR, IAC, VFR, OBST, OTHER: z tytułu,
+    a gdy tytuł nic nie mówi, z numeru serii, series), url."""
     icao = icao.upper()
     p = _Rows()
     p.feed(html)
@@ -531,7 +555,7 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
         href = link["href"]
         try:
             m = CHART_FILE.search(urlsplit(href.strip()).path)
-            url = _chart_url(page_url, href) if m and m.group(1).upper() == icao else None
+            url = _chart_url(page_url, href) if m and m.group(1) == str(part) and m.group(2).upper() == icao else None
         except ValueError:   # adres, którego urllib nie rozbierze ("http://[x/..."): ten jeden odnośnik pomijamy
             continue
         if not url or url in seen:
@@ -553,16 +577,16 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
 
     out, named = [], []
     for i, (link, url, m, _) in enumerate(found):
-        cid = f"{int(m.group(2))}-{int(m.group(3))}"
+        cid = f"{int(m.group(3))}-{int(m.group(4))}"
         alt = "" if _junk(link["alt"]) else link["alt"]
         loose = " ".join("".join(link["text"]).split()) if link["row"] is None else ""
         text = next((t for t in (texts[i], link["title"], alt, loose) if t and not _glued(t, icao)), "")
-        full = _clean_title(text, icao) or f"AD 2 {icao} {cid}"
+        full = _clean_title(text, icao) or f"AD {part} {icao} {cid}"
         kind = chart_kind(full)
         named.append((full, kind))               # krótka nazwa z rodzaju według tytułu ("AD 2 EPWA 8-1" bez "SID")
         if kind == "OTHER":
-            kind = SERIES_KINDS.get(int(m.group(2)), "OTHER")
-        out.append({"id": cid, "page": f"AD 2 {icao} {cid}", "title": full, "full": full, "kind": kind, "url": url})
+            kind = (SERIES_KINDS if series is None else series).get(int(m.group(3)), "OTHER")
+        out.append({"id": cid, "page": f"AD {part} {icao} {cid}", "title": full, "full": full, "kind": kind, "url": url})
     try:
         for c, name in zip(out, short_names(named)):
             c["title"] = name
@@ -578,8 +602,12 @@ def parse_charts(html: str, page_url: str, icao: str) -> list[dict]:
 # konwencjonalna dla RWY 08/26 i RNP dla RWY 08 i RWY 26); kategorie statków powietrznych (CAT A,B,C,D) przy
 # podejściach tylko do rozróżnienia map o tej samej nazwie; mapy o tym samym tytule (EPLL: dwa SID RNP RWY 25)
 # dostają "(1/2)", "(2/2)".
+# 0.13.1: mapy MIL dla statków wysokomanewrowych (HIGHLY MANOEUVRABLE MILITARY AIRCRAFT DEPARTURE / ARRIVAL CHART) to
+# "RWY 11 SID HMA" / "RWY 29 STAR HMA"; skala map VFR "(1: 50 000)" bez nawiasu i spacji po dwukropku ("1:50 000").
 SHORT_PHRASES = tuple((re.compile(p, re.I), r) for p, r in (
     (r"\bAERODROME OBSTACLE CHART\b", "OBSTACLE"),
+    (r"\bHIGHLY\s+MANOEUVRABLE\s+MILITARY\s+AIRCRAFT\b", "HMA"),
+    (r"\(\s*1\s*:\s*(\d[\d ]*\d)\s*\)", r"1:\1"),
     (r"\bPRECISION APPROACH TERRAIN CHART\b", "PATC"),
     (r"\b(?:STANDARD\s+)?(?:INSTRUMENT\s+)?DEPARTURE\s+CHART\b(?:\s*-?\s*INSTRUMENT\b)?(?:\s*\(SID\))?|\(SID\)", " "),
     (r"\b(?:STANDARD\s+)?(?:INSTRUMENT\s+)?ARRIVAL\s+CHART\b(?:\s*-?\s*INSTRUMENT\b)?(?:\s*\(STAR\))?|\(STAR\)", " "),
@@ -736,7 +764,8 @@ def _fetch_error(exc: BaseException) -> str:
     return f"page could not be read ({type(exc).__name__})"
 
 
-async def _load_charts(page_url: str, icao: str) -> dict:
+async def _load_charts(page_url: str, icao: str, link: str = "aip_ifr") -> dict:
+    part, series = AIP_PARTS[link]
     out = {"icao": icao, "page": page_url, "charts": [], "error": None}
     try:
         async with _page_client() as client:
@@ -750,7 +779,8 @@ async def _load_charts(page_url: str, icao: str) -> dict:
                     chunks.append(chunk)
                 raw, enc = b"".join(chunks), resp.encoding or "utf-8"
         # strona AD 2 ma kilka MB: dekodowanie i parsowanie poza pętlą zdarzeń (inaczej serwer stoi 1-3 s)
-        out["charts"] = await asyncio.to_thread(lambda: parse_charts(raw.decode(enc, errors="replace"), page_url, icao))
+        out["charts"] = await asyncio.to_thread(
+            lambda: parse_charts(raw.decode(enc, errors="replace"), page_url, icao, part, series))
         if not out["charts"]:
             out["error"] = "no charts found"
     except (httpx.HTTPError, ValueError) as exc:
@@ -768,18 +798,20 @@ def reset_charts() -> None:
     _charts_inflight.clear()
 
 
-async def aerodrome_charts(icao: str, today: date | None = None) -> dict:
+async def aerodrome_charts(icao: str, today: date | None = None, link: str = "aip_ifr") -> dict:
     """AD CIV: lista map lotniska z AD 2.24 eAIP IFR bieżącej poprawki (resolved_url, adres z .env wygrywa):
-    {icao, page (strona AD 2), charts: [{id, page, title, full, kind, url}], error}. Jedno pobranie strony naraz
-    (single-flight), wynik w pamięci CHARTS_TTL, po błędzie CHARTS_FAIL_TTL."""
+    {icao, page (strona AD 2), charts: [{id, page, title, full, kind, url}], error}. link "aip_mil" / "aip_vfr" (AD MIL /
+    AD VFR, 0.13.1): strona AD 4 lotniska z bieżącej poprawki eAIP MIL / VFR, mapy z AD 4.24 / AD 4.13. Jedno pobranie
+    strony naraz (single-flight), wynik w pamięci CHARTS_TTL, po błędzie CHARTS_FAIL_TTL (klucz: adres strony, osobny
+    dla każdego pakietu i poprawki)."""
     icao = icao.upper()
-    page_url = aerodrome_page_url(await resolved_url("aip_ifr", today), icao)
+    page_url = aerodrome_page_url(await resolved_url(link, today), icao, AIP_PARTS[link][0])
     hit = _charts.get(page_url)
     if hit and hit[0] > time.monotonic():
         return hit[1]
     task = _charts_inflight.get(page_url)
     if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
-        task = asyncio.get_running_loop().create_task(_load_charts(page_url, icao))
+        task = asyncio.get_running_loop().create_task(_load_charts(page_url, icao, link))
         _charts_inflight[page_url] = task
         task.add_done_callback(lambda t: _charts_inflight.pop(page_url) if _charts_inflight.get(page_url) is t else None)
     return await asyncio.shield(task)

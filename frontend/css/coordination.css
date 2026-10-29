@@ -3,7 +3,8 @@
 .view[data-tab="coordination"] > .submenu button { letter-spacing: 0; }
 /* 0.12.5: ostre krawędzie jak w PANDORZE (przyciski, pola, panele i karty bez zaokrągleń) */
 .view[data-tab="coordination"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .cd-card, .cd-tag),
-.view[data-tab="adciv"] :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .chl-row, .chl-kd) { border-radius: 0; }
+.view:is([data-tab="adciv"], [data-tab="admil"], [data-tab="advfr"]) :is(.btn, .gbtn, .field, .ms-card, .ms-card h4, .chl-row,
+  .chl-kd) { border-radius: 0; }
 .cr-wrap { flex: 1; display: flex; min-height: 0; }
 .cr-main { flex: 1; min-width: 0; overflow: auto; padding: 10px 14px; }
 .cr-side { width: 280px; flex: none; background: #050705; border-left: 1px solid var(--line); padding: 8px; overflow: auto;
@@ -78,7 +79,8 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .cd-act .btn { padding: 1px 8px; font-size: 11px; }
 
 /* AD CIV (0.12.5, issue #18): przycisk lotniska otwiera listę map z AD 2.24 eAIP (jak „Charts” w PANDORZE), PDF obok;
-   lista przewijana w karcie, przyciski PDF / AD 2 TEXT zawsze widoczne pod nią */
+   lista przewijana w karcie, przyciski PDF / AD 2 TEXT zawsze widoczne pod nią. 0.13.1 (issue #25): ta sama lista
+   w AD MIL (AD 4.24 eAIP MIL) i AD VFR (AD 4.13 eAIP VFR), przycisk AD 4 TEXT */
 .chl-wrap .mapside { width: 390px; overflow: hidden; }
 .chl-wrap .mapside > .ms-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .chl-name { margin-bottom: 6px; font: 13px/1.3 var(--sans); color: #fff; }
