@@ -470,7 +470,7 @@ console.log(JSON.stringify({ plain: bar("https://example.test/a?b=1&c=2", "Note"
 
 
 def test_frame_bar_without_url(tmp_path):
-    """Pasek nad ramką (INOP, AD CIV/MIL/VFR, PHRASEOLOGY) bez adresu strony (adres mówi tylko, skąd jest strona),
+    """Pasek nad ramką (INOP, AD CIV/MIL/VFR) bez adresu strony (adres mówi tylko, skąd jest strona),
     przycisk ↗ i uwaga zostają."""
     node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
     if not node:
