@@ -1,0 +1,25 @@
+/* METEO › METAR PL / MIL / INTL i TAF PL / INTL jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): tabela stacja |
+   treść, wiersze na przemian czarne i ciemnoszare, treść zawija się pod początkiem komunikatu (nie pod stacją).
+   Kolory grup (metarfmt.js): zielony = dzień, kierunek wiatru, zjawisko, RMK; jasnozielony = wartości; ciemnozielony =
+   ilość chmur; niebieski = trend; biały = stacja, jednostki, temperatura, Q, reszta po RMK, opis zjawiska [EN / PL]
+   kapitalikami. MONO: wszystko jednym kolorem. Bez pogrubień, bez poświaty, ostre krawędzie. */
+.mtr { --mt-key: #35ad35; --mt-val: #a3e4ad; --mt-cov: #24802a; --mt-trend: #7f9df2; --mt-alt: #2b2b2b; }
+.mtr-bar .ids { flex: 1 1 420px; min-width: 220px; max-width: 760px; }
+.mt-mode { display: inline-flex; gap: 10px; flex: none; }
+.mt-mode button { background: none; border: 0; border-radius: 0; padding: 2px; font: 12px var(--ui); letter-spacing: .3px;
+  color: var(--bad); cursor: pointer; }
+.mt-mode button.on { color: var(--green-hi); cursor: default; }
+.mt-mode button:not(.on):hover { color: #ff6a5a; }
+table.mt-tab { border-collapse: collapse; width: 100%; font: 18px/1.45 var(--mono); color: #fff; }
+table.mt-tab td { padding: 1px 8px; vertical-align: top; background: #000; }
+table.mt-tab tr:nth-child(even) td { background: var(--mt-alt); }
+table.mt-tab td.mt-st { width: 1%; white-space: nowrap; padding-right: 4px; }
+.mt-tab .mt-g { white-space: nowrap; }
+.mt-tab .mt-cont { padding-left: 1.5em; }
+.mt-tab .mt-key { color: var(--mt-key); }
+.mt-tab .mt-val { color: var(--mt-val); }
+.mt-tab .mt-cov { color: var(--mt-cov); }
+.mt-tab .mt-trend { color: var(--mt-trend); }
+.mt-tab .mt-nil { color: var(--bad); }
+.mt-tab .mt-dec { font-size: .8em; font-variant: small-caps; text-transform: capitalize; }
+.mtr.mono .mt-tab span { color: inherit; }
