@@ -235,8 +235,10 @@ def test_pick_alias_number_after_type_article():
     """E145 ("ERJ-145, C-99"): Embraer R-99 (radarowy, numer z nazwy wojskowej) nie wyprzedza artykułu o ERJ."""
     results = [{"title": "Embraer ERJ family"}, {"title": "Embraer Legacy 600"}, {"title": "Embraer R-99"}]
     assert pick(results, *args("E145")) == ["Embraer ERJ family", "Embraer R-99"]
+    # przekierowania na R-99 z numerem cywilnego płatowca nie robią z niego artykułu o ERJ
     assert pick(list(reversed(results)), *args("E145"),
-                redirects={"Embraer ERJ family": ["Embraer ERJ 145"]}) == ["Embraer ERJ family", "Embraer R-99"]
+                redirects={"Embraer ERJ family": ["Embraer ERJ 145"], "Embraer R-99": ["EMB 145 AEW&C"]}) == \
+        ["Embraer ERJ family", "Embraer R-99"]
 
 
 def test_pick_named_variants_over_base_model():

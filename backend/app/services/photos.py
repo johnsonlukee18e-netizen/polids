@@ -166,8 +166,9 @@ def pick(results: list[dict], nums: set[str], primary: set[str] | None = None, w
     """Tytuły wyników wyszukiwania w kolejności wyboru. Najpierw, w kolejności wyszukiwarki, artykuły o tym modelu:
     numer z pierwszej nazwy w tytule, w przekierowaniu, przez które wyszukiwarka je znalazła ("redirecttitle"),
     albo w jednym z przekierowań na artykuł (redirects: tytuł -> tytuły przekierowań, np. "Antonov An-148" ->
-    ["Antonov An-158"]), albo tytuł bez innego numeru z nazwą typu i producenta ("Airbus Beluga"). Potem, gdy nie
-    strict, tytuły bez liczb i z numerem tylko z dalszych nazw; tytuły z innym numerem odpadają.
+    ["Antonov An-158"]; nie dla tytułu z numerem z dalszej nazwy: "Embraer R-99" ma przekierowania "EMB 145 …"),
+    albo tytuł bez innego numeru z nazwą typu i producenta ("Airbus Beluga"). Potem, gdy nie strict, tytuły bez liczb
+    i z numerem tylko z dalszych nazw; tytuły z innym numerem odpadają.
     words, maker: type_words(manufacturer, model)."""
     primary = nums if primary is None else primary
     good, rest = [], []
@@ -175,7 +176,7 @@ def pick(results: list[dict], nums: set[str], primary: set[str] | None = None, w
         title = r.get("title") or ""
         fit = title_fit(title, nums, primary)
         via = [r.get("redirecttitle") or "", *((redirects or {}).get(title) or [])]
-        if fit == "exact" or any(title_fit(t, nums, primary) == "exact" for t in via) \
+        if fit == "exact" or (fit != "alias" and any(title_fit(t, nums, primary) == "exact" for t in via)) \
                 or (fit == "neutral" and _named(title, words, maker)):
             good.append(title)
         elif fit in ("neutral", "alias"):
@@ -300,7 +301,8 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
             words, maker = type_words(manufacturer, model)
             args = (model_numbers(model), model_numbers(model, primary=True), words, maker)
             sure = pick(results, *args, strict=True)
-            unsure = [r["title"] for r in results if r.get("title") and r["title"] not in sure]
+            unsure = [r["title"] for r in results if r.get("title") and r["title"] not in sure
+                      and title_fit(r["title"], args[0], args[1]) != "alias"]
             redirects = await _redirects_of(client, unsure) if unsure and args[0] else {}
             titles = pick(results, *args, redirects=redirects, strict=strict)
             page = await _first_with_image(client, titles) if titles else None
