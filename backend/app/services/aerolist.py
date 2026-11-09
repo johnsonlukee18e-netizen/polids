@@ -25,7 +25,7 @@ from .positions import all_positions
 from .radio import INFO_MID
 from .vatsim import FACILITY_TYPES, controller_info, fir_boundaries, match_positions
 
-# kolejność podzakładek AERODROME (po "0" = OVERVIEW)
+# kolejność podzakładek AERODROME (po "()" = OVERVIEW, w adresie "0")
 FIR_KEYS = ("EPWW", "ESAA", "ED", "ET", "LKAA", "LZBB", "UMKK", "EYVL", "UMMV", "UKLV")
 FIR_LABELS = {
     "EPWW": "Poland", "ESAA": "Sweden", "ED": "Germany, civil aerodromes", "ET": "Germany, military aerodromes",
