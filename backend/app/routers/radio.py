@@ -197,7 +197,7 @@ def _board_stamp(db: Session, positions: dict) -> tuple:
     """Stan danych tablicy (ok. 2 ms): import plików (ImportLog), zawartość tabel sektorów (liczba, granice pionowe,
     długość list OWNER i geometrii – import kasuje tabelę i wstawia ją od nowa z tymi samymi id; sektory sąsiadów
     tylko z listami OWNER, do kolejności kafelków), stanowiska, ownership.json, kafelki sąsiadów z VACS
-    (vacs_epww.json), granice VATSpy i podział okienek sąsiadów (radio_layout.json). Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
+    (vacs_epww.json), granice VATSpy i siatka strony z okienkami sąsiadów (radio_layout.json). Zmiana czegokolwiek = część stała liczona od nowa i nowa wersja `ver` (strona
     pobiera wtedy geometrię jeszcze raz)."""
     def tbl(*cols):  # liczba wierszy i sumy kolumn jednej tabeli
         return tuple(db.execute(select(func.count(), *[func.total(c) for c in cols])).one())
@@ -240,32 +240,28 @@ def _build_static(db: Session, positions: dict) -> dict:
     vacs = _seed_or_empty("vacs_epww.json").get("neighbours")
     by_id = {p.position_id: p.callsign for p in db.scalars(select(AtcPosition))}
     covered = covered_firs(db)
-    # wycinki sąsiadów z ich plików .ese: listy OWNER (kolejność kafelków) i geometria (podglądy: nb_areas)
-    epww, nb_chains, nb_slices = [], [], []
-    for s in nb_sectors(db):
-        nb_chains.append(owners_of(s))
-        nb_slices.append(radioboard.make_slice(s.fir.upper(), s.name, s.lower_ft, s.upper_ft, owners_of(s),
-                                               json.loads(s.geometry)))
+    # wycinki sąsiadów z ich plików .ese: tylko listy OWNER (kolejność kafelków; 0.13.2: bez geometrii sąsiadów
+    # na podglądach)
+    epww, nb_chains = [], [owners_of(s) for s in nb_sectors(db)]
     for s in db.scalars(select(Sector).order_by(Sector.id)):
         owners = [by_id[o] for o in s.owners.split(":") if o in by_id]
         if s.fir.upper() == "EPWW":
             epww.append(radioboard.make_slice(s.fir, s.name, s.lower_ft, s.upper_ft, owners, json.loads(s.geometry)))
         elif s.fir.upper() not in covered and sector_kind(s.fir, s.name):
-            # FIR bez własnego pliku .ese (Białoruś): listy OWNER i geometria z pliku EPWW
+            # FIR bez własnego pliku .ese (Białoruś): listy OWNER z pliku EPWW
             nb_chains.append(owners)
-            nb_slices.append(radioboard.make_slice(s.fir.upper(), s.name, s.lower_ft, s.upper_ft, owners,
-                                                   json.loads(s.geometry)))
     coords = {a.icao: (a.lat, a.lon) for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.like("EP%")))}
     firs = fir_boundaries()
     border = next((f["geometry"] for f in firs.get("features", []) if f["properties"]["id"] == "EPWW"), None) or {}
-    # same FIR-y (bez sektorów VATSpy typu ESMM-7), żeby tło było lekkie
+    # granice FIR-ów sąsiednich (same linie na podglądach; bez sektorów VATSpy typu ESMM-7)
     frame = [{"id": f["properties"]["id"], "geometry": f["geometry"]} for f in firs.get("features", [])
              if "-" not in f["properties"]["id"] and f["properties"]["id"] != "EPWW" and _in_frame(f["geometry"])]
-    # podział okienek FIR-ów sąsiednich wg szkicu i wskaźniki u góry; brak pliku = strona bez okienek
+    # siatka strony wg szkicu (okienka FIR-ów sąsiednich, kody FIR-ów, przyciski, podglądy) i wskaźniki u góry; brak
+    # pliku = strona bez okienek
     layout = _seed_or_empty("radio_layout.json")
     return radioboard.build_static(own=own, epww_slices=epww, vacs_tiles=vacs if isinstance(vacs, list) else [],
                                    positions=positions, coords=coords, border_geom=border, firs_geo=frame,
-                                   nb_chains=nb_chains, nb_slices=nb_slices, layout=layout)
+                                   nb_chains=nb_chains, layout=layout)
 
 
 def _board_data(db: Session) -> tuple[list[dict], dict, dict, set]:
@@ -326,18 +322,21 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     """Wszystko dla strony RADIO w jednym zapytaniu: sektory ACC EPWW (LOW/MID/HIGH) z właścicielem wg kolejności
     przejmowania (ownership.json), TMA/APP, CTR/TWR, FIS i ATIS polskich lotnisk; TMA w częściach wg stanowiska APP
     (WA APP, WA N APP, WA S APP), TMA proceduralne z wieżą lotniska.
-    owner/owners = pierwsze stanowisko online z kolejności (null/[] = nikt: na stronie sektora ACC nie ma, sektory
-    jednego stanowiska to jeden obszar; TMA, CTR i FIS EPWW samo ID, okienko sąsiada bez częstotliwości).
+    owner/owners = pierwsze stanowisko online z kolejności (null/[] = nikt: na stronie sektor ACC szary bez granicy
+    i bez plakietki, TMA, CTR i FIS bez niczego, okienko sąsiada bez częstotliwości).
     `ver`: wersja danych z importu. `geo=1` albo `have=<ver>` inne niż bieżąca: także geometria podglądów (granica
-    EPWW, FIR-y w tle, wycinki ACC, TMA, CTR, FIS) – strona trzyma ją, dopóki `ver` się nie zmieni (np. po imporcie).
-    Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (EPWW: same ID; okienka sąsiadów bez
-    częstotliwości i bez ADVISORY, bo nie wiadomo, czy ktoś tam jest).
-    Podział okienek sąsiadów wg szkicu Marka (data/seed/radio_layout.json): `firs` (stosy okienek FIR-ów sąsiednich
-    po łączeniu okienek jednego stanowiska; `map`/`at` = przy którym podglądzie i z której strony stoi stos, `cols`/
-    `rows` = stały podział stosu), `indicators` (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST z ATIS
-    EDDB, bez ATIS wg wiatru z METAR), `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %; `ok=false` =
-    brak danych vIFF) i `plates` (plakietki APP i TWR tylko dla zalogowanych). Od 0.13.1 (stary styl strony) bez siatki
-    strony `grid`; na podglądach z sąsiadów tylko sektory ACC i TMA Ostrawy i Berlina (`geo.nb`)."""
+    EPWW, granice FIR-ów sąsiednich, wycinki ACC, kształty TMA/CTA, CTR i FIS) – strona trzyma ją, dopóki `ver` się
+    nie zmieni (np. po imporcie).
+    Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (okienka sąsiadów bez częstotliwości i bez
+    ADVISORY, bo nie wiadomo, czy ktoś tam jest).
+    Siatka strony wg szkicu Marka (data/seed/radio_layout.json; 0.13.2, issue #27: miejsca jak na szkicu, kafelki jak
+    w 0.13.1): `grid` (kolumny, rodzaje kolumn, BERLIN, przyciski warstw, podglądy, stan danych i legenda), `firs`
+    (okienka FIR-ów sąsiednich w komórkach siatki po łączeniu okienek jednego stanowiska; `name`/`room` = kod FIR-u
+    i miejsce na nazwę i ADVISORY), `indicators` (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST
+    z ATIS EDDB, bez ATIS wg wiatru z METAR), `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %;
+    `ok=false` = brak danych vIFF), `plates` (plakietki APP i TWR tylko dla zalogowanych), `areas` (stanowisko APP
+    i FIS online → id kształtów TMA/CTA i FIS, które teraz obsługuje: granica sumy na LOW) i `acc_short` (skróty
+    stanowisk ACC na plakietkach). Od 0.13.2 bez geometrii sąsiadów (`nb`): jedyne zagraniczne granice to FIR-y."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
     merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}

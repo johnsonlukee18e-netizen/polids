@@ -1,31 +1,30 @@
-/* RADIO (runda 10): jedna strona jak w PANDORZE. 0.13.1 (issue #25, Marek: „Przywróć stary styl strony RADIO”) znów
-   układ z 0.12.6: u góry jeden rząd – małe wskaźniki konfiguracji, na prawo od nich ATIS-y; pod nim podgląd LOW ze
-   stosami sąsiadów z zachodu, północy i południa, w środku przyciski warstw, stan danych, legenda i mały podgląd MID,
-   po prawej podgląd HIGH ze stosami ze wschodu. Podział okienek w stosach wg szkicu Marka (0.13.0), wysokości między
-   kafelkami jak na zdjęciu PANDORY (stos LKAA).
+/* RADIO (runda 10): jedna strona jak w PANDORZE. 0.13.2 (issue #27, Marek: szkic strony): u góry jeden rząd – małe
+   wskaźniki konfiguracji, na prawo od nich ATIS-y; pod nim siatka szkicu (13 kolumn, wiersze szkicu po dwa tory: rząd
+   liczb i kafelek – radioboard.js pageGrid): kody i kafelki FIR-ów sąsiadów, BERLIN, przyciski warstw w kolumnie H,
+   podglądy LOW, HIGH i mały MID, stan danych, legenda. Kafelki stałego rozmiaru, wysokości między kafelkami jak na
+   zdjęciu PANDORY; rzędy liczb rozciągają się, gdy okno jest wyższe niż strona.
    Czarne tło, czcionka bezszeryfowa zwykłej grubości (bez pogrubień: znaczenie niesie kolor); bez poświaty i cieni pod
    tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP). Układ nie zależy od czcionki o stałej szerokości.
-   0.12.5 (Marek): kolory podglądów jak na zrzucie od Marka:
-   jasnoszare = nieobsadzone, ciemne = obsadzone – na LOW, MID, HIGH i u sąsiadów tak samo; granice sektorów, FIR i TMA
-   szare (70,70,70), CTR czerwone (97,46,54), granica obsadzonego obszaru oliwkowa (120,123,9).
+   Podglądy (0.13.2, Marek: "mapy całe czarne"): czarne, cienkie jasne granice FIR-ów i granica FIR EPWW; sektor ACC
+   EPWW bez nikogo szary (bez granic), obszar stanowiska online z granatową granicą (--rb-navy) i plakietką jak kafelek.
    Przyciski i kafelki jak na zdjęciach PANDORY: jasne prostokąty, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
-   --rb-f: rozmiar częstotliwości (0.12.6: mniejszy na 1366×768, większy na 1920×1080); od niego kafelki stosów
-   (--rb-tw × --rb-th: ok. 70 × 29 px na 1600×900, ten sam obsadzony i nie) i rzędy liczb między nimi (--rb-lv0..2). */
+   --rb-f: rozmiar częstotliwości (mniejszy na 1366×768, większy na 1920×1080); od niego kafelki (--rb-tw × --rb-th:
+   ok. 70 × 29 px na 1600×900, ten sam obsadzony i nie), rzędy liczb między nimi (--rb-lv0..2), kolumna przycisków
+   (--rb-hw) i kolumna samych kodów FIR-ów z prawej (--rb-nw). */
 .rb { --rb-f: clamp(11px, .8vw, 15px);
-  --rb-unst: #1e1e1e; --rb-st: #020202; --rb-line: #464646; --rb-ctr: #612e36; --rb-act: #787b09;
-  --rb-lbl: #c8d4ee; --rb-lbl2: #c8b686;
-  --rb-tile: #dcdace; --rb-tile-hi: #f4f2e6; --rb-tile-tx: #15191d; --rb-tile-id: #3d4247;
+  --rb-line: #6a6a6a; --rb-epww: #b4b4b4; --rb-free: #5a5a5a; --rb-navy: #2f45c8; --rb-navy-hi: #7d8cff;
+  --rb-flow: #7a1414; --rb-flow-line: #ff5245;
   --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
   --rb-box: #eeede6; --rb-box-tx: #55595d; --rb-box-id: #6c7075;
   --rb-grey: #595959; --rb-grey-line: #8a8a8a; --rb-name: var(--yellow); --rb-pref: #ff8a80;
-  --rb-flow: #7a1414; --rb-flow-line: #ff5245;
   --rb-btn-on: #ecebe2; --rb-btn-off: #7b7b74; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
   --rb-lf: max(9px, calc(var(--rb-f) - 3px));
   --rb-tw: calc(var(--rb-f) * 4.7 + 10px); --rb-th: calc(var(--rb-f) * 1.75 + 7px);
-  --rb-lv0: 2px; --rb-lv1: calc(var(--rb-lf) * 1.15 + 2px); --rb-lv2: calc(var(--rb-lf) * 2.3 + 8px);
+  --rb-lv0: 2px; --rb-lv1: calc(var(--rb-lf) * 1.1 + 2px); --rb-lv2: calc(var(--rb-lf) * 2.2 + 6px);
+  --rb-hw: clamp(200px, 15vw, 330px); --rb-nw: calc(var(--rb-f) * 4.6);
   flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px;
   padding: 3px 6px 6px; overflow: hidden; background: #000; font-family: var(--sans); font-weight: 400; }
-/* bez pogrubień w całej zakładce (Marek, 0.13.0): także w etykietach i panelu LOA */
+/* bez pogrubień w całej zakładce (Marek, 0.13.0): także w plakietkach i panelu LOA */
 .rb b, .rb strong, .rb h4, .rb th { font-weight: 400; }
 
 /* --- rząd u góry (0.13.1): wskaźniki konfiguracji (dużo mniejsze niż w 0.13.0: pole ok. 60 × 20 px z małą żółtą
@@ -34,17 +33,14 @@
 .rb-cfg { flex: none; display: flex; align-items: flex-end; gap: 10px; min-width: 0; padding: 0 2px 3px;
   border-bottom: 1px solid #1a1a1a; }
 .rb-inds { flex: none; display: flex; gap: 4px; }
-/* wskaźnik i BERLIN: żółta nazwa nad szarym polem z białą wartością */
+/* wskaźnik: żółta nazwa nad szarym polem z białą wartością */
 .rb-indc { flex: none; display: flex; flex-direction: column; gap: 1px; cursor: help; }
-.rb-ind, .rb-blbl { padding: 0 1px; font: 400 10px/12px var(--sans); color: var(--rb-name); white-space: nowrap; }
-.rb-indv, .rb-bln { box-sizing: border-box; width: 60px; height: 20px; display: flex; align-items: center; justify-content: center;
+.rb-ind { padding: 0 1px; font: 400 10px/12px var(--sans); color: var(--rb-name); white-space: nowrap; }
+.rb-indv { box-sizing: border-box; width: 60px; height: 20px; display: flex; align-items: center; justify-content: center;
   overflow: hidden; padding: 0 3px; background: var(--rb-grey); border: 1px solid var(--rb-grey-line); border-radius: 0; color: #f4f4f4;
   font: 400 12px/1 var(--sans); white-space: nowrap; }
 /* wartość dłuższa niż pole (ACC GAT: 4 i więcej stanowisk ACC): od początku, wielokropek na końcu, całość w dymku */
 .rb-indt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.rb-bln { letter-spacing: .5px; }
-/* BERLIN bez pasa z ATIS: konfiguracja preferowana czerwonym napisem (jasna czerwień: kontrast ok. 3:1 na szarym) */
-.rb-bln.pref { color: var(--rb-pref); }
 /* ATIS-y: ICAO i częstotliwość jasnofioletowe jak w PANDORZE (offline przygaszone), online z literą informacji; jedna
    linia na wysokości pól wskaźników, nadmiar ucięty (nie zawija się) */
 .rb-atis { flex: 1 1 auto; min-width: 0; height: 20px; overflow: hidden; }
@@ -66,182 +62,122 @@
   border-radius: 0; }
 
 
-/* --- siatka (0.12.6): [LOW + sąsiedzi] [przyciski + MID] [HIGH + sąsiedzi] */
-.rb-grid { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(200px, 16vw, 330px) minmax(0, 1fr); gap: 6px; }
-.rb-panel { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; border: 1px solid #1a1a1a; }
-/* tło podglądu poza FIR EPWW i sektorami sąsiadów: jak przestrzeń nieobsadzona (nie wiemy o nikim) – ciemne jest tylko
-   to, co ktoś obsługuje */
-.rb-panel .rb-svg { background: var(--rb-unst); }
-.rb-svg { position: absolute; inset: 0; display: block; }
-/* ramka: miejsca na stosy sąsiadów i wolne pole do rzutowania mapy (mapa leży pod stosami na całym panelu) */
-.rb-frame { position: absolute; inset: 0; display: grid; gap: 6px; padding: 5px; pointer-events: none; }
-.rb-low .rb-frame { grid-template: "col top" auto "col free" minmax(0, 1fr) "col bot" auto / auto minmax(0, 1fr); }
-.rb-high .rb-frame { grid-template: "top col" auto "free col" minmax(0, 1fr) "bot col" auto / minmax(0, 1fr) auto; }
-.rb-midmap .rb-frame { grid-template: "free" minmax(0, 1fr) / minmax(0, 1fr); padding: 20px 3px 3px; }
-.rb-col { grid-area: col; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; }
-/* stos tylko tak szeroki jak jego kolumny okienek: po lewej do lewej krawędzi, po prawej do prawej */
-.rb-low .rb-col { align-items: flex-start; }
-.rb-high .rb-col { align-items: flex-end; }
-.rb-top { grid-area: top; display: flex; align-items: flex-start; gap: 8px; }
-.rb-bot { grid-area: bot; display: flex; align-items: flex-end; gap: 8px; }
-.rb-free { grid-area: free; min-width: 0; min-height: 0; }
-/* stosy mniej więcej tam, gdzie leży FIR: Szwecja nad zachodnią częścią Polski, Czechy na południowym zachodzie,
-   Kaliningrad nad wschodnią częścią, Słowacja na południu */
-.rb-low .rb-top { justify-content: flex-start; padding-left: 12%; }
-.rb-low .rb-bot { justify-content: flex-start; padding-left: 4%; }
-.rb-high .rb-top { justify-content: flex-end; padding-right: 8%; }
-.rb-high .rb-bot { justify-content: center; }
 
-/* --- podgląd: tło FIR-ów, sektory ACC sąsiadów, FIR EPWW, obszary stanowisk ACC warstwy, warstwy APP/TWR/FIS (LOW).
-   Ta sama zasada na LOW, MID i HIGH (0.12.5, Marek: „czemu MID ma inny kolor skoro też jest nieobsadzony?”):
-   przestrzeń nieobsadzona jasnoszara (--rb-unst), obsadzona ciemna (--rb-st) z oliwkową granicą obszaru */
-.rb-svg path { fill: none; stroke-linejoin: round; }
-.rb-firs path { stroke: var(--rb-line); stroke-width: 1; }
-.rb-nbacc path { fill: var(--rb-unst); stroke: var(--rb-line); stroke-width: .8; }
-.rb-nbacc path.on { fill: var(--rb-st); }
-.rb-land { fill: var(--rb-unst); }
-/* sektory ACC EPWW (runda 12): jeden obszar na stanowisko (suma wycinków z dziurami: evenodd), sektorów bez nikogo nie
-   rysujemy (zostaje jasnoszary FIR); fb = po błędzie sumy same wypełnienia wycinków, bez konturów między nimi */
-.rb-accg path { fill: var(--rb-st); stroke: var(--rb-act); stroke-width: 1.2; fill-rule: evenodd; }
-.rb-accg path.fb { stroke: none; }
-/* obszar pod etykietą: jaśniejsza granica */
-.rb-accg path.hl { stroke: var(--rb-lbl); stroke-width: 2; fill: #0c0c0c; }
-.rb-border { stroke: #8a8a8a; stroke-width: 1.3; }
-.rb-tmag path { stroke: var(--rb-line); stroke-width: 1.1; }
-.rb-ctrg path { stroke: var(--rb-ctr); stroke-width: 1.2; }
-.rb-tmag.nb path, .rb-ctrg.nb path { stroke-width: 1; }
-.rb-fisg path { stroke: var(--rb-line); stroke-width: 1; stroke-dasharray: 2 3; }
-/* czerwone tło (0.13.0, Marek): sektor ACC albo TMA z ograniczeniem przepływu teraz lub zajętością ponad 80 %
-   dopuszczalnej – pełne wypełnienie z jasnoczerwoną granicą, pod obrysami TMA/CTR i etykietami; w dymku powód */
-.rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
-.rb-flow path.fb { stroke: none; fill-rule: nonzero; }
-.rb-flow path:hover { fill: #8e1a1a; }
-/* linia od odsuniętej etykiety ACC albo FIS do jej punktu, kropka FIS; plakietki APP i TWR bez linii i bez kropki */
-.rb-marks { pointer-events: none; }
-.rb-marks .rb-lead { stroke: #9a9a9a; stroke-width: 1; }
-.rb-dot.fis { fill: var(--rb-lbl2); }
+/* --- siatka strony wg szkicu (0.13.2): kolumny i tory wierszy ustawia radio.js (pageGrid z radioboard.js); kody,
+   kafelki, liczby i BERLIN (.rb-nbs) oraz komórki przycisków (.rb-btns) to elementy tej samej siatki. Do pierwszych
+   danych (bez układu) tylko stan danych */
+.rb-page { position: relative; flex: 1; min-height: 0; display: grid; column-gap: 4px; row-gap: 0; overflow: hidden; }
+.rb-page:not(.rb-on) > :not(.rb-status) { display: none; }
+.rb-nbs, .rb-btns { display: contents; }
 
-/* --- etykiety (sektory, APP, TWR, FIS) jak na zdjęciu PANDORY: jasne pole, małe ID w prawym górnym
-   rogu, pod nim duża ciemna częstotliwość; skrót stanowiska, które przejmuje (inne niż stanowisko sektora), przed
-   częstotliwością. Częstotliwość tylko, gdy ktoś obsługuje (runda 11, Marek): bez nikogo samo ID w ciemniejszym,
-   przygaszonym polu (etykieta w odmianie skróconej .cmp) */
-.rb-lbls { position: absolute; inset: 0; pointer-events: none; }
-.rb-lbl { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-grid; justify-items: end; align-content: start;
-  padding: 0 4px 1px; background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line); border-radius: 0; white-space: nowrap;
-  line-height: 1.05; cursor: help; }
-/* ID sektora i liczby FL nie mniejsze niż 9 px (8 px na etykietach APP/TWR/FIS), także na 1366×768 */
-.rb-id { font: 400 max(9px, calc(var(--rb-f) - 3px))/1.15 var(--sans); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
-.rb-ln { display: flex; align-items: baseline; gap: 4px; }
-.rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--sans); color: var(--rb-tile-tx); }
-.rb-by { font: 400 max(8px, calc(var(--rb-f) - 3px))/1 var(--sans); font-style: normal; color: #1f4f86; }
-.rb-more { font: 400 max(8px, calc(var(--rb-f) - 4px)) var(--sans); font-style: normal; color: #1f4f86; }
-.rb-lbl.on { background: var(--rb-tile); border-color: var(--rb-tile-hi); }
-.rb-lbl.on .rb-id { color: var(--rb-tile-id); }
-/* APP, TWR i FIS mniejsze niż sektory ACC (na podglądzie LOW bywa ich kilkadziesiąt) */
-.rb-lbl.app, .rb-lbl.twr, .rb-lbl.fis { --rb-f: clamp(10px, .7vw, 13px); }
-.rb-lbl.app .rb-id, .rb-lbl.twr .rb-id, .rb-lbl.fis .rb-id { font-size: max(8px, calc(var(--rb-f) - 3px)); }
-/* skrócona etykieta (brak miejsca przy punkcie, bez nikogo): ID i częstotliwość w jednej linii albo samo ID */
-.rb-lbl.cmp { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 3px; }
-.rb-lbl.cmp .rb-id { font-size: max(9px, calc(var(--rb-f) - 2px)); }
-.rb-lbl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-/* rodzaj etykiety: pasek z lewej w kolorach granic z podglądów (TMA szary, CTR czerwony; FIS oliwkowy), rozjaśnionych na polu */
-.rb-lbl.app { border-left: 3px solid #7c8a99; }
-.rb-lbl.twr { border-left: 3px solid #a04656; cursor: pointer; }
-.rb-lbl.fis { border-left: 3px solid #a3a62a; }
-/* linia ATIS (TWR/A) tylko z ATIS online: czytelna także na plakietce z samym ATIS (wieża offline) */
-.rb-lbl .rb-atl .rb-by { color: #1f4f86; }
-.rb-lbl.off .rb-atl .rb-by, .rb-lbl.off .rb-atl .rb-fq { color: var(--rb-atis); }
-.rb-lbl .rb-atl .rb-code, .rb-lbl.cmp .rb-code { margin-left: 0; font-size: max(8px, calc(var(--rb-f) - 4px)); }
-.rb-lbl:hover { outline: 1px solid #fff; }
+/* kod FIR-u sąsiada: żółty kod w swojej komórce, obok szara nazwa (tylko gdy się mieści: inaczej klasa nn i nazwa
+   w dymku) i małe ADVISORY 122.800; przy dolnej krawędzi komórki, tuż nad liczbą pierwszego kafelka. Przy prawej
+   krawędzi siatki (down: EYVL, UMMV, UKLV) kod u góry, ADVISORY pod nim. Nic nie wychodzi poza swoje miejsce */
+.rb-fh { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-end;
+  column-gap: 6px; padding-left: 1px; white-space: nowrap; cursor: pointer; }
+.rb-fh.down { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: flex-start; }
+.rb-fc { font: 400 calc(var(--rb-f) + 1px)/1.15 var(--sans); color: var(--rb-name); }
+.rb-fn { font: 400 var(--rb-lf)/1.15 var(--sans); color: #8c8c8c; }
+.rb-fh.nn .rb-fn { display: none; }
+.rb-fs { font: 400 var(--rb-lf)/1.15 var(--sans); color: #fff; }
+.rb-fh.down .rb-fs { white-space: normal; }
+.rb-fh:hover .rb-fc, .rb-fh.sel .rb-fc { text-decoration: underline; }
+.rb-fh.sel .rb-fn { color: #fff; }
+.rb-fh:focus-visible { outline: 1px solid #fff; outline-offset: -1px; }
 
-
-/* --- stosy sąsiadów (0.12.6) z podziałem okienek wg szkicu: żółty kod FIR-u i szara nazwa (kliknięcie: LOA), linia
-   ADVISORY 122.800 (zawsze na miejscu, napis tylko bez nikogo w całym FIR-ze), kafelki w siatce stackGrid z liczbami
-   (granice pionowe) między nimi jak na zdjęciu PANDORY – małe białe liczby od lewej krawędzi kolumny. Stos ma stały
-   rozmiar: kafelki stałej wielkości, rzędy liczb stałej wysokości, połączony kafelek na swoich komórkach */
-.rb-nb, .rb-ber { pointer-events: auto; min-width: 0; padding: 1px 4px 3px; background: rgba(30, 30, 30, .9); border: 0; border-radius: 0; }
-.rb-nbh { font: 400 var(--rb-lf)/1.3 var(--sans); color: #8c8c8c; white-space: nowrap; cursor: pointer; }
-.rb-nbc { font-size: calc(var(--rb-f) + 1px); color: var(--rb-name); }
-.rb-nbh:hover .rb-nbc, .rb-nbh.sel .rb-nbc { text-decoration: underline; }
-.rb-nbh.sel { color: #fff; }
-.rb-nbh:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
-.rb-unicom { height: calc(var(--rb-lf) * 1.25 + 1px); font: 400 calc(var(--rb-f) - 2px)/1.25 var(--sans); color: #fff; white-space: nowrap; }
-.rb-sg { display: grid; column-gap: 3px; row-gap: 0; justify-content: start; }
-.rb-bd { min-width: 0; align-self: center; justify-self: start; display: flex; flex-direction: column; align-items: flex-start;
+/* wysokości między kafelkami (rząd liczb nad i pod kafelkiem): małe białe liczby od lewej krawędzi kolumny, przy swoim
+   kafelku – górna granica kafelka pod spodem na dole rzędu (up), dolna kafelka nad nią na górze (dn), wspólna w środku */
+.rb-bd { min-width: 0; min-height: 0; align-self: center; justify-self: start; display: flex; flex-direction: column; align-items: flex-start;
   padding-left: 1px; font: 400 var(--rb-lf)/1.1 var(--sans); color: #fff; white-space: nowrap; cursor: help; }
+.rb-bd.up { align-self: end; }
+.rb-bd.dn { align-self: start; }
+.rb-bd.two { align-self: stretch; justify-content: space-between; }
 .rb-bd i { font-style: normal; }
 /* nowy ciąg okienek (EDUU OSE1 285, HVL2 660): krótka kreska między dolną granicą nad nią i górną pod nią */
-.rb-sep { display: block; width: 16px; margin: 2px 0; border-top: 2px solid #6a6a6a; }
-/* kafelek jak na zdjęciu PANDORY: obsadzony – jasne pole, szara częstotliwość, małe ID w prawym górnym rogu; bez nikogo
-   – ciemne pole z samym ID; ten sam rozmiar (cała komórka siatki stosu) */
-.rb-box { box-sizing: border-box; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto 1fr;
+.rb-sep { display: block; width: 16px; margin: 1px 0; border-top: 2px solid #6a6a6a; }
+
+/* kafelek i plakietka podglądu jak na zdjęciu PANDORY: obsadzony – jasne pole, szara częstotliwość, małe ID w prawym
+   górnym rogu; bez nikogo – ciemne pole z samym ID; zawsze ten sam rozmiar (kafelek: cała komórka siatki, plakietka:
+   najmniej tyle co kafelek) */
+.rb-box, .rb-pl { box-sizing: border-box; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto 1fr;
   justify-items: end; align-items: end; padding: 0 4px 1px; background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line);
   border-radius: 0; white-space: nowrap; cursor: help; }
-.rb-box .rb-id { align-self: start; font: 400 var(--rb-lf)/1.1 var(--sans); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
-.rb-box .rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--sans); color: var(--rb-box-tx); }
-.rb-box.on { background: var(--rb-box); border-color: #fff; }
-.rb-box.on .rb-id { color: var(--rb-box-id); }
-.rb-box:hover { outline: 1px solid #fff; outline-offset: -1px; }
-.rb-box.on:hover { outline-color: #000; }
-/* BERLIN pod stosem EDWW (jak wskaźniki u góry) */
-.rb-grp { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.rb-ber { padding: 1px 4px 3px; }
+.rb-id { align-self: start; font: 400 var(--rb-lf)/1.1 var(--sans); color: var(--rb-tile-off-tx); letter-spacing: .2px; }
+.rb-box .rb-fq, .rb-pl .rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--sans); color: var(--rb-box-tx); }
+.rb-box.on, .rb-pl.on { background: var(--rb-box); border-color: #fff; }
+.rb-box.on .rb-id, .rb-pl.on .rb-id { color: var(--rb-box-id); }
+.rb-box:hover, .rb-pl:hover { outline: 1px solid #fff; outline-offset: -1px; }
+.rb-box.on:hover, .rb-pl.on:hover { outline-color: #000; }
 
-/* --- tytuł podglądu (warstwa, zakres) i suwak wysokości LOW */
-.rb-title { position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 1px 4px;
-  font: 400 11px var(--sans); color: #9a9a9a; white-space: nowrap; background: rgba(30, 30, 30, .9); }
-.rb-tk { font-size: 13px; color: #fff; letter-spacing: 1px; }
-/* LOW i HIGH: w rogu wolnego pola przy środkowej kolumnie (miejsce ustawia radio.js), MID: lewy górny róg */
-.rb-low .rb-title { right: 4px; top: 3px; }
-.rb-high .rb-title, .rb-midmap .rb-title { left: 4px; top: 3px; }
-/* suwak: jasnoszary uchwyt (jak przyciski) na ciemnym torze, kreski pod torem = granice wycinków ACC (tam zmieniają się
-   kształty) */
-.rb-lvl { position: relative; display: inline-flex; align-items: center; width: clamp(96px, 8.5vw, 170px); height: 18px; }
-.rb-cut { width: 100%; height: 18px; margin: 0; padding: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.rb-cut::-webkit-slider-runnable-track { height: 4px; background: #111; border: 1px solid #464646; border-radius: 0; }
-.rb-cut::-webkit-slider-thumb { width: 9px; height: 14px; margin-top: -6px; background: var(--rb-btn-on); border: 1px solid #000; border-radius: 0;
-  -webkit-appearance: none; appearance: none; }
-.rb-cut::-moz-range-track { height: 4px; background: #111; border: 1px solid #464646; border-radius: 0; }
-.rb-cut::-moz-range-thumb { width: 9px; height: 14px; background: var(--rb-btn-on); border: 1px solid #000; border-radius: 0; }
-.rb-cut:hover::-webkit-slider-thumb { background: #fff; }
-.rb-cut:hover::-moz-range-thumb { background: #fff; }
-.rb-cut:focus { outline: none; }
-.rb-cut:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
-.rb-ticks { position: absolute; left: 5px; right: 5px; bottom: 0; height: 4px; pointer-events: none; }
-.rb-ticks i { position: absolute; top: 0; width: 1px; height: 4px; background: #8a8a8a; }
-.rb-cutv { min-width: 5ch; font: 400 12px var(--sans); color: #fff; }
+/* BERLIN (szkic: kolumna A pod EDWW): żółty napis, pod nim szare pole WEST/EAST na dwie kolumny, wysokości kafelka */
+.rb-blbl { align-self: end; min-width: 0; padding: 0 1px; font: 400 var(--rb-lf)/1.3 var(--sans); color: var(--rb-name); white-space: nowrap; cursor: help; }
+.rb-bln { box-sizing: border-box; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: var(--rb-grey); border: 1px solid var(--rb-grey-line); border-radius: 0; color: #f4f4f4;
+  font: 400 calc(var(--rb-f) + 1px)/1 var(--sans); letter-spacing: .5px; white-space: nowrap; cursor: help; }
+/* BERLIN bez pasa z ATIS: konfiguracja preferowana czerwonym napisem (jasna czerwień: kontrast ok. 3:1 na szarym) */
+.rb-bln.pref { color: var(--rb-pref); }
 
-
-/* --- środkowa kolumna (0.12.6): przyciski warstw, stan danych, legenda, podgląd MID */
-.rb-mid { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
-/* przyciski jak na zdjęciu PANDORY: krzyż ATIS / LOW MID HIGH, pod nim w kolumnie APP / TWR / TWR/A / FIS (OAT pomijamy).
-   Rozmiar wspólnych przycisków (0.13.1, issue #25: 137 × 28 z marginesem 1,5 px) wpisany tu liczbami (bez zmiennych
-   z innych plików): wysokość 28 px i margines 1,5 px zawsze, szerokość 137 px tylko, gdy trzy obok siebie
-   mieszczą się w środkowej kolumnie – inaczej jedna trzecia kolumny (ok. 80 px na 1600×900), ale nie mniej niż napis
-   z odstępem po bokach (runda 14: "TWR/ATIS" był ucięty). Włączona warstwa: jasne pole i ciemny napis, wyłączona:
-   szare pole i jasny napis – kolorem, bez pogrubienia (0.13.0) */
-.rb-btns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, calc(137px + 3px)));
-  grid-template-rows: auto auto repeat(4, minmax(0, 1fr)); justify-content: center; align-items: center; gap: 0; padding: 4px 0 2px; }
-.rb-btns button { grid-column: 2; box-sizing: border-box; width: calc(100% - 3px); min-width: max-content; height: 28px; margin: 1.5px;
-  padding: 0 6px; background: var(--rb-btn-off); border: 1px solid #000; border-radius: 0; color: #f2f2ec;
-  font: 400 clamp(11px, .8vw, 14px)/1.2 var(--sans); letter-spacing: .3px; cursor: pointer; white-space: nowrap; overflow: hidden; }
-.rb-btns button[data-ly="low"] { grid-column: 1; }
-.rb-btns button[data-ly="high"] { grid-column: 3; }
+/* --- przyciski warstw w kolumnie H (szkic: ATIS / LOW MID HIGH w jednym wierszu / APP / TWR / TWR/A / FIS), jak na
+   zdjęciu PANDORY. Rozmiar (0.13.1, issue #25: 137 × 28 z marginesem 1,5 px) wpisany tu liczbami: wysokość 28 px
+   (najwyżej wysokość kafelka), szerokość 137 px tylko, gdy trzy obok siebie mieszczą się w kolumnie – inaczej jedna
+   trzecia kolumny, ale nie mniej niż napis z odstępem po bokach (runda 14: "TWR/ATIS" był ucięty). Włączona warstwa:
+   jasne pole i ciemny napis, wyłączona: szare pole i jasny napis – kolorem, bez pogrubienia (0.13.0) */
+.rb-bt { min-width: 0; min-height: 0; display: flex; justify-content: center; align-items: center; }
+.rb-btns button { box-sizing: border-box; flex: none; width: calc(min(137px + 3px, var(--rb-hw) / 3) - 3px); min-width: max-content;
+  height: 28px; max-height: calc(100% - 3px); margin: 1.5px; padding: 0 6px; background: var(--rb-btn-off); border: 1px solid #000;
+  border-radius: 0; color: #f2f2ec; font: 400 clamp(11px, .8vw, 14px)/1.2 var(--sans); letter-spacing: .3px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; }
 .rb-btns button:hover { outline: 1px solid #fff; outline-offset: 0; }
 .rb-btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .rb-btns button.on { background: var(--rb-btn-on); color: #111; }
-/* stan danych i legenda pod przyciskami */
-.rb-status { flex: none; font: 400 11px/1.35 var(--sans); color: #9a9a9a; text-align: center; overflow-wrap: anywhere; }
-.rb-legend { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font: 400 10px/1.3 var(--sans); color: #9a9a9a; }
-.rb-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.rb-sw { display: inline-block; width: 11px; height: 9px; border: 1px solid var(--rb-line); background: var(--rb-unst); }
-.rb-sw.on { border-color: var(--rb-act); background: var(--rb-st); }
-.rb-sw.flow { border-color: var(--rb-flow-line); background: var(--rb-flow); }
+/* stan danych pod przyciskami (cały tekst także w dymku), legenda w lewym dolnym rogu */
+.rb-status { min-width: 0; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  font: 400 11px/1.3 var(--sans); color: #9a9a9a; text-align: center; overflow-wrap: anywhere; }
+.rb-legend { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px;
+  padding: 0 0 2px 1px; font: 400 var(--rb-lf)/1.3 var(--sans); color: #9a9a9a; }
+.rb-legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: help; }
+.rb-sw { flex: none; box-sizing: border-box; display: inline-block; width: 22px; height: 12px; background: var(--rb-free); }
+/* stanowisko online: czarny obszar z granatową granicą i plakietką (małe jasne pole) */
+.rb-sw.on { position: relative; background: #000; border: 2px solid var(--rb-navy); }
+.rb-sw.on::after { content: ""; position: absolute; left: 4px; top: 2px; width: 10px; height: 4px; background: var(--rb-box); }
+.rb-sw.flow { border: 1px solid var(--rb-flow-line); background: var(--rb-flow); }
 /* bez danych o ograniczeniach przepływu: legenda czerwonego tła przygaszona */
 .rb-legend .na { opacity: .45; }
-.rb-ln-sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--rb-line); }
-.rb-ln-sw.ctr { border-color: var(--rb-ctr); }
-.rb-midmap { flex: none; aspect-ratio: .9; max-height: 55%; --rb-f: clamp(10px, .68vw, 13px); }
+
+/* --- podgląd w swoich komórkach siatki: mapa na całym polu, plakietki nad nią, mały tytuł w górnym rogu */
+.rb-map { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; }
+.rb-svg { position: absolute; inset: 0; display: block; }
+.rb-svg path { fill: none; stroke-linejoin: round; }
+.rb-firs path { stroke: var(--rb-line); stroke-width: .8; }
+/* FIR EPWW czarny: kryje granice sąsiadów wzdłuż granicy i w środku */
+.rb-land { fill: #000; }
+/* sektory ACC warstwy bez nikogo: szare pole bez granic (suma wycinków z dziurami: evenodd; fb = po błędzie sumy) */
+.rb-free path { fill: var(--rb-free); fill-rule: evenodd; }
+.rb-free path.fb { fill-rule: nonzero; }
+.rb-border { stroke: var(--rb-epww); stroke-width: 1.2; }
+/* obszar stanowiska online (ACC warstwy, na LOW części TMA stanowiska APP, CTR wieży, obszary FIS): granatowa granica
+   wokół całego obszaru, bez granic między jego częściami; pod plakietką pod kursorem jaśniejsza */
+.rb-own path { stroke: var(--rb-navy); stroke-width: 2; fill-rule: evenodd; }
+.rb-own path.hl { stroke: var(--rb-navy-hi); stroke-width: 2.5; }
+/* czerwone tło (0.13.0, Marek): sektor ACC albo TMA z ograniczeniem przepływu teraz lub zajętością ponad 80 %
+   dopuszczalnej – pełne wypełnienie z jasnoczerwoną granicą, pod granicami stanowisk i plakietkami; w dymku powód */
+.rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
+.rb-flow path.fb { stroke: none; fill-rule: nonzero; }
+.rb-flow path:hover { fill: #8e1a1a; }
+/* plakietki (radio.js: miejsce z placeLabels, bez linii prowadzących) */
+.rb-lbls { position: absolute; inset: 0; pointer-events: none; }
+.rb-pl { position: absolute; left: 0; top: 0; pointer-events: auto; min-width: var(--rb-tw); height: var(--rb-th); }
+.rb-tr { align-self: start; display: inline-flex; align-items: center; gap: 3px; }
+.rb-pl .rb-code { margin-left: 0; padding: 0 2px; font: 400 var(--rb-lf)/1.1 var(--sans); }
+/* sam ATIS (TWR/A, wieża offline): ciemne pole, częstotliwość ATIS jasnofioletowa */
+.rb-pl.atis .rb-fq { color: var(--rb-atis); }
+.rb-pl.twr { cursor: pointer; }
+.rb-pl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.rb-title { position: absolute; z-index: 2; left: 2px; top: 1px; display: flex; align-items: baseline; gap: 5px; padding: 0 3px;
+  font: 400 10px/1.4 var(--sans); color: #9a9a9a; white-space: nowrap; background: #000; cursor: help; }
+.rb-tk { font-size: 12px; color: #fff; letter-spacing: 1px; }
+/* HIGH: tuż na prawo od przycisku HIGH – tytuł w prawym górnym rogu */
+.rb-high .rb-title { left: auto; right: 2px; }
 
 /* --- panel LOA EPWW z sąsiadem (kliknięcie nazwy FIR-u): nad siatką po przeciwnej stronie niż ten FIR */
 .rb-loa { position: absolute; z-index: 5; top: 0; right: 0; width: min(1120px, 72%); max-height: 100%; display: flex; flex-direction: column;
@@ -298,10 +234,18 @@
   background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
   white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
 
-/* niskie okno (1366×768): ciaśniej, żeby stosy i przyciski zmieściły się bez przewijania */
+/* --- dymek (jeden, przy kursorze; 0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
+   maleje przy krawędzi okna (radio.js tipPos odwraca go na drugą stronę kursora, 12 px od brzegu), wysokość z treści,
+   najwyżej okno bez dwóch odstępów (tipPos dosuwa go wtedy do krawędzi, nic nie wychodzi poza okno) */
+.rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px); overflow: hidden; padding: 5px 8px;
+  background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
+  white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
+
+/* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania */
 @media (max-height: 820px) {
-  .rb { gap: 3px; padding: 2px 5px 4px; }
-  .rb-frame { gap: 4px; padding: 4px; }
-  .rb-col { gap: 4px; }
+  .rb { gap: 3px; padding: 2px 5px 4px; --rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: calc(var(--rb-lf) + 1px);
+    --rb-lv2: calc(var(--rb-lf) * 2 + 4px); }
+  .rb-id, .rb-box .rb-fq, .rb-pl .rb-fq, .rb-bd { line-height: 1; }
   .rb-btns button { font-size: 12px; }
 }

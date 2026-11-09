@@ -1,67 +1,45 @@
-// RADIO (jedna strona jak w PANDORZE): czyste funkcje bez DOM – adres (warstwy i przekrój LOW), rzutowanie map,
-// układ etykiet bez nakładania się, siatka stosu okienek sąsiada (0.13.1: kafelki i wysokości między nimi wg szkicu).
-// Testowane w Node (test_radio_board.py).
+// RADIO (jedna strona jak w PANDORZE): czyste funkcje bez DOM – adres (warstwy), rzutowanie map, układ plakietek
+// bez nakładania się, siatka strony wg szkicu (0.13.2, issue #27: miejsca kafelków, kodów FIR-ów, przycisków
+// i podglądów jak na szkicu, wygląd kafelków z 0.13.1, wysokości między kafelkami). Testowane w Node
+// (test_radio_board.py).
 
 // Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
 export const LAYERS = [
   { id: "atis", label: "ATIS", tip: "ATIS of Polish aerodromes at the top, next to the configuration boxes (online with the information letter)" },
-  { id: "low", label: "LOW", tip: "ACC sectors on the left preview: LOW" },
-  { id: "mid", label: "MID", tip: "ACC sectors on the small preview: MID" },
-  { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH" },
-  { id: "app", label: "APP", tip: "TMAs and APP frequencies; of the neighbours only the Ostrava (LKMT) and Berlin (EDDB) TMAs (on the LOW preview)" },
-  { id: "twr", label: "TWR", tip: "Aerodrome CTRs and TWR frequencies of FIR EPWW (on the LOW preview)" },
-  { id: "twra", label: "TWR/A", tip: "Aerodrome CTRs: TWR and aerodrome ATIS (on the LOW preview)" },
-  { id: "fis", label: "FIS", tip: "FIS areas and Warszawa Information frequencies (on the LOW preview)" },
+  { id: "low", label: "LOW", tip: "ACC sectors on the left preview: LOW (cross-section at FL330)" },
+  { id: "mid", label: "MID", tip: "ACC sectors on the small preview: MID (FL350)" },
+  { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH (FL400)" },
+  { id: "app", label: "APP", tip: "APP positions online: TMA boundary, name and frequency (on the LOW preview)" },
+  { id: "twr", label: "TWR", tip: "Towers online: CTR boundary, name and frequency (on the LOW preview)" },
+  { id: "twra", label: "TWR/A", tip: "Towers online and aerodrome ATIS: CTR boundary, name, frequency and ATIS (on the LOW preview)" },
+  { id: "fis", label: "FIS", tip: "FIS positions online: FIS area boundary, name and frequency (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
-// przekrój LOW (FL): na FL300 są wszystkie sektory LOW (F od FL285, T od FL195)
-export const DEFAULT_CUT = 300;
-// suwak wysokości LOW co 500 ft (granice wycinków są co 500 ft)
-export const CUT_STEP = 5;
+// Stałe przekroje podglądów (0.13.2, Marek: "Dla LOW przygotuj widok na FL330", bez suwaka wysokości – widoki
+// uniwersalne): LOW na FL330 (kształty pasma FL295–FL335, bez wycięć TMA), MID na FL350, HIGH na FL400
+export const LEVEL_FT = { LOW: 33000, MID: 35000, HIGH: 40000 };
 
-// adres "#radio/<warstwy>/fl<przekrój>": warstwy po przecinku w stałej kolejności, "none" = żadna
-export function argOf(layers, cut) {
+// adres "#radio/<warstwy>": warstwy po przecinku w stałej kolejności, "none" = żadna
+export function argOf(layers) {
   const ids = LAYER_IDS.filter((id) => layers.has(id));
-  return `${ids.length ? ids.join(",") : "none"}/fl${cut}`;
+  return ids.length ? ids.join(",") : "none";
 }
-// {layers: Set | null, cut: liczba | null}; null = brak w adresie (zostaje bieżący stan)
+// {layers: Set | null}; null = brak w adresie (zostaje bieżący stan). Stary adres z przekrojem LOW
+// (#radio/atis,low/fl300, do 0.13.1) otwiera się dalej: część po "/" pomijamy
 export function parseArg(arg) {
-  const [ly = "", c = ""] = String(arg || "").split("/");
+  const [ly = ""] = String(arg || "").split("/");
   let layers = null;
   if (ly === "none") layers = new Set();
   else if (ly) {
     const ids = ly.split(",").filter((x) => LAYER_IDS.includes(x));
     if (ids.length) layers = new Set(ids);
   }
-  const m = /^fl(\d{2,3})$/i.exec(c);
-  return { layers, cut: m ? Number(m[1]) : null };
+  return { layers };
 }
 
 export const flNum = (ft) => String(Math.round((Number(ft) || 0) / 100));
 export const flText = (ft) => "FL" + String(Math.round((Number(ft) || 0) / 100)).padStart(3, "0");
-
-// Przedziały warstwy LOW, w których kształty sektorów ACC są stałe: granice wycinków LOW (ft, rosnąco)
-export function cutBounds(acc, layer) {
-  const lo = layer?.lower_ft ?? 9500, hi = layer?.upper_ft ?? 33500;
-  const b = new Set([lo, hi]);
-  (acc || []).forEach((s) => [s.lo, s.hi].forEach((x) => { if (x > lo && x < hi) b.add(x); }));
-  return [...b].sort((x, y) => x - y);
-}
-// przedział zawierający przekrój cut (FL) i sąsiednie: {i, lo, hi, n}
-export function cutBand(bounds, cut) {
-  const ft = cut * 100;
-  let i = bounds.findLastIndex((x) => x <= ft);
-  i = Math.max(0, Math.min(i, bounds.length - 2));
-  return { i, lo: bounds[i], hi: bounds[i + 1], n: bounds.length - 1 };
-}
-// Suwak wysokości LOW (FL): od dolnej granicy warstwy do ostatniego poziomu pod górną (FL095–FL330; na FL335 są
-// już kształty MID), co CUT_STEP; cutAt wyrównuje dowolny poziom (adres, pamięć przeglądarki) do suwaka
-export function cutRange(layer) {
-  const min = Math.round((layer?.lower_ft ?? 9500) / 100), max = Math.round((layer?.upper_ft ?? 33500) / 100) - CUT_STEP;
-  return { min, max: Math.max(min, max), step: CUT_STEP };
-}
-export const cutAt = (cut, r) => Math.max(r.min, Math.min(r.max, r.min + Math.round(((Number(cut) || 0) - r.min) / r.step) * r.step));
 
 // wycinki ACC na podglądzie: przekrój poziomem ft (dolna granica włącznie)
 export const sliceAt = (acc, ft) => (acc || []).filter((s) => s.lo <= ft && s.hi > ft);
@@ -172,18 +150,16 @@ function distSeg(px, py, [x0, y0, x1, y1]) {
   const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
   return Math.hypot(px - x0 - t * dx, py - y0 - t * dy);
 }
-// Plakietki APP i TWR (0.13.0, Marek): tylko zalogowani, plakietka w środku swojej przestrzeni (części TMA, CTR), bez
-// linii do punktu – wolno ją tylko lekko odsunąć od innej etykiety: krawędź pełnej plakietki najwyżej PLATE_NEAR px od
-// punktu, skróconej PLATE_MAX px (w tłoku × STRETCH)
-export const PLATE_NEAR = 12, PLATE_MAX = 20;
-// Parametry etykiety warstwy do placeLabels (wspólne dla strony i testu): kind acc / app / twr / fis; on = obsadzona,
-// fq = z częstotliwością, shapes = obrysy na podglądzie ("twr": CTR, "app": TMA, "" = żadne). ACC: do 70 px od punktu,
-// schodzi z CTR i małych TMA, gdy jest miejsce; plakietki APP i TWR: w środku, obrysy pod nimi bez kary (plakietka
-// stoi na swoim CTR), bez kropki; FIS jak dotąd; częstotliwość obsadzonych ważniejsza niż odległość (wv)
-export function labelOpts(kind, { on = false, fq = false, shapes = "" } = {}) {
-  if (kind === "acc") return { max: 70, wc: { twr: 1, app: 0.5 }[shapes] ?? 0.15 };
-  if (kind === "app" || kind === "twr") return { near: PLATE_NEAR, max: PLATE_MAX, wc: 0, wv: 4 };
-  return { wc: 1.5, wv: on || fq ? 4 : 2 };
+// Plakietki (0.13.2, Marek: "Usuń wszystkie leader line"): jedna odmiana jak kafelek, w środku swojego obszaru, bez
+// linii do punktu – przy tłoku tylko lekko odsunięta: krawędź plakietki najwyżej `max` px od jej punktu (w tłoku
+// × STRETCH). Parametry do placeLabels (wspólne dla strony i testu), kind acc / app / twr / fis: APP w środku
+// obsługiwanych części TMA; TWR obok swojego CTR, gdy CTR jest mniejszy niż plakietka (obrys CTR pod plakietką kosztuje:
+// wc, więc granica wieży zostaje widoczna); ACC i FIS – duże obszary, dalej od punktu, z dala od obrysów TMA i CTR
+export const PLATE_MAX = 20;
+export function labelOpts(kind) {
+  if (kind === "app") return { max: PLATE_MAX, wc: 0.2 };
+  if (kind === "twr") return { max: PLATE_MAX + 10, wc: 2 };
+  return { max: 3 * PLATE_MAX, wc: 0.4 };
 }
 
 // Etykiety bez nakładania się. items [{x, y, w, h, alts?: [{w, h}], near?, max?, wc?, wv?, pin?}] w kolejności priorytetu
@@ -201,9 +177,10 @@ export function labelOpts(kind, { on = false, fq = false, shapes = "" } = {}) {
 // linia), a dopiero potem najmniejsza odmiana w miejscu najmniejszego nałożenia. Układ zachłanny; gdy etykieta z wv > 1 zmalała (skrócona) albo coś zasłania, kolejna runda układa ją przed
 // innymi (w tłoku, np. Warszawa–Modlin–Łódź–Radom na 1366 px, najpierw ta bez miejsca), a zostaje runda z najmniejszą
 // liczbą zasłonięć, z nich ta o najmniejszym koszcie (nałożenie gorsze niż dłuższa linia i więcej skróconych).
-// Wynik: [{dx, dy, v, hit}] – przesunięcie środka, numer odmiany (0 = pełna) i czy coś zasłania.
+// lines = false (plakietki RADIO od 0.13.2: bez linii prowadzących): bez kar za linie, tylko odległość, obrysy
+// i nałożenia. Wynik: [{dx, dy, v, hit}] – przesunięcie środka, numer odmiany (0 = pełna) i czy coś zasłania.
 const WC = 0.5, WV = [0, 25, 100], WX = 40, HIT = 500, ROUNDS = 4, STRETCH = 1.5;
-export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26, far = 90, rings = 14, cover = null } = {}) {
+export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26, far = 90, rings = 14, cover = null, lines = true } = {}) {
   const pins = items.map((it, i) => (it.pin ? [it.x, it.y, i] : null)).filter(Boolean);
   const over = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
   const rectAt = (it, s, dx, dy) => ({ x0: it.x + dx - s.w / 2 - gap / 2, y0: it.y + dy - s.h / 2 - gap / 2,
@@ -252,8 +229,8 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
             if (dots(r).length) continue;  // kropka lotniska i TMA (swoja albo cudza) zostaje widoczna
             let cost = d + pv + coverOf(cover, r) * wc;
             if (cost >= best) continue;
-            cost += leads.reduce((acc, l) => acc + (crosses(...l, r) ? WX : 0), 0);
-            if (d > 0) {
+            if (lines) cost += leads.reduce((acc, l) => acc + (crosses(...l, r) ? WX : 0), 0);
+            if (lines && d > 0) {
               const l = leadOf(it, r);
               cost += placed.reduce((acc, p) => acc + (crosses(...l, p) ? WX : 0), 0)
                 + leads.reduce((acc, m) => acc + (cross2(l, m) ? WX : 0), 0)
@@ -279,7 +256,7 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
         best += HIT;
       }
       placed.push(pick.r);
-      if (pick.d > 0) leads.push(leadOf(it, pick.r));
+      if (lines && pick.d > 0) leads.push(leadOf(it, pick.r));
       out[idx] = { dx: pick.dx, dy: pick.dy, v: pick.v, hit: pick.hit };
       total += best;
       hits += pick.hit ? 1 : 0;
@@ -316,7 +293,9 @@ export const ADVISORY_FQ = "122.800";
 // 365, 999, 0); nad i pod połączonym okienkiem granice jego członków przy tej krawędzi (jak bez łączenia). Wysokość
 // rzędów liczb stała, z podziału bez łączenia: l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows,
 // cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek, l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column,
-// grid-row), marks: [{gc, gr, n: [liczby]}]}
+// grid-row), marks: [{gc, gr, n: [liczby], at: up | dn | sh | two}]}.
+// 0.13.2 (issue #27): ta sama siatka dla całej strony – pageGrid podaje każdemu FIR-owi wszystkie kolumny i wiersze
+// szkicu (f.cols, f.rows), więc tory stosów są torami strony, a kafelki różnych FIR-ów w jednym wierszu stoją równo
 export function stackGrid(f) {
   const num = (v, d = 0) => (Number(v) > 0 ? Math.round(Number(v)) : d);
   const cellOf = (b) => ({ b, col: num(b?.col, 1), row: num(b?.row, 1), cols: num(b?.cols, 1), rows: num(b?.rows, 1) });
@@ -347,29 +326,78 @@ export function stackGrid(f) {
   const up = (t) => Math.round(Number(t.b.upper) || 0), lo = (t) => Math.round(Number(t.b.lower) || 0);
   // granice kafelka t przy jego krawędzi w wierszu r stosu (pierwszym albo ostatnim): z jego komórek bez łączenia
   // w tym wierszu (najwyższa górna, najniższa dolna), bez nich – samo okienko. Połączone EDUU OSE1 + HVL2 (660-285):
-  // nad nim 365 (OSE1), pod nim 365 (HVL2) jak bez łączenia, nie 365/660 i 285/365 w rzędzie na jedną liczbę
+  // nad nim 365 (OSE1), pod nim 365 (HVL2) jak bez łączenia, nie 365/660 i 285/365 w rzędzie na jedną liczbę.
+  // 0.13.2 (issue #27): liczba stoi w pierwszej kolumnie kafelka, więc najpierw komórka z tej kolumny – ESAA 8 + 7
+  // nad L: 195 (dolna granica 8, ta sama co górna L), nie 0/195, i rząd liczb strony nie rośnie przy łączeniu
   const rim = (t, r) => {
-    const cs = st.occ.map((c) => c[r]).filter((s) => s && s.of === t.b);
+    const row = st.occ.map((c) => c[r]).filter((s) => s && s.of === t.b), mine = row.filter((s) => s.c0 === t.c0);
+    const cs = mine.length ? mine : row;
     return cs.length ? { ...t, b: { upper: Math.max(...cs.map(up)), lower: Math.min(...cs.map(lo)) } } : t;
   };
+  // {n: liczby, at: przy czym stoją}: up = górna granica kafelka pod spodem (liczba przy nim, na dole rzędu), dn = dolna
+  // granica kafelka nad nią (na górze rzędu), sh = wspólna granica obu (w środku), two = dwie (dolna nad kreską,
+  // górna pod nią; rząd liczb wyższy niż zwykle na stronie rozciąga się między nimi)
+  const NONE = { n: [], at: "" };
   const nums = (occ, i, k, at = (t) => t) => {
     const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
-    if (aT && aT === bT) return [];
+    if (aT && aT === bT) return NONE;
     const a0 = aT && aT.c0 === i ? aT : null, b0 = bT && bT.c0 === i ? bT : null;
-    if (a0 && b0 && up(a0) === up(b0) && lo(a0) === lo(b0)) return [];
+    if (a0 && b0 && up(a0) === up(b0) && lo(a0) === lo(b0)) return NONE;
     const a = a0 ? at(a0, k - 1) : null, b = b0 ? at(b0, k) : null;
-    if (a && b) return up(a) === up(b) && lo(a) === lo(b) ? [] : lo(a) === up(b) ? [up(b)] : [lo(a), up(b)];
-    return a ? [lo(a)] : b ? [up(b)] : [];
+    if (a && b) {
+      return up(a) === up(b) && lo(a) === lo(b) ? NONE : lo(a) === up(b) ? { n: [up(b)], at: "sh" } : { n: [lo(a), up(b)], at: "two" };
+    }
+    return a ? { n: [lo(a)], at: "dn" } : b ? { n: [up(b)], at: "up" } : NONE;
   };
   const cur = grid(boxes), st = grid(base), marks = [];
   // rząd liczb k: wysokość z podziału bez łączenia; po łączeniu liczb nie przybywa (granice członków), max – żeby
   // żadna liczba nie wyszła poza swój rząd także przy nietypowym połączeniu
   const now = Array.from({ length: m + 1 }, (_, k) => cols.map((_, i) => nums(cur.occ, i, k, rim)));
-  const lv = now.map((n, k) => Math.max(0, ...cols.map((_, i) => Math.max(nums(st.occ, i, k).length, n[i].length))));
-  now.forEach((n, k) => n.forEach((v, i) => { if (v.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n: v }); }));
+  const lv = now.map((n, k) => Math.max(0, ...cols.map((_, i) => Math.max(nums(st.occ, i, k).n.length, n[i].n.length))));
+  now.forEach((n, k) => n.forEach((v, i) => { if (v.n.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n: v.n, at: v.at }); }));
   return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
     tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };
 }
+// --- siatka strony wg szkicu (0.13.2, issue #27, Marek: "Zrób stronę dokładnie jak na szkicu"): 13 kolumn szkicu
+// (grid.tracks z /api/radio/board: box = kafelek stałej szerokości, btn = przyciski warstw i MID, name = same kody
+// FIR-ów z prawej, map = podglądy LOW i HIGH dzielące resztę szerokości) i wiersze szkicu od grid.top + 1 (rząd
+// u góry: wskaźniki i ATIS-y, poza siatką). Każdy wiersz szkicu r to dwa tory: rząd liczb nad nim (levelTrack, tor
+// nieparzysty) i kafelek (tileTrack); ostatni rząd liczb zamyka siatkę. Rzędy liczb rozciągają się (1fr), gdy okno
+// jest wyższe niż strona – kafelki zawsze tej samej wysokości (radio.css: --rb-th). Liczby między kafelkami jak
+// w stosach 0.13.1 (stackGrid na wszystkich kolumnach i wierszach strony)
+export const COL_TRACK = { box: "var(--rb-tw)", btn: "var(--rb-hw)", name: "var(--rb-nw)", map: "minmax(0, 1fr)" };
+export const ROW_TRACK = { t: "var(--rb-th)", l0: "minmax(var(--rb-lv0), 1fr)", l1: "minmax(var(--rb-lv1), 1fr)",
+  l2: "minmax(var(--rb-lv2), 1fr)" };
+export const levelTrack = (r, top) => 2 * (r - top - 1) + 1;
+export const tileTrack = (r, top) => 2 * (r - top - 1) + 2;
+// miejsce komórki szkicu {col, row, cols, rows} na stronie (grid-column, grid-row): od toru kafelka pierwszego wiersza
+// do końca toru kafelka ostatniego; above / below = ile torów więcej nad i pod (rząd liczb obok)
+export function cellArea(c, top, { above = 0, below = 0 } = {}) {
+  const n = (v) => Math.max(1, Math.round(Number(v) || 1));
+  const r0 = tileTrack(n(c?.row), top) - above, r1 = tileTrack(n(c?.row) + n(c?.rows) - 1, top) + 1 + below;
+  return { gc: `${n(c?.col)} / span ${n(c?.cols)}`, gr: `${Math.max(1, r0)} / ${r1}` };
+}
+// Siatka strony: grid z /api/radio/board (cols, rows, top, tracks) i bloki FIR-ów (firs: boxes) → {top, cols: tory
+// kolumn (COL_TRACK), rows: tory wierszy (ROW_TRACK; rząd liczb tak wysoki jak najwyższy z FIR-ów), stacks:
+// [{f, g: stackGrid}] w torach strony}
+export function pageGrid(grid, firs) {
+  const n = (v) => Math.max(0, Math.round(Number(v) || 0));
+  const top = n(grid?.top), nc = Math.max(1, n(grid?.cols)), nr = Math.max(top + 1, n(grid?.rows));
+  const cols = Array.from({ length: nc }, (_, i) => i + 1), rows = Array.from({ length: nr - top }, (_, i) => top + 1 + i);
+  const stacks = (Array.isArray(firs) ? firs : []).map((f) => ({ f, g: stackGrid({ ...f, cols, rows }) }));
+  const len = Math.max(2 * rows.length + 1, ...stacks.map((s) => s.g.nrows));
+  const lvl = (j) => Math.max(0, ...stacks.map((s) => Number(String(s.g.rows[j] || "l0").slice(1)) || 0));
+  const kinds = Array.isArray(grid?.tracks) && grid.tracks.length ? grid.tracks : cols.map(() => "box");
+  return { top, cols: kinds.map((k) => COL_TRACK[k] || COL_TRACK.map),
+    rows: Array.from({ length: len }, (_, j) => (j % 2 ? ROW_TRACK.t : ROW_TRACK[`l${Math.min(2, lvl(j))}`])), stacks };
+}
+// Nazwa plakietki stanowiska ACC (0.13.2, Marek): jeden sektor tej warstwy – litera i warstwa ("B LOW"), kilka – skrót
+// stanowiska (acc_short z /api/radio/board: "ALL", "DBT", "TM"), bez skrótu – nazwa stanowiska (dn)
+export function accPlateName(g, key, short, dn = (cs) => cs) {
+  const ss = Array.isArray(g?.sectors) ? g.sectors : [];
+  return ss.length === 1 && ss[0]?.letter ? `${ss[0].letter} ${key}` : short?.[g?.owner] || dn(g?.owner);
+}
+
 // granice okienka jak na szkicu (górna-dolna, FL): "660-365", "285-0" (dymek połączonego okienka)
 export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round(Number(b?.lower) || 0)}`;
 // granice w dymku: od dolnej do górnej, GND od ziemi, UNL bez górnej (999)
