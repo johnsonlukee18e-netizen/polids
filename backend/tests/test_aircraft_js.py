@@ -429,8 +429,8 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
 
 
 def test_touch_keyboard_hook():
-    """0.13.1 (issue #25): klawiatura dotykowa (KEYBOARD pod ALL, api.js touchKeyboard) jako ostatnie dziecko .ac-pane,
-    pod przewijaną listą; producent zdejmuje zaznaczenie liter, ale nie KEYBOARD; activate() ustawia stan klawiatury
+    """0.13.1 (issue #25): klawiatura dotykowa ("()" pod ALL, api.js touchKeyboard) jako ostatnie dziecko .ac-pane,
+    pod przewijaną listą; producent zdejmuje zaznaczenie liter, ale nie "()"; activate() ustawia stan klawiatury
     wg wspólnego wyboru przed fokusem w polu (test_touch_keyboard.py sprawdza samą klawiaturę)."""
     assert re.search(r'^import \{[^}]*\btouchKeyboard\b[^}]*\} from "\.\./api\.js";', SRC, re.M)
     assert 'const kbd = touchKeyboard(pane.querySelector(".q"), letters.kbd);\n    pane.append(kbd.el);' in SRC

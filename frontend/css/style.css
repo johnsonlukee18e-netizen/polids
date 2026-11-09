@@ -135,9 +135,10 @@ main { flex: 1; min-width: 0; position: relative; }
    to jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu */
 .submenu { width: var(--col-w); flex: none; padding: var(--col-pad); background: #050605; border-right: 1px solid var(--line);
   overflow-y: auto; display: flex; flex-direction: column; }
-/* AIRCRAFT / CALLSIGN: ALL i pod nim KEYBOARD (klawiatura dotykowa) na całą szerokość jak każdy przycisk podmenu,
-   pod nimi 26 liter w 13 rzędach po dwie (A B … Y Z): litera to połowa przycisku (2 x 67 px + 3 px = 137 px), ta sama
-   wysokość i ten sam margines; siatka bez odstępu (gap), bo odstęp 3 px dają marginesy, rzędy co 31 px jak w menu */
+/* AIRCRAFT / CALLSIGN: ALL i pod nim "()" (klawiatura dotykowa, do 0.13.2 KEYBOARD) na całą szerokość jak każdy
+   przycisk podmenu, pod nimi 26 liter w 13 rzędach po dwie (A B … Y Z): litera to połowa przycisku (2 x 67 px + 3 px
+   = 137 px), ta sama wysokość i ten sam margines; siatka bez odstępu (gap), bo odstęp 3 px dają marginesy, rzędy co
+   31 px jak w menu */
 .submenu.letters { display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
 .submenu.letters button { width: auto; }
 .submenu.letters button.all, .submenu.letters button.kbd { grid-column: 1 / -1; }

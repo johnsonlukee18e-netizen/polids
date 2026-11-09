@@ -101,8 +101,13 @@ def js(tmp_path_factory):
     (d / "qnhmap.mjs").write_text("export const qnhMap = () => ({ destroy() {} });\n", "utf-8")
     # 0.13.1: kolory i opisy METAR/TAF w metarfmt.js (importuje api.js)
     (d / "metarfmt.mjs").write_text(METARFMT.replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    # 0.13.2 (issue #27): lista METAR PL / TAF PL z AD2 w aip.js (importuje api.js)
+    aip = (FRONTEND / "js" / "tabs" / "aip.js").read_text("utf-8")
+    (d / "aip.mjs").write_text(aip.replace('"../api.js"', '"./api.mjs"'), "utf-8")
     (d / "meteo.mjs").write_text(METEO.replace('"../api.js"', '"./api.mjs"').replace('"../solar.js"', '"./solar.mjs"')
-                                 .replace('"../qnhmap.js"', '"./qnhmap.mjs"').replace('"../metarfmt.js"', '"./metarfmt.mjs"'), "utf-8")
+                                 .replace('"../qnhmap.js"', '"./qnhmap.mjs"')
+                                 .replace('"../metarfmt.js"', '"./metarfmt.mjs"').replace('"./aip.js"', '"./aip.mjs"'),
+                                 "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (d / "meteo.mjs").as_uri()], capture_output=True, text=True, timeout=60)

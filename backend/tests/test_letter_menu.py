@@ -1,6 +1,8 @@
 """0.12.3 (issue #13): podmenu liter w CALLSIGN i AIRCRAFT: zamiast "∗" przycisk ALL na obie kolumny, pod nim 26 liter
 symetrycznie w dwóch kolumnach (13 rzędów: A B, C D … Y Z). Adresy bez zmian: "" = wszystkie, "A".."Z" = litera.
-0.13.1 (issue #25): pod ALL przycisk KEYBOARD tej samej wielkości (klawiatura dotykowa, test_touch_keyboard.py)."""
+0.13.1 (issue #25): pod ALL przycisk KEYBOARD tej samej wielkości (klawiatura dotykowa, test_touch_keyboard.py).
+0.13.2 (issue #27): "Nazwa przycisku KEYBOARD miała być ()": napis "()", dymek bez zmian, aria-label
+"Touch keyboard"."""
 import json
 import re
 import shutil
@@ -16,7 +18,7 @@ CSS = (FRONTEND / "css" / "style.css").read_text("utf-8")
 
 NODE_SCRIPT = r"""
 const api = await import(process.argv[2]);
-console.log(JSON.stringify({ html: api.letterButtons(), letters: api.LETTERS }));
+console.log(JSON.stringify({ html: api.letterButtons(), letters: api.LETTERS, label: api.KBD_LABEL }));
 """
 
 
@@ -40,11 +42,13 @@ def test_all_button_first_then_letters(js):
     attrs, label = buttons[0]
     # ALL: wszystkie rekordy, data-l="" (ten sam arg adresu co dawniej "∗"), klasa all = cała szerokość
     assert label == "ALL" and 'class="all"' in attrs and 'data-l=""' in attrs
-    # 0.13.1: KEYBOARD pod ALL (klasa kbd = cała szerokość jak ALL), przełącznik bez data-l: nie filtruje i nie jest
-    # krokiem do cofnięcia (klik w letterMenu szuka button[data-l])
+    # 0.13.1: przycisk klawiatury pod ALL (klasa kbd = cała szerokość jak ALL), przełącznik bez data-l: nie filtruje
+    # i nie jest krokiem do cofnięcia (klik w letterMenu szuka button[data-l]). 0.13.2 (issue #27): napis "()" zamiast
+    # KEYBOARD (issue #25: "podzakładkę () która będzie klawiaturą dotykową"), dymek ten sam, nazwa dla czytnika ekranu
     attrs, label = buttons[1]
-    assert label == "KEYBOARD" and 'class="kbd"' in attrs and 'data-kbd=""' in attrs and "data-l" not in attrs
-    assert 'title="Touch keyboard for the search field"' in attrs
+    assert label == "()" == js["label"] and 'class="kbd"' in attrs and 'data-kbd=""' in attrs and "data-l" not in attrs
+    assert 'title="Touch keyboard for the search field"' in attrs and 'aria-label="Touch keyboard"' in attrs
+    assert ">KEYBOARD<" not in js["html"] and ">KEYBOARD<" not in API
     assert [lbl for _, lbl in buttons[2:]] == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") == js["letters"]
     assert all(re.fullmatch(rf' data-l="{lbl}"', a) for a, lbl in buttons[2:])
     assert "∗" not in API and '"*"' not in API
@@ -71,10 +75,10 @@ def test_letter_menu_contract():
     body = body[:body.index("\n}\n")]
     assert "onPick(b.dataset.l);" in body and "remember(tab, b.dataset.l);" in body
     assert 'b.dataset.l === (l || "")' in body and 'set("");' in body
-    # set() zaznacza tylko litery i ALL (KEYBOARD zostaje zaznaczony, gdy klawiatura jest otwarta); kbd dla touchKeyboard
+    # set() zaznacza tylko litery i ALL ("()" zostaje zaznaczony, gdy klawiatura jest otwarta); kbd dla touchKeyboard
     assert 'nav.querySelectorAll("button[data-l]").forEach' in body
     assert 'return { set, kbd: nav.querySelector("button.kbd") };' in body
-    # wywołujący bez zmian: "" = wszystkie; AIRCRAFT: producent zdejmuje zaznaczenie liter (także ALL), nie KEYBOARD
+    # wywołujący bez zmian: "" = wszystkie; AIRCRAFT: producent zdejmuje zaznaczenie liter (także ALL), nie "()"
     callsign = (FRONTEND / "js" / "tabs" / "callsign.js").read_text("utf-8")
     aircraft = (FRONTEND / "js" / "tabs" / "aircraft.js").read_text("utf-8")
     assert "letterMenu(root, (l) => { prefix = l; load(); })" in callsign and "letters.set(arg)" in callsign

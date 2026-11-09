@@ -198,12 +198,16 @@ def test_css_font_sans():
 
 def test_toolbar_switch_first():
     """Pasek METAR/TAF: COLOURED / MONO jako pierwszy (lewy górny róg jak na zdjęciu), potem pole stacji, Show,
-    odświeżanie i czas; wybór we wspólnym kluczu meteo.wx.mode (lsGet/lsSet), lista jako tabela z metarfmt.js."""
+    odświeżanie i czas; wybór we wspólnym kluczu meteo.wx.mode (lsGet/lsSet), lista jako tabela z metarfmt.js.
+    0.13.2 (issue #27): pole stacji i Show (${field}) tylko w listach z wyborem stacji, METAR PL i TAF PL bez nich
+    (test_meteo_lists.py)."""
     body = METEO[METEO.index("function wxList("):METEO.index("// --- RADAR")]
     bar = body[body.index('<div class="toolbar mtr-bar">'):body.index('<div class="mtr-list">')]
     order = [bar.index(x) for x in ('data-mode="coloured"', ">COLOURED</button>", 'data-mode="mono"', ">MONO</button>",
-                                    'class="ids"', ">Show</button>", "refresh every 2 min", 'class="hint upd"')]
+                                    "${field}", "refresh every 2 min", 'class="hint upd"')]
     assert order == sorted(order)
+    field = body[body.index("const field = "):body.index("pane.append(")]
+    assert field.index('class="ids"') < field.index(">Show</button>") and 'fixed ? ""' in field
     assert "setMode(wxMode(lsGet(MODE_KEY)))" in body and "lsSet(MODE_KEY, b.dataset.mode)" in body
     assert 'wrap.classList.toggle("mono", m === "mono")' in body
     assert '$(".mtr-list").innerHTML = wxTable(kind, rows, { decode: true })' in body
