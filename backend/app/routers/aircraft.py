@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import AircraftType
-from ..services.photos import cached_photo, fetch_photo, model_numbers, photo_query
+from ..services.photos import type_photo
 
 router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
 log = logging.getLogger("polids.aircraft")
@@ -123,14 +123,12 @@ def search(q: str = "", prefix: str = "", wtc: str = "", recat: str = "", maker:
 @router.get("/{aircraft_id}/photo")
 async def photo(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depends(get_db)):
     """Zdjęcie typu z data/photos/; przy pierwszym wywołaniu pobierane z Wikipedii i zapisywane lokalnie
-    (0.13.3: artykuł z numerem modelu w tytule, zdjęcia z artykułów o innym modelu pobierane od nowa)."""
+    (0.13.3: tylko z artykułu o tym modelu, zdjęcia z artykułów o innym modelu sprawdzane od nowa; photos.type_photo)."""
     a = db.get(AircraftType, aircraft_id)
     if not a:
         raise HTTPException(404, "No such aircraft type")
-    if found := cached_photo(a.icao, a.model):
-        return found
     try:
-        found = await fetch_photo(a.icao, photo_query(a.manufacturer, a.model), model_numbers(a.model))
+        found = await type_photo(a.icao, a.manufacturer, a.model)
     except (httpx.HTTPError, ValueError) as exc:
         # przyczyna w logu serwera; w interfejsie sam komunikat
         log.warning("AIRCRAFT: zdjęcie %s niedostępne (%s)", a.icao, exc)

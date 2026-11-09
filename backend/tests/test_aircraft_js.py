@@ -417,17 +417,17 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "photos_dir", tmp_path)
     monkeypatch.setattr(photos, "_missing", set())
 
-    async def broken(icao, query, nums=None):
+    async def broken(icao, manufacturer, model):
         raise httpx.ConnectError("[Errno -3] wikipedia.org unreachable")
 
-    monkeypatch.setattr(aircraft_router, "fetch_photo", broken)
+    monkeypatch.setattr(photos, "fetch_photo", broken)
     a = client.get("/api/aircraft", params={"q": "B738"}).json()[0]
     r = client.get(f"/api/aircraft/{a['id']}/photo")
     assert r.status_code == 502 and r.json()["detail"] == "Photo unavailable"
     # własne zdjęcie bez pliku opisu: bez podpisu
     (tmp_path / "B738.jpg").write_bytes(b"\xff\xd8\xff")
-    assert client.get(f"/api/aircraft/{a['id']}/photo").json() == {"url": "/files/photos/B738.jpg", "credit": "",
-                                                                   "page": None}
+    own = client.get(f"/api/aircraft/{a['id']}/photo").json()
+    assert own["url"].startswith("/files/photos/B738.jpg?v=") and own["credit"] == "" and own["page"] is None
 
 
 def test_touch_keyboard_hook():
