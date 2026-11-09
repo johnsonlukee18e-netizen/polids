@@ -1,16 +1,22 @@
 import { h, navigate, remember, subtabs } from "../api.js";
+import { mountBombPhone } from "../bombphone.js";
 import { mountChecklists } from "../checklist.js";
 import { isCoordFile, mountDocs } from "../docs.js";
 import { cleanCallsign, mountFlightPlan } from "../flightplan.js";
 import { cleanTv, mountFmp } from "../fmp.js";
+import { mountHolding } from "../holding.js";
 import { mountRegcause } from "../regcause.js";
 import { mountSquawk } from "../squawk.js";
 import { mountVfrMinima } from "../vfrminima.js";
 
-// OTHER: podmenu jak w PANDORZE, alfabetycznie (0.13.0, issue #23): 17 podzakładek (0.13.1, issue #25: bez PHRASEOLOGY),
-// z czego DOCS (PDF-y z data/docs/), CHECKLIST (do 0.12.5 osobna zakładka; checklisty w drugim podmenu), SQUAWK
-// (do 0.12.6 osobna zakładka), FLIGHT PLAN, FMP, REGCAUSE i VFR MINIMA; reszta to zaślepki z jednym zdaniem.
-// Bez adresu (przycisk menu przy pierwszym otwarciu, "#other") i dla nieznanego id: DOCS, jak do 0.12.6.
+// OTHER: podmenu jak w PANDORZE, alfabetycznie (0.13.0, issue #23): 13 podzakładek (0.13.1, issue #25: bez PHRASEOLOGY;
+// 0.13.2, issue #27: bez LIGHT GUN, IA, METEO i NATO WEATHER), z czego DOCS (PDF-y z data/docs/), CHECKLIST (do 0.12.5
+// osobna zakładka; checklisty w drugim podmenu), SQUAWK (do 0.12.6 osobna zakładka), FLIGHT PLAN, FMP, REGCAUSE,
+// VFR MINIMA, HOLDING (0.13.2: ściąga FLIRT z rysunkami holdingu i wejść) i BOMB PHONE (0.13.2: checklista rozmowy
+// z groźbą bombową, stan formularza tylko w tej karcie przeglądarki); reszta (4P, AFTN, BRAKING ACTION, POSITION) to
+// zaślepki z jednym zdaniem. Stare adresy usuniętych podzakładek ("#other/light-gun", "#other/ia", "#other/meteo",
+// "#other/nato-weather") to nieznane id. Bez adresu (przycisk menu przy pierwszym otwarciu, "#other") i dla nieznanego
+// id: DOCS, jak do 0.12.6.
 // Adresy "#other/<id>", a z zapamiętanym stanem "#other/docs/<plik w data/docs>" (bez pliku: pierwszy dokument),
 // "#other/checklist/<id checklisty>" (bez id: pierwsza), "#other/squawk/<kod>", "#other/flight-plan/<ZNAK>"
 // i "#other/fmp/<TV>" (sektor z wykresami ENTRY i OCC, np. EP-BH). Stare "#docs/<plik>", "#checklist/<id>"
@@ -36,7 +42,8 @@ export default {
     const PAGES = [
       { id: "4p", label: "4P" },
       { id: "aftn", label: "AFTN" },
-      { id: "bomb-phone", label: "BOMB PHONE" },
+      // 0.13.2: formularz trzyma stan w sessionStorage tej karty; nic nie idzie do serwera
+      { id: "bomb-phone", label: "BOMB PHONE", render: (pane) => mountBombPhone(pane) },
       { id: "braking-action", label: "BRAKING ACTION" },
       // ponowne kliknięcie CHECKLIST wraca do ostatnio wybranej checklisty; zaznaczenia są w przeglądarce.
       // destroy() przy przejściu do innej podzakładki: spóźnione dane już nic nie rysują
@@ -58,11 +65,7 @@ export default {
       { id: "fmp", label: "FMP", arg: () => fmpTv, set: (tv) => { fmpTv = cleanTv(tv); },
         update: (fmp) => fmp.activate(fmpTv), resume: (fmp) => fmp.activate(),
         render: (pane) => mountFmp(pane, { start: fmpTv, onPick: (tv) => { fmpTv = cleanTv(tv); remember("other", argOf()); } }) },
-      { id: "holding", label: "HOLDING" },
-      { id: "ia", label: "IA" },
-      { id: "light-gun", label: "LIGHT GUN" },
-      { id: "meteo", label: "METEO" },
-      { id: "nato-weather", label: "NATO WEATHER" },
+      { id: "holding", label: "HOLDING", render: (pane) => mountHolding(pane) },
       { id: "position", label: "POSITION" },
       { id: "regcause", label: "REGCAUSE", render: (pane) => mountRegcause(pane) },
       // każdy wpisany pełny kod to krok do cofnięcia (onCode); wyczyszczone pole podmienia adres (replace); tekst pola
