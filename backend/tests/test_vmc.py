@@ -6,7 +6,7 @@ import json
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -103,7 +103,19 @@ def test_runway_choice_uses_ctr_imc():
 
 # --- weather.newest: jeden (najnowszy) METAR lotniska w całej aplikacji ------------------------------------------
 
-def test_newest_metar_wins_across_requests(monkeypatch):
+@pytest.fixture
+def clock(monkeypatch):
+    """Zegar weather.newest zatrzymany na 09.11.2026 12:10Z: METAR-y '0911xxZ' / '0912xxZ' poniżej są z przeszłości
+    niezależnie od dnia uruchomienia testów (z prawdziwym zegarem 8. dnia miesiąca 11:30-12:00 jeden z nich trafiał
+    do poprzedniego miesiąca, a 9. przed 11:40 byłyby z przyszłości)."""
+    class Fixed(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 9, 12, 10, tzinfo=timezone.utc)
+    monkeypatch.setattr(weather, "datetime", Fixed)
+
+
+def test_newest_metar_wins_across_requests(monkeypatch, clock):
     """OVERVIEW / METEO (wiele lotnisk) mają już METAR 12:00 z BKN009, AWOS (jedno lotnisko, osobny adres i osobna
     pamięć podręczna) dostaje jeszcze 11:30: oddajemy 12:00, więc AWOS nie pokazuje VMC ze starszego METAR."""
     old = "EPWA 091130Z 24008KT 9999 SCT020 08/06 Q1012 NOSIG"
@@ -127,7 +139,7 @@ def test_newest_metar_wins_across_requests(monkeypatch):
     assert run(["EPWA"]) == {"EPWA": cor}
 
 
-def test_newest_metar_awc_source_and_reset(monkeypatch):
+def test_newest_metar_awc_source_and_reset(monkeypatch, clock):
     rows = {"a": [{"icaoId": "EPKK", "rawOb": "EPKK 091200Z 24008KT 9999 BKN009 08/06 Q1012"}],
             "b": [{"icaoId": "EPKK", "rawOb": "EPKK 091130Z 24008KT CAVOK 08/06 Q1012"}]}
     which = {"k": "a"}
@@ -155,6 +167,58 @@ def test_newest_metar_month_change_and_pruning():
     for i in range(weather.NEWEST_MAX + 1):
         weather.newest({f"X{i:03d}": "X 300000Z 24008KT CAVOK 08/06 Q1012"}, now)    # sprzed 2 dni
     assert len(weather._newest) == 0
+
+
+@pytest.mark.parametrize("now", [datetime(2026, 10, 31, 23, 57, tzinfo=timezone.utc),
+                                 datetime(2026, 11, 30, 23, 58, tzinfo=timezone.utc)])
+@pytest.mark.parametrize("first", ["old", "new"])
+def test_newest_metar_next_month_before_midnight(now, first):
+    """METAR 'z jutra' (01 dnia, 00:00Z) wydany przed północą ostatniego dnia miesiąca to obserwacja sprzed chwili,
+    nie sprzed miesiąca: wygrywa ze starszym 23:30 w obu kolejnościach zapytań."""
+    old = f"EPWA {now.day}2330Z 24008KT CAVOK 08/06 Q1012"
+    new = "EPWA 010000Z 24008KT 9999 BKN009 08/06 Q1012"
+    weather.newest({"EPWA": old if first == "old" else new}, now)
+    assert weather.newest({"EPWA": new}, now)["EPWA"] == new
+    assert weather.newest({"EPWA": old}, now)["EPWA"] == new
+    assert weather._newest["EPWA"][0] == (now + timedelta(days=1)).replace(hour=0, minute=0)
+
+
+def test_newest_metar_observed_time_month_and_year():
+    now = datetime(2026, 12, 31, 23, 57, tzinfo=timezone.utc)
+    assert weather._observed("EPWA 010000Z 24008KT", now) == datetime(2027, 1, 1, tzinfo=timezone.utc)
+    assert weather._observed("EPWA 312330Z 24008KT", now) == datetime(2026, 12, 31, 23, 30, tzinfo=timezone.utc)
+    # w środku miesiąca jak dotąd: jutro w tym miesiącu, dzień z dalszej przyszłości w poprzednim
+    mid = datetime(2026, 10, 9, 23, 57, tzinfo=timezone.utc)
+    assert weather._observed("EPWA 100000Z", mid) == datetime(2026, 10, 10, tzinfo=timezone.utc)
+    assert weather._observed("EPWA 250000Z", mid) == datetime(2026, 9, 25, tzinfo=timezone.utc)
+    # 01 dnia o 12:00 przedostatniego dnia miesiąca: dalej niż doba naprzód, więc 1 dzień tego miesiąca
+    noon = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+    assert weather._observed("EPWA 010000Z", noon) == datetime(2026, 10, 1, tzinfo=timezone.utc)
+
+
+def test_newest_metar_future_time_not_kept():
+    """METAR z błędną grupą czasu (092300Z o 12:05) nie trafia do pamięci: kolejne poprawne METAR-y (IMC) nie są nim
+    zastępowane; METAR wydany kilka minut przed czasem nominalnym jest pamiętany jak dotąd."""
+    t = datetime(2026, 11, 9, 12, 5, tzinfo=timezone.utc)
+    bad = "EPWA 092300Z 24008KT 9999 SCT040 08/06 Q1012"
+    assert weather.newest({"EPWA": bad}, t) == {"EPWA": bad} and "EPWA" not in weather._newest
+    for k, hhmm in enumerate(("1230", "1300", "1330")):
+        good = f"EPWA 09{hhmm}Z 24008KT 1500 BR BKN003 08/06 Q1012"
+        now = t + timedelta(minutes=27 + 30 * k)
+        assert weather.newest({"EPWA": good}, now)["EPWA"] == good
+        assert weather.newest({"EPWA": bad}, now)["EPWA"] == bad          # odpowiedź serwera bez zmian
+        assert weather._newest["EPWA"][1] == good
+    # 13:00 wydany o 12:52 wygrywa ze starszym 12:30 z innego zapytania
+    weather.reset_newest()
+    early = "EPWA 091300Z 24008KT 1500 BR BKN003 08/06 Q1012"
+    weather.newest({"EPWA": early}, datetime(2026, 11, 9, 12, 52, tzinfo=timezone.utc))
+    assert weather.newest({"EPWA": "EPWA 091230Z 24008KT CAVOK 08/06 Q1012"},
+                          datetime(2026, 11, 9, 12, 53, tzinfo=timezone.utc))["EPWA"] == early
+    # wpis z dalszej przyszłości (np. po cofnięciu zegara) nie zastępuje odpowiedzi, tylko jest zastępowany
+    weather._newest["EPWA"] = (datetime(2026, 11, 9, 23, 0, tzinfo=timezone.utc), bad)
+    good = "EPWA 091400Z 24008KT 1500 BR BKN003 08/06 Q1012"
+    assert weather.newest({"EPWA": good}, datetime(2026, 11, 9, 14, 2, tzinfo=timezone.utc))["EPWA"] == good
+    assert weather._newest["EPWA"][1] == good
 
 
 # --- AWOS: pole VMC / IMC tylko ze stanu z serwera (Node) --------------------------------------------------------

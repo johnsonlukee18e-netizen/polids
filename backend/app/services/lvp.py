@@ -17,6 +17,9 @@ from .metar import Metar
 
 CANCEL_HOLD = timedelta(minutes=30)
 MAX_GAP = timedelta(minutes=90)   # dłuższa przerwa między METAR w pamięci: liczymy od nowa, jak po starcie aplikacji
+# 0.13.2 (przegląd): najdalej tyle w przyszłości może być czas obserwacji METAR (wydany przed czasem nominalnym,
+# różnica zegarów); późniejszy to błędna grupa czasu: bez pamięci (tu i w weather.newest)
+OBS_FUTURE_MAX = timedelta(minutes=30)
 OPS = {"<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operator.ge}
 SYM = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
 LABEL = {"rvr_m": "RVR", "vis_m": "visibility", "ceiling_ft": "ceiling"}
@@ -75,7 +78,9 @@ def _values(key: str, cond: dict, m: Metar) -> list[tuple[str, int | None, int]]
     """Wartości z METAR do porównania z progiem: [(etykieta, wartość, próg)]; pusta lista = brak danych.
     Podstawa None = brak chmur BKN/OVC/VV (nieograniczona). 0.13.2 (issue #27): warstwa BKN/OVC/VV bez podstawy
     (VV///, BKN///) i żadnej znanej to brak danych, a nie brak chmur: nie odwołuje LVP (warunek "podstawa ≥ 200 ft"
-    niespełniony) i nie wprowadza go sama (decyduje RVR)."""
+    niespełniony) i nie wprowadza go sama (decyduje RVR). Tak samo przy odwołaniu warstwa nieznanej ilości (//////,
+    ///001, //////CB) bez wysokości albo poniżej progu, jak w ctr_conditions: może być podstawą chmur, więc nie
+    odwołuje LVP; znana podstawa BKN/OVC/VV poniżej progu i tak rozstrzyga (warunek niespełniony)."""
     op, limit = cond[key]
     rvrs = [(f"RVR {r['runway']}", v) for r in m.rvr if (v := rvr_value(r["value"])) is not None]
     if key == "rvr_m":
@@ -89,6 +94,11 @@ def _values(key: str, cond: dict, m: Metar) -> list[tuple[str, int | None, int]]
         return [(lbl, v, eq) for lbl, v in rvrs] if eq else []
     if m.ceiling_ft is None and any(c["cover"] in ("BKN", "OVC", "VV") and c["base_ft"] is None for c in m.clouds):
         return []
+    if op in (">", ">="):
+        fn = OPS[op]
+        if (m.ceiling_ft is None or fn(m.ceiling_ft, limit)) and any(
+                c["cover"] == "///" and (c["base_ft"] is None or not fn(c["base_ft"], limit)) for c in m.clouds):
+            return []
     return [("ceiling", m.ceiling_ft, limit)]
 
 
@@ -203,6 +213,10 @@ def evaluate(m: Metar | None, icao: str, now: datetime | None = None) -> dict:
     if m is None:
         return base
     obs = obs_time(m.time, now)
+    if obs is not None and obs > (now or datetime.now(timezone.utc)) + OBS_FUTURE_MAX:
+        # 0.13.2 (przegląd): czas z dalszej przyszłości liczony bez historii i niezapamiętany, inaczej poprawne METAR-y
+        # dostawałyby do tej godziny stan z tego (gałąź "starszy METAR" niżej)
+        obs = None
     mem = _memory.get(code)
     if mem is not None and obs is not None and obs < mem["obs"]:
         # starszy METAR (OVERVIEW i AERODROME pytają osobno, każde zapytanie ma własną pamięć podręczną): stan

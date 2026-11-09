@@ -4,13 +4,17 @@ from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from .http_cache import fetch_text
-from .lvp import obs_time
+from .lvp import OBS_FUTURE_MAX, obs_time
 
 # 0.13.2 (issue #27): najnowszy znany METAR każdego lotniska ze wszystkich zapytań. Każda lista lotnisk to osobny adres
 # z własną pamięcią podręczną (weather_cache_seconds): AWOS pyta o jedno lotnisko, METEO i OVERVIEW o wiele naraz, więc
 # po nowym METAR (np. BKN009) METEO mogło go już pokazywać, a AWOS jeszcze do 2 min (plus 1 min odświeżania widoku)
 # starszy METAR i VMC. Teraz z dwóch METAR-ów lotniska wygrywa późniejsza obserwacja, niezależnie od zapytania.
 # Lotnisko, którego bieżąca odpowiedź nie zawiera, zostaje bez METAR jak dotąd (pamięć tylko zastępuje starszy).
+# Poprawki po przeglądzie 0.13.2: METAR z początku następnego miesiąca widziany tuż przed północą (wydany przed czasem
+# nominalnym, różnica zegarów) to obserwacja z jutra, nie sprzed miesiąca, więc nie przegrywa ze starszym METAR;
+# METAR z czasem obserwacji ponad OBS_FUTURE_MAX w przyszłości (błędna grupa czasu) zostaje w odpowiedzi bez zmian,
+# ale nie trafia do pamięci, inaczej zastępowałby wszystkie poprawne METAR-y lotniska aż do swojej godziny.
 _newest: dict[str, tuple[datetime, str]] = {}
 NEWEST_MAX = 2000                  # tyle lotnisk w pamięci; przy przekroczeniu wypadają obserwacje starsze niż 6 h
 NEWEST_KEEP = timedelta(hours=6)
@@ -24,19 +28,29 @@ def reset_newest() -> None:
 
 def _observed(raw: str, now: datetime) -> datetime | None:
     m = OBS_RE.search(raw or "")
-    return obs_time(m.group(1), now) if m else None
+    t = obs_time(m.group(1), now) if m else None
+    if t is None:
+        return None
+    # dzień z początku następnego miesiąca do doby naprzód (np. 010000Z o 31.10 23:57): bliżej teraz niż miesiąc temu
+    nxt = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
+    try:
+        cand = t.replace(year=nxt.year, month=nxt.month)
+    except ValueError:
+        return t
+    return cand if cand <= now + timedelta(days=1) else t
 
 
 def newest(out: dict[str, str], now: datetime | None = None) -> dict[str, str]:
     """{ICAO: METAR} z odpowiedzi serwera, w którym METAR starszy od znanego już z innego zapytania zastępuje nowszy
     (ten sam czas obserwacji: wygrywa świeża odpowiedź, np. poprawka COR)."""
     now = now or datetime.now(timezone.utc)
+    future = now + OBS_FUTURE_MAX
     for icao, raw in list(out.items()):
         t = _observed(raw, now)
-        if t is None:
+        if t is None or t > future:     # bez czasu albo z czasem z dalszej przyszłości: bez pamięci i bez zamiany
             continue
         known = _newest.get(icao)
-        if known and known[0] > t:
+        if known and future >= known[0] > t:
             out[icao] = known[1]
         else:
             _newest[icao] = (t, raw)
