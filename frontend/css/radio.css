@@ -242,10 +242,11 @@
   background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
   white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
 
-/* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania */
+/* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania; litera
+   ATIS na plakietce TWR/A tej samej wysokości co ID (przegląd 0.13.2: częstotliwość siedziała na dolnej krawędzi) */
 @media (max-height: 820px) {
   .rb { gap: 3px; padding: 2px 5px 4px; --rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: calc(var(--rb-lf) + 1px);
     --rb-lv2: calc(var(--rb-lf) * 2 + 4px); }
-  .rb-id, .rb-box .rb-fq, .rb-pl .rb-fq, .rb-bd { line-height: 1; }
+  .rb-id, .rb-box .rb-fq, .rb-pl .rb-fq, .rb-pl .rb-code, .rb-bd { line-height: 1; }
   .rb-btns button { font-size: 12px; }
 }
