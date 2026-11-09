@@ -161,14 +161,19 @@ export function subtabs(root, tabs, opts = {}) {
 }
 
 // Podmenu z literami A–Z (jak w AIRCRAFT / CALLSIGN w PANDORZE): u góry ALL (wszystkie rekordy) na obie kolumny,
-// pod nim KEYBOARD (0.13.1, issue #25: klawiatura dotykowa, przełącznik bez data-l, też na obie kolumny), dalej
+// pod nim przycisk klawiatury dotykowej (0.13.1, issue #25: przełącznik bez data-l, też na obie kolumny), dalej
 // litery parami w dwóch równych kolumnach (A B, C D … Y Z). onPick("") = wszystkie.
+// 0.13.2 (issue #27): napis na przycisku klawiatury to "()" (w 0.13.1 "KEYBOARD"; issue #25 nazywało podzakładkę "()"),
+// dymek (title) bez zmian, nazwa dla czytnika ekranu w aria-label ("Touch keyboard"); klasa kbd, data-kbd i działanie
+// bez zmian.
 // Kliknięcie litery to krok do cofnięcia: remember(zakładka, "A".."Z" albo "" dla wszystkich); activate(arg)
 // zakładki ustawia literę z adresu przez set() ("" albo brak = ALL). opts.remember = false wyłącza.
-// Zwraca { set, kbd }: kbd to przycisk KEYBOARD dla touchKeyboard(); set() zaznacza tylko przyciski liter i ALL.
+// Zwraca { set, kbd }: kbd to przycisk klawiatury "()" dla touchKeyboard(); set() zaznacza tylko przyciski liter i ALL.
 export const LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+export const KBD_LABEL = "()";
 export const letterButtons = () => `<button class="all" data-l="" title="All records">ALL</button>`
-  + `<button class="kbd" data-kbd="" title="Touch keyboard for the search field">KEYBOARD</button>`
+  + `<button class="kbd" data-kbd="" title="Touch keyboard for the search field" aria-label="Touch keyboard">`
+  + `${KBD_LABEL}</button>`
   + LETTERS.map((l) => `<button data-l="${l}">${l}</button>`).join("");
 export function letterMenu(root, onPick, opts = {}) {
   const nav = h(`<nav class="submenu letters">${letterButtons()}</nav>`);
@@ -215,10 +220,10 @@ export function applyKey(value, start, end, key) {
 
 // wybór otwartej klawiatury, jeden klucz dla AIRCRAFT i CALLSIGN: "1" otwarta, "0" zamknięta, "" = jeszcze nie wybrano
 export const KEYBOARD_KEY = "letters.keyboard";
-// Klawiatura pod listą zakładki: input = pole wyszukiwania, button = KEYBOARD z letterMenu (może być null).
+// Klawiatura pod listą zakładki: input = pole wyszukiwania, button = przycisk "()" z letterMenu (może być null).
 // Klawisz wpisuje w miejscu kursora (pole bez fokusu: na końcu) i wysyła zdarzenie input, więc wyszukiwanie z debounce
 // działa jak przy zwykłym pisaniu; pointerdown bez domyślnej akcji zostawia fokus w polu. Otwarta klawiatura ustawia
-// inputmode=none (bez klawiatury systemu na tablecie, kursor zostaje). KEYBOARD przełącza (nie krok do cofnięcia);
+// inputmode=none (bez klawiatury systemu na tablecie, kursor zostaje). Przycisk "()" przełącza (nie krok do cofnięcia);
 // bez zapisanego wyboru klawiatura otwarta tylko przy dotykowym wskaźniku (pointer: coarse).
 // Zwraca { el, sync }: el zakładka wstawia na koniec panelu, sync() w activate() ustawia stan wg wyboru (zmienionego
 // może w drugiej zakładce).
@@ -399,6 +404,10 @@ export function lsGet(key) {
 }
 export function lsSet(key, value) {
   try { localStorage.setItem(key, value); } catch { /* tryb prywatny */ }
+}
+// 0.13.2: usunięcie klucza, który już nic nie znaczy (np. dawna lista stacji METAR PL i TAF PL)
+export function lsDel(key) {
+  try { localStorage.removeItem(key); } catch { /* tryb prywatny */ }
 }
 
 // Wybór przekazywany między zakładkami tego okna (stanowisko HOME ↔ AERODROME › OVERVIEW): zapis także w localStorage

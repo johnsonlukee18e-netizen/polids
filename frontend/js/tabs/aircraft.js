@@ -192,7 +192,8 @@ export default {
       <div class="ac-list"><table class="data ac-table">${tableHead()}<tbody></tbody></table></div>
     </div>`);
     root.append(pane);
-    // 0.13.1: klawiatura dotykowa (KEYBOARD pod ALL) zawsze ostatnia w panelu, pod przewijaną listą
+    // 0.13.1: klawiatura dotykowa (przycisk "()" pod ALL, do 0.13.2 KEYBOARD) zawsze ostatnia w panelu, pod
+    // przewijaną listą
     const kbd = touchKeyboard(pane.querySelector(".q"), letters.kbd);
     pane.append(kbd.el);
     const $ = (s) => pane.querySelector(s);

@@ -1,10 +1,13 @@
-import { api, BASEMAPS, esc, frameGo, h, splitTaf, subtabs, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
+import { api, BASEMAPS, esc, frameGo, h, splitTaf, subtabs, lsDel, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
 import { CIVIL_ALT, SR_ALT, latLonTxt, nightRings, subsolarPoint, sunElevation, sunState, wrapLon } from "../solar.js";
 import { qnhMap } from "../qnhmap.js";
 import { MODE_KEY, wxMode, wxTable } from "../metarfmt.js";
+import { AD2 } from "./aip.js";
 
 // listy domyślne alfabetycznie (wyniki i tak są sortowane po ICAO)
-const PL_CIV = "EPBY EPGD EPKK EPKT EPLB EPLL EPMO EPPO EPRA EPRZ EPSC EPSY EPWA EPWR EPZG";
+// 0.13.2 (issue #27): METAR PL i TAF PL to zawsze wszystkie lotniska IFR, czyli lista AD CIV (AD2 w aip.js: lotniska
+// z częścią AD 2 eAIP IFR, ta sama co eaip.AD2_AERODROMES w backendzie), a nie własna kopia kodów
+export const PL_IFR = AD2.map(([icao]) => icao).sort().join(" ");
 const PL_MIL = "EPCE EPDA EPDE EPIR EPKS EPLK EPLY EPMB EPMI EPMM EPOK EPPR EPPW EPSN EPTM";
 const INTL = "EDDB EDDF EDDM EKCH ESSA EVRA EYVI LKPR LOWW LZIB UKLL";
 
@@ -40,14 +43,21 @@ const normIds = (s) => [...new Set(String(s || "").toUpperCase().split(/[\s,;]+/
 
 // METAR i TAF jak strona METAR w PANDORZE (0.13.1): tabela stacja | komunikat w kolorach grup, zjawiska z opisem
 // [EN / PL], u góry COLOURED / MONO (wybór zapamiętany w przeglądarce, wspólny dla pięciu list; metarfmt.js)
-function wxList(kind, defaults, key) {
+// 0.13.2 (issue #27): fixed = lista stała (METAR PL i TAF PL: wszystkie lotniska IFR, PL_IFR), jak w realnym systemie
+// bez pola stacji i bez Show; zostają COLOURED / MONO, odświeżanie co 2 min i czas pobrania. Wybór stacji zapisany
+// w starszej wersji pod key (meteo.metar.pl, meteo.taf.pl) niczego już nie zawęża i jest usuwany. Lotnisko bez
+// komunikatu stoi na liście z NIL (backend zwraca każdy kod, metarfmt.js wxRow). METAR MIL, METAR INTL i TAF INTL
+// bez zmian: pole stacji (lista zapamiętana pod key) i Show.
+function wxList(kind, defaults, key, { fixed = false } = {}) {
   return (pane) => {
-    pane.append(h(`<div class="mtr">
+    if (fixed) lsDel(key);
+    const field = fixed ? "" : `
+        <input type="text" class="ids" value="${esc(normIds(lsGet(key) || defaults))}">
+        <button class="btn primary go">Show</button>`;
+    pane.append(h(`<div class="mtr${fixed ? " fixed" : ""}">
       <div class="toolbar mtr-bar">
         <span class="mt-mode"><button data-mode="coloured" title="Groups in colour">COLOURED</button><button data-mode="mono"
-          title="All text in one colour">MONO</button></span>
-        <input type="text" class="ids" value="${esc(normIds(lsGet(key) || defaults))}">
-        <button class="btn primary go">Show</button>
+          title="All text in one colour">MONO</button></span>${field}
         <label class="sc"><input type="checkbox" class="auto" checked> refresh every 2 min</label>
         <span class="hint upd"></span>
       </div>
@@ -70,9 +80,11 @@ function wxList(kind, defaults, key) {
     // następnej podzakładki, więc spóźniona odpowiedź nie może do niego pisać
     let dead = false;
     const load = async () => {
-      const ids = normIds($(".ids").value);
-      $(".ids").value = ids;
-      lsSet(key, ids);
+      const ids = normIds(fixed ? defaults : $(".ids").value);
+      if (!fixed) {
+        $(".ids").value = ids;
+        lsSet(key, ids);
+      }
       try {
         // METAR i TAF alfabetycznie po ICAO (odpowiedź też sortujemy, gdyby backend zmienił kolejność)
         const rows = (await api(`/api/meteo/${kind}?ids=${encodeURIComponent(ids.split(" ").join(","))}`)).sort((a, b) => a.icao.localeCompare(b.icao));
@@ -81,8 +93,10 @@ function wxList(kind, defaults, key) {
         $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
       } catch (e) { if (!dead) $(".mtr-list").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
     };
-    $(".go").addEventListener("click", load);
-    $(".ids").addEventListener("keydown", (e) => e.key === "Enter" && load());
+    if (!fixed) {
+      $(".go").addEventListener("click", load);
+      $(".ids").addEventListener("keydown", (e) => e.key === "Enter" && load());
+    }
     const timer = setInterval(() => $(".auto")?.checked && load(), 120000);
     // serwer wrócił (okno run.bat uruchomione ponownie): komunikat błędu od razu zastępują dane
     const online = () => $(".mtr-list .error") && load();
@@ -689,10 +703,10 @@ export default {
     // kolejność z issue #13 i #18: METAR i TAF, odstęp, WIND i RADAR (środkowa grupa, issue #18), odstęp, GAMET, SIGWX,
     // ICING, QNH, SAT EUR, SAT PL, TURB, SUN
     subtabs(root, [
-      { id: "metar-pl", label: "METAR PL", render: wxList("metar", PL_CIV, "meteo.metar.pl") },
+      { id: "metar-pl", label: "METAR PL", render: wxList("metar", PL_IFR, "meteo.metar.pl", { fixed: true }) },
       { id: "metar-mil", label: "METAR MIL", render: wxList("metar", PL_MIL, "meteo.metar.mil") },
       { id: "metar-intl", label: "METAR INTL", render: wxList("metar", INTL, "meteo.metar.intl") },
-      { id: "taf-pl", label: "TAF PL", render: wxList("taf", PL_CIV, "meteo.taf.pl") },
+      { id: "taf-pl", label: "TAF PL", render: wxList("taf", PL_IFR, "meteo.taf.pl", { fixed: true }) },
       { id: "taf-intl", label: "TAF INTL", render: wxList("taf", INTL, "meteo.taf.intl") },
       { sep: true },
       { id: "wind", label: "WIND", fill: true, render: windy("wind") },
