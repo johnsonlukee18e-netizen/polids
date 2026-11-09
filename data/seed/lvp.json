@@ -1,5 +1,5 @@
 {
-  "_uwaga": "Progi LVP (Low Visibility Procedures) z AIP (AIRAC AMDT 10-26, 01.10.2026): AD 2.22 lotnisk IFR, AIP MIL AD 4.20. Fazy: prep = przygotowanie (gdy AIP je podaje), lvp = wprowadzenie, cancel = odwołanie. Warunek [op, wartość]: op jak w AIP (<, <=, >, >=). rvr_m = RVR z METAR (najniższy z pasów), bez grupy RVR widzialność; ceiling_ft = podstawa chmur BKN/OVC/VV ('chmury pokrywające więcej niż połowę nieba'); vis_m = widzialność z METAR (lotniska wojskowe), rvr_eq_m = odpowiednik RVR z AIP, używany tylko, gdy METAR nie podaje widzialności. logic: or = wystarczy jeden warunek, and = wszystkie (AIP pisze przy odwołaniu czasem 'i/lub', liczymy wtedy 'i', jak wprost w AD 2.22 EPKT, EPRZ i EPLB). Histereza: LVP trwa, dopóki nie są spełnione warunki odwołania; po odwołaniu stan 'LVP ODWOŁANE' przez 30 min. Tendencji (poprawa / pogorszenie) z METAR nie oceniamy. scope DEP = LVP tylko dla odlotów (lotniska wojskowe). applies false = AIP nie przewiduje LVP (reason). verified false = progi niesprawdzone z AIP. DEFAULT dotyczy lotnisk bez wpisu (lotniska VFR i nieopublikowane w AIP).",
+  "_uwaga": "Progi LVP (Low Visibility Procedures) z AIP (AIRAC AMDT 10-26, 01.10.2026; 0.13.2, issue #27: wszystkie wpisy oprócz EPWA porównane z eAIP AIRAC AMDT 11-26, 29.10.2026 – EPSY i EPMO wprowadzenie przy podstawie ≤ 200 ft, lotniska wojskowe odwołanie przy widzialności ≥ 800 m; EPWA bez zmian: tekst AD 2.22 z AMDT 10-26, strona eAIP EPWA za duża do odczytania w całości): AD 2.22 lotnisk IFR, AIP MIL AD 4.20. Fazy: prep = przygotowanie (gdy AIP je podaje), lvp = wprowadzenie, cancel = odwołanie. Warunek [op, wartość]: op jak w AIP (<, <=, >, >=). rvr_m = RVR z METAR (najniższy z pasów), bez grupy RVR widzialność; ceiling_ft = podstawa chmur BKN/OVC/VV ('chmury pokrywające więcej niż połowę nieba'); vis_m = widzialność z METAR (lotniska wojskowe), rvr_eq_m = odpowiednik RVR z AIP, używany tylko, gdy METAR nie podaje widzialności. logic: or = wystarczy jeden warunek, and = wszystkie (AIP pisze przy odwołaniu czasem 'i/lub', liczymy wtedy 'i', jak wprost w AD 2.22 EPKT, EPRZ i EPLB). Histereza: LVP trwa, dopóki nie są spełnione warunki odwołania; po odwołaniu stan 'LVP ODWOŁANE' przez 30 min. Tendencji (poprawa / pogorszenie) z METAR nie oceniamy. scope DEP = LVP tylko dla odlotów (lotniska wojskowe). applies false = AIP nie przewiduje LVP (reason). verified false = progi niesprawdzone z AIP. DEFAULT dotyczy lotnisk bez wpisu (lotniska VFR i nieopublikowane w AIP).",
   "DEFAULT": {"applies": false, "reason": "No LVP in AIP (VFR aerodrome or no AIP data)"},
   "EPWA": {
     "source": "AIP AD 2.22 para 7.1.2.1-7.1.2.2",
@@ -15,10 +15,10 @@
     "cancel": {"rvr_m": [">", 550], "ceiling_ft": [">", 200], "logic": "and"}
   },
   "EPMO": {
-    "source": "AIP AD 2.22 para 5.1.2",
-    "note": "para 5.1.2.2 gives ceiling '200 ft or less', the next sentence 'below 200 ft' (taken as < 200 ft); cancellation 'and/or' taken as 'and', with further improvement expected",
+    "source": "AIP AD 2.22 para 5.2.1-5.2.3",
+    "note": "para 5.2.2 gives ceiling 'at 200 ft or lower', the unnumbered sentence after it 'below 200 ft' (taken as the numbered para: ≤ 200 ft, as at EPKK, EPGD, EPSY, EPSC, EPBY, EPLB); cancellation 'and/or' taken as 'and', with further improvement expected",
     "prep": {"rvr_m": ["<=", 800], "ceiling_ft": ["<=", 300], "logic": "or"},
-    "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<", 200], "logic": "or"},
+    "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<=", 200], "logic": "or"},
     "cancel": {"rvr_m": [">=", 600], "ceiling_ft": [">=", 200], "logic": "and"}
   },
   "EPLL": {
@@ -28,9 +28,9 @@
     "cancel": {"rvr_m": [">=", 550], "ceiling_ft": [">=", 200], "logic": "and"}
   },
   "EPSY": {
-    "source": "AIP AD 2.22 para 4.2",
-    "note": "new AMDT 10-26 text reconstructed from a page mixed with the old text (formerly: preparation 800 m / 300 ft, cancellation 600 m and 200 ft); no preparation phase in AIP",
-    "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<", 200], "logic": "or"},
+    "source": "AIP AD 2.22 para 4.2.1-4.2.2",
+    "note": "para 4.2.1 'ceiling falls to 200 ft or below' (AMDT 11-26); no preparation phase in AIP",
+    "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<=", 200], "logic": "or"},
     "cancel": {"rvr_m": [">=", 550], "ceiling_ft": [">", 200], "logic": "and"}
   },
   "EPKK": {
@@ -46,14 +46,14 @@
     "cancel": {"rvr_m": [">=", 600], "ceiling_ft": [">=", 200], "logic": "and"}
   },
   "EPRZ": {
-    "source": "AIP AD 2.22 para 4.1",
+    "source": "AIP AD 2.22 para 4.1.1-4.1.4",
     "note": "after LVP cancellation the aerodrome returns to the preparation phase",
     "prep": {"rvr_m": ["<=", 800], "ceiling_ft": ["<=", 300], "logic": "or"},
     "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<", 200], "logic": "or"},
     "cancel": {"rvr_m": [">=", 600], "ceiling_ft": [">=", 200], "logic": "and"}
   },
   "EPLB": {
-    "source": "AIP AD 2.22 para 5.1",
+    "source": "AIP AD 2.22 para 5.1.1-5.1.3",
     "prep": {"rvr_m": ["<=", 800], "ceiling_ft": ["<=", 300], "logic": "or"},
     "lvp": {"rvr_m": ["<", 550], "ceiling_ft": ["<=", 200], "logic": "or"},
     "cancel": {"rvr_m": [">=", 600], "ceiling_ft": [">", 200], "logic": "and"}
@@ -86,39 +86,39 @@
   "EPRA": {"applies": false, "reason": "No LVP in AIP (AD 2.20 and AD 2.22 without LVP)", "source": "AIP AD 2.20, AD 2.22"},
   "EPZG": {"applies": false, "reason": "AIP: no LVO at EPZG", "source": "AIP AD 2.22 para 3"},
   "EPKS": {
-    "source": "AIP MIL AD 4.20 para 2", "scope": "DEP",
-    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated)",
+    "source": "AIP MIL AD 4.20 para 2.2.1-2.2.4", "scope": "DEP",
+    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated); LVP suspended when the visibility falls below 400 m",
     "prep": {"vis_m": ["<=", 1200], "rvr_eq_m": 800, "logic": "or"},
     "lvp": {"vis_m": ["<=", 800], "rvr_eq_m": 550, "logic": "or"},
-    "cancel": {"vis_m": [">", 800], "rvr_eq_m": 550, "logic": "and"}
+    "cancel": {"vis_m": [">=", 800], "rvr_eq_m": 550, "logic": "and"}
   },
   "EPMB": {
-    "source": "AIP MIL AD 4.20 para 2", "scope": "DEP",
-    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated)",
+    "source": "AIP MIL AD 4.20 para 2.2.1-2.2.4", "scope": "DEP",
+    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated); LVP suspended when the visibility falls below 400 m",
     "prep": {"vis_m": ["<=", 1200], "rvr_eq_m": 800, "logic": "or"},
     "lvp": {"vis_m": ["<=", 800], "rvr_eq_m": 550, "logic": "or"},
-    "cancel": {"vis_m": [">", 800], "rvr_eq_m": 550, "logic": "and"}
+    "cancel": {"vis_m": [">=", 800], "rvr_eq_m": 550, "logic": "and"}
   },
   "EPMI": {
-    "source": "AIP MIL AD 4.20 para 3", "scope": "DEP",
-    "note": "departures only (TWR may skip LVP with no departures); preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated)",
+    "source": "AIP MIL AD 4.20 para 3.2.1-3.2.4", "scope": "DEP",
+    "note": "departures only (TWR may skip LVP with no departures); preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated); LVP suspended when the visibility falls below 400 m",
     "prep": {"vis_m": ["<=", 1200], "rvr_eq_m": 800, "logic": "or"},
     "lvp": {"vis_m": ["<=", 800], "rvr_eq_m": 550, "logic": "or"},
-    "cancel": {"vis_m": [">", 800], "rvr_eq_m": 550, "logic": "and"}
+    "cancel": {"vis_m": [">=", 800], "rvr_eq_m": 550, "logic": "and"}
   },
   "EPPW": {
-    "source": "AIP MIL AD 4.20 para 3", "scope": "DEP",
-    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated)",
+    "source": "AIP MIL AD 4.20 para 3.2.1-3.2.4", "scope": "DEP",
+    "note": "departures only; preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated); LVP suspended when the visibility falls below 400 m",
     "prep": {"vis_m": ["<=", 1200], "rvr_eq_m": 800, "logic": "or"},
     "lvp": {"vis_m": ["<=", 800], "rvr_eq_m": 550, "logic": "or"},
-    "cancel": {"vis_m": [">", 800], "rvr_eq_m": 550, "logic": "and"}
+    "cancel": {"vis_m": [">=", 800], "rvr_eq_m": 550, "logic": "and"}
   },
   "EPSN": {
-    "source": "AIP MIL AD 4.20 para 2", "scope": "DEP",
-    "note": "departures only (TWR may skip LVP with no departures); preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated)",
+    "source": "AIP MIL AD 4.20 para 2.2.1-2.2.4", "scope": "DEP",
+    "note": "departures only (TWR may skip LVP with no departures); preparation with a decreasing trend, cancellation with an increasing trend (METAR trend not evaluated); LVP suspended when the visibility falls below 400 m",
     "prep": {"vis_m": ["<=", 1200], "rvr_eq_m": 800, "logic": "or"},
     "lvp": {"vis_m": ["<=", 800], "rvr_eq_m": 550, "logic": "or"},
-    "cancel": {"vis_m": [">", 800], "rvr_eq_m": 550, "logic": "and"}
+    "cancel": {"vis_m": [">=", 800], "rvr_eq_m": 550, "logic": "and"}
   },
   "EPDE": {"applies": false, "reason": "No LVP in AIP MIL", "source": "AIP MIL AD 4.20-4.22"},
   "EPLK": {"applies": false, "reason": "No LVP in AIP MIL", "source": "AIP MIL AD 4.20-4.22"},

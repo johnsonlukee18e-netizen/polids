@@ -152,11 +152,21 @@ function sunPhase(sun) {
   return "NIGHT";
 }
 
-// VMC w strefie kontrolowanej lotniska (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft
-function vmc(p) {
-  if (!p || (!has(p.visibility_m) && !p.flight_category)) return null;
-  const imc = ["IFR", "LIFR"].includes(p.flight_category) || (p.visibility_m ?? 9999) < 5000 || (p.ceiling_ft ?? 99999) < 1500;
-  return imc ? "IMC" : "VMC";
+// VMC w strefie kontrolowanej lotniska (SERA.5005): widzialność ≥ 5 km i podstawa chmur ≥ 1500 ft.
+// 0.13.2 (issue #27): stan liczy tylko serwer (parsed.vmc i parsed.vmc_reason z metar.ctr_conditions, ta sama reguła
+// co "IMC conditions" przy wyborze pasa); dotąd przeglądarka miała własną kopię reguły, która przy samych grupach RVR
+// dawała kreskę, a przy VV///, //////, BKN/// i METAR bez widzialności VMC. Tutaj tylko wygląd pola: VMC, IMC albo
+// kreska (METAR nie pozwala ocenić), kategoria lotu pod spodem i dymek z powodem; tendencja (BECMG / TEMPO) nie zmienia
+// stanu, więc dymek ją pokazuje osobno.
+function vmcBox(p) {
+  const v = p && (p.vmc === "VMC" || p.vmc === "IMC") ? p.vmc : null;
+  const why = p ? p.vmc_reason : "no METAR";
+  const tip = [v ? `${v}: ${why || ""}` : `VMC / IMC unknown${why ? ": " + why : ""}`,
+    "VMC in the CTR: visibility \u2265 5 km and cloud ceiling \u2265 1500 ft",
+    p?.trend && p.trend !== "NOSIG" ? `Trend (not included): ${p.trend}` : "",
+    p?.flight_category ? `Flight category: ${p.flight_category}` : ""];
+  return { text: v || "\u2013", cls: v ? v.toLowerCase() : "", cat: p?.flight_category || "",
+    tip: tip.filter(Boolean).join("\n") };
 }
 
 const metarWind = (p) => {
@@ -166,8 +176,11 @@ const metarWind = (p) => {
   return `${dir}${pad(p.wind_speed, 2)}${p.wind_gust ? "G" + p.wind_gust : ""}KT${has(p.wind_var_from) ? ` ${pad(p.wind_var_from, 3)}V${pad(p.wind_var_to, 3)}` : ""}`;
 };
 const visText = (p) => (!p || !has(p.visibility_m) ? "–" : p.cavok ? "CAVOK" : p.visibility_m >= 9999 ? "≥10 KM" : `${p.visibility_m} M`);
-const cloudList = (p) => (!p ? [] : p.clouds?.length
-  ? p.clouds.map((c) => `${c.cover} ${has(c.base_ft) ? c.base_ft : "///"} FT${c.type ? " " + c.type : ""}`) : [p.cavok ? "CAVOK" : "NSC"]);
+// 0.13.2: bez warstw CAVOK, NSC / NCD z METAR albo kreska (dotąd zawsze NSC, także przy NCD i bez grupy chmur);
+// warstwa stacji AUTO bez ilości i wysokości (//////) jednym napisem
+const cloudText = (c) => (c.cover === "///" && !has(c.base_ft) ? "//////"
+  : `${c.cover} ${has(c.base_ft) ? c.base_ft : "///"} FT`) + (c.type ? " " + c.type : "");
+const cloudList = (p) => (!p ? [] : p.clouds?.length ? p.clouds.map(cloudText) : [p.cavok ? "CAVOK" : p.sky || "\u2013"]);
 const tempText = (v) => (has(v) ? (v < 0 ? "M" + Math.abs(v) : String(v)) : "–");
 // RVR: P2000 → >2000, M0050 → <50, 0350V0600 → 350–600; tendencja U/D/N jako strzałka
 function rvrText(r) {
@@ -604,10 +617,10 @@ RVR without a reported value: >2000 M at visibility ≥ 1500 m (9999, CAVOK), si
     lv.innerHTML = { prep: "LVP<small>PREP</small>", cancel: `LVP<small>CNL ${esc(lvp.since || "")}</small>`,
       na: "LVP<small>N/A</small>" }[ls.cls] || "LVP";
     lv.title = [ls.label, ...(lvp.reasons || []), lvpTip(st.lvp)].filter(Boolean).join("\n");
-    const v = vmc(p), vm = $(".aw-vmc");
-    vm.className = "aw-box aw-vmc " + (v || "").toLowerCase();
-    vm.innerHTML = `${v || "–"}${p?.flight_category ? `<small>${esc(p.flight_category)}</small>` : ""}`;
-    vm.title = "VMC in the CTR: visibility ≥ 5 km and cloud ceiling ≥ 1500 ft" + (p?.flight_category ? `\nFlight category: ${p.flight_category}` : "");
+    const vb = vmcBox(p), vm = $(".aw-vmc");
+    vm.className = "aw-box aw-vmc" + (vb.cls ? " " + vb.cls : "");
+    vm.innerHTML = `${vb.text}${vb.cat ? `<small>${esc(vb.cat)}</small>` : ""}`;
+    vm.title = vb.tip;
     $(".aw-sun").innerHTML = sun ? `<span class="k">Sun UTC · ${sunPhase(sun)}</span><span class="aw-sunrow">${[["BMCT", sun.civil_dawn, "beginning of morning civil twilight"],
       ["SR", sun.sunrise, "sunrise"], ["SS", sun.sunset, "sunset"], ["EECT", sun.civil_dusk, "end of evening civil twilight"]]
       .map(([k, t, tip]) => `<span title="${tip}"><i>${k}</i>${t || "--:--"}</span>`).join("")}</span>` : "";
@@ -785,4 +798,4 @@ RVR without a reported value: >2000 M at visibility ≥ 1500 m (9999, CAVOK), si
 
 // do testów symulacji wiatru i RVR oraz układu, pasów kolumn i ręcznego wyboru (node)
 export const awosSim = { windBasis, WindField, Sensor, metarAge, RvrRunway, rvrFor, rvrCode, rvrSlot, rwyNorm, rvrText, atisLines,
-  autoMode, autoRunways, manualPick, manualKeep };
+  autoMode, autoRunways, manualPick, manualKeep, vmcBox, cloudList };

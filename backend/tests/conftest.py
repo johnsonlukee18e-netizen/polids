@@ -24,11 +24,14 @@ def state(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def lvp_memory():
-    """Stan LVP ma histerezę (pamięć poprzedniego METAR); każdy test zaczyna bez historii."""
-    from backend.app.services import lvp
+    """Stan LVP ma histerezę (pamięć poprzedniego METAR); każdy test zaczyna bez historii. 0.13.2: także bez pamięci
+    najnowszych METAR-ów (weather.newest)."""
+    from backend.app.services import lvp, weather
     lvp.reset_memory()
+    weather.reset_newest()
     yield
     lvp.reset_memory()
+    weather.reset_newest()
 
 
 def _eaip_offline_client():

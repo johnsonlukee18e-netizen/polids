@@ -254,10 +254,12 @@ function value(label, v, extra = "") {
 
 export default {
   mount(root, ctx) {
-    // Podmenu jak w PANDORZE: 0 = OVERVIEW całego FIR EPWW (overview.js), dalej listy lotnisk FIR-ów (aerolist.js):
+    // Podmenu jak w PANDORZE: () = OVERVIEW całego FIR EPWW (overview.js), dalej listy lotnisk FIR-ów (aerolist.js):
     // lotnisko polskie z bazy otwiera INFO / AWOS / TRAFFIC (dawniej PRZEGLĄD / AWOS / RUCH), pozostałe kartę z METAR,
     // TAF i stanowiskami.
-    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="OVERVIEW: whole FIR EPWW">0</button>
+    // 0.13.2 (issue #27): przycisk OVERVIEW ma napis "()" zamiast "0"; identyfikator zostaje "0" (data-fir, adres
+    // #aerodrome/0, zapisany ostatni ekran aerodrome.last), więc stare odnośniki i ustawienia działają dalej.
+    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="OVERVIEW: whole FIR EPWW">()</button>
       ${FIR_KEYS.map((k) => `<button data-fir="${k}" title="${esc(FIR_LABELS[k])}">${k}</button>`).join("")}</nav>`);
     root.append(sub);
     const pane = h(`<div class="pane aero-pane">
@@ -274,14 +276,15 @@ export default {
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
     // lotnisko pełnej strony; ustawienie serwera default_aerodrome tylko wypełnia nim pole ICAO, zanim użytkownik coś
-    // wybierze (pierwsze otwarcie AERODROME to zawsze 0, potem ostatni ekran: initial() niżej)
+    // wybierze (pierwsze otwarcie AERODROME to zawsze () = OVERVIEW, potem ostatni ekran: initial() niżej)
     let icao = lsGet("aerodrome.icao") || ctx.config.default_aerodrome || "EPWA";
     let timer = null;
     // widok: PRZEGLĄD (siatka poniżej), AWOS (awos.js) albo RUCH (paski EFES, dman.js); w adresie: #aerodrome/EPWA,
     // #aerodrome/EPWA/awos, #aerodrome/EPWA/ruch (krok do cofnięcia). AWOS i RUCH mają własne zegary sprzątane
     // przy zmianie widoku.
     let view = "overview", awos = null, strips = null;
-    // tryb ekranu: "ov" (0 = OVERVIEW), "list" (lista FIR-u), "page" (lotnisko z bazy: PRZEGLĄD/AWOS/RUCH), "card" (karta)
+    // tryb ekranu: "ov" (() = OVERVIEW, w adresie "0"), "list" (lista FIR-u), "page" (lotnisko z bazy:
+    // PRZEGLĄD/AWOS/RUCH), "card" (karta)
     let mode = null, state = null, ov = null, list = null, listKey = null, card = null, cardIcao = null;
     // filtr, wybrany wiersz i przewinięcie listy: każdy wpis historii z listą ma swoje (stash w api.js, ← i Wstecz wracają
     // do listy z jej filtrem, także gdy tę samą listę otwarto później z innym); listState: ostatni stan każdej listy
@@ -455,7 +458,8 @@ export default {
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
       $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
-      const clouds = (p.clouds || []).map((c) => `${c.cover}${c.base_ft !== null ? String(c.base_ft / 100).padStart(3, "0") : "///"}${c.type || ""}`).join(" ") || (p.cavok ? "CAVOK" : "NSC");
+      // 0.13.2: bez warstw CAVOK, NSC / NCD z METAR albo kreska (dotąd zawsze NSC, także przy NCD i bez grupy chmur)
+      const clouds = (p.clouds || []).map((c) => `${c.cover}${c.base_ft !== null ? String(c.base_ft / 100).padStart(3, "0") : "///"}${c.type || ""}`).join(" ") || (p.cavok ? "CAVOK" : p.sky || "\u2013");
       const rvr = (p.rvr || []).map((x) => `R${x.runway} ${x.value}`).join("<br>") || "–";
       const obs = obsInfo(p.time);
       const gust = p.wind_gust ? ` <span class="gust">G${p.wind_gust}</span>` : "";
@@ -515,7 +519,7 @@ export default {
       strips = null;
     };
 
-    // 0: cały FIR EPWW (overview.js) w miejscu siatki lotniska
+    // () (adres "0"): cały FIR EPWW (overview.js) w miejscu siatki lotniska
     const showOverview = () => {
       markSub("0");
       // już otwarty: zostaje ze swoim filtrem i zaznaczeniami checklisty, chyba że w HOME wybrano inne stanowisko
@@ -613,7 +617,7 @@ export default {
       timer = setInterval(load, 60000);
     };
 
-    // Ostatni ekran (0 albo lotnisko z widokiem) na następne uruchomienie: zapisany dopiero, gdy wiadomo, że lotnisko
+    // Ostatni ekran ("0" = OVERVIEW albo lotnisko z widokiem) na następne uruchomienie: zapisany dopiero, gdy wiadomo, że lotnisko
     // istnieje (w bazie albo karta się wczytała), więc literówka (ZZZZ) nie zostaje ekranem startowym.
     const saveLast = (cardOk = false) => {
       if (!state || state.startsWith("fir/")) return;
@@ -649,7 +653,7 @@ export default {
       a = show(a, opts);
       remember("aerodrome", a);
     };
-    // pierwsze otwarcie z menu: ostatni ekran albo 0 (także z kluczy zapisanych przez wersje do 0.12: lotnisko i widok)
+    // pierwsze otwarcie z menu: ostatni ekran albo "0" = OVERVIEW (także z kluczy zapisanych przez wersje do 0.12: lotnisko i widok)
     const initial = () => {
       const last = aeroArg(lsGet("aerodrome.last"));
       if (last && !last.startsWith("fir/")) return last;

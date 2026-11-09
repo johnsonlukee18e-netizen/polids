@@ -1,7 +1,8 @@
 """0.12.3: CALLSIGN › ALL („Wszystkie rekordy”) pobiera najwyżej LIMIT znaków wywoławczych (w bazie ~7000). Obcięta lista
 nie może udawać pełnej: licznik mówi „first N shown” i podpowiada literę albo wyszukiwanie, jak AIRCRAFT.
 Zakładka montowana w Node z zastępczym api.js (h, api, letterMenu, touchKeyboard), bez przeglądarki.
-0.13.1 (issue #25): klawiatura dotykowa (KEYBOARD pod ALL) na końcu panelu, przewija się tylko lista (.cs-list)."""
+0.13.1 (issue #25): klawiatura dotykowa (przycisk "()" pod ALL, do 0.13.2 KEYBOARD) na końcu panelu, przewija się
+tylko lista (.cs-list)."""
 import json
 import shutil
 import subprocess
@@ -25,7 +26,7 @@ export const pane = { querySelector: (s) => parts[s], append: (x) => appended.pu
 export const h = () => pane;
 export const esc = (s) => String(s ?? "");
 export const debounce = (f) => f;
-// przycisk KEYBOARD z letterMenu i klawiatura: zapis wywołań (pole, przycisk) i sync()
+// przycisk "()" z letterMenu i klawiatura: zapis wywołań (pole, przycisk) i sync()
 export const KBD = { name: "kbd-button" };
 export const letterMenu = () => ({ set() {}, kbd: KBD });
 export const keyboards = [];
@@ -97,7 +98,7 @@ def test_limit_in_request_matches_hint(js):
 
 
 def test_touch_keyboard_last_in_pane(js):
-    """Jedna klawiatura na montowanie, dla pola wyszukiwania i przycisku KEYBOARD, dołączona na końcu panelu (po liście);
+    """Jedna klawiatura na montowanie, dla pola wyszukiwania i przycisku "()", dołączona na końcu panelu (po liście);
     activate() ustawia jej stan wg wspólnego wyboru (sync) przed fokusem w polu."""
     assert len(js["keyboards"]) == 5 and all(k["inputIsQ"] and k["buttonIsKbd"] for k in js["keyboards"])
     assert js["appended"] == ["tkbd"] * 5

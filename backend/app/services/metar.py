@@ -1,4 +1,13 @@
-"""Prosty parser METAR wystarczający dla widoku AWOS (wiatr, widzialność, chmury, QNH, temperatura)."""
+"""Prosty parser METAR wystarczający dla widoku AWOS (wiatr, widzialność, chmury, QNH, temperatura).
+
+0.13.2 (issue #27): VMC / IMC w strefie kontrolowanej lotniska liczymy w jednym miejscu (ctr_conditions) i oddajemy
+w polach vmc / vmc_reason każdego zdekodowanego METAR-u; AWOS i wybór pasa (runways.py, "IMC conditions") biorą wynik
+stąd, frontend nie ma własnej reguły. Reguła SERA.5005(b): VMC = widzialność przy ziemi ≥ 5 km i podstawa chmur
+(ceiling: BKN, OVC albo VV) ≥ 1500 ft. Liczy się sama obserwacja: zmiany zapowiadane w tendencji (BECMG, TEMPO)
+nie zmieniają stanu. IMC także przy zakrytym niebie bez wartości (VV///) i przy samych grupach RVR bez widzialności
+(RVR podaje się przy widzialności albo RVR poniżej 1500 m). Gdy METAR nie pozwala potwierdzić VMC (brak widzialności,
+chmury bez podstawy BKN/// albo nieobserwowane //////, brak jakiejkolwiek informacji o chmurach), stan jest nieznany
+(None) z powodem w vmc_reason, a nie VMC jak dotąd."""
 
 import re
 from dataclasses import asdict, dataclass, field
@@ -7,7 +16,12 @@ WIND_RE = re.compile(r"^(?P<dir>\d{3}|VRB)(?P<spd>\d{2,3})(?:G(?P<gust>\d{2,3}))
 VAR_RE = re.compile(r"^(?P<from>\d{3})V(?P<to>\d{3})$")
 VIS_RE = re.compile(r"^(?P<vis>\d{4})(?P<ndv>NDV)?$")
 RVR_RE = re.compile(r"^R(?P<rwy>\d{2}[LCR]?)/(?P<val>[PM]?\d{4}(?:V[PM]?\d{4})?)(?:FT)?(?P<trend>[UDN])?$")
-CLOUD_RE = re.compile(r"^(?P<cov>FEW|SCT|BKN|OVC|VV)(?P<hgt>\d{3}|///)(?P<type>CB|TCU|///)?$")
+CLOUD_RE = re.compile(r"^(?P<cov>FEW|SCT|BKN|OVC|VV|///)(?P<hgt>\d{3}|///)(?P<type>CB|TCU|///)?$")
+# brak chmur istotnych operacyjnie (NSC), brak chmur wykrytych przez stację automatyczną (NCD), dawne SKC / CLR
+NO_CLOUD = ("NSC", "NCD", "SKC", "CLR")
+# SERA.5005(b): VFR w CTR lotniska tylko przy widzialności przy ziemi ≥ 5 km i podstawie chmur ≥ 1500 ft
+VMC_VIS_M = 5000
+VMC_CEILING_FT = 1500
 TEMP_RE = re.compile(r"^(?P<t>M?\d{2})/(?P<d>M?\d{2})?$")
 QNH_RE = re.compile(r"^(?P<u>[QA])(?P<v>\d{4})$")
 # zjawisko z opadem albo samo TS / SH (burza bez opadu "TS", w pobliżu "VCTS", "VCSH")
@@ -39,6 +53,11 @@ class Metar:
     trend: str | None = None
     ceiling_ft: int | None = None
     flight_category: str | None = None
+    # 0.13.2: NSC / NCD / SKC / CLR z METAR (None: grupa chmur albo brak informacji o chmurach)
+    sky: str | None = None
+    # 0.13.2: warunki w CTR wg ctr_conditions: "VMC", "IMC" albo None (nie da się ocenić) i powód po angielsku
+    vmc: str | None = None
+    vmc_reason: str | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -86,10 +105,12 @@ def parse_metar(raw: str) -> Metar:
             m.rvr.append({"runway": r["rwy"], "value": r["val"], "trend": r["trend"]})
             continue
         if c := CLOUD_RE.match(tok):
+            # "///" w miejscu ilości (stacja AUTO, np. //////, //////CB, ///015): warstwa o nieznanej ilości
             hgt = None if c["hgt"] == "///" else int(c["hgt"]) * 100
             m.clouds.append({"cover": c["cov"], "base_ft": hgt, "type": c["type"] if c["type"] != "///" else None})
             continue
-        if tok in ("NSC", "NCD", "SKC", "CLR"):
+        if tok in NO_CLOUD:
+            m.sky = m.sky or tok
             continue
         if t := TEMP_RE.match(tok):
             m.temperature, m.dewpoint = _temp(t["t"]), _temp(t["d"])
@@ -103,7 +124,44 @@ def parse_metar(raw: str) -> Metar:
     ceilings = [c["base_ft"] for c in m.clouds if c["cover"] in ("BKN", "OVC", "VV") and c["base_ft"] is not None]
     m.ceiling_ft = min(ceilings) if ceilings else None
     m.flight_category = flight_category(m.visibility_m, m.ceiling_ft)
+    m.vmc, m.vmc_reason = ctr_conditions(m)
     return m
+
+
+def ctr_conditions(m: Metar) -> tuple[str | None, str]:
+    """VMC / IMC w strefie kontrolowanej lotniska z obserwacji METAR (bez tendencji): ("VMC" | "IMC" | None, powód).
+
+    IMC, gdy choć jeden warunek SERA.5005(b) nie jest spełniony: widzialność < 5000 m, same grupy RVR bez widzialności,
+    podstawa BKN / OVC / VV < 1500 ft albo zakryte niebo bez wartości (VV///). VMC tylko wtedy, gdy METAR potwierdza
+    oba warunki: widzialność ≥ 5000 m (CAVOK = 10 km) i znane chmury bez podstawy poniżej 1500 ft (CAVOK, NSC, NCD,
+    same FEW / SCT albo ceiling ≥ 1500 ft). Inaczej None: brak widzialności, warstwa BKN / OVC bez podstawy (BKN///),
+    warstwa nieznanej ilości (//////, ///hhh) poniżej 1500 ft albo bez wysokości, brak informacji o chmurach."""
+    vis, ceil = m.visibility_m, m.ceiling_ft
+    imc, unknown = [], []
+    if vis is not None and vis < VMC_VIS_M:
+        imc.append(f"visibility {vis} m < {VMC_VIS_M} m")
+    if vis is None and m.rvr:
+        imc.append("RVR reported (visibility below 1500 m)")
+    if ceil is not None and ceil < VMC_CEILING_FT:
+        imc.append(f"ceiling {ceil} ft < {VMC_CEILING_FT} ft")
+    if any(c["cover"] == "VV" and c["base_ft"] is None for c in m.clouds):
+        imc.append("sky obscured, vertical visibility not reported")
+    if imc:
+        return "IMC", "; ".join(imc)
+    if vis is None:
+        unknown.append("visibility not reported")
+    if any(c["cover"] in ("BKN", "OVC") and c["base_ft"] is None for c in m.clouds):
+        unknown.append("cloud base not reported")
+    if any(c["cover"] == "///" and (c["base_ft"] is None or c["base_ft"] < VMC_CEILING_FT) for c in m.clouds):
+        unknown.append("cloud amount not reported")
+    if not m.clouds and not m.cavok and not m.sky:
+        unknown.append("clouds not reported")
+    if unknown:
+        return None, "; ".join(unknown)
+    if m.cavok:
+        return "VMC", "CAVOK"
+    seen = "10 km or more" if vis >= 9999 else f"{vis} m"
+    return "VMC", f"visibility {seen}, " + (f"ceiling {ceil} ft" if ceil is not None else "no ceiling")
 
 
 def flight_category(vis: int | None, ceiling: int | None) -> str | None:

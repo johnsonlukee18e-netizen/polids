@@ -5,6 +5,10 @@
    kapitalikami. MONO: wszystko jednym kolorem. Bez pogrubień, bez poświaty, ostre krawędzie. */
 .mtr { --mt-key: #35ad35; --mt-val: #a3e4ad; --mt-cov: #24802a; --mt-trend: #7f9df2; --mt-alt: #2b2b2b; }
 .mtr-bar .ids { flex: 1 1 420px; min-width: 220px; max-width: 760px; }
+/* 0.13.2 (issue #27): METAR PL i TAF PL bez pola stacji i Show (zawsze wszystkie lotniska IFR); pasek ma wysokość pola
+   (wiersz 1,4em + padding 2 x 4 px + ramka 2 x 1 px), więc tabela zaczyna się na tej samej wysokości co w METAR MIL,
+   METAR INTL i TAF INTL, a COLOURED / MONO, odświeżanie i czas stoją od lewej bez pustego miejsca po polu */
+.mtr.fixed .mtr-bar { min-height: calc(1.4em + 10px); }
 .mt-mode { display: inline-flex; gap: 10px; flex: none; }
 .mt-mode button { background: none; border: 0; border-radius: 0; padding: 2px; font: 12px var(--ui); letter-spacing: .3px;
   color: var(--bad); cursor: pointer; }

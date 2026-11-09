@@ -1,6 +1,7 @@
 """RADIO 0.13.0 (issue #23, szkic Marka): okienka FIR-ów sąsiednich w siatce (data/seed/radio_layout.json), łączenie
 okienek jednego stanowiska, wskaźniki u góry, BERLIN WEST/EAST, czerwone tło przy ograniczeniach przepływu i plakietki
-APP/TWR tylko dla zalogowanych (GET /api/radio/board i czyste funkcje radioboard.py)."""
+APP/TWR tylko dla zalogowanych (GET /api/radio/board i czyste funkcje radioboard.py). 0.13.2 (issue #27): znów jedna
+siatka całej strony wg szkicu (grid, name, room), SAS i L z powrotem w stosach EDMM i ESAA."""
 import asyncio
 import json
 import os
@@ -90,16 +91,17 @@ def short(b):
 
 # --- seed układu
 def test_layout_seed_matches_sketch():
-    """Okienka, nazwy i granice jak na szkicu Marka (ESSA = ESAA), w kolumnach A..M (1..13); 0.13.1: bez SAS
-    (EDDC_SAS_APP, EDMM) i L (ESMS_APP, ESAA) – stosy bez dziur."""
+    """Okienka, nazwy i granice jak na szkicu Marka (ESSA = ESAA), w kolumnach A..M (1..13); 0.13.2 (issue #27): znów
+    SAS (EDDC_SAS_APP, EDMM) i L (ESMS_APP, ESAA) jak w 0.13.0 i siatka całej strony w seedzie (rząd u góry, BERLIN,
+    przyciski warstw, podglądy, stan danych, legenda, komórki kodów FIR-ów)."""
     lay = json.loads(SEED.read_text("utf-8"))
     got = {f["fir"]: [(b["id"], b["upper"], b["lower"], b["col"], b["row"]) for b in f["boxes"]] for f in lay["firs"]}
     assert got == {
         "EDWW": [("MRZ", 285, 0, 2, 5), ("MAR", 285, 0, 2, 9), ("FLG", 285, 0, 2, 11)],
         "EDUU": [("OSE2", 660, 365, 3, 7), ("OSE1", 365, 285, 3, 8), ("HVL2", 660, 365, 3, 11), ("HVL1", 365, 285, 3, 12)],
         # SPE1 (Spree, kafelek EDUU SPE) na szkicu obok MEI pod nazwą EDMM, jak na zdjęciu PANDORY i w LOA
-        "EDMM": [("MEI", 315, 165, 2, 15), ("SPE1", 660, 315, 3, 15)],
-        "ESAA": [("9", 660, 365, 5, 5), ("6", 660, 365, 6, 5), ("8", 365, 195, 5, 6), ("7", 365, 0, 6, 6)],
+        "EDMM": [("MEI", 315, 165, 2, 15), ("SPE1", 660, 315, 3, 15), ("SAS", 165, 0, 2, 16)],
+        "ESAA": [("9", 660, 365, 5, 5), ("6", 660, 365, 6, 5), ("8", 365, 195, 5, 6), ("7", 365, 0, 6, 6), ("L", 195, 0, 5, 7)],
         "LKAA": [("NU", 660, 305, 5, 19), ("SU", 660, 305, 6, 19), ("NL", 305, 125, 5, 20), ("SL", 305, 125, 6, 20),
                  ("MT", 125, 0, 6, 21)],
         "UMKK": [("ACC", 999, 0, 10, 5)], "LZBB": [("U", 660, 305, 10, 19), ("BB", 305, 80, 10, 20)],
@@ -108,53 +110,80 @@ def test_layout_seed_matches_sketch():
         "UMMV": [("ACC", 660, 75, 12, 9)], "UKLV": [("RLV", 660, 55, 12, 15)]}
     # łączenie tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW
     assert {f["fir"] for f in lay["firs"] if f["merge"]} == rb.MERGE_FIRS == {"EDUU", "EDMM", "ESAA", "EYVL", "LZBB", "LKAA"}
-    # 0.13.1: wskaźniki w kolejności rzędu u góry strony, bez miejsc w siatce; bez siatki strony, przycisków, podglądów
-    # i BERLIN w seedzie (układ strony jak w 0.12.6 robi frontend)
+    # wskaźniki w kolejności rzędu u góry strony (wiersze 1–2 szkicu), bez miejsc w siatce
     assert [i["id"] for i in lay["indicators"]] == ["ACC GAT", "APP GD", "APP WA", "APP KK", "APP PO"]
     assert not any(k in i for i in lay["indicators"] for k in ("col", "row"))
-    assert set(lay) == {"note", "indicators", "firs"}
-    assert all(set(f) == {"fir", "merge", "boxes"} for f in lay["firs"])
-    assert not {"SAS", "L"} & {b["id"] for f in lay["firs"] if f["fir"] in ("EDMM", "ESAA") for b in f["boxes"]}
-    assert not {"EDDC_SAS_APP", "ESMS_APP"} & {b["callsign"] for f in lay["firs"] for b in f["boxes"]}
+    # 0.13.2: siatka strony wg szkicu – przyciski w kolumnie H (ATIS r5, LOW/MID/HIGH r6, APP r8, TWR r10, TWR/A r12,
+    # FIS r14), podglądy LOW D–G 8–17, HIGH I–K 6–17, MID H 16–21, stan danych H15, legenda A–C 18–21
+    assert set(lay) == {"note", "grid", "indicators", "berlin", "buttons", "maps", "status", "legend", "firs"}
+    assert lay["grid"] == {"cols": 13, "rows": 21, "top": 2}
+    assert lay["buttons"] == {"col": 8, "rows": {"atis": 5, "low": 6, "mid": 6, "high": 6, "app": 8, "twr": 10,
+                                                 "twra": 12, "fis": 14}}
+    assert lay["maps"] == {"low": {"col": 4, "row": 8, "cols": 4, "rows": 10}, "high": {"col": 9, "row": 6, "cols": 3, "rows": 12},
+                           "mid": {"col": 8, "row": 16, "rows": 6}}
+    assert (lay["status"], lay["legend"]) == ({"col": 8, "row": 15}, {"col": 1, "row": 18, "cols": 3, "rows": 4})
+    assert lay["berlin"] == {"col": 1, "row": 6, "box": {"col": 1, "row": 7, "cols": 2}}
+    assert all(set(f) == {"fir", "merge", "name", "boxes"} for f in lay["firs"])
+    assert {f["fir"]: (f["name"]["col"], f["name"]["row"], f["name"].get("cols", 1)) for f in lay["firs"]} == {
+        "EDWW": (2, 4, 1), "EDUU": (3, 6, 1), "EDMM": (2, 14, 1), "ESAA": (5, 4, 2), "LKAA": (5, 18, 2),
+        "UMKK": (10, 4, 1), "LZBB": (10, 18, 1), "EYVL": (13, 3, 1), "UMMV": (13, 9, 1), "UKLV": (13, 15, 1)}
+    cs = {(f["fir"], b["id"]): b["callsign"] for f in lay["firs"] for b in f["boxes"]}
+    assert (cs[("EDMM", "SAS")], cs[("ESAA", "L")]) == ("EDDC_SAS_APP", "ESMS_APP")
     for f in lay["firs"]:
         for b in f["boxes"]:
             assert b["upper"] > b["lower"] >= 0 and 1 <= b["col"] <= 13 and 1 <= b["row"] <= 21, (f["fir"], b["id"])
 
 
 def test_layout_boxes_map_to_known_callsigns(client):
-    """Każde okienko ma kafelek sąsiada i kolejność ze znanych stanowisk; okienka jednego FIR-u się nie nakładają;
-    stos ma stronę i miejsce jak w 0.12.6 (map, at) i stałe kolumny i wiersze szkicu (cols, rows)."""
+    """Każde okienko ma kafelek sąsiada i kolejność ze znanych stanowisk; 0.13.2 (issue #27): jedna siatka całej strony
+    – okienka wszystkich FIR-ów, kody FIR-ów z miejscem na nazwę i ADVISORY (room), BERLIN, przyciski, podglądy, stan
+    danych i legenda nigdzie się nie nakładają (bez stron i miejsc stosów z 0.13.1: map, at, cols, rows)."""
     d = get(client)
     vacs = json.loads((ROOT_DIR / "data" / "seed" / "vacs_epww.json").read_text("utf-8"))["neighbours"]
     labels = {n["label"] for n in vacs if not n.get("fmp")}
     lay = json.loads(SEED.read_text("utf-8"))
     for f in lay["firs"]:
         assert set(sum((b["tiles"] for b in f["boxes"]), [])) <= labels, f["fir"]
-    where = {s["fir"]: (s["map"], s["at"]) for s in rb.STACKS}
+    cells: dict[tuple[int, int], str] = {}
+
+    def take(tag, col, row, cols=1, rows=1, **_):
+        for x in range(col, col + cols):
+            for y in range(row, row + rows):
+                assert 1 <= x <= 13 and 3 <= y <= 21, (tag, x, y)
+                assert (x, y) not in cells, (tag, cells.get((x, y)))
+                cells[(x, y)] = tag
+
     for f in d["firs"]:
-        cells: dict[tuple[int, int], str] = {}
-
-        def take(tag, col, row, cols=1, rows=1):
-            for x in range(col, col + cols):
-                for y in range(row, row + rows):
-                    assert (x, y) not in cells, (tag, cells.get((x, y)))
-                    cells[(x, y)] = tag
-
-        seed = next(x for x in lay["firs"] if x["fir"] == f["fir"])["boxes"]
-        assert len(f["boxes"]) == len(seed)
-        assert set(f) == {"fir", "title", "map", "at", "merge", "cols", "rows", "staffed", "advisory", "online", "boxes"}
-        assert (f["map"], f["at"]) == where[f["fir"]], f["fir"]
-        assert f["cols"] == sorted({b["col"] for b in seed}) and f["rows"] == sorted({b["row"] for b in seed}), f["fir"]
+        seed = next(x for x in lay["firs"] if x["fir"] == f["fir"])
+        assert len(f["boxes"]) == len(seed["boxes"])
+        assert set(f) == {"fir", "title", "name", "room", "merge", "staffed", "advisory", "online", "boxes"}
+        # room: komórka kodu i wolne komórki na prawo (albo pod kodem przy prawej krawędzi), zaczyna się w kodzie
+        assert (f["room"]["col"], f["room"]["row"]) == (f["name"]["col"], f["name"]["row"]), f["fir"]
+        assert f["room"]["cols"] >= f["name"]["cols"] and f["room"]["rows"] >= f["name"]["rows"], f["fir"]
+        take(f"name {f['fir']}", **f["room"])
         for b in f["boxes"]:
             take(f"{f['fir']} {b['id']}", b["col"], b["row"], b["cols"], b["rows"])
             assert b["chain"] and b["callsign"] in b["chain"], (f["fir"], b["id"])
             assert b["callsign"] in d["pos"] and all(cs in d["pos"] for cs in b["chain"]), (f["fir"], b["id"])
             assert set(b) == {"id", "label", "col", "row", "cols", "rows", "upper", "lower", "callsign", "chain", "owner",
                               "staffed", "frequency", "members", "merged"}
-    # 0.13.1: bez siatki strony (układ jak w 0.12.6: trzy kolumny, stosy na podglądach LOW i HIGH)
-    assert "grid" not in d and not hasattr(rb, "col_kinds")
-    assert [s["fir"] for s in rb.STACKS if s["map"] == "left"] == ["ESAA", "EDWW", "EDUU", "EDMM", "LKAA"]
-    assert [s["fir"] for s in rb.STACKS if s["map"] == "right"] == ["UMKK", "EYVL", "UMMV", "UKLV", "LZBB"]
+    g = d["grid"]
+    take("berlin", **{k: v for k, v in g["berlin"].items() if k != "box"})
+    take("berlin box", **g["berlin"]["box"])
+    for k, row in g["buttons"]["rows"].items():
+        if (g["buttons"]["col"], row) not in cells:  # LOW, MID i HIGH w jednym wierszu
+            take(f"button {k}", g["buttons"]["col"], row)
+    for k, c in g["maps"].items():
+        take(f"map {k}", **c)
+    take("status", **g["status"])
+    take("legend", **g["legend"])
+    # kody przy prawej krawędzi (EYVL, UMMV, UKLV): ADVISORY pod kodem; reszta: nazwa i ADVISORY na prawo
+    room = {f["fir"]: (f["room"]["cols"], f["room"]["rows"]) for f in d["firs"]}
+    assert room == {"EDWW": (3, 1), "EDUU": (2, 1), "EDMM": (2, 1), "ESAA": (4, 1), "LKAA": (3, 1), "UMKK": (2, 1),
+                    "LZBB": (3, 1), "EYVL": (1, 2), "UMMV": (1, 2), "UKLV": (1, 2)}
+    assert [s["fir"] for s in rb.STACKS] == ["ESAA", "EDWW", "EDUU", "EDMM", "LKAA", "UMKK", "EYVL", "UMMV", "UKLV", "LZBB"]
+    assert all(set(s) == {"fir", "title"} and s["title"] for s in rb.STACKS)
+    assert g["tracks"] == rb.col_kinds(rb.layout_static(lay, {})["occupied"], 13, 8)
     assert all(i["tip"] and set(i) == {"id", "tip", "value", "positions"} for i in d["indicators"])
     # HVL2: w plikach sektorów nie ma osobnego stanowiska HVL2, obsługuje je OSE2 (EDUU_O22_CTR)
     eduu = {b["id"]: b for b in boxes(d, "EDUU")}
@@ -207,28 +236,36 @@ def test_merge_lkaa(client):
 
 
 def test_stack_axes_fixed_when_merged(client):
-    """0.13.1: kolumny i wiersze stosu (cols, rows) z okienek szkicu, nie z połączonych – stos nie zmienia rozmiaru,
-    gdy jedno stanowisko obsługuje kilka okienek; członkowie połączonego okienka mają swoje miejsca (do wysokości
-    między kafelkami na stronie)."""
-    lk = next(f for f in get(client, [ctl("LKAA_CTR", "127.125")])["firs"] if f["fir"] == "LKAA")
-    assert (lk["cols"], lk["rows"], len(lk["boxes"])) == ([5, 6], [19, 20, 21], 1)
+    """Członkowie połączonego okienka mają swoje miejsca ze szkicu (komórki i granice) – strona liczy z nich wysokości
+    między kafelkami, więc ścieżki siatki strony się nie zmieniają, gdy jedno stanowisko obsługuje kilka okienek;
+    0.13.2: siatka strony (grid) taka sama, kto by nie był online."""
+    empty = get(client)["grid"]
+    d = get(client, [ctl("LKAA_CTR", "127.125")])
+    lk = next(f for f in d["firs"] if f["fir"] == "LKAA")
+    assert len(lk["boxes"]) == 1 and d["grid"] == empty
     assert sorted((m["id"], m["col"], m["row"], m["upper"], m["lower"]) for m in lk["boxes"][0]["members"]) == [
         ("MT", 6, 21, 125, 0), ("NL", 5, 20, 305, 125), ("NU", 5, 19, 660, 305), ("SL", 6, 20, 305, 125),
         ("SU", 6, 19, 660, 305)]
-    ed = next(f for f in get(client, [ctl("EDUU_H12_CTR", "128.235")])["firs"] if f["fir"] == "EDUU")
-    assert (ed["cols"], ed["rows"]) == ([3], [7, 8, 11, 12]) and len(ed["boxes"]) == 1
-    assert (ed["map"], ed["at"]) == ("left", "w")
+    d = get(client, [ctl("EDUU_H12_CTR", "128.235")])
+    ed = next(f for f in d["firs"] if f["fir"] == "EDUU")
+    assert len(ed["boxes"]) == 1 and d["grid"] == empty
+    assert [(m["id"], m["col"], m["row"]) for m in ed["boxes"][0]["members"]] == [
+        ("OSE2", 3, 7), ("OSE1", 3, 8), ("HVL2", 3, 11), ("HVL1", 3, 12)]
 
 
 def test_merge_esaa(client):
-    # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 2 (0.13.1: bez L)
+    # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 3 z pustą komórką obok L (0.13.2: L znów jest, jak w 0.13.0)
     (b,) = boxes(get(client, [ctl("ESAA_CTR", "128.180")]), "ESAA")
-    assert short(b) == ("ESAA", 660, 0, 5, 5, 2, 2, "ESAA_CTR") and len(b["members"]) == 4
+    assert short(b) == ("ESAA", 660, 0, 5, 5, 2, 3, "ESAA_CTR") and len(b["members"]) == 5
     # ESMM_6 i ESMM_9: 6 obsługuje 6, 8, 7 – prostokąt z 9 w środku nie, więc tylko ciąg 6 + 7 w kolumnie F
     es = {b["label"]: b for b in boxes(get(client, [ctl("ESMM_6_CTR", "135.805"), ctl("ESMM_9_CTR", "135.985")]), "ESAA")}
     assert short(es["6"]) == ("6", 660, 0, 6, 5, 1, 2, "ESMM_6_CTR") and es["6"]["id"] == "6+7"
     assert short(es["8"]) == ("8", 365, 195, 5, 6, 1, 1, "ESMM_6_CTR") and not es["8"]["merged"]
-    assert es["9"]["owner"] == "ESMM_9_CTR" and set(es) == {"9", "6", "8"}
+    assert es["9"]["owner"] == "ESMM_9_CTR" and es["L"]["owner"] is None and set(es) == {"9", "6", "8", "L"}
+    # sam ESMS_APP: tylko okienko L (APP, nie łączy się z sektorami ESMM)
+    es = {b["label"]: b for b in boxes(get(client, [ctl("ESMS_APP", "120.000")]), "ESAA")}
+    assert short(es["L"]) == ("L", 195, 0, 5, 7, 1, 1, "ESMS_APP") and set(es) == {"9", "6", "8", "7", "L"}
+    assert all(b["owner"] is None for k, b in es.items() if k != "L")
 
 
 def test_merge_never_edww(client):
@@ -250,24 +287,29 @@ def test_merge_eduu_runs(client):
     assert short(b) == ("HVL1", 660, 285, 3, 7, 1, 6, "EDUU_H12_CTR")
     em = {b["label"]: b for b in boxes(d, "EDMM")}
     assert (em["SPE1"]["owner"], em["SPE1"]["frequency"], em["SPE1"]["merged"]) == ("EDUU_H12_CTR", "128.235", False)
-    assert em["MEI"]["owner"] is None and set(em) == {"MEI", "SPE1"}
+    assert em["MEI"]["owner"] is None and em["SAS"]["owner"] is None and set(em) == {"MEI", "SPE1", "SAS"}
 
 
 def test_merge_edmm_with_spree(client):
-    """EDMM_MEI_CTR sam: MEI i SPE1 (Spree za MEI w kolejności) to jedno okienko jak na szkicu (dawniej SPE1
-    w bloku EDUU obok MEI z tą samą częstotliwością, bez łączenia; 0.13.1 bez SAS)."""
+    """EDMM_MEI_CTR sam: MEI, SAS i SPE1 (Spree za MEI w kolejności) to jedno okienko jak na szkicu (dawniej SPE1
+    w bloku EDUU obok MEI z tą samą częstotliwością, bez łączenia; 0.13.2: SAS znów jest, jak w 0.13.0)."""
     d = get(client, [ctl("EDMM_MEI_CTR", "124.960")])
     (b,) = boxes(d, "EDMM")
-    assert short(b) == ("MEI", 660, 165, 2, 15, 2, 1, "EDMM_MEI_CTR") and b["frequency"] == "124.960"
-    assert sorted(m["id"] for m in b["members"]) == ["MEI", "SPE1"]
+    assert short(b) == ("MEI", 660, 0, 2, 15, 2, 2, "EDMM_MEI_CTR") and b["frequency"] == "124.960"
+    assert sorted(m["id"] for m in b["members"]) == ["MEI", "SAS", "SPE1"]
     assert all(x["owner"] is None for x in boxes(d, "EDUU"))
     f = next(f for f in d["firs"] if f["fir"] == "EDMM")
     assert f["staffed"] and not f["advisory"]
     # sam Spree: EDMM obsadzone (okienko SPE1), EDUU bez nikogo – ADVISORY pod EDUU
     d = get(client, [ctl("EDUU_SPE_CTR", "133.840")])
     em = {b["label"]: b for b in boxes(d, "EDMM")}
-    assert em["SPE1"]["owner"] == "EDUU_SPE_CTR" and em["MEI"]["owner"] is None
+    assert em["SPE1"]["owner"] == "EDUU_SPE_CTR" and em["MEI"]["owner"] is None and em["SAS"]["owner"] is None
     assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDUU"] is True
+    assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDMM"] is False
+    # sam EDDC_SAS_APP: tylko okienko SAS pod MEI (APP Drezno), EDMM obsadzone
+    d = get(client, [ctl("EDDC_SAS_APP", "120.130")])
+    em = {b["label"]: b for b in boxes(d, "EDMM")}
+    assert short(em["SAS"]) == ("SAS", 165, 0, 2, 16, 1, 1, "EDDC_SAS_APP") and em["MEI"]["owner"] is None
     assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDMM"] is False
 
 
@@ -604,7 +646,8 @@ def test_flow_tma_shapes_keyed(client):
     d = client.get("/api/radio/board?geo=1").json()
     keys = {t["tma"] for t in d["geo"]["tma"]}
     assert {g["tma"] for g in d["tma"]} <= keys and None in keys
-    assert all(set(t) == {"name", "geometry", "tma"} for t in d["geo"]["tma"])
+    # 0.13.2: kształty z id (t0, t1, …) – plakietki APP i obrysy obsługiwanych części po id z areas.app
+    assert all(set(t) == {"id", "name", "geometry", "tma"} and t["id"].startswith("t") for t in d["geo"]["tma"])
     wa = [t["name"] for t in d["geo"]["tma"] if t["tma"] == "TMA Warszawa"]
     assert wa and all(n.startswith("EPWA_") for n in wa)
 

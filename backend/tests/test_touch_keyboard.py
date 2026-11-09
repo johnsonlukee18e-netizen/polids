@@ -1,8 +1,9 @@
 """0.13.1 (issue #25): "AIRCRAFT i CALLSIGN dodaj podzakładkę () która będzie klawiaturą dotykową. Rozmiar powinien być
-jednakowy jak ALL i być pod przyciskiem ALL." Przycisk KEYBOARD pod ALL przełącza klawiaturę dotykową na dole panelu
-(cyfry, QWERTY, "-", CLEAR / SPACE / BACKSPACE): klawisz wpisuje w polu wyszukiwania w miejscu kursora i wysyła zdarzenie
-input, więc działa zwykłe wyszukiwanie z debounce. Funkcje api.js (KEYBOARD_ROWS, keyboardHtml, applyKey, touchKeyboard)
-uruchamiane w Node z atrapą DOM; wygląd keyboard.css sprawdzany w arkuszu."""
+jednakowy jak ALL i być pod przyciskiem ALL." Przycisk pod ALL (od 0.13.2, issue #27, z napisem "()" zamiast
+KEYBOARD; napis w test_letter_menu.py) przełącza klawiaturę dotykową na dole panelu (cyfry, QWERTY, "-", CLEAR / SPACE /
+BACKSPACE): klawisz wpisuje w polu wyszukiwania w miejscu kursora i wysyła zdarzenie input, więc działa zwykłe
+wyszukiwanie z debounce. Funkcje api.js (KEYBOARD_ROWS, keyboardHtml, applyKey, touchKeyboard) uruchamiane w Node
+z atrapą DOM; wygląd keyboard.css sprawdzany w arkuszu."""
 import json
 import re
 import shutil
@@ -18,7 +19,7 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 KCSS = (FRONTEND / "css" / "keyboard.css").read_text("utf-8")
 
 # atrapa DOM: h() z api.js robi <template>, więc document.createElement("template") daje element z HTML-em
-# klawiatury; pole wyszukiwania i przycisk KEYBOARD to te same atrapy (zdarzenia, klasy, atrybuty, zaznaczenie)
+# klawiatury; pole wyszukiwania i przycisk "()" to te same atrapy (zdarzenia, klasy, atrybuty, zaznaczenie)
 NODE_SCRIPT = r"""
 class El {
   constructor(tag) { this.tag = tag; this.on = {}; this.attrs = {}; this.cls = new Set(); this.dataset = {}; this.hidden = false;
@@ -55,7 +56,7 @@ const cases = [["", null, null, "B"], ["B", null, null, "7"], ["B738", 1, 1, "X"
   ["B738", 2, 2, "CLEAR"], ["", 0, 0, "CLEAR"], ["B738", 3, 1, "X"], ["B738", -5, 99, "X"], ["B738", 99, null, "-"],
   ["B738", 2, null, "X"], ["B738", 1.7, 1.2, "X"], ["", 0, 0, "BACKSPACE"], [null, undefined, undefined, "1"]];
 out.apply = cases.map(([v, s, e, k]) => api.applyKey(v, s, e, k));
-// zakładka: pole i KEYBOARD; nic nie zapisano i wskaźnik nie dotykowy, więc zamknięta
+// zakładka: pole i "()"; nic nie zapisano i wskaźnik nie dotykowy, więc zamknięta
 const input = new El("input"), button = new El("button");
 const kb = api.touchKeyboard(input, button);
 out.start = st(kb, input, button);
@@ -156,10 +157,10 @@ def test_apply_key(js):
 
 
 def test_touch_keyboard_toggle_and_typing(js):
-    """KEYBOARD przełącza klawiaturę (zaznaczony, gdy otwarta; aria-pressed), wybór zapisany w choiceSet pod jednym kluczem
-    dla AIRCRAFT i CALLSIGN. Otwarta: inputmode=none (bez klawiatury systemu na tablecie), zamknięta: atrybut usunięty.
-    Klawisz: pointerdown bez domyślnej akcji (fokus zostaje w polu), tekst w miejscu kursora, fokus w polu, kursor za
-    wpisanym znakiem i zdarzenie input (bubbles) tylko, gdy tekst się zmienił."""
+    """Przycisk "()" przełącza klawiaturę (zaznaczony, gdy otwarta; aria-pressed), wybór zapisany w choiceSet pod jednym
+    kluczem dla AIRCRAFT i CALLSIGN. Otwarta: inputmode=none (bez klawiatury systemu na tablecie), zamknięta: atrybut
+    usunięty. Klawisz: pointerdown bez domyślnej akcji (fokus zostaje w polu), tekst w miejscu kursora, fokus w polu,
+    kursor za wpisanym znakiem i zdarzenie input (bubbles) tylko, gdy tekst się zmienił."""
     assert js["key"] == "letters.keyboard"
     assert 'class="tkbd" role="group" aria-label="Touch keyboard" hidden>' in js["kbdHtml"]
     start = js["start"]

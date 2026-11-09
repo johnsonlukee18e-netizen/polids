@@ -2,7 +2,9 @@
 nowa checklista TIPS FOR CONTROLLERS (punkty bez "...AKCJA", numerowane) i napisy bez źródeł danych w OTHER,
 EMERGENCY i na stronie offline. 0.13.0 (issue #23): 18 podzakładek alfabetycznie (tabela stron w other.js), domyślnie
 DOCS, zaślepki, SQUAWK, FLIGHT PLAN i FMP w OTHER z adresami #other/<id>[/<stan>]. 0.13.1 (issue #25): 17 podzakładek
-(bez PHRASEOLOGY), napisy podmenu w jednej linijce, sektor FMP z wykresami w adresie (#other/fmp/<TV>)."""
+(bez PHRASEOLOGY), napisy podmenu w jednej linijce, sektor FMP z wykresami w adresie (#other/fmp/<TV>). 0.13.2 (issue
+#27): 13 podzakładek (bez LIGHT GUN, IA, METEO i NATO WEATHER; stare adresy = nieznane id, czyli DOCS), HOLDING
+i BOMB PHONE to strony (holding.js, bombphone.js), zaślepki zostają tylko 4P, AFTN, BRAKING ACTION i POSITION."""
 import json
 import re
 import shutil
@@ -64,7 +66,7 @@ PROVENANCE = re.compile(r"Source:|source:|vatiris|minsulander|data/seed|Learning
 
 
 @pytest.mark.parametrize("name", ["js/tabs/other.js", "js/checklist.js", "js/tabs/emergency.js",
-                                  "js/squawk.js", "js/regcause.js", "js/vfrminima.js",
+                                  "js/squawk.js", "js/regcause.js", "js/vfrminima.js", "js/holding.js", "js/bombphone.js",
                                   "offline.html", "index.html", "login.html"])
 def test_no_provenance_in_ui(name):
     path = FRONTEND / name
@@ -85,7 +87,7 @@ def test_other_files_in_english():
     """Napisy po angielsku; polskie znaki tylko w komentarzach w osobnych linijkach (nie po kodzie)."""
     polish = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
     for name in ("js/tabs/other.js", "js/checklist.js", "js/tabs/emergency.js", "sw.js",
-                 "js/squawk.js", "js/regcause.js", "js/vfrminima.js"):
+                 "js/squawk.js", "js/regcause.js", "js/vfrminima.js", "js/holding.js", "js/bombphone.js"):
         src = (FRONTEND / name).read_text("utf-8")
         bad = [line.strip() for line in src.splitlines() if polish.search(line) and not line.strip().startswith("//")]
         assert not bad, (name, bad)
@@ -114,8 +116,8 @@ const html = {
   proc: chk.checklistHtml(proc, { n1: "DLH1 \"x\"" }),
 };
 
-// --- OTHER: podzakładki i adresy (podmenu, DOCS, CHECKLIST, SQUAWK, FLIGHT PLAN, FMP, REGCAUSE i VFR MINIMA
-// zastąpione atrapami)
+// --- OTHER: podzakładki i adresy (podmenu, DOCS, CHECKLIST, SQUAWK, FLIGHT PLAN, FMP, REGCAUSE, VFR MINIMA, HOLDING
+// i BOMB PHONE zastąpione atrapami)
 const root = {};
 const view = other.mount(root, { config: { links: {} } });
 const sub = globalThis.__sub;
@@ -127,7 +129,7 @@ const step = (name, fn) => { log.length = 0; fn(); steps.push({ name, sub: sub.c
   mounts: globalThis.__chk.map((c) => ({ start: c.opts.start, picks: [...c.picks], dead: c.dead })),
   docs: globalThis.__docs.map((d) => ({ start: d.start, picks: [...d.picks] })),
   squawk: page("squawk"), fp: page("fp"), fmp: page("fmp"), regcause: page("regcause"), vfr: page("vfr"),
-  pane: globalThis.__pane.items.join("") }); };
+  holding: page("holding"), bomb: page("bomb"), pane: globalThis.__pane.items.join("") }); };
 const last = (kind) => globalThis.__pages.filter((x) => x.kind === kind).at(-1);
 step("first", () => view.activate("checklist/close-position"));
 step("again", () => view.activate("checklist/rwy-change"));
@@ -159,7 +161,7 @@ step("fmp-close", () => last("fmp").opts.onPick(""));
 step("fmp-bad", () => view.activate("fmp/x y"));
 step("fmp-pick2", () => last("fmp").opts.onPick("EP-WATMA"));
 step("fmp-away", () => { sub.click("holding"); sub.click("fmp"); });
-step("fmp-other", () => { sub.click("ia"); view.activate("fmp/EP-GDTMA"); });
+step("fmp-other", () => { sub.click("position"); view.activate("fmp/EP-GDTMA"); });
 step("fmp-menu2", () => view.activate(undefined));
 step("fp-return", () => sub.click("flight-plan"));
 step("regcause", () => view.activate("regcause"));
@@ -179,6 +181,17 @@ step("sq-open", () => view.activate("squawk/7700"));
 step("sq-filter", () => { last("squawk").opts.onInput("NATO"); sub.click("regcause"); sub.click("squawk"); });
 step("sq-clear", () => { last("squawk").opts.onInput(""); last("squawk").opts.onCode("", { replace: true }); });
 step("sq-after-clear", () => { sub.click("vfr-minima"); sub.click("squawk"); });
+// 0.13.2 (issue #27): HOLDING i BOMB PHONE to strony; stare adresy usuniętych podzakładek = nieznane id (DOCS)
+step("holding", () => view.activate("holding"));
+step("holding-same", () => view.activate("holding"));
+step("bomb", () => view.activate("bomb-phone"));
+step("bomb-menu", () => view.activate(undefined));
+step("bomb-away", () => sub.click("holding"));
+step("bomb-back", () => sub.click("bomb-phone"));
+for (const old of ["light-gun", "ia", "meteo", "nato-weather"]) {
+  step("old-" + old, () => { sub.click("4p"); view.activate(old); });
+}
+step("old-meteo-sub", () => { sub.click("regcause"); view.activate("meteo/metar"); });
 console.log(JSON.stringify({ html, initial, steps, future: globalThis.__future }));
 """
 
@@ -235,7 +248,8 @@ export function %(fn)s(pane, opts) {
 }
 """
 PAGES = {"squawk": ("mountSquawk", "squawk"), "flightplan": ("mountFlightPlan", "fp"), "fmp": ("mountFmp", "fmp"),
-         "regcause": ("mountRegcause", "regcause"), "vfrminima": ("mountVfrMinima", "vfr")}
+         "regcause": ("mountRegcause", "regcause"), "vfrminima": ("mountVfrMinima", "vfr"),
+         "holding": ("mountHolding", "holding"), "bombphone": ("mountBombPhone", "bomb")}
 
 
 @pytest.fixture(scope="module")
@@ -336,26 +350,28 @@ def test_other_subtab_switching(js):
     assert _step(js, "loa")["log"] == [["navigate", "coordination", "docs/LOA/x.pdf"]]
 
 
-OTHER_LABELS = ["4P", "AFTN", "BOMB PHONE", "BRAKING ACTION", "CHECKLIST", "DOCS", "FLIGHT PLAN", "FMP", "HOLDING", "IA",
-                "LIGHT GUN", "METEO", "NATO WEATHER", "POSITION", "REGCAUSE", "SQUAWK", "VFR MINIMA"]
-PLACEHOLDERS = ["4p", "aftn", "bomb-phone", "braking-action", "holding", "ia", "light-gun", "meteo", "nato-weather",
-                "position"]
+OTHER_LABELS = ["4P", "AFTN", "BOMB PHONE", "BRAKING ACTION", "CHECKLIST", "DOCS", "FLIGHT PLAN", "FMP", "HOLDING",
+                "POSITION", "REGCAUSE", "SQUAWK", "VFR MINIMA"]
+PLACEHOLDERS = ["4p", "aftn", "braking-action", "position"]
+# 0.13.2 (issue #27): usunięte podzakładki (stare adresy #other/<id> = nieznane id)
+REMOVED = ["light-gun", "ia", "meteo", "nato-weather"]
 FUTURE = "This function will be available in the future."
 
 
 def test_other_submenu_order_and_default(js):
     """0.13.0 (issue #23): podzakładki alfabetycznie jak w PANDORZE (BRAKING, nie BREAKING), każda na całą
     wysokość; OTHER bez adresu otwiera się na DOCS (jak do 0.12.6), nie na pierwszej w kolumnie (4P). 0.13.1 (issue
-    #25): 17 podzakładek bez PHRASEOLOGY, napisy w jednej linijce (przyciski podmenu 137 x 28)."""
+    #25): 17 podzakładek bez PHRASEOLOGY, napisy w jednej linijce (przyciski podmenu 137 x 28). 0.13.2 (issue #27):
+    13 podzakładek, bez LIGHT GUN, IA, METEO i NATO WEATHER."""
     tabs = js["initial"]["tabs"]
-    assert OTHER_LABELS == sorted(OTHER_LABELS) and len(OTHER_LABELS) == 17
+    assert OTHER_LABELS == sorted(OTHER_LABELS) and len(OTHER_LABELS) == 13
     assert [label for _, label, _ in tabs] == OTHER_LABELS
     assert not any("\n" in label for _, label, _ in tabs)
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     assert '.replace(" ", "\\n")' not in other and "label: p.label, fill: true" in other
     assert [i for i, _, _ in tabs] == ["4p", "aftn", "bomb-phone", "braking-action", "checklist", "docs", "flight-plan",
-                                        "fmp", "holding", "ia", "light-gun", "meteo", "nato-weather", "position",
-                                        "regcause", "squawk", "vfr-minima"]
+                                        "fmp", "holding", "position", "regcause", "squawk", "vfr-minima"]
+    assert not any(i in REMOVED for i, _, _ in tabs)
     assert all(fill for _, _, fill in tabs)
     assert js["initial"]["sub"] == "docs" and js["initial"]["docs"] == [""]
 
@@ -365,10 +381,13 @@ def test_other_placeholders(js):
     four = _step(js, "4p")
     assert four["sub"] == "4p" and four["log"] == [["remember", "other", "4p", False]]
     assert four["pane"] == f'<div class="pane ot-future"><p>{FUTURE}</p></div>'
-    # klik w podmenu: krok historii z id zaślepki; adres #other/aftn
+    # klik w podmenu: krok historii z id strony; 0.13.2: BOMB PHONE to strona (atrapa), nie zaślepka
     bomb = _step(js, "click-bomb")
-    assert bomb["sub"] == "bomb-phone" and bomb["log"] == [["remember", "other", "bomb-phone", False]] and FUTURE in bomb["pane"]
+    assert bomb["sub"] == "bomb-phone" and bomb["log"] == [["remember", "other", "bomb-phone", False]]
+    assert FUTURE not in bomb["pane"] and len(bomb["bomb"]) == 1 and bomb["bomb"][0]["dead"] is False
+    # adres #other/aftn: zaślepka
     assert _step(js, "aftn")["log"] == [["remember", "other", "aftn", False]] and FUTURE in _step(js, "aftn")["pane"]
+    assert _step(js, "aftn")["bomb"][0]["dead"] is True
     other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     pages = re.findall(r'\{ id: "([^"]+)", label: "[^"]+" \}', other)
     assert pages == PLACEHOLDERS
@@ -607,3 +626,49 @@ def test_fmp_charts_beside_table_at_1280():
     # wąskie okno: wykresy jeden pod drugim (bez dwóch kolumn po ok. 330 px w oknie 1024 px), panel jak tabela
     assert ".fmc-charts { grid-template-columns: minmax(0, 520px); }" in narrow and "1fr 1fr" not in css
     assert re.search(r"\.fmp-side \{[^}]*max-width: 680px;", narrow)
+
+
+def test_other_holding_and_bomb_phone_pages(js):
+    """0.13.2 (issue #27): HOLDING i BOMB PHONE to strony bez stanu w adresie (#other/holding, #other/bomb-phone):
+    otwarta strona przy tym samym adresie nie rysuje się drugi raz, inna podzakładka niszczy ją (destroy), powrót
+    rysuje ją od nowa (BOMB PHONE bierze wtedy formularz z sessionStorage, test w test_other_pages.py)."""
+    hold = _step(js, "holding")
+    n = len(hold["holding"])
+    assert hold["sub"] == "holding" and hold["log"] == [["remember", "other", "holding", False]] and FUTURE not in hold["pane"]
+    assert hold["holding"][-1]["dead"] is False and hold["holding"][-1]["calls"] == []
+    same = _step(js, "holding-same")
+    assert len(same["holding"]) == n and same["log"] == [["remember", "other", "holding", False]]
+    bomb = _step(js, "bomb")
+    assert bomb["sub"] == "bomb-phone" and bomb["holding"][-1]["dead"] is True and bomb["bomb"][-1]["dead"] is False
+    assert bomb["log"] == [["remember", "other", "bomb-phone", False]]
+    # przycisk menu: strona bez resume, adres bez zmian
+    menu = _step(js, "bomb-menu")
+    assert len(menu["bomb"]) == len(bomb["bomb"]) and menu["bomb"][-1]["calls"] == []
+    assert menu["log"] == [["remember", "other", "bomb-phone", False]]
+    away = _step(js, "bomb-away")
+    assert away["bomb"][-1]["dead"] is True and away["sub"] == "holding"
+    back = _step(js, "bomb-back")
+    assert len(back["bomb"]) == len(bomb["bomb"]) + 1 and back["bomb"][-1]["dead"] is False
+    assert back["log"] == [["remember", "other", "bomb-phone", False]]
+    other = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert 'import { mountHolding } from "../holding.js";' in other and 'import { mountBombPhone } from "../bombphone.js";' in other
+    assert '{ id: "holding", label: "HOLDING", render: (pane) => mountHolding(pane) },' in other
+    assert '{ id: "bomb-phone", label: "BOMB PHONE", render: (pane) => mountBombPhone(pane) },' in other
+
+
+@pytest.mark.parametrize("old", REMOVED)
+def test_other_removed_pages_open_docs(js, old):
+    """0.13.2 (issue #27): stare adresy #other/light-gun, #other/ia, #other/meteo i #other/nato-weather otwierają DOCS
+    z pierwszym dokumentem (nieznane id), a adres zostaje poprawiony na #other/docs."""
+    st = _step(js, "old-" + old)
+    assert st["sub"] == "docs" and st["docs"][-1]["start"] == ""
+    assert st["log"] == [["remember", "other", "4p", False], ["remember", "other", "docs", False]]
+    other = _code(FRONTEND / "js" / "tabs" / "other.js")
+    assert f'id: "{old}"' not in other
+
+
+def test_other_removed_page_with_rest(js):
+    """Stary adres z dalszą częścią (#other/meteo/metar): też DOCS z pierwszym dokumentem, reszta adresu pominięta."""
+    st = _step(js, "old-meteo-sub")
+    assert st["sub"] == "docs" and st["docs"][-1]["start"] == ""
+    assert st["log"] == [["remember", "other", "regcause", False], ["remember", "other", "docs", False]]

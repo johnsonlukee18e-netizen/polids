@@ -3,10 +3,12 @@
 Trzy podglądy FIR EPWW: sektory ACC w warstwach LOW, MID i HIGH (data/seed/ownership.json), a do tego warstwy
 APP (TMA), TWR (CTR lotnisk), FIS i pasek ATIS. Każda etykieta ma kolejność przejmowania (chain); właściciel to
 pierwsze stanowisko z tej kolejności, które jest teraz online (dopasowanie z /api/radio/online, z aliasami sąsiadów).
-Sąsiedzi: stosy okienek FIR-ów sąsiednich przy podglądach LOW i HIGH (0.13.1: znów jak w 0.12.6, STACKS: map i at),
-podział okienek i granice wg szkicu Marka (data/seed/radio_layout.json, 0.13.0); kolejność przejmowania okienka
-z kafelków sektorów graniczących z FIR EPWW jak w VACS (profil ACC_EPWW z data/seed/vacs_epww.json, bez FMP); okienko
-obsługuje pierwsze stanowisko online z tej kolejności (controlled_by), okienka jednego stanowiska łączymy (merge_boxes).
+Sąsiedzi: okienka FIR-ów sąsiednich w siatce całej strony wg szkicu Marka (0.13.2, issue #27: miejsca kafelków jak na
+szkicu, wygląd jak w 0.13.1; data/seed/radio_layout.json); kolejność przejmowania okienka z kafelków sektorów
+graniczących z FIR EPWW jak w VACS (profil ACC_EPWW z data/seed/vacs_epww.json, bez FMP), uzupełniona listami OWNER
+z plików .ese sąsiadów; okienko obsługuje pierwsze stanowisko online z tej kolejności (controlled_by), okienka jednego
+stanowiska łączymy (merge_boxes). Geometrii sąsiadów (sektory, TMA) na podglądach już nie ma (0.13.2: jedyne
+zagraniczne granice to granice FIR-ów).
 
 Część zależna tylko od danych z importu (wycinki, kafelki, punkty etykiet, geometria) jest liczona raz i trzymana
 w pamięci do zmiany bazy, ownership.json albo vacs_epww.json; przy każdym odświeżeniu liczymy tylko, kto jest online."""
@@ -27,20 +29,20 @@ from .viff import restriction_active
 LAYERS = ("LOW", "MID", "HIGH")
 TOP_FT = 66000  # FL660: górna granica podglądów (Kaliningrad ma w pliku 99900)
 
-# FIR-y sąsiednie na stronie RADIO: kod i nazwa (nagłówek stosu, dymek, panel LOA), podgląd, przy którym stoi stos
-# (map: left = LOW, right = HIGH) i strona FIR-u na mapie (at: n/s nad i pod podglądem, reszta w kolumnie z boku), jak
-# w 0.12.6 (0.13.1, issue #25: stary styl strony). Kafelki sąsiadów (stack_tiles) dają okienkom kolejność przejmowania.
+# FIR-y sąsiednie na stronie RADIO: kod i nazwa (żółty kod FIR-u w siatce strony, nazwa w dymku i obok kodu, gdy się
+# mieści; panel LOA). Miejsca kodów i okienek: radio_layout.json (0.13.2). Kafelki sąsiadów (stack_tiles) dają
+# okienkom kolejność przejmowania.
 STACKS = (
-    {"fir": "ESAA", "title": "SVERIGE", "map": "left", "at": "n"},
-    {"fir": "EDWW", "title": "BREMEN", "map": "left", "at": "nw"},
-    {"fir": "EDUU", "title": "RHEIN", "map": "left", "at": "w"},
-    {"fir": "EDMM", "title": "MÜNCHEN", "map": "left", "at": "sw"},
-    {"fir": "LKAA", "title": "PRAHA", "map": "left", "at": "s"},
-    {"fir": "UMKK", "title": "KALININGRAD", "map": "right", "at": "n"},
-    {"fir": "EYVL", "title": "VILNIUS", "map": "right", "at": "ne"},
-    {"fir": "UMMV", "title": "MINSK", "map": "right", "at": "e"},
-    {"fir": "UKLV", "title": "LVIV", "map": "right", "at": "se"},
-    {"fir": "LZBB", "title": "BRATISLAVA", "map": "right", "at": "s"},
+    {"fir": "ESAA", "title": "SVERIGE"},
+    {"fir": "EDWW", "title": "BREMEN"},
+    {"fir": "EDUU", "title": "RHEIN"},
+    {"fir": "EDMM", "title": "MÜNCHEN"},
+    {"fir": "LKAA", "title": "PRAHA"},
+    {"fir": "UMKK", "title": "KALININGRAD"},
+    {"fir": "EYVL", "title": "VILNIUS"},
+    {"fir": "UMMV", "title": "MINSK"},
+    {"fir": "UKLV", "title": "LVIV"},
+    {"fir": "LZBB", "title": "BRATISLAVA"},
 )
 STACK_FIRS = {s["fir"] for s in STACKS}
 # kafelek VACS → stos: pierwszy człon etykiety (EYVL U → EYVL); lotniska i FIR-y bez własnego stosu do stosu obok
@@ -465,110 +467,11 @@ def stack_tiles(items: list[dict], ese: dict[str, list[str]] | None = None, know
     return out
 
 
-# --- sąsiedzi na podglądach (0.12.5, Marek): sektory ACC FIR-ów sąsiednich (podgląd pokazuje te na swoim poziomie,
-# jak sektory EPWW) oraz TMA lotnisk sąsiadów przy granicy FIR EPWW (warstwa APP, jak TMA EPWW). 0.13.1 (issue #25,
-# Marek: "TWR wyświetlaj jedynie dla EPWW", "APP zostaw tylko w EPWW oraz LKMT i EDDB"): bez CTR sąsiadów, z TMA tylko
-# Ostrawy i Berlina – wg pierwszego stanowiska listy OWNER (wycinki TMA Berlina mają nazwy EDWWDB…, stanowisko EDDB_…)
-NB_APP_KEEP = ("LKMT", "EDDB")
-NB_NEAR_KM = 15  # wycinek APP/TWR sąsiada „przy granicy”: dotyka granicy FIR EPWW albo leży najwyżej tyle od niej
-NB_FAR_KM = 50   # reszta wycinków tego samego stanowiska (cała TMA Ostrawa), ale nie w głąb kraju (TMA Praga)
-NB_INFO = re.compile(r"_(?:I|IE|IW|IS|IN|FIS|FIC|INFO)_[A-Z]+$")  # informacja (EYKA_I_APP): to nie APP ani ACC
-NB_LOCAL = ("APP", "DEP", "TWR")
-_KM_LAT = 111.2
-
-
-def nb_kind(name: str, owners: list[str]) -> str | None:
-    """Rodzaj wycinka sąsiada wg pierwszego stanowiska z listy OWNER: acc (CTR/FSS), app (TMA: APP/DEP, TMA wieży
-    jak LZTT_TMA), twr (CTR lotniska: nazwa z CTR albo wieża bez TMA, np. EDAH); None = informacja (FIS), ziemia
-    (GND/DEL) albo wycinek bez stanowisk – nie rysujemy."""
-    first = owners[0] if owners else ""
-    if not first or NB_INFO.search(first):
-        return None
-    fac = facility(first)
-    if fac in RADAR:
-        return "acc"
-    if fac not in NB_LOCAL:
-        return None
-    n = name.upper()
-    return "twr" if "CTR" in n or (fac == "TWR" and "TMA" not in n) else "app"
-
-
-def _km(lon: float, lat: float) -> tuple[float, float]:
-    """Punkt w kilometrach (rzut lokalny: długość × cos szerokości) – do odległości rzędu kilkudziesięciu km."""
-    return lon * _KM_LAT * math.cos(math.radians(lat)), lat * _KM_LAT
-
-
-class _Border:
-    """Odcinki granicy FIR EPWW w km w siatce (komórka CELL km) do szybkiego szukania najbliższego odcinka."""
-    CELL = 20.0
-
-    def __init__(self, geom: dict):
-        self.grid: dict[tuple[int, int], list[tuple[float, float, float, float]]] = {}
-        for ring in rings(geom):
-            pts = [_km(x, y) for x, y in ring]
-            for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
-                c = self.CELL
-                for i in range(math.floor(min(ax, bx) / c), math.floor(max(ax, bx) / c) + 1):
-                    for j in range(math.floor(min(ay, by) / c), math.floor(max(ay, by) / c) + 1):
-                        self.grid.setdefault((i, j), []).append((ax, ay, bx, by))
-
-    def dist(self, x: float, y: float, cap: float) -> float:
-        """Odległość punktu (km) od granicy; dalej niż cap → inf."""
-        c, n, best = self.CELL, math.ceil(cap / self.CELL), math.inf
-        ci, cj = math.floor(x / c), math.floor(y / c)
-        for i in range(ci - n, ci + n + 1):
-            for j in range(cj - n, cj + n + 1):
-                for ax, ay, bx, by in self.grid.get((i, j), ()):
-                    dx, dy = bx - ax, by - ay
-                    l2 = dx * dx + dy * dy
-                    t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / l2)) if l2 else 0.0
-                    best = min(best, math.hypot(x - ax - t * dx, y - ay - t * dy))
-        return best if best <= cap else math.inf
-
-    def to_geom(self, geom: dict, cap: float, step: float = 4.0) -> float:
-        """Najmniejsza odległość obrysu wielokąta od granicy (km, do cap): wierzchołki i punkty co `step` km na
-        bokach – bok przecinający granicę daje punkt najwyżej step/2 od niej."""
-        best = math.inf
-        for ring in rings(geom):
-            pts = [_km(x, y) for x, y in ring]
-            for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
-                k = max(1, math.ceil(math.hypot(bx - ax, by - ay) / step))
-                for t in range(k):
-                    best = min(best, self.dist(ax + (bx - ax) * t / k, ay + (by - ay) * t / k, cap))
-                    if best < step / 2:
-                        return best
-        return best
-
-
-def nb_areas(slices: list[dict], border_geom: dict) -> list[dict]:
-    """Wycinki sąsiadów na podglądy: wszystkie sektory ACC (wycinki z plików .ese sąsiadów są już tylko z rejonu
-    Polski) oraz TMA stanowisk APP Ostrawy i Berlina (NB_APP_KEEP), które mają wycinek przy granicy FIR EPWW
-    (NB_NEAR_KM), z ich wycinkami do NB_FAR_KM od granicy; CTR sąsiadów (twr) i inne TMA pomijamy (0.13.1).
-    slices: [{fir, name, lo, hi, owners (znaki), geom}]. Wynik: [{id, fir, name, kind (acc/app), lo, hi, chain, geom}]
-    (id: n0, n1… w kolejności wejścia)."""
-    border = _Border(border_geom)
-    out, local = [], []
-    for s in slices:
-        kind = nb_kind(s["name"], s["owners"])
-        if not kind or kind == "twr" or s["lo"] >= TOP_FT:
-            continue
-        if kind == "app" and s["owners"][0].split("_")[0] not in NB_APP_KEEP:
-            continue
-        a = {"fir": s["fir"], "name": s["name"], "kind": kind, "lo": s["lo"], "hi": min(s["hi"], TOP_FT),
-             "chain": list(s["owners"]), "geom": s["geom"]}
-        if kind == "acc":
-            out.append(a)
-        else:
-            local.append((a, border.to_geom(s["geom"], NB_FAR_KM)))
-    near = {a["chain"][0] for a, d in local if d <= NB_NEAR_KM}
-    out += [a for a, d in local if a["chain"][0] in near and d <= NB_FAR_KM]
-    return [{"id": f"n{i}", **a} for i, a in enumerate(out)]
-
-
-# --- okienka wg szkicu (0.13.0, issue #23): podział okienek FIR-ów sąsiednich, łączenie okienek jednego stanowiska,
-# wskaźniki u góry (ACC GAT, APP GD, APP WA, APP KK, APP PO), BERLIN, czerwone tło przy ograniczeniach przepływu
-# i plakietki APP/TWR tylko dla zalogowanych. Id, granice, komórki okienek i reguły: data/seed/radio_layout.json;
-# od 0.13.1 komórki col/row to miejsce okienka w stosie jego FIR-u (strona bez siatki wg szkicu).
+# --- siatka strony wg szkicu (0.13.0, issue #23; 0.13.2, issue #27: znów cała strona w siatce szkicu, wygląd kafelków
+# z 0.13.1): okienka FIR-ów sąsiednich, łączenie okienek jednego stanowiska, kody FIR-ów, wskaźniki u góry (ACC GAT,
+# APP GD, APP WA, APP KK, APP PO), BERLIN, przyciski warstw, podglądy, stan danych i legenda, czerwone tło przy
+# ograniczeniach przepływu i plakietki APP/TWR tylko dla zalogowanych. Komórki, id, granice i reguły:
+# data/seed/radio_layout.json (col/row: kolumna A..M = 1..13 i wiersz szkicu).
 MERGE_FIRS = frozenset({"EDUU", "EDMM", "ESAA", "EYVL", "LZBB", "LKAA"})  # EDWW nigdy (Marek)
 FREQ = re.compile(r"^1[1-3]\d\.\d{2,3}$")
 OBS_FREQ = "199.998"
@@ -590,13 +493,52 @@ def _tile_for(tiles: list[dict], label: str, callsign: str | None) -> dict | Non
     return next((t for t in same if t["callsign"] == callsign), same[0] if same else None)
 
 
+HEAD_RIGHT = 2  # kod FIR-u: nazwa i ADVISORY najwyżej o tyle wolnych kolumn w prawo
+HEAD_DOWN = 1   # kod przy prawej krawędzi siatki (EYVL, UMMV, UKLV): ADVISORY pod kodem, najwyżej o tyle wierszy
+
+
+def head_room(name: dict, occupied: dict, cols: int, rows: int) -> dict:
+    """Miejsce na nazwę FIR-u i ADVISORY 122.800 obok żółtego kodu (0.13.2): komórka kodu i wolne komórki na prawo od
+    niej (najwyżej HEAD_RIGHT kolumn, do pierwszej zajętej), a gdy na prawo nie ma miejsca (kod w ostatniej kolumnie
+    albo przy okienku) – wolne wiersze pod kodem (najwyżej HEAD_DOWN). Nic nie zachodzi na inne miejsca strony."""
+    def free(cells) -> bool:
+        return all(c not in occupied for c in cells)
+
+    c, r = dict(name), name["row"]
+    while c["cols"] < name["cols"] + HEAD_RIGHT and c["col"] + c["cols"] <= cols \
+            and free({(c["col"] + c["cols"], y) for y in range(r, r + c["rows"])}):
+        c["cols"] += 1
+    if c["cols"] == name["cols"]:
+        while c["rows"] < name["rows"] + HEAD_DOWN and r + c["rows"] <= rows \
+                and free({(x, r + c["rows"]) for x in range(c["col"], c["col"] + c["cols"])}):
+            c["rows"] += 1
+    return c
+
+
+def col_kinds(occupied: dict, cols: int, button_col: int) -> list[str]:
+    """Rodzaj każdej kolumny siatki do jej szerokości na stronie (stała, niezależna od tego, kto jest online): btn =
+    przyciski warstw i podgląd MID, box = okienka, BERLIN i legenda (szerokość kafelka), name = same kody FIR-ów (EYVL,
+    UMMV, UKLV z prawej), map = reszta (podglądy LOW i HIGH; dzielą wolne miejsce)."""
+    tags: dict[int, set[str]] = {}
+    for (x, _), tag in occupied.items():
+        tags.setdefault(x, set()).add(tag.split(":")[0])
+    out = []
+    for x in range(1, max([cols, *tags]) + 1 if tags or cols else 1):
+        t = tags.get(x, set())
+        out.append("btn" if x == button_col else "box" if t & {"box", "berlin", "legend"}
+                   else "name" if "name" in t else "map")
+    return out
+
+
 def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
     """Część stała układu z radio_layout.json: okienka FIR-ów z kolejnością przejmowania z kafelków stosów (tiles:
-    stack_tiles; kilka kafelków = ich stanowiska, potem ich kolejności, bez powtórek), stanowiska FIR-u do dymku (area: stanowiska
-    kafelków tego FIR-u i z ich kolejności o prefiksie tego FIR-u, także z kafelków, których szkic nie ma), miejsce
-    stosu (map, at: STACKS), kolumny i wiersze szkicu z okienkami (cols, rows: stały podział stosu, także po łączeniu
-    okienek) i zajęte komórki (occupied: okienka; łączenie okienek tylko przez puste komórki)."""
-    where = {s["fir"]: s for s in STACKS}
+    stack_tiles; kilka kafelków = ich stanowiska, potem ich kolejności, bez powtórek), stanowiska FIR-u do dymku (area:
+    stanowiska kafelków tego FIR-u i z ich kolejności o prefiksie tego FIR-u, także z kafelków, których szkic nie ma),
+    komórka kodu FIR-u (name) i miejsce na nazwę i ADVISORY obok niego (room: head_room), siatka strony (grid: kolumny,
+    wiersze, rząd u góry, BERLIN, przyciski, podglądy, stan danych, legenda, rodzaje kolumn) i zajęte komórki
+    (occupied: łączenie okienek tylko przez puste komórki, nigdy na kod FIR-u, podgląd albo przycisk)."""
+    title = {s["fir"]: s["title"] for s in STACKS}
+    grid = layout.get("grid") or {}
     occupied: dict[tuple[int, int], str] = {}
     firs = []
     for f in layout.get("firs") or ():
@@ -618,15 +560,34 @@ def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
                    "chain": chain}
             occupied.update(dict.fromkeys(_cells_of(box), f"box:{fir}:{box['id']}"))
             boxes.append(box)
+        name = _cell(f["name"]) if f.get("name") else None
+        if name:
+            occupied.update(dict.fromkeys(_cells_of(name), f"name:{fir}"))
         area = sorted({t["callsign"] for t in mine} | {cs for t in mine for cs in t["chain"] if _same_stack(cs, fir)})
-        cells = set().union(*(_cells_of(b) for b in boxes)) if boxes else set()
-        st = where.get(fir) or {}
-        firs.append({"fir": fir, "title": st.get("title", ""), "map": st.get("map"), "at": st.get("at"),
-                     "merge": bool(f.get("merge")), "cols": sorted({x for x, _ in cells}),
-                     "rows": sorted({y for _, y in cells}), "boxes": boxes, "area": area})
-    # wskaźniki u góry strony w kolejności z seeda (bez miejsc w siatce: strona układa je w jednym rzędzie)
+        firs.append({"fir": fir, "title": title.get(fir, ""), "name": name, "merge": bool(f.get("merge")),
+                     "boxes": boxes, "area": area})
+    berlin = layout.get("berlin") or {}
+    if berlin:
+        berlin = {**_cell(berlin), "box": _cell(berlin.get("box") or {}, berlin.get("col", 1), berlin.get("row", 1) + 1)}
+        occupied.update(dict.fromkeys(_cells_of(berlin) | _cells_of(berlin["box"]), "berlin"))
+    buttons = layout.get("buttons") or {}
+    for row in (buttons.get("rows") or {}).values():
+        occupied[(int(buttons.get("col") or 0), int(row))] = "buttons"
+    # podglądy (prostokąty LOW, HIGH, MID), stan danych i legenda: stałe miejsca, połączone okienko ich nie zajmie
+    maps = {k: _cell(v) for k, v in (layout.get("maps") or {}).items()}
+    for k, c in maps.items():
+        occupied.update(dict.fromkeys(_cells_of(c), f"map:{k}"))
+    places = {k: _cell(layout[k]) for k in ("status", "legend") if layout.get(k)}
+    for k, c in places.items():
+        occupied.update(dict.fromkeys(_cells_of(c), k))
+    ncols, nrows = int(grid.get("cols") or 0), int(grid.get("rows") or 0)
+    for f in firs:
+        f["room"] = head_room(f["name"], occupied, ncols, nrows) if f["name"] else None
+    # wskaźniki u góry strony w kolejności z seeda (rząd u góry, wiersze 1–2 szkicu: bez miejsc w siatce)
     inds = [{k: v for k, v in i.items() if k not in ("col", "row", "cols", "rows")} for i in layout.get("indicators") or ()]
-    return {"indicators": inds, "firs": firs, "occupied": occupied}
+    page = {"cols": ncols, "rows": nrows, "top": int(grid.get("top") or 0), "berlin": berlin, "buttons": buttons,
+            "maps": maps, **places, "tracks": col_kinds(occupied, ncols, int(buttons.get("col") or 0))}
+    return {"grid": page, "indicators": inds, "firs": firs, "occupied": occupied}
 
 
 def freq_of(cs: str | None, online: dict, positions: dict | None = None) -> str | None:
@@ -648,7 +609,7 @@ def merge_key(cs: str | None, online: dict) -> str | None:
 
 def _member(b: dict) -> dict:
     """Okienko w połączonym (i samo w sobie): id, granice, stanowisko i jego komórki ze szkicu (strona liczy z nich
-    stały podział stosu i wysokości między kafelkami także po łączeniu)."""
+    stałe rzędy liczb i wysokości między kafelkami także po łączeniu)."""
     return {"id": b["id"], "upper": b["upper"], "lower": b["lower"], "callsign": b["callsign"],
             **{k: b[k] for k in ("col", "row", "cols", "rows")}}
 
@@ -738,10 +699,10 @@ def _who(cs: str, online: dict) -> dict:
 
 
 def fir_blocks(lay: dict, online: dict, positions: dict | None = None, net_ok: bool = True) -> list[dict]:
-    """Stosy okienek FIR-ów sąsiednich: właściciel = pierwsze stanowisko online z kolejności okienka, łączenie (tylko
-    MERGE_FIRS z merge=true w seedzie). advisory: cały FIR bez nikogo (strona: ADVISORY 122.800 pod nagłówkiem stosu;
-    przy błędzie sieci nie wiadomo, więc bez). online: zalogowani tego FIR-u do dymku. map, at: miejsce stosu przy
-    podglądzie (STACKS); cols, rows: kolumny i wiersze szkicu z okienkami (stały podział stosu, layout_static)."""
+    """Okienka FIR-ów sąsiednich: właściciel = pierwsze stanowisko online z kolejności okienka, łączenie (tylko
+    MERGE_FIRS z merge=true w seedzie). advisory: cały FIR bez nikogo (strona: ADVISORY 122.800 obok kodu FIR-u;
+    przy błędzie sieci nie wiadomo, więc bez). online: zalogowani tego FIR-u do dymku. name, room: komórka kodu FIR-u
+    i miejsce na nazwę i ADVISORY obok niego (layout_static)."""
     out = []
     for f in lay.get("firs") or ():
         boxes = []
@@ -757,8 +718,8 @@ def fir_blocks(lay: dict, online: dict, positions: dict | None = None, net_ok: b
             if is_on(cs, online) and (real := (online[cs].get("callsign") or cs)) not in seen:
                 seen.add(real)
                 who.append(_who(cs, online))
-        out.append({"fir": f["fir"], "title": f["title"], "map": f["map"], "at": f["at"], "merge": f["merge"],
-                    "cols": f["cols"], "rows": f["rows"], "staffed": staffed, "advisory": net_ok and not staffed,
+        out.append({"fir": f["fir"], "title": f["title"], "name": f["name"], "room": f["room"], "merge": f["merge"],
+                    "staffed": staffed, "advisory": net_ok and not staffed,
                     "online": sorted(who, key=lambda w: w["callsign"]), "boxes": rendered})
     return out
 
@@ -1052,71 +1013,101 @@ def twr_plates(static: dict, online: dict, atis: list[dict], positions: dict | N
     return out
 
 
+def area_shapes(slices: list[dict], prefix: str, chain_of=None, **extra) -> list[dict]:
+    """Kształty jednej warstwy (TMA i CTA, CTR, FIS) do obrysów stanowisk online na podglądzie LOW (0.13.2): każdy
+    kształt raz (uproszczony; ten sam na kilku wysokościach – jeden), id = prefiks i numer, chains = różne kolejności
+    przejmowania jego wycinków (chain_of; strona rysuje granicę sumy kształtów stanowiska, które teraz jest w nich
+    pierwsze online), dodatki (np. klucz TMA albo grupa CTR) z pierwszego wycinka, który je ma."""
+    out, by = [], {}
+    for s in slices:
+        g = simplify(s["geom"])
+        if not g["coordinates"]:
+            continue
+        key = json.dumps(g["coordinates"])
+        a = by.get(key)
+        if a is None:
+            a = by[key] = {"id": f"{prefix}{len(out)}", "name": s["name"], "geometry": g, "chains": [],
+                           **{k: f(s) for k, f in extra.items()}}
+            out.append(a)
+        else:
+            for k, f in extra.items():
+                if a[k] is None:
+                    a[k] = f(s)
+        ch = chain_of(s) if chain_of else []
+        if ch and ch not in a["chains"]:
+            a["chains"].append(ch)
+    return out
+
+
 def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], positions: dict, coords: dict,
-                 border_geom: dict, firs_geo: list[dict], nb_chains=(), nb_slices=(), layout: dict | None = None) -> dict:
+                 border_geom: dict, firs_geo: list[dict], nb_chains=(), layout: dict | None = None) -> dict:
     """Wszystko, co nie zależy od tego, kto jest online.
 
     epww_slices: wycinki z pliku EPWW ({fir, name, lo, hi, owners (znaki), geom}); vacs_tiles: kafelki sąsiadów
     z profilu VACS (vacs_epww.json, neighbours); positions: znak → {frequency, name, ...}; coords: ICAO → (lat, lon);
-    border_geom: granica FIR EPWW (VATSpy); firs_geo: [{id, geometry}] do tła; nb_chains: listy OWNER (znaki)
-    wycinków sąsiadów z plików .ese – do kolejności kafelków bez CTR w controlled_by (tile_chain); nb_slices: wycinki
-    sąsiadów ({fir, name, lo, hi, owners, geom}: pliki .ese sąsiadów i Białoruś z pliku EPWW) – nb_areas; layout:
-    data/seed/radio_layout.json (okienka FIR-ów sąsiednich i wskaźniki – layout_static)."""
+    border_geom: granica FIR EPWW (VATSpy); firs_geo: [{id, geometry}] – granice FIR-ów sąsiednich (same linie);
+    nb_chains: listy OWNER (znaki) wycinków sąsiadów z plików .ese (i Białorusi z pliku EPWW) – do kolejności kafelków
+    (tile_chain; 0.13.2: geometrii sąsiadów na podglądach już nie ma); layout: data/seed/radio_layout.json (siatka
+    strony, okienka FIR-ów sąsiednich i wskaźniki – layout_static).
+    Obrysy stanowisk na podglądzie LOW (0.13.2, Marek: granice tylko zalogowanych, tylko zewnętrzne, bez sektorów MVA
+    TMA): kształty TMA i CTA (areas.tma: kolejność bez ACC, dyrektorów i informacji – kto jest pierwszy online, ten
+    obsługuje kształt), CTR (grupa CTR jak twr[].id) i FIS (kolejność bez ACC) – area_shapes; strona sumuje kształty
+    jednego stanowiska (dissolve.js)."""
     kinds: dict[str, list[dict]] = {"acc": [], "tma": [], "ctr": [], "fis": []}
     for s in epww_slices:
         k = sector_kind(s["fir"], s["name"])
         if s["fir"].upper() == "EPWW" and k in kinds:
             kinds[k].append(s)
     tiles = stack_tiles(vacs_tiles, first_chains(nb_chains), positions, chain_tails(nb_chains))
-    acc_geo, seen = [], set()
+    acc_geo = []
     for s in kinds["acc"]:
         m = re.match(r"^EPWW([A-Z])", s["name"])
         if m and (own.get("sectors") or {}).get(m.group(1)):
             acc_geo.append({"letter": m.group(1), "name": s["name"], "lo": s["lo"], "hi": s["hi"],
                             "geometry": simplify(s["geom"], 0.002, 4)})
-
-    def outlines(sl, **extra):
-        out, mine = [], {}
-        for s in sl:
-            g = simplify(s["geom"])
-            key = json.dumps(g["coordinates"])
-            if key not in seen:
-                seen.add(key)
-                mine[key] = {"name": s["name"], "geometry": g, **{k: f(s) for k, f in extra.items()}}
-                out.append(mine[key])
-            elif key in mine:
-                # ten sam kształt drugi raz (inna wysokość): brakujące dodatki z kolejnego wycinka (np. klucz TMA)
-                for k, f in extra.items():
-                    if mine[key][k] is None:
-                        mine[key][k] = f(s)
-        return out
-
     fis_sl = [s for s in kinds["fis"] if FIS_NAME.match(s["name"])]
     # kształt TMA → klucz TMA (jak tma[].tma i flow.tma): czerwone tło TMA z alarmem przepływu na podglądzie LOW;
-    # wspólne części kilku TMA i CTA bez klucza (tylko obrys)
-    tma_key = {s["name"]: key for key, (_, parts) in tma_parts(kinds["tma"], own)[0].items()
-               for sl in parts.values() for s in sl}
-    # sąsiedzi: ten sam kształt na tej samej wysokości (kopie z dwóch plików) raz
-    nb, nb_seen = [], set()
-    for a in nb_areas(list(nb_slices), border_geom):
-        g = simplify(a["geom"], 0.008, 2)  # tło podglądu: ok. 1 km wystarczy (0,01° to niecały piksel)
-        key = (a["kind"], a["lo"], a["hi"], json.dumps(g["coordinates"]))
-        if g["coordinates"] and key not in nb_seen:
-            nb_seen.add(key)
-            nb.append({**{k: v for k, v in a.items() if k != "geom"}, "geometry": g})
+    # wspólne części kilku TMA i CTA bez klucza
+    parts_by, dirs = tma_parts(kinds["tma"], own)
+    tma_key = {s["name"]: key for key, (_, parts) in parts_by.items() for sl in parts.values() for s in sl}
+    radar = set(own.get("acc_positions") or ())
+
+    def app_chain(s):  # TMA i CTA: stanowiska APP (i wieża TMA proceduralnej) bez ACC, dyrektorów i informacji
+        return [cs for cs in air_chain(s["name"], s["owners"], own)
+                if not ACC_CS.match(cs) and cs not in radar and cs not in dirs and not INFO.search(cs)]
+
+    # FIS: kolejność bez sektorów radarowych; informacja Warszawa (EPWW_I_CTR, EPWW_IE_CTR – znak jak ACC, ale to FIS)
+    # zostaje (0.13.2, przegląd: bez niej warstwa FIS była pusta, gdy obsługiwała ją tylko informacja Warszawa)
+    def fis_chain(s):
+        return [cs for cs in air_chain(s["name"], s["owners"], own)
+                if cs not in radar and (not ACC_CS.match(cs) or INFO.search(cs))]
+
+    areas = {"tma": area_shapes(kinds["tma"], "t", app_chain, tma=lambda s: tma_key.get(s["name"])),
+             "ctr": area_shapes(kinds["ctr"], "c", ctr=lambda s: sector_group("EPWW", s["name"], "ctr")),
+             "fis": area_shapes(fis_sl, "f", fis_chain)}
     geo = {"border": simplify(border_geom, 0.002), "firs": [{"id": f["id"], "geometry": simplify(f["geometry"], 0.02, 2)}
                                                            for f in firs_geo],
-           "acc": acc_geo, "tma": outlines(kinds["tma"], tma=lambda s: tma_key.get(s["name"])), "ctr": outlines(kinds["ctr"]),
-           "fis": outlines(fis_sl, owner=lambda s: s["owners"][0] if s["owners"] else None),
-           "nb": [{k: a[k] for k in ("id", "fir", "name", "kind", "lo", "hi", "geometry")} for a in nb]}
+           "acc": acc_geo, **{k: [{x: v for x, v in a.items() if x != "chains"} for a in sl] for k, sl in areas.items()}}
     atis = sorted(cs for cs in positions if cs.startswith("EP") and facility(cs) == "ATIS")
     acc_pos = own.get("acc_positions") or {}
     return {"layers": own.get("layers") or {}, "acc_positions": sorted(acc_pos),
             "acc_short": {cs: (v or {}).get("short") or cs for cs, v in acc_pos.items()},
             "sectors": acc_sectors(own), "tma": tma_groups(kinds["tma"], own),
             "twr": ctr_groups(kinds["ctr"], own, coords, positions), "fis": fis_groups(fis_sl, own),
-            "atis": atis, "nb": [{"id": a["id"], "chain": a["chain"]} for a in nb], "geo": geo,
-            "layout": layout_static(layout or {}, tiles), "plates": tma_plate_static(kinds["tma"], own)}
+            "atis": atis, "areas": {k: [{"id": a["id"], "chains": a["chains"]} for a in areas[k]] for k in ("tma", "fis")},
+            "geo": geo, "layout": layout_static(layout or {}, tiles), "plates": tma_plate_static(kinds["tma"], own)}
+
+
+def area_owners(areas: list[dict], online: dict, keep=None) -> dict[str, list[str]]:
+    """Kto teraz obsługuje kształty warstwy (areas z build_static): stanowisko → id kształtów, w których jest pierwsze
+    online w którejś kolejności (keep: tylko takie stanowiska, np. APP – wieża TMA proceduralnej to nie APP). Kształt
+    bez nikogo online nie ma właściciela (strona: bez granicy i bez plakietki)."""
+    out: dict[str, list[str]] = {}
+    for a in areas:
+        for o in dict.fromkeys(first_online(ch, online) for ch in a["chains"]):
+            if o and (keep is None or keep(o)):
+                out.setdefault(o, []).append(a["id"])
+    return out
 
 
 # --- część zmienna: kto jest online
@@ -1129,6 +1120,8 @@ def _referenced(static: dict) -> set[str]:
         refs.update(cs for ch in g["chains"] for cs in ch)
         if g.get("atis"):
             refs.add(g["atis"])
+    for a in (k for sl in (static.get("areas") or {}).values() for k in sl):
+        refs.update(cs for ch in a["chains"] for cs in ch)
     for f in (static.get("layout") or {}).get("firs") or ():
         refs.update(f["area"])
         for b in f["boxes"]:
@@ -1141,9 +1134,11 @@ def _referenced(static: dict) -> set[str]:
 def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (), net_ok: bool = True,
           berlin: dict | None = None, flow: dict | None = None) -> dict:
     """Stan tablicy dla zestawu zalogowanych (online: znak stanowiska → kontroler, jak /api/radio/online).
-    Także firs (stosy okienek FIR-ów sąsiednich wg szkicu, po łączeniu; miejsce stosu: map, at), indicators, plates
-    (APP i TWR tylko dla zalogowanych), berlin (berlin_config z feedu i METAR, liczy endpoint) i flow (flow_alerts
-    z vIFF, liczy endpoint; None = brak danych). Od 0.13.1 bez siatki strony (grid): stary styl jak w 0.12.6."""
+    Także grid (siatka strony wg szkicu: kolumny, rodzaje kolumn, BERLIN, przyciski, podglądy, stan danych, legenda;
+    0.13.2), firs (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu; kod FIR-u: name i room), indicators,
+    plates (APP i TWR tylko dla zalogowanych), areas (0.13.2: kto obsługuje kształty TMA/CTA i FIS – obrysy
+    zalogowanych na LOW), acc_short (skróty stanowisk ACC do plakietek), berlin (berlin_config z feedu i METAR, liczy
+    endpoint) i flow (flow_alerts z vIFF, liczy endpoint; None = brak danych)."""
     sectors = [{**s, "owner": first_online(s["chain"], online)} for s in static["sectors"]]
     # APP, TWR, FIS: właściciel spośród stanowisk tej przestrzeni (APP, TWR, informacja); sektor ACC, który przejmuje
     # ją top-down, osobno (topdown) – ACC widać już na podglądach LOW/MID/HIGH
@@ -1177,14 +1172,16 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
         online = {**online, cs: {"callsign": cs, "frequency": info.get("frequency"), "name": info.get("name"),
                                  "cid": info.get("cid"), "logon_time": info.get("logon_time"),
                                  "atis_code": info.get("atis_code"), "text_atis": info.get("text_atis")}}
-    # wycinki sąsiadów na podglądach: obsadzone (id → pierwsze stanowisko online z listy OWNER); reszta nieobsadzona
-    nb = {a["id"]: o for a in static.get("nb") or () if (o := first_online(a["chain"], online))}
+    # obrysy zalogowanych na LOW (0.13.2): stanowisko APP → kształty TMA i CTA, stanowisko FIS → kształty FIS
+    sa = static.get("areas") or {}
+    areas = {"app": area_owners(sa.get("tma") or (), online, lambda cs: facility(cs) in APP_TYPES),
+             "fis": area_owners(sa.get("fis") or (), online)}
     lay = static.get("layout") or {}
     flow = flow or {}
     return {"layers": static["layers"], "sectors": sectors, "tma": tma, "twr": twr,
-            "fis": fis, "atis": atis, "nb": nb, "pos": pos,
+            "fis": fis, "atis": atis, "areas": areas, "acc_short": static.get("acc_short") or {}, "pos": pos,
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra},
-            "firs": fir_blocks(lay, online, positions, net_ok),
+            "grid": lay.get("grid") or {}, "firs": fir_blocks(lay, online, positions, net_ok),
             "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),
             "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions)},
             "berlin": berlin or berlin_config([], net_ok=net_ok),

@@ -83,6 +83,20 @@ def test_seed_from_aip(client):
     assert st["lvp"]["applies"] is False and st["lvp"]["state"] is None
 
 
+def test_status_ctr_vmc_imc(client, monkeypatch):
+    """0.13.2 (issue #27): /status oddaje stan VMC / IMC z serwera (parsed.vmc, parsed.vmc_reason) z tego samego METAR,
+    który pokazuje AWOS; BKN009 przy 10 km widzialności to IMC, a pas wybierany jak w IMC."""
+    for body, vmc in (("9999 BKN009", "IMC"), ("9999 OVC014", "IMC"), ("9999 SCT009 BKN040", "VMC"),
+                      ("9999 BKN///", None)):
+        metar = f"EPWA 091130Z 24008KT {body} 08/06 Q1012 NOSIG"
+
+        async def fake_metars(icaos, metar=metar):
+            return {i: metar for i in icaos}
+        monkeypatch.setattr(aerodromes, "get_metars", fake_metars)
+        st = client.get("/api/aerodromes/EPWA/status").json()
+        assert st["metar"] == metar and st["parsed"]["vmc"] == vmc and st["parsed"]["vmc_reason"], (body, st["parsed"])
+
+
 def test_status_cancelled_lvp_runway_choice_imc(client, monkeypatch):
     """Po odwołaniu LVP (CANCELLED) pas wybierany jak przy IMC z kategorii METAR, nie jak w LVP."""
     from datetime import datetime, timedelta, timezone

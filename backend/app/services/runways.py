@@ -9,7 +9,8 @@ przy LVP / przygotowaniu LVP / IMC wybieramy do lądowania pas z ILS, o ile skł
 startu na lotniskach z pasami preferowanymi pas z listy AIP). W LVP pasy preferowane z AD 2.21 nie obowiązują: pasy
 dopuszczone w LVP przez AIP AD 2.22 (klucz lvp, np. EPWA: lądowania 33 albo 11, starty 29 albo 15, para w limicie
 wiatru), a bez nich lądowania i starty w jednym kierunku, z ILS. Starty nie pod prąd lądowań (ten sam pas, przeciwny
-kierunek): w LVP nigdy, poza LVP na lotniskach z kilkoma pasami (EPWA) i gdy hałas nie decyduje."""
+kierunek): w LVP nigdy, poza LVP na lotniskach z kilkoma pasami (EPWA) i gdy hałas nie decyduje.
+0.13.2 (issue #27): IMC to ten sam stan co pole IMC w AWOS (metar.ctr_conditions), a nie kategoria IFR / LIFR."""
 
 import json
 import math
@@ -471,7 +472,9 @@ def _wind_choice(rows: list[dict], by: dict, wind_dir, wind_speed, cfg: dict, li
 def runway_state(ad, parsed, lvp: dict | None, now: datetime | None = None) -> dict:
     """Pasy lotniska `ad` (model Aerodrome) ze składowymi wiatru z METAR (`parsed`) i pas preferowany (select_runways):
     {"config": runway_config, "runways": [...], "preferred": {"arr", "dep", "reason"}}. `lvp` = evaluate() z lvp.py:
-    LVP i przygotowanie LVP wymagają podejścia precyzyjnego; odwołane LVP już nie, zostaje IMC z kategorii METAR."""
+    LVP i przygotowanie LVP wymagają podejścia precyzyjnego; odwołane LVP już nie, zostaje IMC. 0.13.2 (issue #27): IMC
+    to ten sam stan co w AWOS (parsed.vmc z metar.ctr_conditions: widzialność < 5 km albo ceiling < 1500 ft), a nie
+    kategoria IFR / LIFR jak dotąd (przy ceilingu 1000–1400 ft AWOS pokazywał IMC, a pas był wybierany jak przy VMC)."""
     wd = parsed.wind_dir if parsed else None
     ws = parsed.wind_speed if parsed else None
     cfg = runway_config(ad.icao)
@@ -483,7 +486,7 @@ def runway_state(ad, parsed, lvp: dict | None, now: datetime | None = None) -> d
         r["headwind"], r["crosswind"] = wind_components(wd, ws, r["heading"])
     state = (lvp or {}).get("state")
     low_vis = state if state in ("LVP", "PREP") else (
-        "IMC" if parsed and parsed.flight_category in ("IFR", "LIFR") else None)
+        "IMC" if parsed and parsed.vmc == "IMC" else None)
     pref = select_runways(rwys, wd, ws, equipment=equipment, low_vis=low_vis, config=cfg,
                           gust=parsed.wind_gust if parsed else None, metar=parsed,
                           now=now or datetime.now(timezone.utc))

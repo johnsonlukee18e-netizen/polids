@@ -462,8 +462,8 @@ def test_one_button_size_everywhere():
 
 def test_letters_half_width_and_rows():
     """Jedyny wyjątek z issue #25: litery AIRCRAFT / CALLSIGN pół szerokości przycisku i tej samej wysokości. ALL
-    i KEYBOARD na całą szerokość (137 px), pod nimi litery parami; odstęp .sep w podmenu (METEO, AWALON, AD CIV) to
-    jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu."""
+    i "()" (klawiatura) na całą szerokość (137 px), pod nimi litery parami; odstęp .sep w podmenu (METEO, AWALON,
+    AD CIV) to jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu."""
     letters = _rule(STYLE, ".submenu.letters")
     assert "display: grid;" in letters and "grid-template-columns: 1fr 1fr;" in letters
     # bez własnej szerokości i bez gap: kolumna jak każde podmenu (150 px), odstęp 3 px dają marginesy przycisków
