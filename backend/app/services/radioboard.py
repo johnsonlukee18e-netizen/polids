@@ -1076,8 +1076,11 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
         return [cs for cs in air_chain(s["name"], s["owners"], own)
                 if not ACC_CS.match(cs) and cs not in radar and cs not in dirs and not INFO.search(cs)]
 
+    # FIS: kolejność bez sektorów radarowych; informacja Warszawa (EPWW_I_CTR, EPWW_IE_CTR – znak jak ACC, ale to FIS)
+    # zostaje (0.13.2, przegląd: bez niej warstwa FIS była pusta, gdy obsługiwała ją tylko informacja Warszawa)
     def fis_chain(s):
-        return [cs for cs in air_chain(s["name"], s["owners"], own) if not ACC_CS.match(cs) and cs not in radar]
+        return [cs for cs in air_chain(s["name"], s["owners"], own)
+                if cs not in radar and (not ACC_CS.match(cs) or INFO.search(cs))]
 
     areas = {"tma": area_shapes(kinds["tma"], "t", app_chain, tma=lambda s: tma_key.get(s["name"])),
              "ctr": area_shapes(kinds["ctr"], "c", ctr=lambda s: sector_group("EPWW", s["name"], "ctr")),

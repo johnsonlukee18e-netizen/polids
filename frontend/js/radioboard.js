@@ -295,7 +295,9 @@ export const ADVISORY_FQ = "122.800";
 // cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek, l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column,
 // grid-row), marks: [{gc, gr, n: [liczby], at: up | dn | sh | two}]}.
 // 0.13.2 (issue #27): ta sama siatka dla całej strony – pageGrid podaje każdemu FIR-owi wszystkie kolumny i wiersze
-// szkicu (f.cols, f.rows), więc tory stosów są torami strony, a kafelki różnych FIR-ów w jednym wierszu stoją równo
+// szkicu (f.cols, f.rows), więc tory stosów są torami strony, a kafelki różnych FIR-ów w jednym wierszu stoją równo.
+// Połączone okienko na kilka kolumn (przegląd 0.13.2): w dalszej kolumnie granica jego członka z tej kolumny, gdy
+// inna niż w kolumnie obok (ESAA 9+6+8+7 nad L: 195 pod 8 i 0 pod 7; EDMM MEI+SPE1: 315 i 660 nad nim)
 export function stackGrid(f) {
   const num = (v, d = 0) => (Number(v) > 0 ? Math.round(Number(v)) : d);
   const cellOf = (b) => ({ b, col: num(b?.col, 1), row: num(b?.row, 1), cols: num(b?.cols, 1), rows: num(b?.rows, 1) });
@@ -338,12 +340,24 @@ export function stackGrid(f) {
   // granica kafelka nad nią (na górze rzędu), sh = wspólna granica obu (w środku), two = dwie (dolna nad kreską,
   // górna pod nią; rząd liczb wyższy niż zwykle na stronie rozciąga się między nimi)
   const NONE = { n: [], at: "" };
-  const nums = (occ, i, k, at = (t) => t) => {
+  // Dalsza kolumna połączonego okienka (0.13.2, przegląd: ESAA 9+6+8+7 nad L pokazywało 660-195, choć 7 sięga ziemi;
+  // EDMM MEI+SPE1 – 315-165 bez 660 nad SPE1): granica jego komórki bez łączenia w tej kolumnie przy krawędzi w wierszu
+  // r (f = up albo lo), gdy różni się od granicy w kolumnie przed nią (ta sama – liczba już stoi obok; 660 nad ESAA 6)
+  const cellAt = (t, r, i) => { const s = st.occ[i]?.[r]; return s && s.of === t.b ? s : null; };
+  const later = (t, r, i, f) => {
+    const s = cellAt(t, r, i);
+    if (!s) return null;
+    let p = null;
+    for (let j = i - 1; j > t.c0 && !p; j--) p = cellAt(t, r, j);
+    return f(s) === f(p || rim(t, r)) ? null : { ...t, b: { upper: up(s), lower: lo(s) } };
+  };
+  const nums = (occ, i, k, at = null) => {
     const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
     if (aT && aT === bT) return NONE;
     const a0 = aT && aT.c0 === i ? aT : null, b0 = bT && bT.c0 === i ? bT : null;
     if (a0 && b0 && up(a0) === up(b0) && lo(a0) === lo(b0)) return NONE;
-    const a = a0 ? at(a0, k - 1) : null, b = b0 ? at(b0, k) : null;
+    const a = a0 ? (at ? at(a0, k - 1) : a0) : at && aT ? later(aT, k - 1, i, lo) : null;
+    const b = b0 ? (at ? at(b0, k) : b0) : at && bT ? later(bT, k, i, up) : null;
     if (a && b) {
       return up(a) === up(b) && lo(a) === lo(b) ? NONE : lo(a) === up(b) ? { n: [up(b)], at: "sh" } : { n: [lo(a), up(b)], at: "two" };
     }

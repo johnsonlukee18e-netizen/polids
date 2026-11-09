@@ -293,6 +293,34 @@ def test_board_areas_and_page(client, board):
     assert grid["berlin"] == {"col": 1, "row": 6, "cols": 1, "rows": 1, "box": {"col": 1, "row": 7, "cols": 2, "rows": 1}}
 
 
+def test_board_fis_warszawa_information(client, monkeypatch):
+    """0.13.2 (przegląd): informacja Warszawa (EPWW_I_CTR, EPWW_IE_CTR) ma znak jak sektor ACC, ale to stanowisko FIS –
+    obsługuje obszary FIS (areas.fis: granica i plakietka na LOW z warstwą FIS), a nie znika z kolejności FIS jak
+    sektory radarowe (dawniej areas.fis było puste, a na stronie nic nie mówiło, że ktoś obsługuje FIS)."""
+    geo = {a["id"]: a["name"] for a in client.get("/api/radio/board?geo=1").json()["geo"]["fis"]}
+    out = {}
+    for name, css in (("i", ["EPWW_I_CTR"]), ("ie", ["EPWW_IE_CTR"]), ("both", ["EPWW_I_CTR", "EPWW_IE_CTR"])):
+        feed = {**FEED, "controllers": [{"callsign": cs, "frequency": fq, "name": "Info", "cid": 70 + i}
+                                        for i, (cs, fq) in enumerate(zip(css, ("128.325", "127.660")))], "atis": []}
+
+        async def get(feed=feed):
+            return feed
+
+        monkeypatch.setattr(vatsim_api, "get_feed", get)
+        out[name] = client.get("/api/radio/board").json()
+    fis_i = out["i"]["areas"]["fis"]
+    # EPWW_I_CTR w kolejności prawie wszystkich obszarów FIS (także EPWW-MIDSEA i Gdańsk), z sektorów radarowych nikt
+    assert set(fis_i) == {"EPWW_I_CTR"} and len(fis_i["EPWW_I_CTR"]) >= 0.9 * len(geo) and "f0" in fis_i["EPWW_I_CTR"]
+    assert out["i"]["areas"]["app"] == {} and all(g["owners"] == ["EPWW_I_CTR"] for g in out["i"]["fis"] if g["owners"])
+    assert out["i"]["pos"]["EPWW_I_CTR"]["frequency"] and "EPWW_I_CTR" in out["i"]["online"]
+    # EPWW_IE_CTR: obszary FIS Warszawa; obaj online – IE Warszawę, I resztę
+    ie = out["ie"]["areas"]["fis"]["EPWW_IE_CTR"]
+    assert ie and all(geo[i].startswith(("FIS_WAW", "WAW_FIS")) for i in ie)
+    both = out["both"]["areas"]["fis"]
+    assert set(both) == {"EPWW_I_CTR", "EPWW_IE_CTR"} and sorted(both["EPWW_IE_CTR"]) == sorted(ie)
+    assert not set(both["EPWW_I_CTR"]) & set(ie)
+
+
 def test_area_shapes_and_owners():
     """0.13.2: area_shapes – każdy kształt raz (ten sam na kilku wysokościach: jeden, z kolejnościami obu wycinków),
     id z prefiksem; area_owners – stanowisko → kształty, w których jest pierwsze online (keep: tylko APP)."""
@@ -631,6 +659,20 @@ console.log(JSON.stringify({
       lkaa: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("LKAA", 5, 19, 660, 0, { cols: 2, rows: 3, merged: true, members: lkaa })] }),
       lkaa0: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: lkaa }),
       edmm: sg({ cols: [2, 3], rows: [15], boxes: [B("MEI", 2, 15, 315, 165), B("SPE1", 3, 15, 660, 315)] }),
+      // 0.13.2 (przegląd): połączone okienko na dwie kolumny – w drugiej kolumnie granica jej członka, gdy inna niż obok
+      // (ESMM_7_CTR na 9+6+8+7 nad L: 0 pod 7; EDMM MEI+SPE1 nad SAS: 660 nad SPE1 i 315 pod nim)
+      esaaL: (() => {
+        const e = [B("9", 5, 5, 660, 365), B("6", 6, 5, 660, 365), B("8", 5, 6, 365, 195), B("7", 6, 6, 365, 0)], L = B("L", 5, 7, 195, 0);
+        return [sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [...e, L] }),
+          sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [B("7", 5, 5, 660, 0, { cols: 2, rows: 2, merged: true, members: e }), L] })];
+      })(),
+      edmmSas: (() => {
+        const e = [B("MEI", 2, 15, 315, 165), B("SPE1", 3, 15, 660, 315)], sas = B("SAS", 2, 16, 165, 0);
+        return [sg({ cols: [2, 3], rows: [15, 16], boxes: [...e, sas] }),
+          sg({ cols: [2, 3], rows: [15, 16], boxes: [B("MEI", 2, 15, 660, 165, { cols: 2, merged: true, members: e }), sas] })];
+      })(),
+      lkaaNs: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("NU", 5, 19, 660, 305, { cols: 2, merged: true, members: lkaa.slice(0, 2) }),
+        ...lkaa.slice(2)] }),
       // bez cols/rows z /api/radio/board (stara część stała): z okienek; złe wartości → 1
       fallback: sg({ boxes: [{ id: "A", col: 1, row: 1, upper: 200, lower: 100 }, { id: "B", col: "1", row: 3, upper: 100, lower: 0 },
         { id: "C", col: -4, row: "x", upper: 50, lower: 0 }] }),
@@ -762,6 +804,19 @@ def test_js_layout_helpers(js):
     assert (lk["ncols"], lk["nrows"], lk["rows"]) == (l0["ncols"], l0["nrows"], l0["rows"]) == (2, 7, ["l1", "t", "l1", "t", "l1", "t", "l1"])
     # EDMM: MEI i SPE1 w jednym wierszu
     assert st["edmm"]["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315]]
+    # 0.13.2 (przegląd): połączone okienko na dwie kolumny pokazuje w drugiej kolumnie granicę jej członka, gdy jest inna
+    # niż w pierwszej – ESAA 9+6+8+7 nad L: 195 pod 8 (wspólna z L) i 0 pod 7 (dawniej 660-195, choć 7 sięga ziemi),
+    # bez drugiego 660 nad 6; EDMM MEI+SPE1 nad SAS: 315 i 660 nad nim, 165 i 315 pod nim (dawniej 315-165)
+    e0, e1 = st["esaaL"]
+    assert e0["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 365], ["2", "3", 365], ["1", "5", 195], ["2", "5", 0],
+                           ["1", "7", 0]]
+    assert e1["tiles"] == [["7", "1 / 3", "2 / 5"], ["L", "1 / 2", "6 / 7"]]
+    assert e1["marks"] == [["1", "1", 660], ["1", "5", 195], ["2", "5", 0], ["1", "7", 0]] and e1["at"][1:3] == ["sh", "dn"]
+    m0, m1 = st["edmmSas"]
+    assert m0["marks"] == m1["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315], ["1", "5", 0]]
+    assert (e1["rows"], m1["rows"]) == (e0["rows"], m0["rows"])  # rzędy liczb jak bez łączenia
+    # LKAA NU+SU nad NL i SL: 660 raz (ta sama granica w obu kolumnach), pod nim 305 w obu kolumnach jak dotąd
+    assert st["lkaaNs"]["marks"] == [["1", "1", 660], ["1", "3", 305], ["2", "3", 305], ["1", "5", 125], ["2", "5", 125], ["2", "7", 0]]
     fb = st["fallback"]
     assert (fb["ncols"], fb["nrows"]) == (1, 5) and fb["tiles"][0] == ["A", "1 / 2", "2 / 3"]
     assert fb["tiles"][1] == ["B", "1 / 2", "4 / 5"] and fb["tiles"][2] == ["C", "1 / 2", "2 / 3"]
@@ -872,7 +927,7 @@ function layout(bd, set, scr) {
   const ly = new Set(SETS[set]);
   const x = { freq: (cs) => bd.online?.[cs]?.frequency || bd.pos[cs]?.frequency || "", nm: posName, dn: posName,
     on: (cs) => bd.online?.[cs] || null, who: (cs) => (bd.online?.[cs] ? `${cs} online` : ""), pos: (cs) => cs, net: true };
-  const groups = radio.accGroups(rb.sliceAt(geo.acc, rb.LEVEL_FT.LOW), bd.sectors, "LOW", "layout");
+  const groups = radio.accGroups(rb.sliceAt(geo.acc, rb.LEVEL_FT.LOW), bd.sectors, "LOW", "layout", geo.border);
   const { lines, plates } = radio.previewItems(bd, geo, "LOW", ly, groups, x, "layout");
   const { W, H } = scr;
   const { P } = rb.projection(rb.bboxOrDefault(rb.bboxOf(geo.border)) || rb.EPWW_BBOX, { x: 0, y: 0, w: W, h: H }, 0.03);
@@ -900,6 +955,12 @@ function layout(bd, set, scr) {
     // każda plakietka z częstotliwością (tylko zalogowani; sam ATIS – częstotliwość ATIS)
     noFq: plates.filter((p) => !FQ.test(p.fq)).map((p) => p.k),
     html: plates.map(radio.plateHtml),
+    // 0.13.2 (przegląd): każdy obrys w granicy FIR EPWW, więc w ramce podglądu (dawniej FIS Gdańsk z EPWW-MIDSEA
+    // ok. 40 px nad górną krawędzią LOW); APP, TWR i FIS – sam obrys zewnętrzny (tyle "M", ile części)
+    outside: lines.flatMap((l) => (l.geom ? [l.geom] : l.shapes).flatMap((g) => rb.ringsOf(g)).flat().map(P))
+      .filter(([px, py]) => px < -0.5 || py < -0.5 || px > W + 0.5 || py > H + 0.5).length,
+    holes: lines.filter((l) => l.kind !== "acc" && l.geom && (radio.linesSvg([l], P).match(/M/g) || []).length !== rb.ringsOf(l.geom).length)
+      .map((l) => l.k),
   };
 }
 const res = {};
@@ -920,6 +981,14 @@ SPLIT_FEED = {**FEED, "controllers": [
         ("EPKK_APP", "121.075"), ("EPKK_E_APP", "126.975"), ("EPKK_KK_APP", "126.530"), ("EPKK_TWR", "123.255"),
         ("EPWA_TWR", "118.305"), ("EPWW_ALL_CTR", "125.450")))]}
 EMPTY_FEED = {**FEED, "controllers": [], "atis": []}
+# 0.13.2 (przegląd): same informacje FIS (Gdańsk z EPWW-MIDSEA nad Bałtykiem) i wieże; informacja Warszawa
+FIS_FEED = {**FEED, "controllers": [
+    {"callsign": cs, "frequency": fq, "name": "Fis", "cid": 80 + i} for i, (cs, fq) in enumerate((
+        ("EPGD_I_APP", "129.850"), ("EPKK_I_APP", "119.275"), ("EPPO_I_APP", "122.525"), ("EPWA_I_APP", "123.975"),
+        ("EPSC_TWR", "121.255"), ("EPKK_TWR", "123.255")))], "atis": []}
+INFO_FEED = {**FEED, "controllers": [
+    {"callsign": cs, "frequency": fq, "name": "Info", "cid": 90 + i} for i, (cs, fq) in enumerate((
+        ("EPWW_I_CTR", "128.325"), ("EPWW_IE_CTR", "127.660")))], "atis": []}
 
 
 def test_js_twr_layout(client, board, tmp_path, monkeypatch):
@@ -938,7 +1007,7 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     (d / "package.json").write_text('{"type": "module"}', "utf-8")
     geo = client.get("/api/radio/board?geo=1").json()["geo"]
     boards = {"board": board}
-    for name, feed in (("alt", ALT_FEED), ("split", SPLIT_FEED), ("empty", EMPTY_FEED)):
+    for name, feed in (("alt", ALT_FEED), ("split", SPLIT_FEED), ("empty", EMPTY_FEED), ("fis", FIS_FEED), ("info", INFO_FEED)):
         async def get(feed=feed):
             return feed
 
@@ -957,7 +1026,7 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     res = json.loads(r.stdout)
     if os.environ.get("RB_DUMP"):
         open(os.environ["RB_DUMP"], "w").write(json.dumps(res))
-    assert len(res) == 48
+    assert len(res) == 72
     # nikt online: ani jednej granicy i plakietki (ACC, APP, TWR, TWR/A bez ATIS-ów, FIS: bez samych ID)
     for key in ("empty-twr-1366", "empty-apptwr-1600", "empty-all-1920"):
         assert res[key]["n"] == 0 and res[key]["lines"] == [], key
@@ -985,7 +1054,18 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     assert {f"app:{cs}" for cs in sp["app"]} | {"twr:EPKK", "twr:EPWA"} <= set(sp["lines"])
     parts = {g["nominal"]: g["at"] for g in boards["split"]["tma"] if g["tma"] in ("TMA Warszawa", "TMA Kraków")}
     assert all(sp["at"][cs] == parts[cs] for cs in sp["app"]), (sp["at"], parts)
+    # 0.13.2 (przegląd): FIS Gdańsk (z EPWW-MIDSEA) i reszta informacji: granice w ramce podglądu, bez pętli wokół CTR;
+    # informacja Warszawa (EPWW_I_CTR, EPWW_IE_CTR) z granicą i plakietką jak inne stanowiska FIS
+    fa = res["fis-all-1920"]
+    assert fa["fis"] == ["EPGD_I_APP", "EPKK_I_APP", "EPPO_I_APP", "EPWA_I_APP"] and fa["twr"] == ["EPKK", "EPSC"]
+    assert {"fis:EPGD_I_APP", "twr:EPSC"} <= set(fa["lines"])
+    for sn in ("1366", "1600", "1920"):
+        assert res[f"info-all-{sn}"]["fis"] == ["EPWW_IE_CTR", "EPWW_I_CTR"], sn
+        assert {"fis:EPWW_IE_CTR", "fis:EPWW_I_CTR"} <= set(res[f"info-all-{sn}"]["lines"]), sn
+        # plakietka z dopiskiem FIS (znak jak sektor ACC: sama nazwa "I" wyglądałaby jak plakietka ACC)
+        assert all('class="rb-id">EPWW I' in h and ' FIS</span>' in h for h in res[f"info-all-{sn}"]["html"]), sn
     for key, out in res.items():
+        assert out["outside"] == 0 and out["holes"] == [], (key, out["outside"], out["holes"])
         # kolejność układania: APP, TWR, ACC, FIS
         assert out["order"] == sorted(out["order"], key=["app", "twr", "acc", "fis"].index), key
         # plakietka w środku: punkt pod nią albo najwyżej lekko obok (PLATE_MAX × 1,5 w tłoku); ACC i FIS dalej
@@ -1032,6 +1112,36 @@ out.free = { board: fr(board.sectors, "fb"), all: fr(board.sectors.map((s) => ({
   none: fr(board.sectors.map((s) => ({ ...s, owner: null })), "fn"), slices: low.length,
   unowned: low.filter((sl) => !board.sectors.some((s) => s.layer === "LOW" && s.owner && s.letter === sl.letter)).length };
 out.path = rb.pathAll({ type: "Polygon", coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[2, 2], [4, 2], [4, 4], [2, 4], [2, 2]]] }, (c) => c);
+// 0.13.2 (przegląd): szare pole, obszary ACC i granice tylko w granicy FIR EPWW (pola w km², rzut jak na podglądzie)
+const km2 = (r) => Math.abs(r.reduce((a, [x1, y1], i) => { const [x2, y2] = r[(i + 1) % r.length]; return a + x1 * y2 - x2 * y1; }, 0)) / 2
+  * Math.cos((52 * Math.PI) / 180) * 111.32 * 111.32;
+const polys = (g) => (g?.type === "Polygon" ? [g.coordinates] : g?.coordinates || []);
+const areaOf = (g) => polys(g).reduce((a, [o, ...hs]) => a + km2(o) - hs.reduce((h, r) => h + km2(r), 0), 0);
+const bRing = polys(geo.border)[0][0];
+const near = (p) => bRing.some(([x1, y1], i) => { const [x2, y2] = bRing[(i + 1) % bRing.length], dx = x2 - x1, dy = y2 - y1;
+  const t = Math.max(0, Math.min(1, ((p[0] - x1) * dx + (p[1] - y1) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(p[0] - x1 - t * dx, p[1] - y1 - t * dy) < 1e-6; });
+// wierzchołki poza granicą FIR-u (na samej granicy się nie liczą)
+const outside = (g) => polys(g).flat().flat().filter((p) => !inRing(bRing, p[0], p[1]) && !near(p)).length;
+const grey = (secs, v) => radio.freeArea(low, secs, "LOW", v, geo.border);
+const gNone = grey(board.sectors.map((s) => ({ ...s, owner: null })), "gn"), gBoard = grey(board.sectors, "gb");
+const grp = radio.accGroups(low, board.sectors, "LOW", "gb", geo.border);
+out.grey = { border: Math.round(areaOf(geo.border)), none: Math.round(areaOf(gNone.geom)), noneOut: outside(gNone.geom),
+  board: Math.round(areaOf(gBoard.geom)), boardOut: outside(gBoard.geom), group: Math.round(areaOf(grp[0].geom)), groupOut: outside(grp[0].geom),
+  // bez granicy FIR-u (stara geometria): jak dotąd suma wycinków bez nikogo
+  noBorder: Math.round(areaOf(radio.freeArea(low, board.sectors, "LOW", "gx").geom)),
+  slices: Math.round(areaOf(radio.freeArea(low, board.sectors, "LOW", "gx2", { type: "MultiPolygon", coordinates: [] }).geom)),
+  all: radio.freeArea(low, board.sectors.map((s) => ({ ...s, owner: s.nominal })), "LOW", "ga", geo.border) };
+const raw = radio.accGroups(low, board.sectors, "LOW", "graw")[0];
+out.grey.groupRawOut = outside(raw.geom);
+// obrysy: dziury tylko w obszarze ACC (FIS, APP, TWR – sam obrys zewnętrzny); kwadrat z dziurą
+const hole = { type: "MultiPolygon", coordinates: [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[2, 2], [4, 2], [4, 4], [2, 4], [2, 2]]],
+  [[[20, 0], [30, 0], [30, 10], [20, 0]]]] };
+out.lines = Object.fromEntries(["acc", "fis", "app", "twr"].map((k) => [k, (radio.linesSvg([{ kind: k, k: "X", geom: hole }], (c) => c).match(/M/g) || []).length]));
+// fokus przy odświeżaniu: selektor tego samego kodu FIR-u, plakietki TWR, ATIS-u; inny element – null
+const fake = (cls, attr, v) => ({ matches: (q) => q === `${cls}[data-${attr}]`, getAttribute: (a) => (a === `data-${attr}` ? v : null) });
+out.focus = [fake(".rb-fh", "fir", "EDWW"), fake(".rb-pl", "icao", "EPWA"), fake(".rb-at", "icao", 'E"X'), fake(".rb-box", "fir", "EDWW"), null]
+  .map(radio.focusSel);
 console.log(JSON.stringify(out));
 """
 
@@ -1078,6 +1188,19 @@ def test_js_acc_groups(client, board, tmp_path):
     assert fr["all"] is None and fr["none"] == {"n": fr["slices"], "geom": True}
     # ścieżka SVG z dziurą (wypełnienie evenodd w radio.css)
     assert out["path"].count("M") == 2 and out["path"].endswith("ZM2.0,2.0L4.0,2.0L4.0,4.0L2.0,4.0L2.0,2.0Z")
+    # 0.13.2 (przegląd): szare pole tylko w granicy FIR EPWW i do samej granicy – bez nikogo cały FIR (dawniej szare
+    # kliny za granicą przy Opawie i Gubinie, czarne szczeliny w środku, np. cypel kłodzki); N online: szare + obszar N
+    # to cały FIR, nic poza granicą; obszar ACC przycięty do granicy (bez granicy wierzchołki N wychodzą poza nią)
+    g = out["grey"]
+    assert g["none"] == pytest.approx(g["border"], rel=1e-4) and g["noneOut"] == 0
+    assert g["boardOut"] == 0 and g["groupOut"] == 0 and g["groupRawOut"] > 0
+    assert g["board"] + g["group"] == pytest.approx(g["border"], rel=0.003) and 0 < g["group"] < g["border"]
+    assert g["all"] is None  # wszystko obsadzone – bez szarego
+    assert g["noBorder"] == g["slices"] and g["noBorder"] != g["board"]  # bez granicy FIR-u jak w 0.13.2 przed przeglądem
+    # dziury tylko w obszarze ACC: FIS, APP i TWR sam obrys zewnętrzny każdej części (pętla wokół CTR wieży offline
+    # wyglądała jak granica wieży online)
+    assert out["lines"] == {"acc": 3, "fis": 2, "app": 2, "twr": 2}
+    assert out["focus"] == ['.rb-fh[data-fir="EDWW"]', '.rb-pl[data-icao="EPWA"]', '.rb-at[data-icao="E\\"X"]', None, None]
 
 
 LOA_SCRIPT = r"""
@@ -1501,6 +1624,9 @@ for (const lib of [true, false]) {
   }));
 }
 out.empty = radio.flowSvg(radio.flowAreas({ sectors: bd.sectors, flow: { ok: false, sectors: {}, tma: {} } }, "HIGH", slices, tmaGeo, x), P);
+// 0.13.2 (przegląd): czerwone tło tylko w granicy FIR EPWW (sektor B wychodzi za granicę – zostaje część w niej)
+globalThis.polygonClipping = createRequire(import.meta.url)(process.argv[4]);
+out.clip = ["HIGH", "LOW"].map((key) => radio.flowAreas(bd, key, slices, tmaGeo, x, "clip", sq(17.5, 51.5, 3)).map((a) => rb.bboxOf(a.geom)));
 const V = [1366, 768], W = 360;
 out.tip = {
   mid: rb.tipPos(600, 300, W, 120, ...V), right: rb.tipPos(1300, 300, W, 120, ...V),
@@ -1545,6 +1671,8 @@ def test_js_flow_and_tip_position(tmp_path):
     assert [(a["id"], a["kind"], a["union"]) for a in lib["HIGH"]["areas"]] == [("HB", "acc", True)]
     assert [(a["id"], a["kind"], a["union"]) for a in lib["LOW"]["areas"]] == [("TMA Warszawa", "tma", True)]
     assert lib["MID"]["areas"] == [] and lib["MID"]["svg"] == "" and out["empty"] == ""
+    # z granicą FIR EPWW (kwadrat 17,5–20,5 E, 51,5–54,5 N): sektor HB (20–21 E) i TMA (do 21,1 E) przycięte do granicy
+    assert out["clip"] == [[[20, 52, 20.5, 53]], []]  # TMA (20,5–21,1 E) cała za granicą: bez tła
     assert lib["HIGH"]["areas"][0]["rt"].split("\n") == ["Sector HB · HIGH", "Now: unstaffed", "Occupancy 12 of 14"]
     assert lib["LOW"]["areas"][0]["rt"].split("\n") == ["TMA Warszawa", "Now: EPWA_APP online",
                                                           "Flow restriction: max occupancy 20 until 18:00Z"]
@@ -1602,6 +1730,25 @@ def test_radio_files_ascii_and_no_source_names():
         text = f.read_text("utf-8").lower()
         for bad in ("euroscope", "plik sektora", "pliku sektora", ".sct", "vacs", "vatspy", "vatsim", ".ese", "viff"):
             assert bad not in text, (f.name, bad)
+
+
+def test_radio_keyboard_mid_title_and_small_plates():
+    """0.13.2 (przegląd): Esc zamyka panel LOA z każdego miejsca strony (nasłuch na dokumencie, gdy RADIO jest widoczne,
+    zdjęty w destroy – fokus znika z kodu FIR-u przy odświeżaniu i po kliknięciu w tekst panelu); fokus z klawiatury
+    wraca po odświeżeniu na ten sam kod FIR-u, plakietkę TWR albo ATIS (focusSel); mały MID pod swoim tytułem (czarne
+    tło tytułu zasłaniało róg granicy FIR-u na 1600×900 i 1366×768); na 1366×768 litera ATIS na plakietce TWR/A tej
+    samej wysokości co ID (częstotliwość siedziała na dolnej krawędzi)."""
+    radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
+    css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
+    assert radio.count('"Escape"') == 1 and 'e.key !== "Escape" || loaBox.hidden || !visible()' in radio
+    assert 'document.addEventListener("keydown", onKey)' in radio and 'document.removeEventListener("keydown", onKey)' in radio
+    body = re.search(r"function renderAll\(\) \{(.*?)\n    \}\n", radio, re.S).group(1)
+    assert "focusSel(a)" in body and "focus({ preventScroll: true })" in body and body.index("renderPage") < body.rindex("focus(")
+    mp = re.search(r"function renderMap\(m\) \{(.*?)\n    \}\n", radio, re.S).group(1)
+    assert mp.index("renderTitle(m)") < mp.index("projection(") and 'm.key === "MID" ? "bottom" : "middle"' in mp
+    assert 'm.key === "MID" && t?.offsetHeight ? t.offsetTop + t.offsetHeight + 2 : 0' in mp
+    small = re.search(r"@media \(max-height: 820px\) \{(.*?)\n\}", css, re.S).group(1)
+    assert re.search(r"\.rb-pl \.rb-fq, \.rb-pl \.rb-code, \.rb-bd \{ line-height: 1; \}", small)
 
 
 def test_frontend_imports_resolve():

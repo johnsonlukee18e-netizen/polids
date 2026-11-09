@@ -16,14 +16,16 @@
 // TWR, TWR/A i FIS: tylko stanowiska online – granatowa granica obsługiwanych części TMA, CTR wieży albo obszarów FIS
 // i plakietka (TWR/A także sam ATIS); bez linii prowadzących, plakietka w środku swojego obszaru, przy tłoku lekko
 // odsunięta. Czerwone tło sektora ACC i TMA z ograniczeniem przepływu albo zajętością ponad 80 %; dymki stałej
-// szerokości.
+// szerokości. Po przeglądzie 0.13.2: szare pole, czerwone tło i granatowe granice tylko w granicy FIR EPWW (inEpww,
+// freeArea), obrysy APP, TWR i FIS bez dziur (linesSvg), MID pod swoim tytułem, fokus z klawiatury zostaje przy
+// odświeżaniu (focusSel), Esc zamyka panel LOA z każdego miejsca strony.
 // Dane: GET /api/radio/board co 30 s (geometria raz, potem tylko po zmianie wersji danych `ver`, np. po imporcie nowych
 // danych sektorów). Panel z wyciągiem z LOA EPWW z FIR-em sąsiada
 // (GET /api/radio/loa), z przyciskiem do dokumentu w COORDINATION › DOKUMENTY i PDF-em w nowej karcie. Kliknięcie
 // kodu FIR-u sąsiada (np. EDWW) otwiera ten panel.
 import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
-import { dissolve, pointIn } from "../dissolve.js";
+import { MIN_HOLE, SLIVER, dissolve, pointIn, ringStats } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
 import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf, bboxOrDefault,
   cellArea, controllersOn, coverGrid, flText, labelOpts, limText, limTip, loaPlace, pageGrid, parseArg, pathAll, pathOf,
@@ -57,12 +59,45 @@ const areaOf = (g) => ringsOf(g).reduce((a, r) => a + Math.abs(r.reduce((s, [x1,
   return s + x1 * y2 - x2 * y1;
 }, 0)) / 2, 0);
 
+// Na podglądzie tylko EPWW (0.13.2, przegląd): wycinki ACC i kształty TMA, CTR i FIS z danych sektorów wychodzą
+// miejscami poza rysowaną granicę FIR EPWW (FIS Gdańsk z EPWW-MIDSEA nad Bałtykiem i z zatoką za Szczecinem, kliny
+// przy Opawie i Gubinie), a w środku granicy zostają szczeliny bez wycinków (cypel kłodzki). Szare pole, czerwone tło
+// i granatowe granice liczymy więc razem z granicą FIR-u (polygon-clipping, w pamięci wg klucza): nic nie wychodzi
+// poza granicę ani poza podgląd (ramka podglądu = granica FIR-u). Bez granicy FIR-u, bez biblioteki albo po błędzie –
+// bez zmian.
+const clipCache = new Map();
+const polysOf = (g) => (g?.type === "Polygon" ? [g.coordinates] : g?.type === "MultiPolygon" ? g.coordinates : [])
+  .map((p) => arr(p).filter((r) => Array.isArray(r) && r.length >= 4)).filter((p) => p.length);
+// bez okruchów i pasków wzdłuż granicy węższych niż SLIVER (wycinek kończy się kilkadziesiąt metrów przed granicą)
+const solidRing = (r) => { const { area, perim } = ringStats(r); return area >= MIN_HOLE && (2 * area) / Math.max(perim, 1e-12) >= SLIVER; };
+const solid = (mp) => arr(mp).filter((p) => p?.[0] && solidRing(p[0])).map(([o, ...hs]) => [o, ...hs.filter(solidRing)]);
+function clipped(key, f) {
+  if (clipCache.has(key)) return clipCache.get(key);
+  let out = null;
+  try {
+    const mp = solid(f(globalThis.polygonClipping));
+    out = { geometry: { type: "MultiPolygon", coordinates: mp }, area: mp.reduce((a, p) => a + ringStats(p[0]).area, 0) };
+  } catch (e) {
+    console.warn("RADIO:", key, e?.message || e);
+  }
+  clipCache.set(key, out);
+  if (clipCache.size > 600) clipCache.delete(clipCache.keys().next().value);
+  return out;
+}
+const hasBorder = (border) => !!polysOf(border).length && !!globalThis.polygonClipping?.intersection;
+// u = {geometry} (wynik dissolve) → część w granicy FIR EPWW {geometry, area} (pusta MultiPolygon, gdy całość leży poza
+// nią); bez granicy albo po błędzie samo u
+export function inEpww(key, u, border) {
+  if (!u?.geometry || !hasBorder(border)) return u;
+  return clipped(`in|${key}`, (pc) => pc.intersection(polysOf(u.geometry), polysOf(border))) || u;
+}
+
 // Sektory ACC podglądu wg obsługującego (runda 12, Marek): wycinki na wysokości podglądu (accs, sliceAt) z tym samym
 // stanowiskiem z kolejności przejmowania warstwy (sectors z /api/radio/board: owner) → jeden obszar (dissolve.js,
 // w pamięci wg klucza: wersja danych, stanowisko, wycinki) i jeden punkt plakietki poza dziurami; wycinki bez nikogo
-// pomijamy (freeArea). Błąd sumy: geom null, rysujemy same wycinki bez granic. Wynik od największego obszaru:
-// [{owner, sectors (wg ID), slices, geom, area, at: [lat, lon]}]
-export function accGroups(accs, sectors, layer, ver = "") {
+// pomijamy (freeArea). Błąd sumy: geom null, rysujemy same wycinki bez granic. border: granica FIR EPWW – obszar tylko
+// w niej (inEpww). Wynik od największego obszaru: [{owner, sectors (wg ID), slices, geom, area, at: [lat, lon]}]
+export function accGroups(accs, sectors, layer, ver = "", border = null) {
   const own = new Map((sectors || []).filter((s) => s.layer === layer && s.owner).map((s) => [s.letter, s]));
   const by = new Map();
   (accs || []).forEach((sl) => {
@@ -74,21 +109,43 @@ export function accGroups(accs, sectors, layer, ver = "") {
     g.slices.push(sl);
   });
   return [...by.values()].map((g) => {
-    const u = dissolve(`rb|${ver}|${g.owner}|${g.slices.map((sl) => `${sl.name}:${sl.lo}`).sort().join(",")}`, g.slices.map((sl) => sl.geometry));
+    const key = `rb|${ver}|${g.owner}|${g.slices.map((sl) => `${sl.name}:${sl.lo}`).sort().join(",")}`;
+    const u = inEpww(key, dissolve(key, g.slices.map((sl) => sl.geometry)), border);
     const big = g.slices.reduce((a, sl) => (areaOf(sl.geometry) > areaOf(a.geometry) ? sl : a));
     const at = (u && (u.at ||= pointIn(u.geometry))) || labelPoint({ type: "Feature", geometry: big.geometry, properties: { fir: "EPWW", name: big.name } })?.at || null;
     return { ...g, sectors: g.sectors.sort((a, b) => a.id.localeCompare(b.id)), geom: u?.geometry || null,
       area: u ? u.area : g.slices.reduce((a, sl) => a + areaOf(sl.geometry), 0), at };
   }).sort((a, b) => b.area - a.area);
 }
+// części granicy FIR-u bez obsadzonych (mp) z wycinkiem bez nikogo (sl); same szczeliny między obsadzonym obszarem
+// a granicą (cypel kłodzki przy obsadzonym sektorze) zostają czarne jak obsadzony obszar obok
+function greyParts(pc, mp, sl) {
+  const free = sl.map((a) => ({ p: polysOf(a.geometry), b: bboxOf(a.geometry) })).filter((x) => x.p.length);
+  const meet = (a, b) => a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+  return arr(mp).filter((poly) => {
+    const b = bboxOf({ type: "Polygon", coordinates: poly });
+    try {
+      return free.some((x) => meet(x.b, b) && solid(pc.intersection([poly], x.p)).length > 0);
+    } catch {
+      return true;
+    }
+  });
+}
 // Sektory ACC bez nikogo na warstwie podglądu (0.13.2, Marek): szare pole bez granic i bez plakietki – wycinki, których
 // sektor tej warstwy nie ma obsługującego, jako jeden obszar (bez granic między nimi). Wynik {geom, shapes} albo null
-// (wszystko obsadzone); geom null po błędzie sumy – wtedy same wycinki (shapes), też bez granic
-export function freeArea(accs, sectors, layer, ver = "") {
+// (wszystko obsadzone); geom null po błędzie sumy – wtedy same wycinki (shapes), też bez granic.
+// Z granicą FIR EPWW (border; 0.13.2, przegląd): szare jest wnętrze granicy bez obszarów obsadzonych – dokładnie do
+// granicy FIR-u, bez szarych klinów za nią i bez czarnych szczelin w niej (bez nikogo: cały FIR szary)
+export function freeArea(accs, sectors, layer, ver = "", border = null) {
   const own = new Set(arr(sectors).filter((s) => s.layer === layer && s.owner).map((s) => s.letter));
-  const sl = arr(accs).filter((a) => !own.has(a.letter));
+  const sl = arr(accs).filter((a) => !own.has(a.letter)), busy = arr(accs).filter((a) => own.has(a.letter));
   if (!sl.length) return null;
-  const u = dissolve(`rbfree|${ver}|${layer}|${sl.map((a) => `${a.name}:${a.lo}`).sort().join(",")}`, sl.map((a) => a.geometry));
+  const key = `${ver}|${layer}|${sl.map((a) => `${a.name}:${a.lo}`).sort().join(",")}`;
+  // obsadzone jako jeden obszar bez szczelin między wycinkami (jak granice stanowisk): bez szarych okruchów w środku
+  const on = busy.length ? dissolve(`rbbusy|${key}`, busy.map((a) => a.geometry)) : null;
+  const cut = on ? [polysOf(on.geometry)] : busy.map((a) => polysOf(a.geometry)).filter((p) => p.length);
+  const g = hasBorder(border) ? clipped(`rbgrey|${key}`, (pc) => (cut.length ? greyParts(pc, pc.difference(polysOf(border), ...cut), sl) : polysOf(border))) : null;
+  const u = g || dissolve(`rbfree|${key}`, sl.map((a) => a.geometry));
   return { geom: u?.geometry || null, shapes: sl.map((a) => a.geometry) };
 }
 
@@ -306,22 +363,25 @@ export function fisPlate(owner, at, x, fis = []) {
   const mine = arr(fis).filter((g) => arr(g.owners).includes(owner));
   const names = [...new Set(mine.map((g) => `${g.id} (up to ${flText(g.hi)})`))];
   const rt = [...(names.length ? names : [x.nm(owner)]), `Position: ${x.pos(owner)}`, nowText([owner], x)].join("\n");
-  return { at: at || mine.find((g) => g.at)?.at || null, kind: "fis", k: owner, id: x.nm(owner), fq: x.freq(owner), state: "on", rt };
+  // informacja Warszawa (EPWW_I_CTR, EPWW_IE_CTR: znak jak sektor ACC, nazwa "I") z dopiskiem FIS – nie jak plakietka ACC
+  const id = x.nm(owner), fisId = /^EPWW_/.test(owner) && !/FIS/.test(id) ? `${id} FIS` : id;
+  return { at: at || mine.find((g) => g.at)?.at || null, kind: "fis", k: owner, id: fisId, fq: x.freq(owner), state: "on", rt };
 }
-// granica kilku kształtów (części TMA, CTR, obszary FIS) jednego stanowiska: suma (dissolve.js, w pamięci wg klucza);
-// błąd sumy – same kształty
-const unionOf = (key, shapes) => {
+// granica kilku kształtów (części TMA, CTR, obszary FIS) jednego stanowiska: suma (dissolve.js, w pamięci wg klucza)
+// w granicy FIR EPWW (inEpww; punkt plakietki w tej części); błąd sumy – same kształty
+const unionOf = (key, shapes, border = null) => {
   if (!shapes.length) return null;
-  const u = dissolve(key, shapes.map((s) => s.geometry));
+  const u = inEpww(key, dissolve(key, shapes.map((s) => s.geometry)), border);
   return { geom: u?.geometry || null, shapes: shapes.map((s) => s.geometry), at: u ? (u.at ||= pointIn(u.geometry)) : null };
 };
 // Granice i plakietki podglądu key (0.13.2): {lines: [{kind, k, geom | null, shapes}], plates: [plakietka]} – tylko
 // stanowiska online. Sektory ACC (groups z accGroups), gdy warstwa podglądu jest włączona; na LOW (bez względu na
 // LOW) warstwy APP (granica obsługiwanych części TMA: areas.app), TWR (CTR wieży online), TWR/A (to samo, także sam
-// ATIS – bez granicy) i FIS (areas.fis). Plakietki w kolejności układania: APP, TWR, ACC, FIS.
+// ATIS – bez granicy) i FIS (areas.fis). Plakietki w kolejności układania: APP, TWR, ACC, FIS. Granice APP, TWR i FIS
+// tylko w granicy FIR EPWW (geo.border, inEpww; sektory ACC już w accGroups).
 // bd = /api/radio/board, geo = jego geometria, x = jak w appPlate
 export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
-  const lines = [], app = [], twr = [], acc = [], fis = [];
+  const lines = [], app = [], twr = [], acc = [], fis = [], border = geo?.border;
   if (layers.has(key.toLowerCase())) {
     arr(groups).forEach((g) => {
       lines.push({ kind: "acc", k: g.owner, geom: g.geom || null, shapes: g.geom ? [] : g.slices.map((sl) => sl.geometry) });
@@ -333,7 +393,7 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
     if (layers.has("app")) {
       const tma = byId(geo?.tma), areas = bd?.areas?.app || {}, plates = new Map(arr(bd?.plates?.app).map((p) => [p.owner, p]));
       [...new Set([...Object.keys(areas), ...plates.keys()])].forEach((o) => {
-        const ids = arr(areas[o]), u = unionOf(`rbapp|${ver}|${o}|${ids.join(",")}`, ids.map((id) => tma.get(id)).filter(Boolean));
+        const ids = arr(areas[o]), u = unionOf(`rbapp|${ver}|${o}|${ids.join(",")}`, ids.map((id) => tma.get(id)).filter(Boolean), border);
         if (u) lines.push({ kind: "app", k: o, geom: u.geom, shapes: u.geom ? [] : u.shapes });
         const p = plates.get(o) || { owner: o, covers: [] }, at = p.at || u?.at;
         if (at) app.push(appPlate({ ...p, at }, x, bd.tma, bd.flow));
@@ -344,7 +404,7 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
       const ctr = byId(bd?.twr);
       arr(bd?.plates?.twr).forEach((p) => {
         if (!arr(p.layers).includes(twra ? "twra" : "twr")) return;
-        const u = arr(p.twr).length ? unionOf(`rbctr|${ver}|${p.id}`, arr(geo?.ctr).filter((c) => c.ctr === p.id)) : null;
+        const u = arr(p.twr).length ? unionOf(`rbctr|${ver}|${p.id}`, arr(geo?.ctr).filter((c) => c.ctr === p.id), border) : null;
         if (u) lines.push({ kind: "twr", k: p.icao, geom: u.geom, shapes: u.geom ? [] : u.shapes });
         const at = p.at || u?.at;
         if (at) twr.push(twrPlate({ ...p, at }, ctr.get(p.id), x, twra));
@@ -353,7 +413,7 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
     if (layers.has("fis")) {
       const shapes = byId(geo?.fis);
       Object.entries(bd?.areas?.fis || {}).forEach(([o, ids]) => {
-        const u = unionOf(`rbfis|${ver}|${o}|${arr(ids).join(",")}`, arr(ids).map((id) => shapes.get(id)).filter(Boolean));
+        const u = unionOf(`rbfis|${ver}|${o}|${arr(ids).join(",")}`, arr(ids).map((id) => shapes.get(id)).filter(Boolean), border);
         if (u) lines.push({ kind: "fis", k: o, geom: u.geom, shapes: u.geom ? [] : u.shapes });
         const p = fisPlate(o, u?.at, x, bd.fis);
         if (p.at) fis.push(p);
@@ -362,20 +422,25 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
   }
   return { lines, plates: [...app, ...twr, ...acc, ...fis] };
 }
-// warstwa SVG granic stanowisk online (granatowe, radio.css): jedna ścieżka na stanowisko (suma z dziurami); po błędzie
-// sumy same kształty
+// warstwa SVG granic stanowisk online (granatowe, radio.css): jedna ścieżka na stanowisko; po błędzie sumy same
+// kształty. Dziury tylko w obszarze ACC (tam wewnętrzny pierścień to granica z innym stanowiskiem); APP, TWR i FIS
+// (0.13.2, przegląd) – sam obrys zewnętrzny: obszary FIS i TMA omijają CTR, a pętla wokół CTR wieży offline wyglądała
+// jak granica wieży online
 export const linesSvg = (lines, P) => `<g class="rb-own">${arr(lines).map((l) => `<path class="${l.kind}${l.geom ? "" : " fb"}" data-k="${esc(l.k)}"`
-  + ` d="${l.geom ? pathAll(l.geom, P) : arr(l.shapes).map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>`;
+  + ` d="${l.geom ? (l.kind === "acc" ? pathAll(l.geom, P) : pathOf(l.geom, P)) : arr(l.shapes).map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>`;
 
 // Czerwone tło (0.13.0, Marek): przestrzeń z ograniczeniem przepływu albo z zajętością ponad 80 % dopuszczalnej –
 // sektor ACC na podglądzie swojej warstwy (wycinki jego litery na wysokości podglądu: slices = sliceAt) i TMA na LOW
 // (kształty z kluczem TMA: tmaGeo), także bez nikogo. Kształty jednej przestrzeni sumowane (dissolve.js, w pamięci wg
 // wersji danych i wycinków): jedna czerwona granica wokół całej TMA, bez granic jej wycinków; błąd sumy – same
-// wypełnienia (fb). Wynik [{id, kind: "acc" | "tma", geom: MultiPolygon | null, shapes: [geometria], rt}]
-export function flowAreas(bd, key, slices, tmaGeo, x, ver = "") {
+// wypełnienia (fb). border: granica FIR EPWW – tło tylko w niej (inEpww). Wynik [{id, kind: "acc" | "tma",
+// geom: MultiPolygon | null, shapes: [geometria], rt}]
+export function flowAreas(bd, key, slices, tmaGeo, x, ver = "", border = null) {
   const fl = bd?.flow || {}, out = [];
   const add = (id, kind, k, shapes, rt) => {
-    const u = dissolve(`rbflow|${ver}|${k}`, shapes);
+    const u = inEpww(`rbflow|${ver}|${k}`, dissolve(`rbflow|${ver}|${k}`, shapes), border);
+    // cała przestrzeń poza granicą FIR EPWW: bez tła
+    if (u && !ringsOf(u.geometry).length) return;
     out.push({ id, kind, geom: u?.geometry || null, shapes, rt });
   };
   arr(bd?.sectors).forEach((s) => {
@@ -395,6 +460,17 @@ export function flowAreas(bd, key, slices, tmaGeo, x, ver = "") {
 // granic (fb)
 export const flowSvg = (areas, P) => (areas.length ? `<g class="rb-flow">${areas.map((a) => `<path class="flow ${a.kind}${a.geom ? "" : " fb"}"`
   + ` data-rt="${esc(a.rt)}" d="${a.geom ? pathAll(a.geom, P) : a.shapes.map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>` : "");
+
+// Fokus przy odświeżaniu (0.13.2, przegląd): element z fokusem, który strona buduje na nowo (kod FIR-u, plakietka TWR,
+// ATIS lotniska) → selektor tego samego elementu na nowej stronie; inny element – null
+const FOCUS_KEYS = [[".rb-fh", "fir"], [".rb-pl", "icao"], [".rb-at", "icao"]];
+export function focusSel(e) {
+  for (const [c, k] of FOCUS_KEYS) {
+    const v = e?.matches?.(`${c}[data-${k}]`) ? e.getAttribute(`data-${k}`) : null;
+    if (v != null) return `${c}[data-${k}="${String(v).replace(/["\\]/g, "\\$&")}"]`;
+  }
+  return null;
+}
 
 // przyciski warstw w wierszach szkicu (grid.buttons z /api/radio/board: {col, rows: {warstwa: wiersz}}): jeden rząd na
 // wiersz, w kolejności LAYERS (LOW MID HIGH obok siebie)
@@ -545,10 +621,14 @@ export default {
     function renderMap(m) {
       const p = m.el, W = p.clientWidth, H = p.clientHeight;
       if (!geo || !d || W < 40 || H < 40) return;
-      const { P } = projection(border, { x: 0, y: 0, w: W, h: H }, 0.03);
+      // tytuł przed rzutem: mały MID (0.13.2, przegląd) – mapa pod tytułem, przy dolnej krawędzi (czarne tło tytułu
+      // zasłaniało róg granicy FIR-u na 1600×900 i 1366×768); LOW i HIGH na całym polu (tytuł nic tam nie zasłania)
+      renderTitle(m);
+      const t = p.querySelector(".rb-title"), top = m.key === "MID" && t?.offsetHeight ? t.offsetTop + t.offsetHeight + 2 : 0;
+      const { P } = projection(border, { x: 0, y: top, w: W, h: H - top }, 0.03, m.key === "MID" ? "bottom" : "middle");
       const accs = sliceAt(geo.acc, LEVEL_FT[m.key]), shown = layers.has(m.layer), x = px();
-      const groups = shown ? accGroups(accs, d.sectors, m.key, geoVer) : [];
-      const free = shown ? freeArea(accs, d.sectors, m.key, geoVer) : null;
+      const groups = shown ? accGroups(accs, d.sectors, m.key, geoVer, geo.border) : [];
+      const free = shown ? freeArea(accs, d.sectors, m.key, geoVer, geo.border) : null;
       const { lines, plates } = previewItems(d, geo, m.key, layers, groups, x, geoVer);
       m.svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
       m.svg.setAttribute("width", W);
@@ -559,10 +639,9 @@ export default {
       m.svg.innerHTML = `<g class="rb-firs">${arr(geo.firs).map((f) => `<path d="${pathOf(f.geometry, P)}"/>`).join("")}</g>`
         + `<path class="rb-land" d="${pathOf(geo.border, P)}"/>`
         + (free ? `<g class="rb-free">${free.geom ? `<path d="${pathAll(free.geom, P)}"/>` : free.shapes.map((g) => `<path class="fb" d="${pathOf(g, P)}"/>`).join("")}</g>` : "")
-        + flowSvg(flowAreas(d, m.key, accs, geo.tma, x, geoVer), P)
+        + flowSvg(flowAreas(d, m.key, accs, geo.tma, x, geoVer, geo.border), P)
         + `<path class="rb-border" d="${pathOf(geo.border, P)}"/>`
         + linesSvg(lines, P);
-      renderTitle(m);
       // plakietki: wstawiamy, mierzymy, układamy (ważniejsze pierwsze: APP, TWR, ACC, FIS) bez nakładania się, każda
       // w środku swojego obszaru, przy tłoku lekko odsunięta (bez linii prowadzących)
       m.lbls.innerHTML = plates.map(plateHtml).join("");
@@ -613,9 +692,13 @@ export default {
     let raf = 0;
     // jeden błąd (np. dziwne dane) nie zatrzymuje reszty strony
     const safe = (f, ...a) => { try { f(...a); } catch (e) { console.error("RADIO", e); } };
+    // fokus z klawiatury przy odświeżaniu (0.13.2, przegląd): kody FIR-ów, plakietki TWR i ATIS-y powstają na nowo
+    // (innerHTML) co 30 s, przy zmianie rozmiaru i warstw – fokus wraca na ten sam element nowej strony (focusSel)
     function renderAll() {
       cancelAnimationFrame(raf);
       raf = 0;
+      const a = document.activeElement, fk = el.contains(a) ? focusSel(a) : null;
+      const fi = fk ? [...el.querySelectorAll(fk)].indexOf(a) : -1;
       safe(renderButtons);
       safe(renderAtis);
       if (d) {
@@ -627,6 +710,10 @@ export default {
         Object.values(maps).forEach((m) => safe(renderMap, m));
       }
       safe(renderStatus);
+      if (fk && !a.isConnected) {
+        const list = el.querySelectorAll(fk);
+        (list[fi] || list[0])?.focus({ preventScroll: true });
+      }
     }
     const later = () => { if (!raf) raf = requestAnimationFrame(renderAll); };
 
@@ -748,8 +835,20 @@ export default {
     el.addEventListener("keydown", (e) => {
       const hd = e.target.closest?.(".rb-fh[data-fir]");
       if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || ""); }
-      if (e.key === "Escape" && !loaBox.hidden) { e.preventDefault(); closeLoa(); }
     });
+    // Esc na całym dokumencie, gdy RADIO jest widoczne (0.13.2, przegląd): klik w tekst panelu przenosi fokus na body,
+    // a przy odświeżaniu bez fokusu w RADIO nic go nie przywraca – Esc na samym RADIO wtedy nie działał. Fokus po
+    // zamknięciu na kod tego FIR-u, gdy był poza stroną (body)
+    const onKey = (e) => {
+      if (e.key !== "Escape" || loaBox.hidden || !visible()) return;
+      e.preventDefault();
+      const fir = loaFir;
+      closeLoa();
+      if (!document.activeElement || document.activeElement === document.body) {
+        el.querySelector(`.rb-fh[data-fir="${CSS.escape(fir || "")}"]`)?.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener("keydown", onKey);
     loaBox.addEventListener("click", (e) => {
       if (e.target.closest(".rb-loa-x")) return closeLoa();
       const doc = e.target.closest("button[data-coord]");
@@ -807,6 +906,7 @@ export default {
       destroy() {
         clearInterval(timer); ro.disconnect();
         document.removeEventListener("visibilitychange", onVis);
+        document.removeEventListener("keydown", onKey);
       },
     };
   },
