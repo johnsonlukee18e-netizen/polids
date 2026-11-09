@@ -256,6 +256,8 @@ def test_detail_markup(js):
     assert "RECAT-EU" not in js["detail"]["EC35"]
     # nazwa z bazy w adresach wyszukiwarek zakodowana
     assert "<test>" not in js["detail"]["EC35"] and "EC-135%20%3Ctest%3E" in js["detail"]["EC35"]
+    # 0.13.3: Airbus bez łącznika po A w wyszukiwarkach zdjęć (jak photo_query), inni producenci bez zmian
+    assert "keyword/AIRBUS%20A300" in js["detail"]["A30B"] and "A-300" not in js["detail"]["A30B"].split("ac-links")[1]
 
 
 def test_no_bold_markup(js):
@@ -415,7 +417,7 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "photos_dir", tmp_path)
     monkeypatch.setattr(photos, "_missing", set())
 
-    async def broken(icao, query):
+    async def broken(icao, query, nums=None):
         raise httpx.ConnectError("[Errno -3] wikipedia.org unreachable")
 
     monkeypatch.setattr(aircraft_router, "fetch_photo", broken)

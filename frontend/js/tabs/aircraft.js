@@ -46,9 +46,12 @@ export function makerGroups(list, order = []) {
   return [...by.entries()].sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
 }
 // hasło do wyszukiwarek zdjęć jak photo_query w services/photos.py: nazwa ICAO wylicza wersje i nazwy wojskowe,
-// "A-300(B4/C4/F4)-600" -> "A-300-600", "737-800, BBJ2" -> "737-800"
-const searchName = (a) => `${a.manufacturer || ""} ${(a.model || a.icao).split(",")[0].replace(/\([^()]*\)/g, "")
-  .split("/")[0].replace(/\s+/g, " ").trim()}`.trim();
+// "A-300(B4/C4/F4)-600" -> "A300-600" (0.13.3: Airbus bez łącznika po A), "737-800, BBJ2" -> "737-800"
+const searchName = (a) => {
+  let name = (a.model || a.icao).replace(/\([^()]*\)/g, "").split(",")[0].split("/")[0].replace(/\s+/g, " ").trim();
+  if ((a.manufacturer || "").trim().toUpperCase() === "AIRBUS") name = name.replace(/^A-(?=\d)/, "A");
+  return `${a.manufacturer || ""} ${name}`.trim();
+};
 
 // --- wartości (czysty tekst; escapowanie przy składaniu HTML) ---
 // liczba bez zbędnych zer: 27.2, 27.05, 54.1; masa w tonach z jednym miejscem po przecinku
