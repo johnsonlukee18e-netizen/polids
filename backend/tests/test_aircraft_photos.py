@@ -22,8 +22,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import main  # noqa: E402
 from backend.app.config import ROOT_DIR, settings  # noqa: E402
 from backend.app.services import photos  # noqa: E402
-from backend.app.services.photos import (TITLES, _words, fetch_photo, local_photo, model_numbers,  # noqa: E402
-                                         photo_query, pick, recheck, stale, title_fit, type_photo)
+from backend.app.services.photos import (TITLES, fetch_photo, local_photo, model_numbers, photo_query,  # noqa: E402
+                                         pick, recheck, stale, title_fit, type_photo, type_words)
 
 JPEG = b"\xff\xd8\xff\xe0test"
 OLD = time.time() - 30 * 86400  # pliki pobrane przez 0.13.2 miesiąc temu
@@ -37,15 +37,21 @@ def photo_dir(monkeypatch, tmp_path):
     return tmp_path
 
 
-def wiki(monkeypatch, search=None, pages=None, redirects=None, down=False):
+def wiki(monkeypatch, search=None, pages=None, redirects=None, redirs=None, down=False, error=False):
     """Podstawiona Wikipedia: search – wyniki list=search, pages – tytuł -> adres miniatury (None: artykuł bez
-    grafiki), redirects – przekierowania w zapytaniu o tytuły, down – każde zapytanie kończy się błędem połączenia.
-    Zwraca listę zapytań (słowniki parametrów, {"image": adres} dla pobrania obrazu)."""
+    grafiki), redirects – przekierowania w zapytaniu o tytuły (from -> to), redirs – tytuł -> tytuły przekierowań
+    na artykuł (prop=redirects), down – każde zapytanie kończy się błędem połączenia, error – API odpowiada błędem
+    w treści z kodem 200 (jak przeciążona wyszukiwarka). Zwraca listę zapytań (słowniki parametrów,
+    {"image": adres} dla pobrania obrazu)."""
     calls = []
 
     def handler(request):
         if down:
             raise httpx.ConnectError("unreachable")
+        if error and request.url.host != "upload.wikimedia.org":
+            calls.append({"error": True})
+            return httpx.Response(200, json={"error": {"code": "search-error", "info": "Search is currently too busy"}},
+                                  headers={"MediaWiki-API-Error": "search-error"})
         if request.url.host == "upload.wikimedia.org":
             calls.append({"image": str(request.url)})
             return httpx.Response(200, content=JPEG + str(request.url).encode())
@@ -54,6 +60,10 @@ def wiki(monkeypatch, search=None, pages=None, redirects=None, down=False):
         if q.get("list") == "search":
             return httpx.Response(200, json={"query": {"search": search or []}})
         asked = q["titles"].split("|")
+        if q.get("prop") == "redirects":
+            return httpx.Response(200, json={"query": {"pages": {str(100 + i): {
+                "title": t, "redirects": [{"ns": 0, "title": x} for x in (redirs or {}).get(t, [])]}
+                for i, t in enumerate(asked)}}})
         moved = [r for r in (redirects or []) if r["from"] in asked]
         out = {}
         for i, t in enumerate(asked):
@@ -147,6 +157,9 @@ def test_model_numbers():
     assert model_numbers("Tu-204/214/224/234") == {"204", "214", "224", "234"}
     assert model_numbers("BD-700 Global 7000/8000") == {"700", "7000", "8000"}
     assert model_numbers("ATP") == set() and model_numbers(None) == set()
+    # primary: tylko pierwsza nazwa (ta z hasła), bez nazw wojskowych i handlowych
+    assert model_numbers("ERJ-145, C-99", primary=True) == {"145"}
+    assert model_numbers("CL-600 Regional Jet CRJ-705/900, Challenger 890", primary=True) == {"600", "705", "900"}
 
 
 def test_title_fit():
@@ -167,6 +180,12 @@ def test_title_fit():
     assert title_fit("De Havilland Canada Dash 8", model_numbers("DHC-8-400 Dash 8")) == "neutral"
     assert title_fit("Boeing 747-8", model_numbers("737 MAX 8")) == "other"
     assert title_fit("Boeing 747-8", model_numbers("747-8, VC-25B")) == "exact"
+    # numer tylko z dalszej nazwy: nie inny model, ale też nie artykuł o tym typie
+    e145 = model_numbers("ERJ-145, C-99"), model_numbers("ERJ-145, C-99", primary=True)
+    assert title_fit("Embraer R-99", *e145) == "alias" and title_fit("Embraer ERJ family", *e145) == "neutral"
+    assert title_fit("Embraer Legacy 600", *e145) == "other"
+    # ten sam numer z łącznikiem w nazwie ICAO i spacją w tytule
+    assert title_fit("Schweizer SGM 2-37", model_numbers("SGM-2-37, TG-7")) == "exact"
 
 
 # --- wybór artykułu z wyników wyszukiwania ---
@@ -193,21 +212,38 @@ def test_pick_dc9_not_dc10():
     assert pick(results, model_numbers("DC-9-10")) == ["McDonnell Douglas DC-9", "McDonnell Douglas"]
 
 
+def args(code):
+    r = MODELS[code]
+    return (model_numbers(r["Model"]), model_numbers(r["Model"], primary=True), *type_words(r["Manufacturer"], r["Model"]))
+
+
 def test_pick_family_article_via_redirect():
-    nums = model_numbers("BD-100 Challenger 350/3500")
-    results = [{"title": "Bombardier Challenger 300", "redirecttitle": "Bombardier Challenger 350"},
-               {"title": "Bombardier Challenger 600 series"}]
-    assert pick(results, nums, _words("BD-100 Challenger 350/3500"), _words("BOMBARDIER")) == \
-        ["Bombardier Challenger 300"]
+    """Artykuł o rodzinie nazwany numerem innego modelu: pasuje przez przekierowanie z numerem tego modelu, podane
+    przez wyszukiwarkę ("redirecttitle") albo z listy przekierowań na artykuł."""
+    results = [{"title": "Bombardier Challenger 300"}, {"title": "Bombardier Challenger 600 series"},
+               {"title": "Bombardier Aviation"}]
+    assert pick(results, *args("CL35")) == ["Bombardier Aviation"]
+    assert pick(results, *args("CL35"), strict=True) == []
+    redirs = {"Bombardier Challenger 300": ["Bombardier Challenger 350", "BD-100"]}
+    assert pick(results, *args("CL35"), redirects=redirs) == ["Bombardier Challenger 300", "Bombardier Aviation"]
+    assert pick(results, *args("CL35"), redirects=redirs, strict=True) == ["Bombardier Challenger 300"]
+    hit = [{"title": "Bombardier Challenger 300", "redirecttitle": "Bombardier Challenger 350"}]
+    assert pick(hit, *args("CL35"), strict=True) == ["Bombardier Challenger 300"]
+
+
+def test_pick_alias_number_after_type_article():
+    """E145 ("ERJ-145, C-99"): Embraer R-99 (radarowy, numer z nazwy wojskowej) nie wyprzedza artykułu o ERJ."""
+    results = [{"title": "Embraer ERJ family"}, {"title": "Embraer Legacy 600"}, {"title": "Embraer R-99"}]
+    assert pick(results, *args("E145")) == ["Embraer ERJ family", "Embraer R-99"]
+    assert pick(list(reversed(results)), *args("E145"),
+                redirects={"Embraer ERJ family": ["Embraer ERJ 145"]}) == ["Embraer ERJ family", "Embraer R-99"]
 
 
 def test_pick_named_variants_over_base_model():
     """Beluga, Dreamlifter i Super Guppy mają artykuły bez numeru; artykuł o bazowym samolocie ma numer modelu,
     ale nie wyprzedza wyższego w wyszukiwarce artykułu z nazwą typu i producenta."""
     def go(code, titles):
-        r = MODELS[code]
-        return pick([{"title": t} for t in titles], model_numbers(r["Model"]), _words(r["Model"]),
-                    _words(r["Manufacturer"]))
+        return pick([{"title": t} for t in titles], *args(code))
 
     assert go("A3ST", ["Airbus Beluga", "Airbus BelugaXL", "Airbus A300"])[0] == "Airbus Beluga"
     assert go("A337", ["Airbus BelugaXL", "Airbus A330"])[0] == "Airbus BelugaXL"
@@ -220,6 +256,9 @@ def test_pick_named_variants_over_base_model():
     assert go("E50P", ["Embraer Phenom 300", "Embraer Phenom 100"]) == ["Embraer Phenom 100"]
     # Dash 8: tytuł bez numeru z nazwą typu i producenta przed innymi tytułami bez liczb
     assert go("DH8D", ["Turboprop", "De Havilland Canada Dash 8"]) == ["De Havilland Canada Dash 8", "Turboprop"]
+    # nazwa producenta w nazwie typu to nie nazwa typu: artykuł o firmie nie wyprzedza artykułu o modelu
+    assert go("GLF6", ["Gulfstream Aerospace", "Gulfstream G650"]) == ["Gulfstream G650", "Gulfstream Aerospace"]
+    assert type_words("DIAMOND", "DA-40 Diamond Star") == ({"star"}, {"diamond"})
 
 
 # --- pobieranie (podstawiona Wikipedia) ---
@@ -255,13 +294,25 @@ def test_fetch_search_picks_model_number(monkeypatch, photo_dir):
                                       {"title": "Airbus A321neo"}],
                  pages={"Airbus A321": None, "Airbus A321neo": img("A21N"), "Airbus A320neo family": img("A20N")})
     got = fetch("A21N")
-    # A321 bez grafiki, więc A321neo; A320neo family (inny numer) nawet nie pytany
+    # A321 bez grafiki, więc A321neo
     assert got["credit"] == "Wikipedia: Airbus A321neo"
     search = next(c for c in calls if c.get("list") == "search")
     assert search["srsearch"] == "AIRBUS A321neo aircraft" and search["srlimit"] == "5"
     assert search["srprop"] == "redirecttitle"
-    assert next(c for c in calls if "titles" in c)["titles"] == "Airbus A321|Airbus A321neo"
+    # A320neo family (inny numer) sprawdzony przez przekierowania na artykuł, bez numeru 321 odpada
+    assert next(c for c in calls if c.get("prop") == "redirects")["titles"] == "Airbus A320neo family"
+    assert next(c for c in calls if c.get("prop") == "pageimages|info")["titles"] == "Airbus A321|Airbus A321neo"
     assert calls[-1] == {"image": img("A21N")}
+
+
+def test_fetch_family_via_redirect_list(monkeypatch, photo_dir):
+    """Wyszukiwarka nie podaje przekierowania, przez które znalazła artykuł: lista przekierowań na artykuł."""
+    calls = wiki(monkeypatch, search=[{"title": "Bombardier Aviation"}, {"title": "Bombardier Challenger 300"}],
+                 pages={"Bombardier Aviation": img("BA"), "Bombardier Challenger 300": img("CL30")},
+                 redirs={"Bombardier Challenger 300": ["Bombardier Challenger 350", "Challenger 300"]})
+    assert fetch("CL35")["credit"] == "Wikipedia: Bombardier Challenger 300"
+    lookup = next(c for c in calls if c.get("prop") == "redirects")
+    assert lookup["titles"] == "Bombardier Aviation|Bombardier Challenger 300" and lookup["rdlimit"] == "max"
 
 
 def test_fetch_dc91(monkeypatch, photo_dir):
@@ -287,6 +338,9 @@ def test_fetch_png_replaces_only_downloaded_file(monkeypatch, photo_dir):
     got = fetch("E190")
     assert got["url"].startswith("/files/photos/E190.png?v=")
     assert not (photo_dir / "E190.jpg").exists() and (photo_dir / "E190.webp").read_bytes() == b"own"
+    # zastąpione pliki w replaced/
+    assert (photo_dir / "replaced" / "E190.jpg").read_bytes() == b"old"
+    assert "Lineage" in (photo_dir / "replaced" / "E190.json").read_text("utf-8")
 
 
 # --- zdjęcia zapisane wcześniej ---
@@ -341,14 +395,17 @@ def test_type_photo_replaces_wrong_photo(monkeypatch, photo_dir):
     # nowy adres: przeglądarka i Cloudflare nie pokażą starego obrazu
     assert got["url"] != before and got["url"].startswith("/files/photos/BCS3.jpg?v=")
     assert (photo_dir / "BCS3.jpg").read_bytes().startswith(JPEG)
-    assert sorted(f.name for f in photo_dir.iterdir()) == ["BCS3.jpg", "BCS3.json"]
+    assert sorted(f.name for f in photo_dir.iterdir()) == ["BCS3.jpg", "BCS3.json", "replaced"]
+    assert (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
 
 
 def test_type_photo_keeps_old_without_better_article(monkeypatch, photo_dir):
     """Rodzina opisana artykułem o innym numerze (An-158 w artykule o An-148): bez lepszego artykułu zdjęcie zostaje
     i nie jest więcej sprawdzane."""
     old_auto(photo_dir, "A158", "Antonov An-148")
-    calls = wiki(monkeypatch, search=[{"title": "Antonov An-148"}], pages={"Antonov An-148": img("A148")})
+    # artykuł o firmie (bez numeru) wystarczyłby na pierwsze pobranie, ale nie zastępuje zdjęcia przy sprawdzaniu
+    calls = wiki(monkeypatch, search=[{"title": "Antonov An-148"}, {"title": "Antonov"}],
+                 pages={"Antonov An-148": img("A148"), "Antonov": img("logo")})
     got = get("A158")
     assert got["credit"] == "Wikipedia: Antonov An-148" and (photo_dir / "A158.jpg").read_bytes() == b"old"
     assert json.loads((photo_dir / "A158.json").read_text("utf-8"))["v"] == 2
@@ -358,6 +415,27 @@ def test_type_photo_keeps_old_without_better_article(monkeypatch, photo_dir):
     assert get("A158")["credit"] == "Wikipedia: Antonov An-148" and len(calls) == n
 
 
+def test_type_photo_refreshes_family_article_via_redirect(monkeypatch, photo_dir):
+    old_auto(photo_dir, "A158", "Antonov An-148")
+    wiki(monkeypatch, search=[{"title": "Antonov"}, {"title": "Antonov An-148"}],
+         pages={"Antonov An-148": img("A148"), "Antonov": img("logo")}, redirs={"Antonov An-148": ["Antonov An-158"]})
+    got = get("A158")
+    assert got["credit"] == "Wikipedia: Antonov An-148" and (photo_dir / "A158.jpg").read_bytes().startswith(JPEG)
+
+
+def test_type_photo_keeps_old_on_api_error(monkeypatch, photo_dir):
+    """Błąd w treści odpowiedzi z kodem 200 (przeciążona wyszukiwarka) to nie "brak artykułu": stare zdjęcie zostaje
+    do następnego sprawdzenia, typ bez zdjęcia dostaje błąd, nic nie trafia do _missing."""
+    old_auto(photo_dir, "DC91", "McDonnell Douglas DC-10")
+    old_auto(photo_dir, "BCS3", "Airbus A321neo")
+    wiki(monkeypatch, error=True)
+    assert get("DC91")["credit"] == "Wikipedia: McDonnell Douglas DC-10" and recheck("DC91", "DC-9-10")
+    assert get("BCS3")["credit"] == "Wikipedia: Airbus A321neo" and recheck("BCS3", "A-220-300")
+    with pytest.raises(ValueError, match="search-error"):
+        get("A318")
+    assert photos._missing == set()
+
+
 def test_type_photo_keeps_old_when_wikipedia_down(monkeypatch, photo_dir):
     old_auto(photo_dir, "BCS3", "Airbus A321neo")
     wiki(monkeypatch, down=True)
@@ -365,6 +443,19 @@ def test_type_photo_keeps_old_when_wikipedia_down(monkeypatch, photo_dir):
     assert recheck("BCS3", "A-220-300")  # sprawdzane przy następnym otwarciu
     with pytest.raises(httpx.ConnectError):
         get("BCS1")
+
+
+def test_own_photo_copied_with_old_time(monkeypatch, photo_dir):
+    """Własne zdjęcie skopiowane z zachowanym starym czasem modyfikacji (docker cp, cp -p, tar): czas zmiany
+    i-węzła jest nowszy niż opisu, więc to własne zdjęcie."""
+    monkeypatch.setattr(photos, "OWN_AFTER_S", 0)
+    old_auto(photo_dir, "BCS3", "Airbus A321neo")
+    assert recheck("BCS3", "A-220-300")
+    time.sleep(0.05)
+    own = photo_dir / "BCS3.jpg"
+    own.write_bytes(b"own")
+    os.utime(own, (OLD - 365 * 86400, OLD - 365 * 86400))
+    assert not recheck("BCS3", "A-220-300")
 
 
 def test_type_photo_never_fetches_over_own(monkeypatch, photo_dir):

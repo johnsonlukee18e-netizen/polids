@@ -417,7 +417,7 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "photos_dir", tmp_path)
     monkeypatch.setattr(photos, "_missing", set())
 
-    async def broken(icao, manufacturer, model):
+    async def broken(icao, manufacturer, model, strict=False):
         raise httpx.ConnectError("[Errno -3] wikipedia.org unreachable")
 
     monkeypatch.setattr(photos, "fetch_photo", broken)

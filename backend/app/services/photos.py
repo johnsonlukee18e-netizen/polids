@@ -8,13 +8,15 @@ do data/photos/ jako <ICAO>.jpg.
 ("AIRBUS A-220-300"), a przy zapisie "A-220" pierwszym wynikiem bywał artykuł o innym modelu. Teraz:
 - typy, których nazwa ICAO nie prowadzi do właściwego artykułu (A220, CRJ, MD-80), biorą artykuł z TITLES;
 - hasło ma nazwę Airbusa bez łącznika ("A220-300"); z pięciu wyników wyszukiwania (pick) w kolejności wyszukiwarki
-  bierzemy artykuł, którego tytuł albo przekierowanie zawiera numer modelu albo którego tytuł ma nazwę typu i nazwę
-  producenta ("Airbus Beluga"), potem tytuły bez liczb; artykuł z innym numerem w tytule odpada – lepiej bez zdjęcia
-  niż z cudzym;
+  bierzemy artykuł o tym modelu: numer z pierwszej nazwy ICAO w tytule albo w jednym z przekierowań na artykuł
+  ("Antonov An-158" -> "Antonov An-148") albo nazwa typu i producenta w tytule ("Airbus Beluga"); potem tytuły bez
+  liczb i z numerem tylko z dalszych nazw (wojskowych: "C-99" przy ERJ-145); artykuł z innym numerem w tytule odpada
+  – lepiej bez zdjęcia niż z cudzym;
 - zdjęcie pobrane wcześniej (opis bez "v") z artykułu o innym numerze albo, dla typów z TITLES, z innego artykułu
-  jest sprawdzane od nowa przy następnym otwarciu typu (type_photo): zostaje podmienione, gdy znajdzie się
-  pasujący artykuł, a gdy nie ma lepszego albo Wikipedia nie odpowiada, zostaje stare. Własne zdjęcia (bez opisu,
-  z opisem bez adresu grafiki Wikipedii albo wrzucone później niż opis) nie są ruszane;
+  jest sprawdzane od nowa przy następnym otwarciu typu (type_photo): podmieniane tylko na artykuł o tym modelu,
+  a gdy go nie ma albo Wikipedia nie odpowiada (także błąd w treści odpowiedzi), zostaje stare. Własne zdjęcia
+  (bez opisu, z opisem bez adresu grafiki Wikipedii albo wrzucone później niż opis) nie są ruszane, a każdy
+  zastąpiony plik trafia do data/photos/replaced/;
 - adres zdjęcia ma "?v=<czas pliku>", żeby przeglądarka i Cloudflare nie pokazywały starej wersji po podmianie."""
 
 import json
@@ -28,6 +30,7 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 META_VERSION = 2  # pliki opisu bez "v" (do 0.13.2) sprawdzamy ponownie
 SEARCH_LIMIT = 5
 OWN_AFTER_S = 60  # obraz nowszy od opisu o więcej sekund to własne zdjęcie (fetch_photo zapisuje obraz przed opisem)
+REPLACED = "replaced"  # podkatalog na pliki zastąpione nowym zdjęciem
 EXTS = ("jpg", "jpeg", "png", "webp")
 _missing: set[str] = set()  # typy, dla których Wikipedia nic nie zwróciła (do restartu aplikacji)
 
@@ -46,9 +49,10 @@ GENERIC = frozenset((
     "family aircraft aerospace aviation industries industry company corporation international helicopter "
     "helicopters systems group manufacturing works aeronautics aeronautical motors factory").split())
 
-# numer w oznaczeniu: liczba co najmniej dwucyfrowa albo jedna cyfra po literach i łączniku ("DC-9", "An-2", "DHC-8");
-# pojedyncza cyfra osobno ("737 MAX 8", "Dash 8") albo po liczbie ("747-8") to wersja, nie numer modelu
-_NUM = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]+-(\d)(?!\d)|(\d{2,})")
+# numer w oznaczeniu: liczba co najmniej dwucyfrowa albo jedna cyfra po literach i łączniku ("DC-9", "An-2", "DHC-8"),
+# także po spacji, gdy dalej jest łącznik i wersja (tytuł "Schweizer SGM 2-37" dla "SGM-2-37"); pojedyncza cyfra osobno
+# ("737 MAX 8", "Dash 8") albo po liczbie ("747-8") to wersja, nie numer modelu
+_NUM = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]+(?:-(\d)(?!\d)| (\d)(?=-\d))|(\d{2,})")
 
 
 def _safe(icao: str) -> str:
@@ -102,17 +106,19 @@ def photo_query(manufacturer: str | None, model: str | None) -> str:
 
 
 def _numbers(text: str | None) -> list[str]:
-    return [(m.group(1) or m.group(2)).lstrip("0") or "0" for m in _NUM.finditer(text or "")]
+    return [(m.group(1) or m.group(2) or m.group(3)).lstrip("0") or "0" for m in _NUM.finditer(text or "")]
 
 
-def model_numbers(model: str | None) -> set[str]:
+def model_numbers(model: str | None, primary: bool = False) -> set[str]:
     """Numery modelu: z każdego oznaczenia (słowa z cyframi) w nazwach na liście (po przecinkach i ukośnikach,
     bez nawiasów) pierwszy numer (_NUM) – "A-220-300" -> {220} (300 to wersja), "DC-9-10" -> {9},
     "CL-600 Regional Jet CRJ-705/900" -> {600, 705, 900}, "EMB-500 Phenom 100" -> {500, 100}. Sama liczba po ukośniku
     za oznaczeniem z wersją to kolejna wersja ("ATR-42-300/320" -> {42}), za oznaczeniem bez wersji kolejny model
-    ("Tu-204/214" -> {204, 214}). Pusty zbiór: nazwa bez numeru (bez sprawdzania)."""
+    ("Tu-204/214" -> {204, 214}). primary: tylko z pierwszej nazwy, tej z hasła ("ERJ-145, C-99" -> {145}).
+    Pusty zbiór: nazwa bez numeru (bez sprawdzania)."""
     nums = set()
-    for name in re.sub(r"\([^()]*\)", "", model or "").split(","):
+    names = re.sub(r"\([^()]*\)", "", model or "").split(",")
+    for name in names[:1] if primary else names:
         prev: list[str] = []
         for alt in name.split("/"):
             if prev and alt.strip().isdigit() and len(_numbers(prev[-1])) > 1:
@@ -128,14 +134,25 @@ def _words(text: str | None) -> set[str]:
     return {w.lower() for w in re.findall(r"[A-Za-z]{4,}", re.sub(r"\([^()]*\)", "", text or ""))} - GENERIC
 
 
-def title_fit(title: str, nums: set[str]) -> str:
-    """Zgodność tytułu artykułu z numerami modelu: "exact" – tytuł zawiera numer modelu ("Airbus A220" dla A-220-300),
-    "neutral" – tytuł bez numerów ("Embraer E-Jet family", "De Havilland Canada Dash 8") albo model bez numeru,
-    "other" – tytuł z innym numerem ("Airbus A321" dla A-220-300, "McDonnell Douglas DC-10" dla DC-9-10, rok)."""
+def type_words(manufacturer: str | None, model: str | None) -> tuple[set[str], set[str]]:
+    """Słowa nazwy typu bez słów producenta ("G-6 Gulfstream G650" -> brak, "DA-40 Diamond Star" -> {star}) i słowa
+    nazwy producenta, do _named."""
+    maker = _words(manufacturer)
+    return {w for w in _words(model) if not any(w.startswith(m) or m.startswith(w) for m in maker)}, maker
+
+
+def title_fit(title: str, nums: set[str], primary: set[str] | None = None) -> str:
+    """Zgodność tytułu artykułu z numerami modelu (nums: wszystkie, primary: z pierwszej nazwy, domyślnie nums):
+    "exact" – tytuł zawiera numer z pierwszej nazwy ("Airbus A220" dla A-220-300), "alias" – tylko numer z dalszej
+    nazwy ("Embraer R-99" dla "ERJ-145, C-99"), "neutral" – tytuł bez numerów ("Embraer E-Jet family",
+    "De Havilland Canada Dash 8") albo model bez numeru, "other" – tytuł z innym numerem ("Airbus A321" dla A-220-300,
+    "McDonnell Douglas DC-10" dla DC-9-10, rok)."""
     found = set(_numbers(title))
     if not nums or not found:
         return "neutral"
-    return "exact" if found & nums else "other"
+    if found & (nums if primary is None else primary):
+        return "exact"
+    return "alias" if found & nums else "other"
 
 
 def _named(title: str, words: set[str], maker: set[str]) -> bool:
@@ -144,22 +161,26 @@ def _named(title: str, words: set[str], maker: set[str]) -> bool:
     return any(t.startswith(w) for t in have for w in words) and any(t.startswith(m) for t in have for m in maker)
 
 
-def pick(results: list[dict], nums: set[str], words: set[str] = frozenset(), maker: set[str] = frozenset()) -> list[str]:
-    """Tytuły wyników wyszukiwania w kolejności wyboru: najpierw, w kolejności wyszukiwarki, artykuły o tym modelu –
-    numer modelu w tytule albo w przekierowaniu, przez które wyszukiwarka je znalazła (np. "Bombardier Challenger 350"
-    -> "Bombardier Challenger 300"), albo tytuł bez innego numeru z nazwą typu i producenta ("Airbus Beluga",
-    "Boeing Dreamlifter"); potem pozostałe tytuły bez liczb; tytuły z innym numerem odpadają.
-    words: słowa nazwy typu (_words(model)), maker: słowa nazwy producenta."""
+def pick(results: list[dict], nums: set[str], primary: set[str] | None = None, words: set[str] = frozenset(),
+         maker: set[str] = frozenset(), redirects: dict | None = None, strict: bool = False) -> list[str]:
+    """Tytuły wyników wyszukiwania w kolejności wyboru. Najpierw, w kolejności wyszukiwarki, artykuły o tym modelu:
+    numer z pierwszej nazwy w tytule, w przekierowaniu, przez które wyszukiwarka je znalazła ("redirecttitle"),
+    albo w jednym z przekierowań na artykuł (redirects: tytuł -> tytuły przekierowań, np. "Antonov An-148" ->
+    ["Antonov An-158"]), albo tytuł bez innego numeru z nazwą typu i producenta ("Airbus Beluga"). Potem, gdy nie
+    strict, tytuły bez liczb i z numerem tylko z dalszych nazw; tytuły z innym numerem odpadają.
+    words, maker: type_words(manufacturer, model)."""
+    primary = nums if primary is None else primary
     good, rest = [], []
     for r in results:
         title = r.get("title") or ""
-        fit = title_fit(title, nums)
-        if fit == "exact" or title_fit(r.get("redirecttitle") or "", nums) == "exact" \
+        fit = title_fit(title, nums, primary)
+        via = [r.get("redirecttitle") or "", *((redirects or {}).get(title) or [])]
+        if fit == "exact" or any(title_fit(t, nums, primary) == "exact" for t in via) \
                 or (fit == "neutral" and _named(title, words, maker)):
             good.append(title)
-        elif fit == "neutral":
+        elif fit in ("neutral", "alias"):
             rest.append(title)
-    return list(dict.fromkeys(good + rest))
+    return list(dict.fromkeys(good if strict else good + rest))
 
 
 def stale(meta: dict, model: str | None, title: str | None = None) -> bool:
@@ -171,13 +192,13 @@ def stale(meta: dict, model: str | None, title: str | None = None) -> bool:
     got = credit.removeprefix("Wikipedia: ")
     if title:
         return got != title
-    return title_fit(got, model_numbers(model)) == "other"
+    return title_fit(got, model_numbers(model)) == "other"  # numer z którejkolwiek nazwy to nie inny model
 
 
 def _downloaded(code: str) -> dict | None:
     """Opis zdjęcia, jeśli wyświetlany plik został pobrany automatycznie: opis ma adres grafiki Wikipedii ("image"),
-    plik ma rozszerzenie z tego adresu i nie jest nowszy od opisu (nowszy to własne zdjęcie wrzucone w miejsce
-    pobranego, z pozostawionym starym opisem)."""
+    plik ma rozszerzenie z tego adresu i nie jest nowszy od opisu ani zmieniony po nim (nowszy to własne zdjęcie
+    wrzucone w miejsce pobranego, z pozostawionym starym opisem)."""
     shown = next((f for f in _files(code) if f.exists()), None)
     meta_file = settings.photos_dir / f"{code}.json"
     meta = _meta(code)
@@ -185,7 +206,9 @@ def _downloaded(code: str) -> dict | None:
     if not shown or not meta_file.exists() or not isinstance(image, str) \
             or not image.startswith("https://upload.wikimedia.org/") or shown.suffix != "." + _ext(image):
         return None
-    if shown.stat().st_mtime > meta_file.stat().st_mtime + OWN_AFTER_S:
+    img, desc = shown.stat(), meta_file.stat()
+    # czas zmiany i-węzła też: docker cp, cp -p, tar zachowują czas modyfikacji wrzucanego pliku
+    if img.st_mtime > desc.st_mtime + OWN_AFTER_S or img.st_ctime > desc.st_ctime + OWN_AFTER_S:
         return None
     return meta
 
@@ -205,14 +228,46 @@ def keep_photo(icao: str) -> None:
             json.dumps({**meta, "v": META_VERSION}, ensure_ascii=False, indent=1), "utf-8")
 
 
+def _move_aside(path) -> None:
+    """Plik zastępowany nowym zdjęciem idzie do data/photos/replaced/ (nic nie znika bezpowrotnie)."""
+    if path.exists():
+        (settings.photos_dir / REPLACED).mkdir(exist_ok=True)
+        path.replace(settings.photos_dir / REPLACED / path.name)
+
+
+async def _api(client: httpx.AsyncClient, params: dict) -> dict:
+    """Zapytanie action=query; błąd HTTP albo błąd w treści odpowiedzi (Wikipedia zgłasza go z kodem 200, np.
+    przeciążona wyszukiwarka) to wyjątek, nie "brak artykułu"."""
+    resp = await client.get(WIKI_API, params={"action": "query", "format": "json", **params})
+    resp.raise_for_status()
+    body = resp.json()
+    if not isinstance(body, dict):
+        raise ValueError("Wikipedia API: unexpected reply")
+    if "error" in body:
+        err = body["error"]
+        raise ValueError(f"Wikipedia API: {err.get('code') if isinstance(err, dict) else err}")
+    return body
+
+
+async def _redirects_of(client: httpx.AsyncClient, titles: list[str]) -> dict[str, list[str]]:
+    """Przekierowania na podane artykuły (tytuł -> tytuły przekierowań), z kontynuacją listy."""
+    out: dict[str, list[str]] = {t: [] for t in titles}
+    params = {"titles": "|".join(titles), "prop": "redirects", "rdprop": "title", "rdnamespace": 0, "rdlimit": "max"}
+    for _ in range(5):
+        body = await _api(client, params)
+        for page in ((body.get("query") or {}).get("pages") or {}).values():
+            out.setdefault(page.get("title"), []).extend(r.get("title") or "" for r in page.get("redirects") or [])
+        if not isinstance(body.get("continue"), dict):
+            break
+        params = {**params, **body["continue"]}
+    return out
+
+
 async def _first_with_image(client: httpx.AsyncClient, titles: list[str]) -> dict | None:
     """Pierwszy z artykułów (w podanej kolejności), który ma główną grafikę; tytuły po przekierowaniach
     i normalizacji Wikipedii (zmiana nazwy artykułu nie gubi zdjęcia)."""
-    resp = await client.get(WIKI_API, params={
-        "action": "query", "format": "json", "titles": "|".join(titles), "redirects": 1, "prop": "pageimages|info",
-        "piprop": "thumbnail", "pithumbsize": 800, "inprop": "url"})
-    resp.raise_for_status()
-    query = resp.json().get("query") or {}
+    query = (await _api(client, {"titles": "|".join(titles), "redirects": 1, "prop": "pageimages|info",
+                                 "piprop": "thumbnail", "pithumbsize": 800, "inprop": "url"})).get("query") or {}
     normalized = {n.get("from"): n.get("to") for n in query.get("normalized") or []}
     redirects = {r.get("from"): r.get("to") for r in query.get("redirects") or []}
     pages = {p.get("title"): p for p in (query.get("pages") or {}).values()}
@@ -224,10 +279,12 @@ async def _first_with_image(client: httpx.AsyncClient, titles: list[str]) -> dic
     return None
 
 
-async def fetch_photo(icao: str, manufacturer: str | None, model: str | None) -> dict | None:
+async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, strict: bool = False) -> dict | None:
     """Zapisuje miniaturę głównej grafiki artykułu o typie jako data/photos/<ICAO>.jpg: dla typów z TITLES tylko z tego
-    artykułu, dla pozostałych z wyników wyszukiwarki Wikipedii (pięć wyników, wybór: pick). Zastępuje tylko
-    zdjęcie pobrane wcześniej automatycznie; None – brak pasującego artykułu z grafiką."""
+    artykułu, dla pozostałych z wyników wyszukiwarki Wikipedii (pięć wyników, wybór: pick z przekierowaniami
+    wyników, które nie pasują od razu). strict: tylko artykuł o tym modelu (przy ponownym sprawdzeniu starego
+    zdjęcia). Zastępuje tylko zdjęcie pobrane wcześniej automatycznie (stare pliki w replaced/); None – brak
+    pasującego artykułu z grafiką."""
     code = _safe(icao)
     if code in _missing:
         return None
@@ -237,38 +294,46 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None) ->
         if code in TITLES:
             page = await _first_with_image(client, [TITLES[code]])
         else:
-            resp = await client.get(WIKI_API, params={
-                "action": "query", "format": "json", "list": "search", "srsearch": f"{query} aircraft",
-                "srlimit": SEARCH_LIMIT, "srnamespace": 0, "srprop": "redirecttitle"})
-            resp.raise_for_status()
-            titles = pick((resp.json().get("query") or {}).get("search") or [], model_numbers(model),
-                          _words(model), _words(manufacturer))
+            body = await _api(client, {"list": "search", "srsearch": f"{query} aircraft", "srlimit": SEARCH_LIMIT,
+                                       "srnamespace": 0, "srprop": "redirecttitle"})
+            results = [r for r in (body.get("query") or {}).get("search") or [] if isinstance(r, dict)]
+            words, maker = type_words(manufacturer, model)
+            args = (model_numbers(model), model_numbers(model, primary=True), words, maker)
+            sure = pick(results, *args, strict=True)
+            unsure = [r["title"] for r in results if r.get("title") and r["title"] not in sure]
+            redirects = await _redirects_of(client, unsure) if unsure and args[0] else {}
+            titles = pick(results, *args, redirects=redirects, strict=strict)
             page = await _first_with_image(client, titles) if titles else None
         if not page:
-            _missing.add(code)
+            if not strict:
+                _missing.add(code)
             return None
         img = await client.get(page["thumbnail"]["source"])
         img.raise_for_status()
     settings.photos_dir.mkdir(parents=True, exist_ok=True)
     if old := _downloaded(code):
-        (settings.photos_dir / f"{code}.{_ext(old['image'])}").unlink(missing_ok=True)
-    ext = _ext(page["thumbnail"]["source"])
-    (settings.photos_dir / f"{code}.{ext}").write_bytes(img.content)
+        _move_aside(settings.photos_dir / f"{code}.{_ext(old['image'])}")
+    target = settings.photos_dir / f"{code}.{_ext(page['thumbnail']['source'])}"
+    _move_aside(target)
+    target.write_bytes(img.content)
+    meta_file = settings.photos_dir / f"{code}.json"
+    _move_aside(meta_file)
     meta = {"credit": f"Wikipedia: {page['title']}", "page": page.get("fullurl"), "image": page["thumbnail"]["source"],
             "query": query, "v": META_VERSION}
-    (settings.photos_dir / f"{code}.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), "utf-8")
+    meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=1), "utf-8")
     return local_photo(code)
 
 
 async def type_photo(icao: str, manufacturer: str | None, model: str | None) -> dict | None:
-    """Zdjęcie typu: zapisane, a gdy go nie ma albo jest do sprawdzenia (recheck) – pobrane (fetch_photo).
-    Zdjęcie do sprawdzenia zostaje, gdy nie ma lepszego artykułu (keep_photo) albo Wikipedia nie odpowiada.
-    Błąd HTTP bez żadnego zdjęcia idzie dalej (httpx.HTTPError, ValueError)."""
+    """Zdjęcie typu: zapisane, a gdy go nie ma albo jest do sprawdzenia (recheck) – pobrane (fetch_photo; przy
+    sprawdzaniu tylko artykuł o tym modelu). Zdjęcie do sprawdzenia zostaje, gdy nie ma artykułu o tym modelu
+    (keep_photo: więcej nie sprawdzane) albo Wikipedia nie odpowiada (sprawdzane przy następnym otwarciu).
+    Błąd bez żadnego zdjęcia idzie dalej (httpx.HTTPError, ValueError)."""
     found = local_photo(icao)
     if found and not recheck(icao, model):
         return found
     try:
-        new = await fetch_photo(icao, manufacturer, model)
+        new = await fetch_photo(icao, manufacturer, model, strict=bool(found))
     except (httpx.HTTPError, ValueError):
         if found:
             return found
