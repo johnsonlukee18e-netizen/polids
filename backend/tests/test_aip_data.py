@@ -431,12 +431,13 @@ def test_lvp_military_rvr_equivalent_without_visibility():
     on = _ev("EPKS", "140630Z 29004KT R29/0500N FG BKN002 08/08 Q1012")
     assert on["state"] == "LVP" and "RVR 29 500 m ≤ 550 m" in on["reasons"]
     off = _ev("EPKS", "140700Z 29004KT R29/0600N BKN002 08/08 Q1012")
-    assert off["state"] == "CANCELLED" and off["reasons"][0] == "cancellation criteria: RVR 29 600 m > 550 m"
+    # 0.13.2: odwołanie przy widzialności 800 m "or more" (AIP MIL AD 4.20), więc ≥ także dla odpowiednika RVR
+    assert off["state"] == "CANCELLED" and off["reasons"][0] == "cancellation criteria: RVR 29 600 m ≥ 550 m"
     # odwołanie z widzialnością: powód z wartością z METAR
     lvp.reset_memory()
     _ev("EPKS", "140630Z 29004KT 0800 FG BKN002 08/08 Q1012")
     assert _ev("EPKS", "140700Z 29004KT 0900 BR BKN002 08/08 Q1012")["reasons"][0] == \
-        "cancellation criteria: visibility 900 m > 800 m"
+        "cancellation criteria: visibility 900 m ≥ 800 m"
 
 
 def test_runway_config_hours_all_parse():

@@ -73,7 +73,9 @@ def rules(cfg: dict) -> list[str]:
 
 def _values(key: str, cond: dict, m: Metar) -> list[tuple[str, int | None, int]]:
     """Wartości z METAR do porównania z progiem: [(etykieta, wartość, próg)]; pusta lista = brak danych.
-    Podstawa None = brak chmur BKN/OVC/VV (nieograniczona)."""
+    Podstawa None = brak chmur BKN/OVC/VV (nieograniczona). 0.13.2 (issue #27): warstwa BKN/OVC/VV bez podstawy
+    (VV///, BKN///) i żadnej znanej to brak danych, a nie brak chmur: nie odwołuje LVP (warunek "podstawa ≥ 200 ft"
+    niespełniony) i nie wprowadza go sama (decyduje RVR)."""
     op, limit = cond[key]
     rvrs = [(f"RVR {r['runway']}", v) for r in m.rvr if (v := rvr_value(r["value"])) is not None]
     if key == "rvr_m":
@@ -85,6 +87,8 @@ def _values(key: str, cond: dict, m: Metar) -> list[tuple[str, int | None, int]]
             return [("visibility", m.visibility_m, limit)]
         eq = cond.get("rvr_eq_m")
         return [(lbl, v, eq) for lbl, v in rvrs] if eq else []
+    if m.ceiling_ft is None and any(c["cover"] in ("BKN", "OVC", "VV") and c["base_ft"] is None for c in m.clouds):
+        return []
     return [("ceiling", m.ceiling_ft, limit)]
 
 
