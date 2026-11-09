@@ -200,6 +200,9 @@ def test_about_tiles_open_current_tabs():
     assert "strip" not in ids and "squawk" not in ids and ids.index("awalon") == ids.index("meteo") + 1
     text = {t[0]: t[2] for t in tiles}
     assert "SQUAWK" in text["other"] and "REGCAUSE" in text["other"] and "FMP" in text["other"]
+    # 0.13.2: nowe strony OTHER w kafelku, RADIO ze stałymi przekrojami (bez suwaka)
+    assert "HOLDING" in text["other"] and "BOMB PHONE" in text["other"]
+    assert "FL330" in text["radio"] and "stack" not in text["radio"]
     assert "10 000 ft" in text["awalon"] and "approach wind" not in text["meteo"]
     assert not re.search(r"strip|EFES|extended label", block, re.I)
 
