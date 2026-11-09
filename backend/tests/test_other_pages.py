@@ -336,7 +336,8 @@ console.log(JSON.stringify({
       bomb.loadForm(null), bomb.loadForm({ getItem() { throw new Error("blocked"); } })],
   },
   dur: [bomb.durationOf("12:00:00", "12:02:35"), bomb.durationOf("23:59", "00:01"), bomb.durationOf("12:00", "12:00"),
-    bomb.durationOf("", "12:00"), bomb.durationOf("25:00", "12:00"), bomb.durationOf("12:00:00", "x")],
+    bomb.durationOf("", "12:00"), bomb.durationOf("25:00", "12:00"), bomb.durationOf("12:00:00", "x"),
+    bomb.durationOf("12:00:02", "12:00:00"), bomb.durationOf("12:00", "00:00"), bomb.durationOf("20:00", "08:00")],
   time: [bomb.utcTime(new Date(Date.UTC(2026, 10, 9, 7, 5, 3))), bomb.utcDate(new Date(Date.UTC(2026, 10, 9, 7, 5, 3)))],
   slug: [bomb.slug("v", "Clearing throat"), bomb.slug("l", "Foul / profane"), bomb.slug("b", "PA system")],
 }));
@@ -532,7 +533,8 @@ def test_bomb_phone_state_rendering(hb):
     # zapis: tylko znane klucze, pola wyboru tylko true, tekst tylko niepusty napis
     assert hb["load"]["ok"] == {"q-when": "noon", "v-calm": True}
     assert hb["load"]["bad"] == [{}, {}, {}, {}, {}]
-    assert hb["dur"] == ["2 min 35 s", "2 min 00 s", "0 min 00 s", "", "", ""]
+    # koniec przed początkiem (przerwa ponad 12 h) bez czasu trwania, nie prawie 24 h; przez północ do 12 h
+    assert hb["dur"] == ["2 min 35 s", "2 min 00 s", "0 min 00 s", "", "", "", "", "720 min 00 s", "720 min 00 s"]
     assert hb["time"] == ["07:05:03", "2026-11-09"]
     assert hb["slug"] == ["v-clearing-throat", "l-foul-profane", "b-pa-system"]
 
@@ -616,9 +618,94 @@ def test_bomb_phone_mount_clear_and_now(tmp_path):
     assert o["appended"] is True and o["start"] is True and o["events"] == ["change", "click", "input"]
     assert o["afterFields"] == {"q-why": "revenge", "words": "bomb at noon", "v-calm": True}
     assert o["afterStart"] == {**o["afterFields"], "c-start": "13:02:03", "c-date": "2026-11-09"}
-    # ten sam czas: czas trwania 0 min 00 s (liczony tylko raz, gdy pole puste)
+    # ten sam czas: czas trwania 0 min 00 s
     assert o["afterEnd"] == {**o["afterStart"], "c-end": "13:02:03", "c-dur": "0 min 00 s"}
     assert o["fieldValues"] == ["13:02:03", "13:02:03", "2026-11-09", "0 min 00 s"]
     assert o["refused"] == [1, True]
     assert o["cleared"] == [2, False, False, False]
     assert o["emptyClear"] == 2 and o["afterDestroy"] == 0
+
+
+# 0.13.2 (przegląd): czas trwania liczony po każdym NOW i każdej zmianie czasu, aż do ręcznego wpisu
+BOMB_DUR = r"""
+const fields = new Map();
+globalThis.__makeEl = (html) => {
+  const el = { innerHTML: "", on: new Map(),
+    addEventListener(t, f) { this.on.set(t, f); }, removeEventListener(t, f) { if (this.on.get(t) === f) this.on.delete(t); },
+    querySelector(sel) { const k = /data-k="([^"]+)"/.exec(sel)?.[1]; if (!fields.has(k)) fields.set(k, { value: "", dataset: { k } }); return fields.get(k); } };
+  globalThis.__root = el;
+  return el;
+};
+const bomb = await import(process.argv[2]);
+const saved = new Map();
+const store = { getItem: (k) => saved.get(k) ?? null, setItem: (k, v) => saved.set(k, v), removeItem: (k) => saved.delete(k) };
+let t = Date.UTC(2026, 10, 9, 13, 46, 40);
+const mount = () => { fields.clear(); return bomb.mountBombPhone({ append() {} }, { store, ask: () => true, now: () => new Date(t) }); };
+let view = mount();
+const fire = (type, target) => globalThis.__root.on.get(type)({ target });
+const now = (k) => fire("click", { closest: () => ({ dataset: { act: "now", for: k } }) });
+// wpis z klawiatury: wartość w polu i zdarzenie input z tego pola
+const type = (k, v) => { const el = globalThis.__root.querySelector(`[data-k="${k}"]`); el.value = v; fire("input", el); };
+const form = () => JSON.parse(saved.get(bomb.STORE_KEY) || "{}");
+// pole w atrapie: wartość ustawiona przez kod, inaczej wartość z narysowanego HTML (jak w przeglądarce)
+const shown = (k) => fields.has(k) ? fields.get(k).value
+  : new RegExp(`data-k="${k}" value="([^"]*)"`).exec(globalThis.__root.innerHTML)?.[1];
+const snap = () => { const f = form(); return [f["c-start"], f["c-end"], f["c-dur"], shown("c-dur")]; };
+const clear = () => fire("click", { closest: () => ({ dataset: { act: "clear" } }) });
+const o = {};
+// powtórne NOW przy końcu (dzwoniący naprawdę się rozłączył): czas trwania poprawiony
+now("c-start"); t += 1000; now("c-end"); o.firstEnd = snap();
+t += 3000; now("c-end"); o.againEnd = snap();
+// NOW przy początku po NOW przy końcu: początek później niż koniec, czas trwania pusty (nie 1439 min)
+clear(); now("c-end"); t += 2000; now("c-start"); o.endFirst = snap();
+// kolejne NOW przy końcu daje już poprawny czas trwania
+t += 5000; now("c-end"); o.endAfter = snap();
+// czasy wpisane ręcznie: czas trwania liczony przy każdej zmianie, zły czas w trakcie pisania czyści pole
+clear(); type("c-start", "12:00:00"); o.typedStart = snap();
+type("c-end", "12:03"); o.typedPartial = snap();
+type("c-end", "12:03:1"); o.typedBad = snap();
+type("c-end", "12:03:10"); o.typedEnd = snap();
+type("c-start", "11:59:10"); o.typedFix = snap();
+// po Reload (nowy mount z zapisu) czas trwania z obu czasów dalej liczony sam
+view.destroy(); view = mount(); type("c-end", "12:05:10"); o.reloadAuto = snap();
+// czas trwania wpisany ręcznie zostaje przy NOW, zmianie czasu i po Reload
+type("c-dur", "about 6 min"); t += 60000; now("c-end"); type("c-start", "11:00:00"); o.manual = snap();
+view.destroy(); view = mount(); now("c-start"); o.manualReload = snap();
+// pole wyczyszczone ręcznie: czas trwania znów liczony sam
+type("c-dur", ""); type("c-start", "13:46:00"); o.manualCleared = snap();
+// CLEAR zaczyna od nowa: NOW start i NOW koniec znów liczą czas trwania
+clear(); now("c-start"); t += 75000; now("c-end"); o.afterClear = snap();
+console.log(JSON.stringify(o));
+"""
+
+
+def test_bomb_phone_duration_follows_times(tmp_path):
+    """BOMB PHONE: czas trwania liczony z obu czasów po każdym NOW i każdej ręcznej zmianie czasu (powtórne NOW przy
+    końcu go poprawia), koniec przed początkiem daje puste pole, czas trwania wpisany ręcznie zostaje (też po Reload),
+    wyczyszczony znów liczony sam."""
+    node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "api.mjs").write_text(HB_API, "utf-8")
+    src = (FRONTEND / "js" / "bombphone.js").read_text("utf-8")
+    (tmp_path / "bombphone.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"'), "utf-8")
+    (tmp_path / "run.mjs").write_text(BOMB_DUR, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "bombphone.mjs").as_uri()], capture_output=True,
+                       text=True, timeout=60, check=False)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    # [c-start, c-end, c-dur w zapisie, c-dur w polu]
+    assert o["firstEnd"] == ["13:46:40", "13:46:41", "0 min 01 s", "0 min 01 s"]
+    assert o["againEnd"] == ["13:46:40", "13:46:44", "0 min 04 s", "0 min 04 s"]
+    assert o["endFirst"] == ["13:46:46", "13:46:44", None, ""]
+    assert o["endAfter"] == ["13:46:46", "13:46:51", "0 min 05 s", "0 min 05 s"]
+    assert o["typedStart"] == ["12:00:00", None, None, ""]
+    assert o["typedPartial"] == ["12:00:00", "12:03", "3 min 00 s", "3 min 00 s"]
+    assert o["typedBad"] == ["12:00:00", "12:03:1", None, ""]
+    assert o["typedEnd"] == ["12:00:00", "12:03:10", "3 min 10 s", "3 min 10 s"]
+    assert o["typedFix"] == ["11:59:10", "12:03:10", "4 min 00 s", "4 min 00 s"]
+    assert o["reloadAuto"] == ["11:59:10", "12:05:10", "6 min 00 s", "6 min 00 s"]
+    assert o["manual"] == ["11:00:00", "13:47:51", "about 6 min", "about 6 min"]
+    assert o["manualReload"] == ["13:47:51", "13:47:51", "about 6 min", "about 6 min"]
+    assert o["manualCleared"] == ["13:46:00", "13:47:51", "1 min 51 s", "1 min 51 s"]
+    assert o["afterClear"] == ["13:47:51", "13:49:06", "1 min 15 s", "1 min 15 s"]

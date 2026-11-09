@@ -4,7 +4,9 @@ import { esc, h } from "./api.js";
 // 08/2025) i ProtectUK (Bomb threats checklist): co robić w czasie rozmowy, pytania do dzwoniącego (z polami na
 // odpowiedzi), dokładne słowa groźby, dane rozmowy (data, czasy UTC z przyciskiem NOW, czas trwania liczony sam, numer
 // na wyświetlaczu, imię i stanowisko), dzwoniący, głos, dźwięki w tle i język groźby (pola wyboru), uwagi i co zrobić
-// po rozmowie. Polski numer alarmowy 112 duży na górze strony i w punktach po rozmowie (Policja 997 mniejszy: numer
+// po rozmowie. Czas trwania liczony z obu czasów po każdym NOW i każdej ręcznej zmianie czasu (powtórne NOW przy
+// końcu rozmowy go poprawia), aż dyżurny sam wpisze czas trwania; koniec przed początkiem daje puste pole, nie prawie
+// 24 h. Polski numer alarmowy 112 duży na górze strony i w punktach po rozmowie (Policja 997 mniejszy: numer
 // dalej działa, zgłoszenia trafiają do operatorów numerów alarmowych jak z 112). Na ekranie bez nazw źródeł.
 // Stan formularza tylko w tej karcie przeglądarki (sessionStorage, bez niego w pamięci strony): przetrwa przejście
 // do innej podzakładki i Reload, znika po zamknięciu karty albo po CLEAR. Nic nie idzie do serwera.
@@ -97,7 +99,8 @@ export function saveForm(store, st) {
   } catch { /* tryb prywatny, pe\u0142na pami\u0119\u0107: zostaje stan w pami\u0119ci strony */ }
 }
 
-// czas trwania z dwóch czasów "HH:MM[:SS]" (przez północ też); zły czas: ""
+// czas trwania z dwóch czasów "HH:MM[:SS]" (przez północ też, do 12 h); zły czas albo koniec przed początkiem
+// (przerwa ponad 12 h, np. NOW przy końcu wciśnięte przed NOW przy początku): ""
 export function durationOf(a, b) {
   const sec = (t) => {
     const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(String(t || "").trim());
@@ -107,6 +110,7 @@ export function durationOf(a, b) {
   const x = sec(a), y = sec(b);
   if (x === null || y === null) return "";
   const d = (y - x + 86400) % 86400;
+  if (d > 43200) return "";
   return `${Math.floor(d / 60)} min ${String(d % 60).padStart(2, "0")} s`;
 }
 export const utcTime = (d = new Date()) => d.toISOString().slice(11, 19);
@@ -178,6 +182,8 @@ const session = () => {
 // wypełnionego formularza (domyślnie confirm), opts.now: bieżąca data (testy). destroy() zdejmuje nasłuchy.
 export function mountBombPhone(pane, { store = session(), ask = (q) => window.confirm(q), now = () => new Date() } = {}) {
   let st = loadForm(store);
+  // czas trwania wpisany sam (ostatnia policzona wartość); inna wartość w polu = wpisana ręcznie, wtedy bez zmian
+  let autoDur = st["c-dur"] && st["c-dur"] === durationOf(st["c-start"], st["c-end"]) ? st["c-dur"] : "";
   const root = h(`<div class="bp-page"></div>`);
   root.innerHTML = bombBody(st);
   pane.append(root);
@@ -188,28 +194,36 @@ export function mountBombPhone(pane, { store = session(), ask = (q) => window.co
     else st[k] = v === true && BOXES.has(k) ? true : String(v);
     saveForm(store, st);
   };
-  // pole zmienione ręcznie
+  const fill = (k, v) => { const el = field(k); if (el) el.value = v; put(k, v); };
+  // czas trwania z obu czasów, gdy pole puste albo wpisane samo (zły czas albo koniec przed początkiem: pole puste)
+  const syncDur = () => {
+    const d = durationOf(st["c-start"], st["c-end"]);
+    if (st["c-dur"] && st["c-dur"] !== autoDur) return;
+    fill("c-dur", d);
+    autoDur = d;
+  };
+  // pole zmienione ręcznie; zmiana czasu początku albo końca liczy czas trwania od nowa
   const onField = (e) => {
     const k = e.target?.dataset?.k;
     if (!k) return;
     put(k, e.target.type === "checkbox" ? e.target.checked : e.target.value);
+    if (k === "c-start" || k === "c-end") syncDur();
   };
-  // NOW: bieżący czas UTC w polu; pusta data dostaje dzisiejszą, pusty czas trwania liczy się z obu czasów
-  const fill = (k, v) => { const el = field(k); if (el) el.value = v; put(k, v); };
+  // NOW: bieżący czas UTC w polu; pusta data dostaje dzisiejszą, czas trwania liczy się od nowa
   const onClick = (e) => {
     const b = e.target?.closest?.("button[data-act]");
     if (!b) return;
     if (b.dataset.act === "clear") {
       if (Object.keys(st).length && !ask("Clear the whole bomb threat form?")) return;
       st = {};
+      autoDur = "";
       saveForm(store, st);
       root.innerHTML = bombBody(st);
     } else if (b.dataset.act === "now" && KEYS.has(b.dataset.for)) {
       const d = now();
       fill(b.dataset.for, utcTime(d));
       if (!st["c-date"]) fill("c-date", utcDate(d));
-      const dur = durationOf(st["c-start"], st["c-end"]);
-      if (dur && !st["c-dur"]) fill("c-dur", dur);
+      syncDur();
     }
   };
   root.addEventListener("input", onField);
