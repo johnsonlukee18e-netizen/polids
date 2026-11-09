@@ -21,11 +21,10 @@ MENU = ["home", "radio", "meteo", "awalon", "aerodrome", "adciv", "admil", "advf
 LABELS = ["?", "RADIO", "METEO", "AWALON", "AERODROME", "AD CIV", "AD MIL", "AD VFR", "INOP", "CALLSIGN", "AIRCRAFT", "MAP",
           "COORDINATION", "CONVERSION", "SYT OP", "AUP", "OTHER", "ABOUT", "EMERGENCY", "ADMIN"]
 # 0.13.0 (issue #23): podmenu OTHER alfabetycznie jak w PANDORZE (id = adres #other/<id>); 0.13.1 (issue #25): bez
-# PHRASEOLOGY
+# PHRASEOLOGY; 0.13.2 (issue #27): bez LIGHT GUN, IA, METEO i NATO WEATHER (13 podzakładek)
 OTHER_SUBS = [("4p", "4P"), ("aftn", "AFTN"), ("bomb-phone", "BOMB PHONE"), ("braking-action", "BRAKING ACTION"),
               ("checklist", "CHECKLIST"), ("docs", "DOCS"), ("flight-plan", "FLIGHT PLAN"), ("fmp", "FMP"),
-              ("holding", "HOLDING"), ("ia", "IA"), ("light-gun", "LIGHT GUN"), ("meteo", "METEO"),
-              ("nato-weather", "NATO WEATHER"), ("position", "POSITION"),
+              ("holding", "HOLDING"), ("position", "POSITION"),
               ("regcause", "REGCAUSE"), ("squawk", "SQUAWK"), ("vfr-minima", "VFR MINIMA")]
 # stare adresy zakładek przeniesionych do podmenu OTHER (słownik MOVED w app.js, kilka linijek)
 MOVED_SRC = re.search(r"^const MOVED = \{\n.*?^\};$", APP, re.M | re.S).group(0)
