@@ -173,6 +173,43 @@ def test_lvp_unreported_ceiling_does_not_cancel():
     assert ev("EPKT 140600Z 27004KT 2000 BR BKN/// 08/07 Q1012", 0)["state"] is None
 
 
+@pytest.mark.parametrize("clouds, state", [("///001", "LVP"), ("//////", "LVP"), ("//////CB", "LVP"),
+                                           ("///001 BKN010", "LVP"), ("///005", "CANCELLED"),
+                                           ("FEW005", "CANCELLED"), ("///002", "CANCELLED")])
+def test_lvp_unknown_cloud_amount_does_not_cancel(clouds, state):
+    """Stacja AUTO: warstwa nieznanej ilości bez wysokości albo poniżej 200 ft może być podstawą chmur (jak
+    w ctr_conditions), więc to brak danych i LVP nie jest odwołane; na 200 ft i wyżej nie przeszkadza odwołaniu."""
+    t = datetime(2026, 10, 14, 6, 2, tzinfo=UTC)
+    assert lvp.evaluate(parse_metar("EPKT 140600Z 27004KT 0100 R27/0100N FG VV001 08/07 Q1012"), "EPKT",
+                        now=t)["state"] == "LVP"
+    e = lvp.evaluate(parse_metar(f"EPKT 140630Z AUTO 27004KT 0800 R27/0800N R09/0800N BR {clouds} 08/07 Q1012"),
+                     "EPKT", now=t + timedelta(minutes=30))
+    assert e["state"] == state, e["reasons"]
+    if state == "LVP":
+        assert "to cancel: ceiling ≥ 200 ft (not reported)" in e["reasons"]
+    # sama warstwa nieznanej ilości LVP nie wprowadza (decyduje RVR)
+    lvp.reset_memory()
+    assert lvp.evaluate(parse_metar(f"EPKT 140600Z AUTO 27004KT 2000 BR {clouds} 08/07 Q1012"), "EPKT",
+                        now=t)["state"] is None
+
+
+def test_lvp_future_observation_time_not_remembered():
+    """METAR z błędną grupą czasu (142300Z o 06:32) nie trafia do pamięci LVP: następny poprawny METAR liczony jest
+    z historii poprawnych, a nie dostaje stanu z tego aż do 23:00."""
+    t = datetime(2026, 10, 14, 6, 2, tzinfo=UTC)
+
+    def ev(raw, minutes):
+        return lvp.evaluate(parse_metar(raw), "EPKT", now=t + timedelta(minutes=minutes))
+    assert ev("EPKT 140600Z 27004KT 0100 R27/0100N FG VV001 08/07 Q1012", 0)["state"] == "LVP"
+    bad = ev("EPKT 142300Z 27004KT 9999 FEW030 10/08 Q1012", 30)
+    assert bad["state"] is None and lvp._memory["EPKT"]["obs"] == datetime(2026, 10, 14, 6, 0, tzinfo=UTC)
+    held = ev("EPKT 140630Z 27004KT 0600 R27/0575N BR BKN003 08/07 Q1012", 31)
+    assert held["state"] == "LVP" and held["reasons"][0] == "in force since 06:00Z"
+    # METAR wydany kilka minut przed czasem nominalnym liczony jak dotąd
+    assert ev("EPKT 140700Z 27004KT 9999 FEW030 10/08 Q1012", 52)["state"] == "CANCELLED"
+    assert lvp._memory["EPKT"]["obs"] == datetime(2026, 10, 14, 7, 0, tzinfo=UTC)
+
+
 @pytest.mark.parametrize("icao", ["EPBC", "EPKX", "EDDB", *NO_LVP])
 def test_lvp_default_and_not_applicable(icao):
     e = lvp.evaluate(parse_metar(f"{icao} 140600Z 27004KT 0100 R27/0100N FG VV001 08/07 Q1012"), icao,
