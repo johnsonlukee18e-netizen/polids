@@ -20,9 +20,10 @@ do data/photos/ jako <ICAO>.jpg.
 - adres zdjęcia ma "?v=<czas pliku>", żeby przeglądarka i Cloudflare nie pokazywały starej wersji po podmianie.
 
 0.13.4 (Marek po wdrożeniu 0.13.3: BCS3 "dalej pokazuje Airbusa"): zdjęcie pobrane wcześniej rozpoznajemy po adresie
-grafiki z dowolnego serwera Wikimedia (*.wikimedia.org, nie tylko upload.wikimedia.org – Wikimedia przenosi
-podawanie miniatur na thumb.wikimedia.org) i rozszerzeniu z samej ścieżki adresu; zdjęcie z podpisem artykułu o innym
-modelu uznane mimo to za własne trafia raz do logu z przyczyną. Zdjęcie z artykułu o innym modelu nie jest już
+grafiki z dowolnego serwera Wikimedia (*.wikimedia.org, nie tylko upload.wikimedia.org – API Wikipedii podaje dziś
+miniatury z thumb.wikimedia.org z parametrami "?utm_…", tak był zapisany BCS3 na polids.pl, więc 0.13.3 brała go za
+własne zdjęcie) i rozszerzeniu z samej ścieżki adresu; zdjęcie z podpisem artykułu o innym modelu uznane mimo to za
+własne trafia raz do logu z przyczyną. Zdjęcie z artykułu o innym modelu nie jest już
 pokazywane: gdy nie ma artykułu o tym modelu, trafia do replaced/, a opis zostaje znacznikiem "only_exact" (dalej tylko
 artykuł o tym modelu, nie np. artykuł o producencie), a gdy Wikipedia nie odpowiada, typ chwilowo jest bez zdjęcia.
 Opisy z "v": 2 (0.13.3 zostawiała stare zdjęcie, gdy nie znalazła lepszego) są sprawdzane jeszcze raz. Miniatura

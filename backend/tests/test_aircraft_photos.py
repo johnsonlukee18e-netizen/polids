@@ -499,6 +499,34 @@ def test_recheck_any_wikimedia_host(monkeypatch, photo_dir):
     assert photos._wikimedia("https://UPLOAD.wikimedia.org/x.jpg") and photos._wikimedia("https://thumb.wikimedia.org/x")
 
 
+# BCS3.json z polids.pl (Marek, zrzut z 10.11.2026 po wdrożeniu 0.13.3): adres na thumb.wikimedia.org z "?utm_..."
+BCS3_ON_SERVER = {
+    "credit": "Wikipedia: Airbus A321neo",
+    "page": "https://en.wikipedia.org/wiki/Airbus_A321neo",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/HA-LVA%40PEK_%2820200403093313%29.jpg/"
+             "960px-HA-LVA%40PEK_%2820200403093313%29.jpg?utm_source=en.wikipedia.org&utm_campaign=api"
+             "&utm_content=thumbnail"}
+
+
+def test_bcs3_as_on_server_is_replaced(monkeypatch, photo_dir, caplog):
+    """Dokładnie ten opis 0.13.3 brała za własne zdjęcie (adres spoza upload.wikimedia.org) i pokazywała dalej A321neo."""
+    (photo_dir / "BCS3.jpg").write_bytes(b"old")
+    (photo_dir / "BCS3.json").write_text(json.dumps(BCS3_ON_SERVER, ensure_ascii=False, indent=1), "utf-8")
+    os.utime(photo_dir / "BCS3.jpg", (OLD, OLD))
+    os.utime(photo_dir / "BCS3.json", (OLD + 1, OLD + 1))
+    assert recheck("BCS3", MODELS["BCS3"]["Model"])
+    new = img("A220", host="thumb.wikimedia.org") + "?utm_source=en.wikipedia.org&utm_campaign=api"
+    calls = wiki(monkeypatch, pages={"Airbus A220": new})
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        got = get("BCS3")
+    assert got["credit"] == "Wikipedia: Airbus A220" and got["url"].startswith("/files/photos/BCS3.jpg?v=")
+    assert calls[-1] == {"image": new} and "Airbus A321neo" in caplog.text
+    assert (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
+    assert json.loads((photo_dir / "replaced" / "BCS3.json").read_text("utf-8")) == BCS3_ON_SERVER
+    # nowy opis z takim samym adresem (thumb.wikimedia.org, "?utm_...") nie jest sprawdzany ponownie
+    assert not recheck("BCS3", MODELS["BCS3"]["Model"]) and photos._downloaded("BCS3")["v"] == 3
+
+
 def test_recheck_extension_from_url_path(photo_dir):
     """Rozszerzenie z samej ścieżki adresu (bez "?..."); plik zapisany według całego adresu (do 0.13.3) też pasuje."""
     assert photos._ext("https://thumb.wikimedia.org/a/960px-X.png?20240101") == "png"
