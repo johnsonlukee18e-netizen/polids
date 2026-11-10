@@ -527,6 +527,25 @@ def test_bcs3_as_on_server_is_replaced(monkeypatch, photo_dir, caplog):
     assert not recheck("BCS3", MODELS["BCS3"]["Model"]) and photos._downloaded("BCS3")["v"] == 3
 
 
+def test_replace_legacy_png_saved_as_jpg(monkeypatch, photo_dir):
+    """Do 0.13.3 obraz .png z "?utm_…" w adresie zapisywany był jako .jpg: przy podmianie na artykuł z obrazem .png
+    przenoszony jest wyświetlany .jpg (inaczej dalej byłby pokazywany, już z podpisem właściwego artykułu)."""
+    q = "?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail"
+    old_auto(photo_dir, "DC91", "McDonnell Douglas DC-10", ext="jpg", image=img("DC10", "png", "thumb.wikimedia.org") + q)
+    assert recheck("DC91", "DC-9-10")
+    wiki(monkeypatch, search=[{"title": "McDonnell Douglas DC-9"}],
+         pages={"McDonnell Douglas DC-9": img("DC9", "png", "thumb.wikimedia.org") + q})
+    got = get("DC91")
+    assert got["url"].startswith("/files/photos/DC91.png?v=") and got["credit"] == "Wikipedia: McDonnell Douglas DC-9"
+    assert not (photo_dir / "DC91.jpg").exists() and (photo_dir / "DC91.png").read_bytes().startswith(JPEG)
+    assert (photo_dir / "replaced" / "DC91.jpg").read_bytes() == b"old"
+    assert not recheck("DC91", "DC-9-10") and photos._downloaded("DC91")
+    # ukrycie takiego zdjęcia też przenosi wyświetlany .jpg
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", ext="jpg", image=img("A21N", "png", "thumb.wikimedia.org") + q)
+    wiki(monkeypatch, pages={"Airbus A220": None})
+    assert get("BCS3") is None and not (photo_dir / "BCS3.jpg").exists()
+
+
 def test_recheck_extension_from_url_path(photo_dir):
     """Rozszerzenie z samej ścieżki adresu (bez "?..."); plik zapisany według całego adresu (do 0.13.3) też pasuje."""
     assert photos._ext("https://thumb.wikimedia.org/a/960px-X.png?20240101") == "png"

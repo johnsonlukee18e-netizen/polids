@@ -385,8 +385,10 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
         img = await client.get(page["thumbnail"]["source"])
         img.raise_for_status()
     settings.photos_dir.mkdir(parents=True, exist_ok=True)
-    if old := _downloaded(code):
-        _move_aside(settings.photos_dir / f"{code}.{_ext(old['image'])}")
+    # wyświetlany plik pobrany automatycznie (ten sprawdzony przez _own_reason; do 0.13.3 obraz .png z "?…" w adresie
+    # był zapisywany jako .jpg, więc nazwy nie da się odtworzyć z adresu)
+    if _downloaded(code):
+        _move_aside(next(f for f in _files(code) if f.exists()))
     target = settings.photos_dir / f"{code}.{_ext(page['thumbnail']['source'])}"
     _move_aside(target)
     target.write_bytes(img.content)
