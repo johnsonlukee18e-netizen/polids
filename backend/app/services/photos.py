@@ -17,22 +17,38 @@ do data/photos/ jako <ICAO>.jpg.
   a gdy go nie ma albo Wikipedia nie odpowiada (także błąd w treści odpowiedzi), zostaje stare. Własne zdjęcia
   (bez opisu, z opisem bez adresu grafiki Wikipedii albo wrzucone później niż opis) nie są ruszane, a każdy
   zastąpiony plik trafia do data/photos/replaced/;
-- adres zdjęcia ma "?v=<czas pliku>", żeby przeglądarka i Cloudflare nie pokazywały starej wersji po podmianie."""
+- adres zdjęcia ma "?v=<czas pliku>", żeby przeglądarka i Cloudflare nie pokazywały starej wersji po podmianie.
+
+0.13.4 (Marek po wdrożeniu 0.13.3: BCS3 "dalej pokazuje Airbusa"): zdjęcie pobrane wcześniej rozpoznajemy po adresie
+grafiki z dowolnego serwera Wikimedia (*.wikimedia.org, nie tylko upload.wikimedia.org – Wikimedia przenosi
+podawanie miniatur na thumb.wikimedia.org) i rozszerzeniu z samej ścieżki adresu; zdjęcie z podpisem artykułu o innym
+modelu uznane mimo to za własne trafia raz do logu z przyczyną. Zdjęcie z artykułu o innym modelu nie jest już
+pokazywane: gdy nie ma artykułu o tym modelu, trafia do replaced/, a opis zostaje znacznikiem "only_exact" (dalej tylko
+artykuł o tym modelu, nie np. artykuł o producencie), a gdy Wikipedia nie odpowiada, typ chwilowo jest bez zdjęcia.
+Opisy z "v": 2 (0.13.3 zostawiała stare zdjęcie, gdy nie znalazła lepszego) są sprawdzane jeszcze raz. Miniatura
+ma szerokość 960 px, jedną ze standardowych szerokości Wikimedia (inne serwer miniatur ogranicza albo odrzuca).
+Każda podmiana i każde ukrycie zdjęcia trafia do logu serwera (polids.photos)."""
 
 import json
+import logging
 import re
+import time
+from urllib.parse import urlsplit
 
 import httpx
 
 from ..config import settings
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
-META_VERSION = 2  # pliki opisu bez "v" (do 0.13.2) sprawdzamy ponownie
+META_VERSION = 3  # pliki opisu bez "v" (do 0.13.2) albo ze starszym "v" (0.13.3: 2) sprawdzamy ponownie
 SEARCH_LIMIT = 5
+THUMB_WIDTH = 960  # standardowa szerokość miniatur Wikimedia ($wgThumbnailSteps: ... 500, 960, 1280 ...)
 OWN_AFTER_S = 60  # obraz nowszy od opisu o więcej sekund to własne zdjęcie (fetch_photo zapisuje obraz przed opisem)
 REPLACED = "replaced"  # podkatalog na pliki zastąpione nowym zdjęciem
 EXTS = ("jpg", "jpeg", "png", "webp")
 _missing: set[str] = set()  # typy, dla których Wikipedia nic nie zwróciła (do restartu aplikacji)
+_own_logged: set[str] = set()  # typy z podpisem Wikipedii uznane za własne zdjęcie (log raz do restartu)
+log = logging.getLogger("polids.photos")
 
 # Artykuły dla typów, przy których nazwa ICAO myli wyszukiwarkę i numery modelu: A220 to dawne CSeries (wyszukiwarka
 # dawała inne Airbusy), CRJ ma w nazwie "CL-600" jak Challenger 600 (CRJ-705/900/1000 opisuje artykuł o CRJ700),
@@ -64,7 +80,20 @@ def _files(code: str) -> list:
 
 
 def _ext(url: str) -> str:
-    return "png" if url.lower().endswith(".png") else "jpg"
+    """Rozszerzenie zapisywanego pliku z adresu grafiki: z samej ścieżki, bez parametrów po "?"."""
+    return "png" if urlsplit(url).path.lower().endswith(".png") else "jpg"
+
+
+def _wikimedia(url) -> bool:
+    """Adres grafiki z serwera Wikimedia (upload.wikimedia.org, thumb.wikimedia.org)."""
+    if not isinstance(url, str):
+        return False
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+    except ValueError:
+        return False
+    return parts.scheme == "https" and (host == "wikimedia.org" or host.endswith(".wikimedia.org"))
 
 
 def _meta(code: str) -> dict:
@@ -185,10 +214,12 @@ def pick(results: list[dict], nums: set[str], primary: set[str] | None = None, w
 
 
 def stale(meta: dict, model: str | None, title: str | None = None) -> bool:
-    """Opis zdjęcia pobranego przed 0.13.3 (tytuł w "credit": "Wikipedia: …") z artykułu o innym modelu;
-    title: artykuł z TITLES – wtedy każdy inny artykuł. Opisy od 0.13.3 ("v") i inne podpisy: False."""
+    """Opis zdjęcia pobranego przed 0.13.4 (tytuł w "credit": "Wikipedia: …") z artykułu o innym modelu;
+    title: artykuł z TITLES – wtedy każdy inny artykuł. Opisy od 0.13.4 ("v": 3) i inne podpisy: False; opisy z 0.13.3
+    ("v": 2) sprawdzane jeszcze raz, bo 0.13.3 zostawiała zdjęcie z artykułu o innym modelu, gdy nie było lepszego."""
     credit, v = meta.get("credit"), meta.get("v")
-    if (isinstance(v, int) and v >= META_VERSION) or not isinstance(credit, str) or not credit.startswith("Wikipedia: "):
+    if (isinstance(v, int) and v >= META_VERSION) or not isinstance(credit, str) \
+            or not credit.startswith("Wikipedia: "):
         return False
     got = credit.removeprefix("Wikipedia: ")
     if title:
@@ -196,44 +227,81 @@ def stale(meta: dict, model: str | None, title: str | None = None) -> bool:
     return title_fit(got, model_numbers(model)) == "other"  # numer z którejkolwiek nazwy to nie inny model
 
 
-def _downloaded(code: str) -> dict | None:
-    """Opis zdjęcia, jeśli wyświetlany plik został pobrany automatycznie: opis ma adres grafiki Wikipedii ("image"),
-    plik ma rozszerzenie z tego adresu i nie jest nowszy od opisu ani zmieniony po nim (nowszy to własne zdjęcie
-    wrzucone w miejsce pobranego, z pozostawionym starym opisem)."""
+def _own_reason(code: str) -> str | None:
+    """Dlaczego wyświetlany plik nie jest zdjęciem pobranym automatycznie (None: pobrany). Pobrany: opis ma adres
+    grafiki Wikimedia ("image"), plik ma rozszerzenie z tego adresu (z samej ścieżki albo, jak do 0.13.3, z całego
+    adresu) i nie jest nowszy od opisu ani zmieniony po nim (nowszy to własne zdjęcie wrzucone w miejsce pobranego,
+    z pozostawionym starym opisem)."""
     shown = next((f for f in _files(code) if f.exists()), None)
     meta_file = settings.photos_dir / f"{code}.json"
-    meta = _meta(code)
-    image = meta.get("image")
-    if not shown or not meta_file.exists() or not isinstance(image, str) \
-            or not image.startswith("https://upload.wikimedia.org/") or shown.suffix != "." + _ext(image):
-        return None
+    image = _meta(code).get("image")
+    if not shown or not meta_file.exists():
+        return "no photo or no description"
+    if not _wikimedia(image):
+        return "no Wikimedia image address in the description"
+    if shown.suffix not in {"." + _ext(image), ".png" if image.lower().endswith(".png") else ".jpg"}:
+        return f"shown file {shown.name} has another extension than the image address"
     img, desc = shown.stat(), meta_file.stat()
     # czas zmiany i-węzła też: docker cp, cp -p, tar zachowują czas modyfikacji wrzucanego pliku
     if img.st_mtime > desc.st_mtime + OWN_AFTER_S or img.st_ctime > desc.st_ctime + OWN_AFTER_S:
-        return None
-    return meta
+        return "shown file is newer than the description"
+    return None
+
+
+def _downloaded(code: str) -> dict | None:
+    """Opis zdjęcia, jeśli wyświetlany plik został pobrany automatycznie (_own_reason)."""
+    return None if _own_reason(code) else _meta(code)
 
 
 def recheck(icao: str, model: str | None) -> bool:
-    """Wyświetlane zdjęcie pobrano automatycznie przed 0.13.3 z artykułu o innym modelu (stale): do sprawdzenia."""
+    """Wyświetlane zdjęcie pobrano automatycznie (przed 0.13.4) z artykułu o innym modelu (stale): do sprawdzenia.
+    Zdjęcie z podpisem artykułu o innym modelu uznane za własne trafia raz do logu (z przyczyną)."""
     code = _safe(icao)
-    meta = _downloaded(code)
-    return meta is not None and stale(meta, model, TITLES.get(code))
+    meta = _meta(code)
+    if not stale(meta, model, TITLES.get(code)):
+        return False
+    if reason := _own_reason(code):
+        if code not in _own_logged and any(f.exists() for f in _files(code)):
+            _own_logged.add(code)
+            log.info("AIRCRAFT: zdjęcie %s (%s) traktowane jako własne, nie sprawdzane: %s", code, meta.get("credit"),
+                     reason)
+        return False
+    return True
 
 
-def keep_photo(icao: str) -> None:
-    """Sprawdzone zdjęcie zostaje (nie ma lepszego artykułu): opis dostaje "v", więc nie jest sprawdzany ponownie."""
-    code = _safe(icao)
-    if meta := _meta(code):
-        (settings.photos_dir / f"{code}.json").write_text(
-            json.dumps({**meta, "v": META_VERSION}, ensure_ascii=False, indent=1), "utf-8")
+def only_exact(icao: str) -> bool:
+    """Typ, którego zdjęcie z artykułu o innym modelu ukryto (hide_photo): dalej tylko artykuł o tym modelu."""
+    return _meta(_safe(icao)).get("only_exact") is True
 
 
 def _move_aside(path) -> None:
-    """Plik zastępowany nowym zdjęciem idzie do data/photos/replaced/ (nic nie znika bezpowrotnie)."""
+    """Plik zastępowany nowym zdjęciem idzie do data/photos/replaced/ (nic nie znika bezpowrotnie; plik o tej
+    nazwie już tam leżący zostaje, nowy dostaje w nazwie czas przeniesienia)."""
     if path.exists():
-        (settings.photos_dir / REPLACED).mkdir(exist_ok=True)
-        path.replace(settings.photos_dir / REPLACED / path.name)
+        aside = settings.photos_dir / REPLACED
+        aside.mkdir(exist_ok=True)
+        dest, n = aside / path.name, 0
+        while dest.exists():
+            n += 1
+            dest = aside / f"{path.stem}-{int(time.time())}{'-' + str(n) if n > 1 else ''}{path.suffix}"
+        path.replace(dest)
+
+
+def hide_photo(icao: str) -> bool:
+    """Zdjęcie z artykułu o innym modelu bez zastępstwa: obraz i opis do replaced/, w miejscu opisu znacznik
+    "only_exact" (typ bez zdjęcia; kolejne pobranie tylko z artykułu o tym modelu). Tylko dla zdjęcia pobranego
+    automatycznie (_downloaded); False – nic nie przeniesiono."""
+    code = _safe(icao)
+    meta = _downloaded(code)
+    if meta is None:
+        return False
+    shown = next(f for f in _files(code) if f.exists())
+    meta_file = settings.photos_dir / f"{code}.json"
+    _move_aside(shown)
+    _move_aside(meta_file)
+    marker = {"credit": "", "only_exact": True, "hidden": meta.get("credit"), "v": META_VERSION}
+    meta_file.write_text(json.dumps(marker, ensure_ascii=False, indent=1), "utf-8")
+    return True
 
 
 async def _api(client: httpx.AsyncClient, params: dict) -> dict:
@@ -267,8 +335,9 @@ async def _redirects_of(client: httpx.AsyncClient, titles: list[str]) -> dict[st
 async def _first_with_image(client: httpx.AsyncClient, titles: list[str]) -> dict | None:
     """Pierwszy z artykułów (w podanej kolejności), który ma główną grafikę; tytuły po przekierowaniach
     i normalizacji Wikipedii (zmiana nazwy artykułu nie gubi zdjęcia)."""
-    query = (await _api(client, {"titles": "|".join(titles), "redirects": 1, "prop": "pageimages|info",
-                                 "piprop": "thumbnail", "pithumbsize": 800, "inprop": "url"})).get("query") or {}
+    body = await _api(client, {"titles": "|".join(titles), "redirects": 1, "prop": "pageimages|info",
+                               "piprop": "thumbnail", "pithumbsize": THUMB_WIDTH, "inprop": "url"})
+    query = body.get("query") or {}
     normalized = {n.get("from"): n.get("to") for n in query.get("normalized") or []}
     redirects = {r.get("from"): r.get("to") for r in query.get("redirects") or []}
     pages = {p.get("title"): p for p in (query.get("pages") or {}).values()}
@@ -284,8 +353,9 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
     """Zapisuje miniaturę głównej grafiki artykułu o typie jako data/photos/<ICAO>.jpg: dla typów z TITLES tylko z tego
     artykułu, dla pozostałych z wyników wyszukiwarki Wikipedii (pięć wyników, wybór: pick z przekierowaniami
     wyników, które nie pasują od razu). strict: tylko artykuł o tym modelu (przy ponownym sprawdzeniu starego
-    zdjęcia). Zastępuje tylko zdjęcie pobrane wcześniej automatycznie (stare pliki w replaced/); None – brak
-    pasującego artykułu z grafiką."""
+    zdjęcia i dla typu ze znacznikiem only_exact). Zastępuje tylko zdjęcie pobrane wcześniej automatycznie (stare
+    pliki w replaced/); None – brak pasującego artykułu z grafiką (typ zapamiętany w _missing do restartu).
+    Grafika spoza serwerów Wikimedia: ValueError."""
     code = _safe(icao)
     if code in _missing:
         return None
@@ -307,9 +377,10 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
             titles = pick(results, *args, redirects=redirects, strict=strict)
             page = await _first_with_image(client, titles) if titles else None
         if not page:
-            if not strict:
-                _missing.add(code)
+            _missing.add(code)
             return None
+        if not _wikimedia(page["thumbnail"]["source"]):
+            raise ValueError(f"Wikipedia API: image outside Wikimedia ({page['thumbnail']['source'][:80]})")
         img = await client.get(page["thumbnail"]["source"])
         img.raise_for_status()
     settings.photos_dir.mkdir(parents=True, exist_ok=True)
@@ -328,20 +399,19 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
 
 async def type_photo(icao: str, manufacturer: str | None, model: str | None) -> dict | None:
     """Zdjęcie typu: zapisane, a gdy go nie ma albo jest do sprawdzenia (recheck) – pobrane (fetch_photo; przy
-    sprawdzaniu tylko artykuł o tym modelu). Zdjęcie do sprawdzenia zostaje, gdy nie ma artykułu o tym modelu
-    (keep_photo: więcej nie sprawdzane) albo Wikipedia nie odpowiada (sprawdzane przy następnym otwarciu).
-    Błąd bez żadnego zdjęcia idzie dalej (httpx.HTTPError, ValueError)."""
-    found = local_photo(icao)
-    if found and not recheck(icao, model):
+    sprawdzaniu i po ukryciu tylko artykuł o tym modelu). Zdjęcia z artykułu o innym modelu nie pokazujemy: bez
+    artykułu o tym modelu idzie do replaced/ (hide_photo, typ bez zdjęcia), a gdy Wikipedia nie odpowiada, błąd idzie
+    dalej (httpx.HTTPError, ValueError; w AIRCRAFT "Photo unavailable") i zdjęcie jest sprawdzane przy następnym
+    otwarciu. Podmiana i ukrycie trafiają do logu."""
+    code = _safe(icao)
+    found = local_photo(code)
+    if found and not recheck(code, model):
         return found
-    try:
-        new = await fetch_photo(icao, manufacturer, model, strict=bool(found))
-    except (httpx.HTTPError, ValueError):
-        if found:
-            return found
-        raise
-    if new:
-        return new
-    if found:
-        keep_photo(icao)
-    return found
+    new = await fetch_photo(code, manufacturer, model, strict=bool(found) or only_exact(code))
+    if found and new:
+        log.info("AIRCRAFT: zdjęcie %s (%s) zastąpione zdjęciem z artykułu o tym modelu (%s)", code, found["credit"],
+                 new["credit"])
+    elif found and hide_photo(code):
+        log.warning("AIRCRAFT: zdjęcie %s (%s) z artykułu o innym modelu ukryte (pliki w %s/): brak artykułu o tym "
+                    "modelu ze zdjęciem", code, found["credit"], REPLACED)
+    return new
