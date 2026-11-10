@@ -256,6 +256,8 @@ def test_detail_markup(js):
     assert "RECAT-EU" not in js["detail"]["EC35"]
     # nazwa z bazy w adresach wyszukiwarek zakodowana
     assert "<test>" not in js["detail"]["EC35"] and "EC-135%20%3Ctest%3E" in js["detail"]["EC35"]
+    # 0.13.3: Airbus bez łącznika po A w wyszukiwarkach zdjęć (jak photo_query), inni producenci bez zmian
+    assert "keyword/AIRBUS%20A300" in js["detail"]["A30B"] and "A-300" not in js["detail"]["A30B"].split("ac-links")[1]
 
 
 def test_no_bold_markup(js):
@@ -415,17 +417,17 @@ def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "photos_dir", tmp_path)
     monkeypatch.setattr(photos, "_missing", set())
 
-    async def broken(icao, query):
+    async def broken(icao, manufacturer, model, strict=False):
         raise httpx.ConnectError("[Errno -3] wikipedia.org unreachable")
 
-    monkeypatch.setattr(aircraft_router, "fetch_photo", broken)
+    monkeypatch.setattr(photos, "fetch_photo", broken)
     a = client.get("/api/aircraft", params={"q": "B738"}).json()[0]
     r = client.get(f"/api/aircraft/{a['id']}/photo")
     assert r.status_code == 502 and r.json()["detail"] == "Photo unavailable"
     # własne zdjęcie bez pliku opisu: bez podpisu
     (tmp_path / "B738.jpg").write_bytes(b"\xff\xd8\xff")
-    assert client.get(f"/api/aircraft/{a['id']}/photo").json() == {"url": "/files/photos/B738.jpg", "credit": "",
-                                                                   "page": None}
+    own = client.get(f"/api/aircraft/{a['id']}/photo").json()
+    assert own["url"].startswith("/files/photos/B738.jpg?v=") and own["credit"] == "" and own["page"] is None
 
 
 def test_touch_keyboard_hook():

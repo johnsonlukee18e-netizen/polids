@@ -1,7 +1,8 @@
 """Pobiera z Wikipedii zdjęcia wszystkich typów samolotów do data/photos/ (jeden plik na kod ICAO).
 
 Aplikacja robi to sama przy pierwszym otwarciu typu w zakładce AIRCRAFT; ten skrypt pobiera wszystko naraz,
-np. żeby wrzucić zdjęcia do repozytorium. Istniejące pliki są pomijane.
+np. żeby wrzucić zdjęcia do repozytorium. Istniejące pliki są pomijane; pobrane przed 0.13.3 z artykułu o innym
+modelu (photos.recheck) są sprawdzane od nowa i podmieniane, gdy znajdzie się artykuł o tym modelu.
 
     python scripts/fetch_aircraft_photos.py            # wszystkie typy
     python scripts/fetch_aircraft_photos.py B738 A320  # wybrane
@@ -18,18 +19,19 @@ from sqlalchemy import select  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.importers.seed import init_db  # noqa: E402
 from backend.app.models import AircraftType  # noqa: E402
-from backend.app.services.photos import fetch_photo, local_photo, photo_query  # noqa: E402
+from backend.app.services.photos import local_photo, recheck, type_photo  # noqa: E402
 
 
 async def main(codes: list[str]):
     init_db()
     with SessionLocal() as db:
         types = {a.icao: a for a in db.scalars(select(AircraftType).order_by(AircraftType.icao))}  # jeden rekord na typ
-    todo = [a for code, a in types.items() if (not codes or code in codes) and not local_photo(code)]
+    todo = [a for code, a in types.items() if (not codes or code in codes)
+            and (not local_photo(code) or recheck(code, a.model))]
     print(f"Do pobrania: {len(todo)} typów")
     for i, a in enumerate(todo, 1):
         try:
-            found = await fetch_photo(a.icao, photo_query(a.manufacturer, a.model))
+            found = await type_photo(a.icao, a.manufacturer, a.model)
             print(f"[{i}/{len(todo)}] {a.icao}: {found['credit'] if found else 'brak zdjęcia'}")
         except Exception as exc:  # noqa: BLE001 - jeden błąd nie przerywa reszty
             print(f"[{i}/{len(todo)}] {a.icao}: błąd {exc}")

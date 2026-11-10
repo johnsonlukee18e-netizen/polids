@@ -150,7 +150,7 @@ def test_parse_icao_aircraft_fields():
 
 
 def test_photo_query_from_icao_names():
-    assert photo_query("AIRBUS", "A-300(B4/C4/F4)-600") == "AIRBUS A-300-600"
+    assert photo_query("AIRBUS", "A-300(B4/C4/F4)-600") == "AIRBUS A300-600"
     assert photo_query("BOEING", "737-800, BBJ2") == "BOEING 737-800"
     assert photo_query("CESSNA", "208 Caravan 1/(Super) Cargomaster/Grand Caravan, C-98, U-27") == "CESSNA 208 Caravan 1"
 
