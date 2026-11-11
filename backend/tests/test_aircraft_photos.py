@@ -2,8 +2,11 @@
 A321 neo?". Wyszukiwarka Wikipedii dawała dla "AIRBUS A-220-300" artykuł o innym Airbusie, a aplikacja brała pierwszy
 wynik i zapisywała go na stałe. Teraz: artykuł z TITLES (A220, CRJ, MD-80), hasło Airbusa bez łącznika, wybór
 artykułu o tym modelu (numer w tytule albo przekierowaniu, nazwa typu z producentem), odrzucanie tytułów z innym
-numerem i ponowne sprawdzenie złych zdjęć zapisanych wcześniej (bez ruszania własnych). Wikipedia nie jest dostępna
-z tego środowiska, więc odpowiedzi API są podstawione (httpx.MockTransport)."""
+numerem i ponowne sprawdzenie złych zdjęć zapisanych wcześniej (bez ruszania własnych). 0.13.4 (Marek po wdrożeniu:
+BCS3 "dalej pokazuje Airbusa"): adres grafiki z dowolnego serwera Wikimedia (thumb.wikimedia.org), rozszerzenie
+z samej ścieżki adresu, zdjęcie z artykułu o innym modelu nigdy nie jest pokazywane (bez zastępstwa idzie do replaced/,
+a typ zostaje bez zdjęcia), miniatury 960 px, log podmian i ukryć. Wikipedia nie jest dostępna z tego środowiska, więc
+odpowiedzi API są podstawione (httpx.MockTransport)."""
 import json
 import os
 import tempfile
@@ -12,6 +15,7 @@ os.environ.setdefault("POLIDS_DATABASE_URL",
                       "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
 
 import asyncio  # noqa: E402
+import logging  # noqa: E402
 import time  # noqa: E402
 from urllib.parse import parse_qs, urlparse  # noqa: E402
 
@@ -22,10 +26,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import main  # noqa: E402
 from backend.app.config import ROOT_DIR, settings  # noqa: E402
 from backend.app.services import photos  # noqa: E402
-from backend.app.services.photos import (TITLES, fetch_photo, local_photo, model_numbers, photo_query,  # noqa: E402
-                                         pick, recheck, stale, title_fit, type_photo, type_words)
+from backend.app.services.photos import (TITLES, fetch_photo, local_photo, model_numbers, only_exact,  # noqa: E402
+                                         photo_query, pick, recheck, stale, title_fit, type_photo, type_words)
 
 JPEG = b"\xff\xd8\xff\xe0test"
+REAL_CLIENT = httpx.AsyncClient  # wiki() można wywołać w teście kilka razy (podmienia klienta od nowa)
 OLD = time.time() - 30 * 86400  # pliki pobrane przez 0.13.2 miesiąc temu
 MODELS = {r["ICAO"]: r for r in json.loads((ROOT_DIR / "data" / "import" / "ICAO_Aircraft.json").read_text("utf-8-sig"))}
 
@@ -34,6 +39,7 @@ MODELS = {r["ICAO"]: r for r in json.loads((ROOT_DIR / "data" / "import" / "ICAO
 def photo_dir(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "photos_dir", tmp_path)
     monkeypatch.setattr(photos, "_missing", set())
+    monkeypatch.setattr(photos, "_own_logged", set())
     return tmp_path
 
 
@@ -48,11 +54,12 @@ def wiki(monkeypatch, search=None, pages=None, redirects=None, redirs=None, down
     def handler(request):
         if down:
             raise httpx.ConnectError("unreachable")
-        if error and request.url.host != "upload.wikimedia.org":
+        wikimedia = request.url.host.endswith(".wikimedia.org")
+        if error and not wikimedia:
             calls.append({"error": True})
             return httpx.Response(200, json={"error": {"code": "search-error", "info": "Search is currently too busy"}},
                                   headers={"MediaWiki-API-Error": "search-error"})
-        if request.url.host == "upload.wikimedia.org":
+        if wikimedia:
             calls.append({"image": str(request.url)})
             return httpx.Response(200, content=JPEG + str(request.url).encode())
         q = {k: v[0] for k, v in parse_qs(urlparse(str(request.url)).query).items()}
@@ -73,21 +80,20 @@ def wiki(monkeypatch, search=None, pages=None, redirects=None, redirs=None, down
                 continue
             page = {"pageid": 100 + i, "title": t, "fullurl": "https://en.wikipedia.org/wiki/" + t.replace(" ", "_")}
             if pages[t]:
-                page["thumbnail"] = {"source": pages[t], "width": 800, "height": 533}
+                page["thumbnail"] = {"source": pages[t], "width": 960, "height": 640}
             out[str(100 + i)] = page
         body = {"query": {"pages": out}}
         if moved:
             body["query"]["redirects"] = moved
         return httpx.Response(200, json=body)
 
-    real = httpx.AsyncClient
     monkeypatch.setattr(photos.httpx, "AsyncClient",
-                        lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+                        lambda **kw: REAL_CLIENT(transport=httpx.MockTransport(handler), **kw))
     return calls
 
 
-def img(name, ext="jpg"):
-    return f"https://upload.wikimedia.org/wikipedia/commons/thumb/x/{name}.{ext}"
+def img(name, ext="jpg", host="upload.wikimedia.org"):
+    return f"https://{host}/wikipedia/commons/thumb/x/{name}.{ext}/960px-{name}.{ext}"
 
 
 def fetch(code):
@@ -100,13 +106,13 @@ def get(code):
     return asyncio.run(type_photo(code, r["Manufacturer"], r["Model"]))
 
 
-def old_auto(dir_, code, title, ext="jpg", **extra):
-    """Zdjęcie zapisane przez 0.13.2: obraz, potem opis bez "v" (oba sprzed miesiąca)."""
+def old_auto(dir_, code, title, ext="jpg", image=None, **extra):
+    """Zdjęcie zapisane przez 0.13.2: obraz, potem opis bez "v" (oba sprzed miesiąca); image: adres grafiki w opisie."""
     f = dir_ / f"{code}.{ext}"
     f.write_bytes(b"old")
     meta = dir_ / f"{code}.json"
-    meta.write_text(json.dumps({"credit": f"Wikipedia: {title}", "page": "p", "image": img("old", ext), **extra}),
-                    "utf-8")
+    meta.write_text(json.dumps({"credit": f"Wikipedia: {title}", "page": "p", "image": image or img("old", ext),
+                                **extra}), "utf-8")
     os.utime(f, (OLD, OLD))
     os.utime(meta, (OLD + 1, OLD + 1))
     return f
@@ -271,9 +277,11 @@ def test_fetch_bcs3_uses_a220_article(monkeypatch, photo_dir):
     assert got["url"].startswith("/files/photos/BCS3.jpg?v=")
     assert got["credit"] == "Wikipedia: Airbus A220" and got["page"] == "https://en.wikipedia.org/wiki/Airbus_A220"
     assert calls[0]["titles"] == "Airbus A220" and calls[0]["redirects"] == "1"
+    # 0.13.4: standardowa szerokość miniatur Wikimedia (inne serwer miniatur ogranicza albo odrzuca)
+    assert calls[0]["pithumbsize"] == "960" == str(photos.THUMB_WIDTH)
     assert not any(c.get("list") == "search" for c in calls)
     meta = json.loads((photo_dir / "BCS3.json").read_text("utf-8"))
-    assert meta["v"] == photos.META_VERSION == 2 and meta["image"] == img("A220") and meta["query"] == "AIRBUS A220-300"
+    assert meta["v"] == photos.META_VERSION == 3 and meta["image"] == img("A220") and meta["query"] == "AIRBUS A220-300"
 
 
 def test_titles_follow_redirect(monkeypatch, photo_dir):
@@ -350,8 +358,11 @@ def test_fetch_png_replaces_only_downloaded_file(monkeypatch, photo_dir):
 def test_stale():
     old = {"credit": "Wikipedia: Airbus A321neo", "page": "x"}
     assert stale(old, "A-220-300")
-    assert not stale({**old, "v": 2}, "A-220-300")
+    assert not stale({**old, "v": 3}, "A-220-300")
     assert stale({**old, "v": 1}, "A-220-300")
+    # 0.13.4: opis z 0.13.3 ("v": 2, zdjęcie zostawione bez lepszego artykułu) sprawdzany jeszcze raz
+    assert stale({**old, "v": 2}, "A-220-300")
+    assert not stale({"credit": "Wikipedia: Airbus A220", "v": 2}, "A-220-300", "Airbus A220")
     assert not stale({"credit": "Wikipedia: Airbus A220"}, "A-220-300")
     assert not stale({"credit": "Wikipedia: Airbus"}, "A-220-300")
     assert not stale({"credit": "J. Kowalski"}, "A-220-300")
@@ -363,7 +374,7 @@ def test_stale():
     assert not stale({"credit": "Wikipedia: Bombardier CRJ700 series"}, MODELS["CRJ9"]["Model"], TITLES["CRJ9"])
     # ręcznie wpisane pola innego typu nie wywracają sprawdzenia
     assert not stale({"credit": ["Wikipedia: X"]}, "A-220-300")
-    assert stale({"credit": "Wikipedia: Airbus A321neo", "v": "2"}, "A-220-300")
+    assert stale({"credit": "Wikipedia: Airbus A321neo", "v": "3"}, "A-220-300")
 
 
 def test_recheck_only_downloaded_photo(photo_dir):
@@ -401,20 +412,182 @@ def test_type_photo_replaces_wrong_photo(monkeypatch, photo_dir):
     assert (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
 
 
-def test_type_photo_keeps_old_without_better_article(monkeypatch, photo_dir):
-    """Rodzina opisana artykułem o innym numerze (An-158 w artykule o An-148): bez lepszego artykułu zdjęcie zostaje
-    i nie jest więcej sprawdzane."""
+def test_type_photo_hides_wrong_photo_without_better_article(monkeypatch, photo_dir, caplog):
+    """0.13.4: bez artykułu o tym modelu zdjęcie z artykułu o innym modelu nie jest pokazywane (lepiej bez zdjęcia
+    niż z cudzym): obraz i opis do replaced/, w miejscu opisu znacznik only_exact, więc kolejne pobranie też tylko
+    z artykułu o tym modelu (artykuł o firmie, bez numeru, wystarczyłby na zwykłe pierwsze pobranie)."""
     old_auto(photo_dir, "A158", "Antonov An-148")
-    # artykuł o firmie (bez numeru) wystarczyłby na pierwsze pobranie, ale nie zastępuje zdjęcia przy sprawdzaniu
     calls = wiki(monkeypatch, search=[{"title": "Antonov An-148"}, {"title": "Antonov"}],
                  pages={"Antonov An-148": img("A148"), "Antonov": img("logo")})
-    got = get("A158")
-    assert got["credit"] == "Wikipedia: Antonov An-148" and (photo_dir / "A158.jpg").read_bytes() == b"old"
-    assert json.loads((photo_dir / "A158.json").read_text("utf-8"))["v"] == 2
-    assert not recheck("A158", "An-158")
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        assert get("A158") is None
+    assert "A158" in caplog.text and "Antonov An-148" in caplog.text and "ukryte" in caplog.text
+    assert local_photo("A158") is None and not recheck("A158", "An-158") and only_exact("A158")
+    assert (photo_dir / "replaced" / "A158.jpg").read_bytes() == b"old"
+    old_meta = json.loads((photo_dir / "replaced" / "A158.json").read_text("utf-8"))
+    assert old_meta["credit"] == "Wikipedia: Antonov An-148"
+    marker = json.loads((photo_dir / "A158.json").read_text("utf-8"))
+    assert marker == {"credit": "", "only_exact": True, "hidden": "Wikipedia: Antonov An-148", "v": 3}
+    assert not any("image" in c for c in calls)
+    # do restartu bez kolejnych zapytań
     n = len(calls)
+    assert get("A158") is None and len(calls) == n
+    # po restarcie znów tylko artykuł o tym modelu: logo producenta nie wchodzi
     monkeypatch.setattr(photos, "_missing", set())
-    assert get("A158")["credit"] == "Wikipedia: Antonov An-148" and len(calls) == n
+    assert get("A158") is None and len(calls) > n and not any("image" in c for c in calls)
+    # Wikipedia podaje przekierowanie An-158 -> An-148: zdjęcie wraca, znacznik do replaced/ pod nową nazwą
+    monkeypatch.setattr(photos, "_missing", set())
+    wiki(monkeypatch, search=[{"title": "Antonov"}, {"title": "Antonov An-148"}],
+         pages={"Antonov An-148": img("A148"), "Antonov": img("logo")}, redirs={"Antonov An-148": ["Antonov An-158"]})
+    got = get("A158")
+    assert got["credit"] == "Wikipedia: Antonov An-148" and (photo_dir / "A158.jpg").read_bytes().startswith(JPEG)
+    assert not only_exact("A158") and not recheck("A158", "An-158")
+    aside = sorted(f.name for f in (photo_dir / "replaced").iterdir())
+    assert len(aside) == 3 and aside[1:] == ["A158.jpg", "A158.json"]
+    assert aside[0].startswith("A158-") and aside[0].endswith(".json")
+    assert json.loads((photo_dir / "replaced" / aside[0]).read_text("utf-8"))["only_exact"] is True
+    assert json.loads((photo_dir / "replaced" / "A158.json").read_text("utf-8")) == old_meta
+
+
+def test_move_aside_keeps_earlier_files(photo_dir):
+    for body in (b"1", b"2", b"3"):
+        (photo_dir / "X.jpg").write_bytes(body)
+        photos._move_aside(photo_dir / "X.jpg")
+    aside = photo_dir / "replaced"
+    assert sorted(f.read_bytes() for f in aside.iterdir()) == [b"1", b"2", b"3"]
+    assert (aside / "X.jpg").read_bytes() == b"1" and not (photo_dir / "X.jpg").exists()
+    photos._move_aside(photo_dir / "missing.jpg")  # brak pliku: nic
+
+
+def test_type_photo_hides_wrong_titles_photo(monkeypatch, photo_dir):
+    """Typ z TITLES, którego artykuł nie ma grafiki: zdjęcie z innego artykułu też nie jest pokazywane."""
+    old_auto(photo_dir, "BCS3", "Airbus A321neo")
+    wiki(monkeypatch, pages={"Airbus A220": None})
+    assert get("BCS3") is None and only_exact("BCS3")
+    assert (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
+
+
+def test_v2_kept_by_0133_is_checked_again(monkeypatch, photo_dir):
+    """0.13.3 zostawiała zdjęcie z artykułu o innym modelu i dopisywała "v": 2; 0.13.4 sprawdza je jeszcze raz."""
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", v=2)
+    assert recheck("BCS3", "A-220-300")
+    wiki(monkeypatch, pages={"Airbus A220": img("A220")})
+    assert get("BCS3")["credit"] == "Wikipedia: Airbus A220"
+    # zdjęcie pobrane przez 0.13.3 z właściwego artykułu nie jest pobierane drugi raz
+    old_auto(photo_dir, "BCS1", "Airbus A220", v=2)
+    assert not recheck("BCS1", "A-220-100")
+
+
+def test_recheck_any_wikimedia_host(monkeypatch, photo_dir):
+    """Wikimedia przenosi miniatury na thumb.wikimedia.org: opis z takim adresem to też zdjęcie pobrane automatycznie
+    (0.13.3 uznawała je za własne i nie sprawdzała; najpewniej dlatego BCS3 dalej miał A321neo po wdrożeniu)."""
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", image=img("old", host="thumb.wikimedia.org"))
+    assert recheck("BCS3", "A-220-300")
+    wiki(monkeypatch, pages={"Airbus A220": img("A220", host="thumb.wikimedia.org")})
+    got = get("BCS3")
+    assert got["credit"] == "Wikipedia: Airbus A220" and (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
+    assert json.loads((photo_dir / "BCS3.json").read_text("utf-8"))["image"].startswith("https://thumb.wikimedia.org/")
+    # podmiana pobranego wcześniej z thumb.wikimedia.org (np. inne rozszerzenie) też przenosi stary plik
+    old_auto(photo_dir, "DC91", "McDonnell Douglas DC-10", ext="png", image=img("old", "png", "thumb.wikimedia.org"))
+    wiki(monkeypatch, search=[{"title": "McDonnell Douglas DC-9"}], pages={"McDonnell Douglas DC-9": img("DC9")})
+    assert get("DC91")["url"].startswith("/files/photos/DC91.jpg?v=") and not (photo_dir / "DC91.png").exists()
+    # inne serwery i adresy to nie Wikimedia
+    for bad in ("https://wikimedia.org.evil.example/x.jpg", "http://upload.wikimedia.org/x.jpg",
+                "//upload.wikimedia.org/x.jpg", "https://example.com/wikimedia.org/x.jpg", "https://[x/a.jpg", None,
+                ["https://upload.wikimedia.org/x.jpg"]):
+        assert not photos._wikimedia(bad), bad
+    assert photos._wikimedia("https://UPLOAD.wikimedia.org/x.jpg") and photos._wikimedia("https://thumb.wikimedia.org/x")
+
+
+# BCS3.json z polids.pl (Marek, zrzut z 10.11.2026 po wdrożeniu 0.13.3): adres na thumb.wikimedia.org z "?utm_..."
+BCS3_ON_SERVER = {
+    "credit": "Wikipedia: Airbus A321neo",
+    "page": "https://en.wikipedia.org/wiki/Airbus_A321neo",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/HA-LVA%40PEK_%2820200403093313%29.jpg/"
+             "960px-HA-LVA%40PEK_%2820200403093313%29.jpg?utm_source=en.wikipedia.org&utm_campaign=api"
+             "&utm_content=thumbnail"}
+
+
+def test_bcs3_as_on_server_is_replaced(monkeypatch, photo_dir, caplog):
+    """Dokładnie ten opis 0.13.3 brała za własne zdjęcie (adres spoza upload.wikimedia.org) i pokazywała dalej A321neo."""
+    (photo_dir / "BCS3.jpg").write_bytes(b"old")
+    (photo_dir / "BCS3.json").write_text(json.dumps(BCS3_ON_SERVER, ensure_ascii=False, indent=1), "utf-8")
+    os.utime(photo_dir / "BCS3.jpg", (OLD, OLD))
+    os.utime(photo_dir / "BCS3.json", (OLD + 1, OLD + 1))
+    assert recheck("BCS3", MODELS["BCS3"]["Model"])
+    new = img("A220", host="thumb.wikimedia.org") + "?utm_source=en.wikipedia.org&utm_campaign=api"
+    calls = wiki(monkeypatch, pages={"Airbus A220": new})
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        got = get("BCS3")
+    assert got["credit"] == "Wikipedia: Airbus A220" and got["url"].startswith("/files/photos/BCS3.jpg?v=")
+    assert calls[-1] == {"image": new} and "Airbus A321neo" in caplog.text
+    assert (photo_dir / "replaced" / "BCS3.jpg").read_bytes() == b"old"
+    assert json.loads((photo_dir / "replaced" / "BCS3.json").read_text("utf-8")) == BCS3_ON_SERVER
+    # nowy opis z takim samym adresem (thumb.wikimedia.org, "?utm_...") nie jest sprawdzany ponownie
+    assert not recheck("BCS3", MODELS["BCS3"]["Model"]) and photos._downloaded("BCS3")["v"] == 3
+
+
+def test_replace_legacy_png_saved_as_jpg(monkeypatch, photo_dir):
+    """Do 0.13.3 obraz .png z "?utm_…" w adresie zapisywany był jako .jpg: przy podmianie na artykuł z obrazem .png
+    przenoszony jest wyświetlany .jpg (inaczej dalej byłby pokazywany, już z podpisem właściwego artykułu)."""
+    q = "?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail"
+    old_auto(photo_dir, "DC91", "McDonnell Douglas DC-10", ext="jpg", image=img("DC10", "png", "thumb.wikimedia.org") + q)
+    assert recheck("DC91", "DC-9-10")
+    wiki(monkeypatch, search=[{"title": "McDonnell Douglas DC-9"}],
+         pages={"McDonnell Douglas DC-9": img("DC9", "png", "thumb.wikimedia.org") + q})
+    got = get("DC91")
+    assert got["url"].startswith("/files/photos/DC91.png?v=") and got["credit"] == "Wikipedia: McDonnell Douglas DC-9"
+    assert not (photo_dir / "DC91.jpg").exists() and (photo_dir / "DC91.png").read_bytes().startswith(JPEG)
+    assert (photo_dir / "replaced" / "DC91.jpg").read_bytes() == b"old"
+    assert not recheck("DC91", "DC-9-10") and photos._downloaded("DC91")
+    # ukrycie takiego zdjęcia też przenosi wyświetlany .jpg
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", ext="jpg", image=img("A21N", "png", "thumb.wikimedia.org") + q)
+    wiki(monkeypatch, pages={"Airbus A220": None})
+    assert get("BCS3") is None and not (photo_dir / "BCS3.jpg").exists()
+
+
+def test_recheck_extension_from_url_path(photo_dir):
+    """Rozszerzenie z samej ścieżki adresu (bez "?..."); plik zapisany według całego adresu (do 0.13.3) też pasuje."""
+    assert photos._ext("https://thumb.wikimedia.org/a/960px-X.png?20240101") == "png"
+    assert photos._ext("https://upload.wikimedia.org/a/960px-X.PNG") == "png"
+    assert photos._ext("https://upload.wikimedia.org/a/960px-X.svg.png") == "png"
+    assert photos._ext("https://upload.wikimedia.org/a/960px-X.jpg?x.png") == "jpg"
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", ext="png", image=img("old", "png") + "?20240101")
+    assert recheck("BCS3", "A-220-300")
+    # do 0.13.3 rozszerzenie z całego adresu: png z "?..." zapisany jako jpg
+    old_auto(photo_dir, "BCS1", "Airbus A321neo", ext="jpg", image=img("old", "png") + "?20240101")
+    assert recheck("BCS1", "A-220-100")
+
+
+def test_own_photo_with_wikipedia_credit_is_logged_once(photo_dir, caplog):
+    """Zdjęcie z podpisem artykułu o innym modelu uznane za własne: przyczyna raz w logu (do restartu)."""
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", image="https://example.com/a.jpg")
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        assert not recheck("BCS3", "A-220-300") and not recheck("BCS3", "A-220-300")
+    lines = [r.getMessage() for r in caplog.records if r.name == "polids.photos"]
+    assert len(lines) == 1 and "BCS3" in lines[0] and "Wikimedia" in lines[0]
+    # zdjęcie z właściwego artykułu albo bez podpisu Wikipedii: bez wpisu
+    caplog.clear()
+    old_auto(photo_dir, "BCS1", "Airbus A220", image="https://example.com/a.jpg")
+    (photo_dir / "B738.jpg").write_bytes(b"own")
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        assert not recheck("BCS1", "A-220-100") and not recheck("B738", "737-800")
+    assert not [r for r in caplog.records if r.name == "polids.photos"]
+
+
+def test_replace_is_logged(monkeypatch, photo_dir, caplog):
+    old_auto(photo_dir, "BCS3", "Airbus A321neo")
+    wiki(monkeypatch, pages={"Airbus A220": img("A220")})
+    with caplog.at_level(logging.INFO, logger="polids.photos"):
+        get("BCS3")
+    assert "BCS3" in caplog.text and "Airbus A321neo" in caplog.text and "Wikipedia: Airbus A220" in caplog.text
+
+
+def test_fetch_refuses_image_outside_wikimedia(monkeypatch, photo_dir):
+    calls = wiki(monkeypatch, pages={"Airbus A220": "https://example.com/A220.jpg"})
+    with pytest.raises(ValueError, match="outside Wikimedia"):
+        fetch("BCS3")
+    assert list(photo_dir.iterdir()) == [] and not any("image" in c for c in calls)
 
 
 def test_type_photo_refreshes_family_article_via_redirect(monkeypatch, photo_dir):
@@ -425,24 +598,27 @@ def test_type_photo_refreshes_family_article_via_redirect(monkeypatch, photo_dir
     assert got["credit"] == "Wikipedia: Antonov An-148" and (photo_dir / "A158.jpg").read_bytes().startswith(JPEG)
 
 
-def test_type_photo_keeps_old_on_api_error(monkeypatch, photo_dir):
-    """Błąd w treści odpowiedzi z kodem 200 (przeciążona wyszukiwarka) to nie "brak artykułu": stare zdjęcie zostaje
-    do następnego sprawdzenia, typ bez zdjęcia dostaje błąd, nic nie trafia do _missing."""
+def test_type_photo_withholds_wrong_photo_on_api_error(monkeypatch, photo_dir):
+    """Błąd w treści odpowiedzi z kodem 200 (przeciążona wyszukiwarka) to nie "brak artykułu": zdjęcie z artykułu
+    o innym modelu nie jest pokazywane (błąd idzie dalej, w AIRCRAFT "Photo unavailable"), ale pliki zostają do
+    następnego sprawdzenia; nic nie trafia do _missing."""
     old_auto(photo_dir, "DC91", "McDonnell Douglas DC-10")
     old_auto(photo_dir, "BCS3", "Airbus A321neo")
     wiki(monkeypatch, error=True)
-    assert get("DC91")["credit"] == "Wikipedia: McDonnell Douglas DC-10" and recheck("DC91", "DC-9-10")
-    assert get("BCS3")["credit"] == "Wikipedia: Airbus A321neo" and recheck("BCS3", "A-220-300")
-    with pytest.raises(ValueError, match="search-error"):
-        get("A318")
+    for code in ("DC91", "BCS3", "A318"):
+        with pytest.raises(ValueError, match="search-error"):
+            get(code)
+    assert recheck("DC91", "DC-9-10") and recheck("BCS3", "A-220-300")
+    assert (photo_dir / "BCS3.jpg").read_bytes() == b"old" and not (photo_dir / "replaced").exists()
     assert photos._missing == set()
 
 
-def test_type_photo_keeps_old_when_wikipedia_down(monkeypatch, photo_dir):
+def test_type_photo_withholds_wrong_photo_when_wikipedia_down(monkeypatch, photo_dir):
     old_auto(photo_dir, "BCS3", "Airbus A321neo")
     wiki(monkeypatch, down=True)
-    assert get("BCS3")["credit"] == "Wikipedia: Airbus A321neo"
-    assert recheck("BCS3", "A-220-300")  # sprawdzane przy następnym otwarciu
+    with pytest.raises(httpx.ConnectError):
+        get("BCS3")
+    assert recheck("BCS3", "A-220-300") and (photo_dir / "BCS3.jpg").read_bytes() == b"old"
     with pytest.raises(httpx.ConnectError):
         get("BCS1")
 
@@ -491,6 +667,21 @@ def test_api_refetches_wrong_bcs3(client, monkeypatch, photo_dir):
     again = client.get(f"/api/aircraft/{a['id']}/photo").json()
     assert again == r.json() and len(calls) == n
     assert client.get(again["url"]).content.startswith(JPEG)  # adres z "?v=" podaje nowy plik
+
+
+def test_api_wrong_photo_not_shown(client, monkeypatch, photo_dir):
+    """0.13.4: zdjęcie BCS3 z A321neo bez zastępstwa – 502 przy błędzie Wikipedii, 404 bez artykułu ze zdjęciem."""
+    mount = next(r for r in main.app.routes if getattr(r, "path", "") == "/files/photos")
+    monkeypatch.setattr(mount.app, "all_directories", [photo_dir])
+    old_auto(photo_dir, "BCS3", "Airbus A321neo", image=img("old", host="thumb.wikimedia.org"))
+    a = client.get("/api/aircraft", params={"q": "BCS3"}).json()[0]
+    wiki(monkeypatch, down=True)
+    r = client.get(f"/api/aircraft/{a['id']}/photo")
+    assert r.status_code == 502 and r.json()["detail"] == "Photo unavailable"
+    wiki(monkeypatch, pages={"Airbus A220": None})
+    r = client.get(f"/api/aircraft/{a['id']}/photo")
+    assert r.status_code == 404 and r.json()["detail"] == "No photo of this type"
+    assert client.get("/files/photos/BCS3.jpg").status_code == 404
 
 
 def test_api_no_matching_article_is_404(client, monkeypatch, photo_dir):

@@ -1,8 +1,9 @@
 """Pobiera z Wikipedii zdjęcia wszystkich typów samolotów do data/photos/ (jeden plik na kod ICAO).
 
 Aplikacja robi to sama przy pierwszym otwarciu typu w zakładce AIRCRAFT; ten skrypt pobiera wszystko naraz,
-np. żeby wrzucić zdjęcia do repozytorium. Istniejące pliki są pomijane; pobrane przed 0.13.3 z artykułu o innym
-modelu (photos.recheck) są sprawdzane od nowa i podmieniane, gdy znajdzie się artykuł o tym modelu.
+np. żeby wrzucić zdjęcia do repozytorium. Istniejące pliki są pomijane; pobrane wcześniej z artykułu o innym
+modelu (photos.recheck) są sprawdzane od nowa: podmieniane, gdy znajdzie się artykuł o tym modelu, a bez niego
+przenoszone do data/photos/replaced/ (typ bez zdjęcia, photos.hide_photo).
 
     python scripts/fetch_aircraft_photos.py            # wszystkie typy
     python scripts/fetch_aircraft_photos.py B738 A320  # wybrane
