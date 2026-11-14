@@ -16,7 +16,8 @@ from ..services import viff as viff_service
 from ..services.aerolist import FIR_KEYS, FIR_LABELS, airport_entry, airport_positions, fir_key, fir_lists
 from ..services.http_cache import UpstreamError
 from ..services.lvp import evaluate as evaluate_lvp
-from ..services.positions import all_positions, known_stations
+from ..services.positions import all_positions, alt_stations, known_stations
+from ..services.radio import Station
 from ..services.metar import parse_metar, qfe_from_qnh
 from ..services.procedures import procedures, strip_board
 from ..services.runways import atis_state, config_now, runway_in_use, runway_state
@@ -64,9 +65,10 @@ def _card_local(db: Session, code: str) -> dict:
     woła tę funkcję w wątku (run_in_threadpool), żeby nie wstrzymać innych zapytań do serwera."""
     entry = airport_entry(db, code)
     known = [p for p in all_positions(db, airports=True) if (p.get("callsign") or "").upper().startswith(code + "_")]
+    alt = alt_stations(db, [Station(p["callsign"], p.get("prefix"), p.get("frequency") or "") for p in known], code)
     ad = db.get(Aerodrome, code)
     lat, lon = (entry["lat"], entry["lon"]) if entry else (ad.lat, ad.lon) if ad else (None, None)
-    return {"entry": entry, "known": known, "lat": lat, "lon": lon, "fir": fir_key(code, lat, lon) if entry or known else None,
+    return {"entry": entry, "known": known, "alt": alt, "lat": lat, "lon": lon, "fir": fir_key(code, lat, lon) if entry or known else None,
             "elevation_ft": ad.elevation_ft if ad else None}
 
 
@@ -97,7 +99,7 @@ async def card(icao: str, db: Session = Depends(get_db)):
     metar, taf = (metars or {}).get(code), (tafs or {}).get(code)
     ctrls = (feed or {}).get("controllers", []) + (feed or {}).get("atis", [])
     updated = (feed or {}).get("general", {}).get("update_timestamp")
-    positions = airport_positions(code, known, ctrls)
+    positions = airport_positions(code, known, ctrls, local["alt"])
     fir = local["fir"]
     return {
         "icao": code, "name": entry["name"] if entry else code, "kind": entry["kind"] if entry else None,

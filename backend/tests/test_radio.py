@@ -136,7 +136,11 @@ def test_online_only_on_position_frequency(client, monkeypatch):
         {"callsign": "EPWA_TWR", "frequency": "118.000", "name": "Nie swoja", "cid": 2},       # EPWA_TWR to 118.305
         {"callsign": "EPWW_N_CTR", "frequency": "199.998", "name": "Bez", "cid": 3},
         {"callsign": "EDWW_EMS_CTR", "frequency": "199.998", "name": "Sasiad bez", "cid": 4},
-        {"callsign": "KZNY_CTR", "frequency": "125.000", "name": "Daleko", "cid": 5}],
+        {"callsign": "KZNY_CTR", "frequency": "125.000", "name": "Daleko", "cid": 5},
+        # znak DBF na częstotliwości C (133.475): obsługuje C – plakietka FIR-u na MAP wg stanowiska, nie znaku
+        {"callsign": "EPWW_DBF_CTR", "frequency": "133.475", "name": "Na C", "cid": 12},
+        # ETNH_TWR: 125.600 w vacs-data, 122.100 w pliku EDWW – obie poprawne
+        {"callsign": "ETNH_TWR", "frequency": "122.100", "name": "Nordholz", "cid": 13}],
         "atis": [{"callsign": "EPKK_ATIS", "frequency": "199.998", "cid": 6, "atis_code": "A"},
                  {"callsign": "EPGD_ATIS", "frequency": "129.630", "cid": 7, "atis_code": "B"},
                  # drugi ATIS z AIP (EPWA ATIS DEP 123.430; w pliku .ese go nie ma) i ten sam znak poza AIP
@@ -152,15 +156,18 @@ def test_online_only_on_position_frequency(client, monkeypatch):
     gone = {"EPWA_TWR", "EPWW_N_CTR", "EDWW_EMS_CTR", "KZNY_CTR", "EPKK_ATIS", "EPWA_X_ATIS"}
     for url in ("/api/radio/online", "/api/vatsim/online"):
         on = client.get(url).json()
-        assert set(on["positions"]) == {"EPWA_APP", "EPGD_ATIS"}, url  # EPWA_D_ATIS: nie stanowisko z pliku .ese
+        # EPWA_D_ATIS: nie stanowisko z pliku .ese (drugi ATIS z AIP)
+        assert {"EPWA_APP", "EPGD_ATIS", "EPWW_C_CTR"} <= set(on["positions"]) and not set(on["positions"]) & gone, url
+        assert on["positions"]["EPWW_C_CTR"]["callsign"] == "EPWW_DBF_CTR", url
         cs = {c["callsign"] for c in on["controllers"]}
-        assert {"EPWA_APP", "EPGD_ATIS", "EPWA_D_ATIS"} <= cs and not cs & gone and on["firs"] == {}, url
+        assert {"EPWA_APP", "EPGD_ATIS", "EPWA_D_ATIS", "EPWW_DBF_CTR"} <= cs and not cs & gone, url
+        assert {k: [c["callsign"] for c in v] for k, v in on["firs"].items()} == {"EPWW-C": ["EPWW_DBF_CTR"]}, url
     atc = client.get("/api/vatsim/atc").json()
     assert {a["icao"]: sorted(a["facilities"]) for a in atc["airports"]} == {
-        "EKCH": ["ATIS"], "EPGD": ["ATIS"], "EPWA": ["APP", "ATIS"]}
+        "EKCH": ["ATIS"], "EPGD": ["ATIS"], "EPWA": ["APP", "ATIS"], "ETNH": ["TWR"]}
     assert [c["callsign"] for c in next(a for a in atc["airports"] if a["icao"] == "EPWA")["facilities"]["ATIS"]] == [
         "EPWA_D_ATIS"]
-    assert atc["firs"] == {}
+    assert {k: [c["callsign"] for c in v] for k, v in atc["firs"].items()} == {"EPWW-C": ["EPWW_DBF_CTR"]}
 
 
 def test_radio_online_upstream_error(client, monkeypatch):

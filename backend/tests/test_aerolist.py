@@ -291,6 +291,28 @@ def test_card_german_airport_positions_from_neighbour_files(client, fakes):
     assert {"TWR", "APP"} <= {p["type"] for p in client.get("/api/aerodromes/ETHN/card").json()["positions"]}
 
 
+def test_card_frequency_from_any_source(client, fakes, monkeypatch):
+    """0.13.6: zalogowany liczy się tylko na częstotliwości stanowiska z danych – z każdego źródła: ETNH_TWR ma 125.600
+    w vacs-data (ta jest na karcie) i 122.100 w pliku EDWW, oba są poprawne; duński ATIS (w pliku EKDK XKCH_A_ATIS)
+    pod znakiem z sieci EKCH_A_ATIS; na 199.998 i na obcej częstotliwości – jakby go nie było."""
+    def feed_of(*rows):
+        async def feed():
+            return {"general": {}, "pilots": [], "prefiles": [], "atis": [r for r in rows if r["callsign"].endswith("ATIS")],
+                    "controllers": [r for r in rows if not r["callsign"].endswith("ATIS")]}
+        monkeypatch.setattr(aerodromes, "get_feed", feed)
+
+    def on(code):
+        return {p["callsign"]: (p["online"] or {}).get("frequency") for p in
+                client.get(f"/api/aerodromes/{code}/card").json()["positions"] if p["online"]}
+
+    feed_of({"callsign": "ETNH_TWR", "frequency": "122.100", "cid": 1}, {"callsign": "EKCH_A_ATIS", "frequency": "122.755",
+                                                                         "cid": 2, "atis_code": "B"})
+    assert on("ETNH") == {"ETNH_TWR": "122.100"} and on("EKCH") == {"EKCH_A_ATIS": "122.755"}
+    for fq in ("199.998", "118.000"):
+        feed_of({"callsign": "ETNH_TWR", "frequency": fq, "cid": 1}, {"callsign": "EKCH_A_ATIS", "frequency": fq, "cid": 2})
+        assert on("ETNH") == {} and on("EKCH") == {}, fq
+
+
 ED_FIR_CODES = {"EDGG", "EDWW", "EDMM", "EDUU", "EDYY", "EDXX", "ETXX"}
 
 

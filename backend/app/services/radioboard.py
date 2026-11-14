@@ -1137,7 +1137,7 @@ def _referenced(static: dict) -> set[str]:
     return refs
 
 
-def board(static: dict, online: dict, positions: dict, net_ok: bool = True,
+def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (), net_ok: bool = True,
           berlin: dict | None = None, flow: dict | None = None) -> dict:
     """Stan tablicy dla zestawu zalogowanych (online: znak stanowiska → kontroler, jak /api/radio/online).
     Także grid (siatka strony wg szkicu: kolumny, rodzaje kolumn, BERLIN, przyciski, podglądy, stan danych, legenda;
@@ -1158,16 +1158,28 @@ def board(static: dict, online: dict, positions: dict, net_ok: bool = True,
     tma = [local(g) for g in static["tma"]]
     twr = [local(g) for g in static["twr"]]
     fis = [local(g) for g in static["fis"]]
-    # ATIS: polskie stanowiska ATIS z pliku .ese; zalogowany ATIS tylko na częstotliwości takiego stanowiska
-    # (match_positions: EPWA_D_ATIS na 120.455 to EPWA_ATIS). 0.13.6 (Marek: "nie po nazwach"): ATIS spoza pliku
-    # (EPWA_D_ATIS na własnej częstotliwości, ATIS na 199.998) nie jest już dopisywany po samym znaku
-    atis = sorted(({"callsign": cs, "icao": cs[:4], "online": cs in online} for cs in static["atis"]),
-                  key=lambda a: (a["icao"], a["callsign"]))
-    refs = _referenced(static)
+    # ATIS: polskie stanowiska ATIS z pliku .ese oraz zalogowane EP**_ATIS spoza niego (np. EPWA_D_ATIS). 0.13.6
+    # (Marek: "nie po nazwach"): feed_atis to już tylko ATIS-y na poprawnej częstotliwości (on_frequency, z drugim
+    # ATIS-em z AIP: EPWA ATIS DEP 123.430) – na 199.998 albo na częstotliwości spoza danych ich tu nie ma
+    atis = [{"callsign": cs, "icao": cs[:4], "online": cs in online} for cs in static["atis"]]
+    known = {online[a["callsign"]]["callsign"] for a in atis if a["online"]}
+    extra = {}
+    for c in feed_atis:
+        cs = str(c.get("callsign") or "").upper()
+        if cs.startswith("EP") and cs.endswith("_ATIS") and cs not in known and cs not in static["atis"]:
+            extra[cs] = {"callsign": cs, "icao": cs[:4], "online": True, "extra": True}
+    atis = sorted(atis + list(extra.values()), key=lambda a: (a["icao"], a["callsign"]))
+    refs = _referenced(static) | set(extra)
     pos = {}
     for cs in sorted(refs):
         p = positions.get(cs) or {}
         pos[cs] = {"frequency": p.get("frequency") or "", "name": p.get("radio") or p.get("name")}
+    for cs, a in extra.items():
+        info = next((c for c in feed_atis if str(c.get("callsign") or "").upper() == cs), {})
+        pos[cs]["frequency"] = info.get("frequency") or ""
+        online = {**online, cs: {"callsign": cs, "frequency": info.get("frequency"), "name": info.get("name"),
+                                 "cid": info.get("cid"), "logon_time": info.get("logon_time"),
+                                 "atis_code": info.get("atis_code"), "text_atis": info.get("text_atis")}}
     # obrysy zalogowanych na LOW (0.13.2): stanowisko APP → kształty TMA i CTA, stanowisko FIS → kształty FIS
     sa = static.get("areas") or {}
     areas = {"app": area_owners(sa.get("tma") or (), online, lambda cs: facility(cs) in APP_TYPES),
@@ -1176,7 +1188,7 @@ def board(static: dict, online: dict, positions: dict, net_ok: bool = True,
     flow = flow or {}
     return {"layers": static["layers"], "sectors": sectors, "tma": tma, "twr": twr,
             "fis": fis, "atis": atis, "areas": areas, "acc_short": static.get("acc_short") or {}, "pos": pos,
-            "online": {cs: v for cs, v in online.items() if cs in refs},
+            "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra},
             "grid": lay.get("grid") or {}, "firs": fir_blocks(lay, online, positions, net_ok),
             "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),
             "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions)},

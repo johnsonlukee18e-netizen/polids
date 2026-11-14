@@ -194,8 +194,15 @@ def fir_boundaries() -> dict:
     return json.loads((settings.seed_dir / "vatspy_firs.geojson").read_text("utf-8"))
 
 
-def online_firs(controllers: list[dict]) -> dict[str, list[dict]]:
-    """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa."""
+def position_of(online: dict[str, dict]) -> dict[str, str]:
+    """Znak zalogowanego → stanowisko, które obsługuje (wynik match_positions bez wpisów pod drugim znakiem sąsiada)."""
+    return {info["callsign"]: cs for cs, info in online.items() if info.get("callsign") and not info.get("alias_of")}
+
+
+def online_firs(controllers: list[dict], by_position: dict[str, str] | None = None) -> dict[str, list[dict]]:
+    """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa.
+    by_position (position_of): znak → stanowisko dopasowane po częstotliwości; 0.13.6 (Marek: "nie po nazwach"):
+    granica wg stanowiska, nie znaku – EPWW_N_CTR na 133.475 (częstotliwość C) to EPWW-C, nie EPWW-N."""
     data = fir_boundaries()
     prefixes = []
     for f in data["features"]:
@@ -207,7 +214,8 @@ def online_firs(controllers: list[dict]) -> dict[str, list[dict]]:
     prefixes.sort(key=lambda x: -len(x[0]))
     out: dict[str, list[dict]] = {}
     for c in controllers:
-        cs = c.get("callsign", "")
+        cs = str(c.get("callsign") or "")
+        cs = (by_position or {}).get(cs, cs)
         if cs.split("_")[-1] not in ("CTR", "FSS"):
             continue
         for pre, ids in prefixes:

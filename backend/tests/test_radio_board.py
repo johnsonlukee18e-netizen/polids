@@ -191,9 +191,38 @@ def test_board_atis(board):
     # 0.13.6 (Marek: "wyswietlaj tylko kontrolerow po czestotliwosciach aktywnych poprawnych dla sektorow"): ATIS na
     # częstotliwości, której nie ma żadne stanowisko z danych (EPWA_D_ATIS na 121.130), jakby go nie było
     assert "EPWA_D_ATIS" not in atis and "EPWA_D_ATIS" not in board["online"] and "EPWA_D_ATIS" not in board["pos"]
-    assert not any(a.get("extra") for a in board["atis"])
+    assert not any(a.get("extra") for a in board["atis"])   # drugi ATIS z AIP (123.430): test_board_atis_from_aip
     assert [a["icao"] for a in board["atis"]] == sorted(a["icao"] for a in board["atis"])
     assert "EPKK_OBS" not in board["online"]  # tylko stanowiska z tablicy
+
+
+def test_board_atis_from_aip(client, monkeypatch):
+    """0.13.6: drugi ATIS z AIP (EPWA ATIS DEP 123.430) i ATIS lotniska bez ATIS w pliku .ese (EPRA 125.230) są na
+    poprawnej częstotliwości: na pasku ATIS jako dodatkowe wiersze z częstotliwością z sieci i z plakietką TWR/A; ten
+    sam znak na 199.998 albo na częstotliwości spoza danych – jakby go nie było."""
+    def feed_with(*atis):
+        return {**FEED, "controllers": [], "atis": [
+            {"callsign": cs, "frequency": fq, "name": "Atis", "cid": 70 + i, "atis_code": code}
+            for i, (cs, fq, code) in enumerate(atis)]}
+
+    def get(feed):
+        async def other():
+            return feed
+        monkeypatch.setattr(vatsim_api, "get_feed", other)
+        return client.get("/api/radio/board").json()
+
+    d = get(feed_with(("EPWA_A_ATIS", "120.455", "K"), ("EPWA_D_ATIS", "123.430", "L"), ("EPRA_ATIS", "125.230", "M")))
+    atis = {a["callsign"]: a for a in d["atis"]}
+    assert atis["EPWA_ATIS"]["online"] and d["online"]["EPWA_ATIS"]["callsign"] == "EPWA_A_ATIS"
+    assert atis["EPWA_D_ATIS"]["extra"] and atis["EPWA_D_ATIS"]["online"] and atis["EPRA_ATIS"]["extra"]
+    assert (d["pos"]["EPWA_D_ATIS"]["frequency"], d["online"]["EPWA_D_ATIS"]["atis_code"]) == ("123.430", "L")
+    assert (d["pos"]["EPRA_ATIS"]["frequency"], d["online"]["EPRA_ATIS"]["atis_code"]) == ("125.230", "M")
+    twra = {p["icao"]: p["atis"] for p in d["plates"]["twr"]}
+    assert twra["EPWA"] == ["EPWA_ATIS", "EPWA_D_ATIS"] and twra["EPRA"] == ["EPRA_ATIS"]
+    for fq in ("199.998", "121.130"):
+        d = get(feed_with(("EPWA_D_ATIS", fq, "L"), ("EPRA_ATIS", fq, "M")))
+        assert not any(a["online"] for a in d["atis"]) and d["plates"]["twr"] == [], fq
+        assert not {"EPWA_D_ATIS", "EPRA_ATIS"} & set(d["online"]), fq
 
 
 def test_board_neighbour_firs(board):

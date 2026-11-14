@@ -25,7 +25,7 @@ from ..services.positions import all_positions, known_stations
 from ..services.radio import (Station, neighbour_tab, position_range, radio_names, sector_group, sector_kind,
                               seed_json)
 from ..services.vatsim import (BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions,
-                               on_frequency, online_firs)
+                               on_frequency, online_firs, position_of)
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
@@ -118,7 +118,8 @@ async def online(db: Session = Depends(get_db)):
     stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
     prefixes = {p["callsign"].split("_")[0] for p in merged}
     near = [c for c in ctrls if (cs := c.get("callsign", "")).split("_")[0] in prefixes or cs.startswith("EP")]
-    return {"positions": match_positions(ctrls, stations, nb_owners(db)), "firs": online_firs(ctrls),
+    positions = match_positions(ctrls, stations, nb_owners(db))
+    return {"positions": positions, "firs": online_firs(ctrls, position_of(positions)),
             "controllers": [controller_info(c) for c in near if not c.get("callsign", "").endswith("_OBS")],
             "updated": data.get("general", {}).get("update_timestamp")}
 
@@ -342,7 +343,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
     merged, positions, static, prefer, known = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}
-    online, ctrls = {}, []
+    online, feed_atis, ctrls = {}, [], []
     try:
         data = await vatsim_api.get_feed()
         # 0.13.6: tylko połączenia na częstotliwości stanowiska z danych (199.998 i inne – jakby ich nie było); także
@@ -350,6 +351,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
         ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known)
         stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
         online = match_positions(ctrls, stations, prefer)
+        feed_atis = [c for c in ctrls if str(c.get("callsign") or "").upper().endswith("_ATIS")]
         net["updated"] = data.get("general", {}).get("update_timestamp")
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
@@ -372,7 +374,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             flow = {"ok": True, **radioboard.flow_alerts(tvs, now, [s["id"] for s in static["sectors"]], static["tma"])}
         except Exception as exc:  # noqa: BLE001 - dane vIFF bez opisu: każdy błąd to brak czerwonego tła
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
-    out = radioboard.board(static, online, positions, net_ok=net["ok"], berlin=berlin, flow=flow)
+    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
     out["net"] = net
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego

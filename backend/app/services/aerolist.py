@@ -282,13 +282,15 @@ def _type(callsign: str, icao: str) -> str | None:
     return FACILITY_TYPES.get(parts[-1])   # DEP → APP, RMP → GND jak na plakietkach lotnisk
 
 
-def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> list[dict]:
+def airport_positions(icao: str, known: list[dict], controllers: list[dict], alt: list = ()) -> list[dict]:
     """Stanowiska lotniska w kolejności APP, TWR, GND, DEL, ATIS (w grupie alfabetycznie) ze stanem online.
 
     known: stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów); controllers: data feed VATSIM
     (kontrolerzy i ATIS). Dopasowanie jak w EuroScope (match_positions, 0.13.5): prefiks, typ i aktywna częstotliwość.
     0.13.6 (Marek: "nie po nazwach"): na karcie tylko zalogowani na częstotliwości stanowiska tego lotniska; na
-    199.998, na częstotliwości spoza danych albo drugi na zajętym stanowisku – jakby ich nie było."""
+    199.998, na częstotliwości spoza danych albo drugi na zajętym stanowisku – jakby ich nie było. alt: te same znaki
+    z częstotliwością z innego źródła (positions.alt_stations: ETNH_TWR 122.100 z pliku EDWW obok 125.600 z vacs-data) –
+    zalogowany na którejkolwiek z nich jest w wierszu swojego znaku."""
     icao = icao.upper()
     rows: dict[str, dict] = {}
     for p in known:
@@ -298,7 +300,8 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
             rows[cs] = {"type": t, "callsign": cs, "name": p.get("name") or None, "frequency": p.get("frequency") or "",
                         "known": True, "online": None}
     mine = [c for c in controllers if _type(c.get("callsign", ""), icao)]
-    online = match_positions(mine, [_Pos(r["callsign"], icao, r["frequency"]) for r in rows.values()])
+    online = match_positions(mine, [_Pos(r["callsign"], icao, r["frequency"]) for r in rows.values()]
+                             + [_Pos(a.callsign.upper(), icao, a.frequency) for a in alt if a.callsign.upper() in rows])
     for cs, info in online.items():
         rows[cs]["online"] = info
     return sorted(rows.values(), key=lambda r: (TYPE_ORDER.index(r["type"]), r["callsign"]))
