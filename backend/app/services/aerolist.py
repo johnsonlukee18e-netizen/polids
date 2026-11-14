@@ -287,7 +287,8 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
 
     known: stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów); controllers: data feed VATSIM
     (kontrolerzy i ATIS). Zalogowany pod znakiem spoza danych (np. EDDB_ATIS) dostaje własny wiersz.
-    Dopasowanie jak w EuroScope (match_positions): dokładny znak, potem prefiks, typ i częstotliwość."""
+    Dopasowanie jak w EuroScope (match_positions, 0.13.5): najpierw aktywna częstotliwość (prefiks, typ
+    i częstotliwość), sam znak tylko bez pasującej częstotliwości."""
     icao = icao.upper()
     rows: dict[str, dict] = {}
     for p in known:

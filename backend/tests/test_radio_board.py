@@ -226,11 +226,12 @@ def test_board_neighbour_firs(board):
     edww = {b["id"]: b for b in st["EDWW"]["boxes"]}
     assert edww["FLG"]["owner"] == "EDWW_FLG_CTR" and edww["MRZ"]["owner"] is None
     assert edww["FLG"]["frequency"] == "136.450" and not st["EDWW"]["advisory"]
-    # EDWW FLG obsługuje też HVL2 i HVL1 Rhein (jest w ich kolejności): jedno okienko na obu komórkach, nazwa ze
-    # środka znaku właściciela (FLG); OSE nie
+    # EDWW FLG obsługuje też HVL2 i HVL1 Rhein (jest w ich kolejności): jedno okienko, nazwa ze środka znaku właściciela
+    # (FLG); OSE nie. 0.13.5: zwykły kafelek w komórce HVL2
     eduu = {b["id"]: b for b in st["EDUU"]["boxes"]}
     hvl = eduu["HVL2+HVL1"]
-    assert (hvl["label"], hvl["owner"], hvl["merged"], hvl["rows"]) == ("FLG", "EDWW_FLG_CTR", True, 2)
+    assert (hvl["label"], hvl["owner"], hvl["merged"], hvl["rows"]) == ("FLG", "EDWW_FLG_CTR", True, 1)
+    assert (hvl["col"], hvl["row"], hvl["cols"]) == (3, 11, 1)
     assert [m["id"] for m in hvl["members"]] == ["HVL2", "HVL1"] and (hvl["upper"], hvl["lower"]) == (660, 285)
     assert eduu["OSE2"]["owner"] is None and not eduu["OSE2"]["merged"]
     # nikt z Wilna ani Pragi online: żadne okienko EYVL i LKAA nie ma właściciela (strona: ADVISORY)
@@ -300,8 +301,10 @@ def test_board_fis_warszawa_information(client, monkeypatch):
     geo = {a["id"]: a["name"] for a in client.get("/api/radio/board?geo=1").json()["geo"]["fis"]}
     out = {}
     for name, css in (("i", ["EPWW_I_CTR"]), ("ie", ["EPWW_IE_CTR"]), ("both", ["EPWW_I_CTR", "EPWW_IE_CTR"])):
-        feed = {**FEED, "controllers": [{"callsign": cs, "frequency": fq, "name": "Info", "cid": 70 + i}
-                                        for i, (cs, fq) in enumerate(zip(css, ("128.325", "127.660")))], "atis": []}
+        # każdy na częstotliwości swojego stanowiska (0.13.5: o stanowisku decyduje częstotliwość)
+        fqs = {"EPWW_I_CTR": "128.325", "EPWW_IE_CTR": "127.660"}
+        feed = {**FEED, "controllers": [{"callsign": cs, "frequency": fqs[cs], "name": "Info", "cid": 70 + i}
+                                        for i, cs in enumerate(css)], "atis": []}
 
         async def get(feed=feed):
             return feed
@@ -319,6 +322,47 @@ def test_board_fis_warszawa_information(client, monkeypatch):
     both = out["both"]["areas"]["fis"]
     assert set(both) == {"EPWW_I_CTR", "EPWW_IE_CTR"} and sorted(both["EPWW_IE_CTR"]) == sorted(ie)
     assert not set(both["EPWW_I_CTR"]) & set(ie)
+
+
+# ACC Visualization z plvacc.pl/acc-sectors (zrzut Marka 14.11.2026): DBF+G 133.180, DB+T 127.025, TC+J 134.875,
+# JR 130.875 i _ALLFIR LM 125.450 online; ten sam podział na HIGH, MID i LOW
+ACC_VIS = {"F": "EPWW_DBF_CTR", "G": "EPWW_DBF_CTR", "B": "EPWW_DBT_CTR", "D": "EPWW_DBT_CTR", "T": "EPWW_TCJ_CTR",
+           "C": "EPWW_TCJ_CTR", "J": "EPWW_JR_CTR", "R": "EPWW_JR_CTR", "N": "EPWW_ALL_CTR", "E": "EPWW_ALL_CTR"}
+
+
+def test_board_config_from_active_frequency(client, monkeypatch):
+    """0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): sektory ACC obsługuje
+    stanowisko z częstotliwości, na której kontroler pracuje, nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT, EPWW_DBT_CTR
+    na 133.180 to DBF, EPWW_ALL_CTR na 130.875 to JR, EPWW_J_CTR na 125.450 to ALL. Wynik jak na zrzucie ACC
+    Visualization: F i G – DBF, B i D – DBT (D HIGH z tabeli om), T i C – TCJ, J i R – JR, N i E – ALL, na każdej
+    warstwie."""
+    ctrls = [("EPWW_DBF_CTR", "127.025"), ("EPWW_DBT_CTR", "133.180"), ("EPWW_ALL_CTR", "130.875"),
+             ("EPWW_J_CTR", "125.450"), ("EPWW_TCJ_CTR", "134.875")]
+    feed = {**FEED, "controllers": [{"callsign": cs, "frequency": fq, "name": f"ACC {i}", "cid": 80 + i}
+                                    for i, (cs, fq) in enumerate(ctrls)], "atis": []}
+
+    async def get():
+        return feed
+
+    monkeypatch.setattr(vatsim_api, "get_feed", get)
+    d = client.get("/api/radio/board").json()
+    got = {}
+    for s in d["sectors"]:
+        got.setdefault(s["letter"], set()).add(s["owner"])
+    assert got == {k: {v} for k, v in ACC_VIS.items()}
+    assert {s["layer"] for s in d["sectors"]} == {"LOW", "MID", "HIGH"}
+    # pod stanowiskiem z częstotliwości jest kontroler z jego znakiem w sieci; stanowisk ze znaków nikt nie zajmuje
+    on = d["online"]
+    assert (on["EPWW_DBT_CTR"]["callsign"], on["EPWW_DBF_CTR"]["callsign"]) == ("EPWW_DBF_CTR", "EPWW_DBT_CTR")
+    assert (on["EPWW_JR_CTR"]["callsign"], on["EPWW_ALL_CTR"]["callsign"]) == ("EPWW_ALL_CTR", "EPWW_J_CTR")
+    assert "EPWW_J_CTR" not in on
+    acc = next(i for i in d["indicators"] if i["id"] == "ACC GAT")
+    assert acc["value"] == "ALL+DBF+DBT+JR+TCJ"
+    # /api/radio/online (MAP, AERODROME) dopasowuje tak samo
+    pos = client.get("/api/radio/online").json()["positions"]
+    assert {cs: pos[cs]["callsign"] for cs in set(ACC_VIS.values())} == {
+        "EPWW_DBF_CTR": "EPWW_DBT_CTR", "EPWW_DBT_CTR": "EPWW_DBF_CTR", "EPWW_JR_CTR": "EPWW_ALL_CTR",
+        "EPWW_ALL_CTR": "EPWW_J_CTR", "EPWW_TCJ_CTR": "EPWW_TCJ_CTR"}
 
 
 def test_area_shapes_and_owners():
@@ -643,35 +687,36 @@ console.log(JSON.stringify({
       edww: sg({ cols: [2], rows: [5, 9, 11], boxes: [B("MRZ", 2, 5, 285, 0), B("MAR", 2, 9, 285, 0), B("FLG", 2, 11, 285, 0)] }),
       eduu: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: eduu }),
       // jedno stanowisko w ciągu okienek EDUU (EDUU_H12_CTR we wszystkich czterech; OSE1 + HVL2 i ciągi z nimi): połączone
-      // okienko jak z merge_boxes – prostokąt przez puste wiersze szkicu 9 i 10, granice od najwyższej do najniższej
+      // okienko jak z merge_boxes (0.13.5) – jedna komórka najwyższego członka, granice od najwyższej do najniższej
       eduuMerged: [[0, 1, 2, 3], [1, 2], [0, 1, 2], [1, 2, 3]].map((ix) => {
         const ms = ix.map((i) => eduu[i]), r0 = ms[0].row, r1 = ms[ms.length - 1].row;
         const mg = B(ms.map((b) => b.id).join("+"), 3, r0, Math.max(...ms.map((b) => b.upper)), Math.min(...ms.map((b) => b.lower)),
-          { rows: r1 - r0 + 1, merged: true, members: ms });
+          { merged: true, members: ms });
         return sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [...eduu.filter((b) => b.row < r0), mg, ...eduu.filter((b) => b.row > r1)] });
       }),
-      // HVL2 + HVL1 jednego stanowiska: jedno okienko na dwa wiersze, rozmiar stosu bez zmian
+      // HVL2 + HVL1 jednego stanowiska: jeden kafelek w komórce HVL2, rozmiar stosu bez zmian
       hvl: sg({ cols: [3], rows: [7, 8, 11, 12], boxes: [eduu[0], eduu[1],
-        B("HVL2+HVL1", 3, 11, 660, 285, { rows: 2, merged: true, members: [eduu[2], eduu[3]] })] }),
+        B("HVL2+HVL1", 3, 11, 660, 285, { merged: true, members: [eduu[2], eduu[3]] })] }),
       esaa: sg({ cols: [5, 6], rows: [5, 6], boxes: [B("9", 5, 5, 660, 365), B("6", 6, 5, 660, 365), B("8", 5, 6, 365, 195),
         B("7", 6, 6, 365, 0)] }),
-      // LKAA_CTR wszędzie: prostokąt 2 × 3 (z pustą komórką pod NL), wysokość rzędów liczb jak bez łączenia
-      lkaa: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("LKAA", 5, 19, 660, 0, { cols: 2, rows: 3, merged: true, members: lkaa })] }),
+      // LKAA_CTR wszędzie: jeden kafelek w komórce NU, wysokość rzędów liczb jak bez łączenia
+      lkaa: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("LKAA", 5, 19, 660, 0, { merged: true, members: lkaa })] }),
       lkaa0: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: lkaa }),
       edmm: sg({ cols: [2, 3], rows: [15], boxes: [B("MEI", 2, 15, 315, 165), B("SPE1", 3, 15, 660, 315)] }),
-      // 0.13.2 (przegląd): połączone okienko na dwie kolumny – w drugiej kolumnie granica jej członka, gdy inna niż obok
-      // (ESMM_7_CTR na 9+6+8+7 nad L: 0 pod 7; EDMM MEI+SPE1 nad SAS: 660 nad SPE1 i 315 pod nim)
+      // połączone okienko z dwóch kolumn (0.13.5: jeden kafelek w komórce lewego górnego członka): ESMM_7_CTR na 9+6+8+7
+      // nad L, EDMM MEI+SPE1 nad SAS, LKAA NU+SU nad NL i SL; ESAA 8+7 (365-0) nad L (195-0): dwie liczby pod nim
       esaaL: (() => {
         const e = [B("9", 5, 5, 660, 365), B("6", 6, 5, 660, 365), B("8", 5, 6, 365, 195), B("7", 6, 6, 365, 0)], L = B("L", 5, 7, 195, 0);
         return [sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [...e, L] }),
-          sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [B("7", 5, 5, 660, 0, { cols: 2, rows: 2, merged: true, members: e }), L] })];
+          sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [B("7", 5, 5, 660, 0, { merged: true, members: e }), L] }),
+          sg({ cols: [5, 6], rows: [5, 6, 7], boxes: [e[0], e[1], B("8+7", 5, 6, 365, 0, { merged: true, members: e.slice(2) }), L] })];
       })(),
       edmmSas: (() => {
         const e = [B("MEI", 2, 15, 315, 165), B("SPE1", 3, 15, 660, 315)], sas = B("SAS", 2, 16, 165, 0);
         return [sg({ cols: [2, 3], rows: [15, 16], boxes: [...e, sas] }),
-          sg({ cols: [2, 3], rows: [15, 16], boxes: [B("MEI", 2, 15, 660, 165, { cols: 2, merged: true, members: e }), sas] })];
+          sg({ cols: [2, 3], rows: [15, 16], boxes: [B("MEI", 2, 15, 660, 165, { merged: true, members: e }), sas] })];
       })(),
-      lkaaNs: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("NU", 5, 19, 660, 305, { cols: 2, merged: true, members: lkaa.slice(0, 2) }),
+      lkaaNs: sg({ cols: [5, 6], rows: [19, 20, 21], boxes: [B("NU", 5, 19, 660, 305, { merged: true, members: lkaa.slice(0, 2) }),
         ...lkaa.slice(2)] }),
       // bez cols/rows z /api/radio/board (stara część stała): z okienek; złe wartości → 1
       fallback: sg({ boxes: [{ id: "A", col: 1, row: 1, upper: 200, lower: 100 }, { id: "B", col: "1", row: 3, upper: 100, lower: 0 },
@@ -774,23 +819,26 @@ def test_js_layout_helpers(js):
     u = st["eduu"]
     assert u["rows"] == ["l1", "t", "l1", "t", "l2", "t", "l1", "t", "l1"]
     assert u["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "7", 365], ["1", "9", 285]]
-    # połączone HVL2 + HVL1: jeden kafelek na dwa wiersze, bez liczby w środku, rzędy liczb bez zmian
+    # połączone HVL2 + HVL1 (0.13.5, Marek: "napraw te ogromne kwadraty"): zwykły kafelek w komórce HVL2, nad nim jego
+    # górna granica, pod nim dolna, rzędy liczb bez zmian
     h = st["hvl"]
-    assert h["rows"] == u["rows"] and h["tiles"][2] == ["HVL2+HVL1", "1 / 2", "6 / 9"]
-    assert h["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "9", 285]]
-    # EDUU_H12_CTR we wszystkich czterech: jeden kafelek przez puste wiersze szkicu 9 i 10 – te same tory stosu co bez
-    # łączenia (dawniej 13 zamiast 9, stos o dwa rzędy kafelków wyższy); OSE1 + HVL2 i ciągi z nimi: nad i pod połączonym
-    # granica jego członka przy krawędzi (365), nie dwie liczby (365/660, 285/365) w rzędzie na jedną
+    assert h["rows"] == u["rows"] and h["tiles"][2] == ["HVL2+HVL1", "1 / 2", "6 / 7"]
+    assert h["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "7", 285]]
+    # EDUU_H12_CTR we wszystkich czterech: jeden kafelek w komórce OSE2 (660 nad nim, 285 pod nim) – te same tory stosu co
+    # bez łączenia; OSE1 + HVL2 i ciągi z nimi: kafelek w komórce OSE1 z granicami całego okienka, więc nad nim dolna
+    # granica OSE2 i jego górna (365 i 660) – rząd liczb na dwie, tory kafelków bez zmian
     full, ose_hvl, ose3, hvl3 = em = st["eduuMerged"]
     for g in em:
-        assert (g["ncols"], g["nrows"], g["cols"], g["rows"]) == (u["ncols"], u["nrows"], u["cols"], u["rows"]), g
-    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "1 / 2", "2 / 9"]] and full["marks"] == [["1", "1", 660], ["1", "9", 285]]
-    assert ose_hvl["tiles"] == [["OSE2", "1 / 2", "2 / 3"], ["OSE1+HVL2", "1 / 2", "4 / 7"], ["HVL1", "1 / 2", "8 / 9"]]
-    assert ose_hvl["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "7", 365], ["1", "9", 285]]
-    assert ose3["tiles"][0] == ["OSE2+OSE1+HVL2", "1 / 2", "2 / 7"] and ose3["marks"] == [["1", "1", 660], ["1", "7", 365],
-                                                                                          ["1", "9", 285]]
-    assert hvl3["tiles"][1] == ["OSE1+HVL2+HVL1", "1 / 2", "4 / 9"] and hvl3["marks"] == [["1", "1", 660], ["1", "3", 365],
-                                                                                          ["1", "9", 285]]
+        assert (g["ncols"], g["nrows"], g["cols"]) == (u["ncols"], u["nrows"], u["cols"]), g
+    two = [*u["rows"][:2], "l2", *u["rows"][3:]]
+    assert (full["rows"], ose_hvl["rows"], ose3["rows"], hvl3["rows"]) == (u["rows"], two, u["rows"], two)
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "1 / 2", "2 / 3"]] and full["marks"] == [["1", "1", 660], ["1", "3", 285]]
+    assert ose_hvl["tiles"] == [["OSE2", "1 / 2", "2 / 3"], ["OSE1+HVL2", "1 / 2", "4 / 5"], ["HVL1", "1 / 2", "8 / 9"]]
+    assert ose_hvl["marks"] == [["1", "1", 660], ["1", "3", 365, 660], ["1", "5", 285], ["1", "7", 365], ["1", "9", 285]]
+    assert ose3["tiles"][0] == ["OSE2+OSE1+HVL2", "1 / 2", "2 / 3"] and ose3["marks"] == [["1", "1", 660], ["1", "3", 285],
+                                                                                          ["1", "7", 365], ["1", "9", 285]]
+    assert hvl3["tiles"][1] == ["OSE1+HVL2+HVL1", "1 / 2", "4 / 5"] and hvl3["marks"] == [["1", "1", 660], ["1", "3", 365, 660],
+                                                                                          ["1", "5", 285]]
     # ESAA: dwie kolumny, liczby osobno w każdej (do lewej w swojej kolumnie)
     assert st["esaa"]["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 365], ["2", "3", 365], ["1", "5", 195],
                                    ["2", "5", 0]]
@@ -798,24 +846,28 @@ def test_js_layout_helpers(js):
     l0 = st["lkaa0"]
     assert l0["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 305], ["2", "3", 305], ["1", "5", 125],
                            ["2", "5", 125], ["2", "7", 0]]
-    # LKAA_CTR: jeden kafelek 2 × 3, liczby tylko nad nim i pod nim w pierwszej kolumnie, stos tego samego rozmiaru
+    # LKAA_CTR: jeden zwykły kafelek w komórce NU (0.13.5), 660 nad nim i 0 pod nim, stos tego samego rozmiaru
     lk = st["lkaa"]
-    assert lk["tiles"] == [["LKAA", "1 / 3", "2 / 7"]] and lk["marks"] == [["1", "1", 660], ["1", "7", 0]]
+    assert lk["tiles"] == [["LKAA", "1 / 2", "2 / 3"]] and lk["marks"] == [["1", "1", 660], ["1", "3", 0]]
     assert (lk["ncols"], lk["nrows"], lk["rows"]) == (l0["ncols"], l0["nrows"], l0["rows"]) == (2, 7, ["l1", "t", "l1", "t", "l1", "t", "l1"])
     # EDMM: MEI i SPE1 w jednym wierszu
     assert st["edmm"]["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315]]
-    # 0.13.2 (przegląd): połączone okienko na dwie kolumny pokazuje w drugiej kolumnie granicę jej członka, gdy jest inna
-    # niż w pierwszej – ESAA 9+6+8+7 nad L: 195 pod 8 (wspólna z L) i 0 pod 7 (dawniej 660-195, choć 7 sięga ziemi),
-    # bez drugiego 660 nad 6; EDMM MEI+SPE1 nad SAS: 315 i 660 nad nim, 165 i 315 pod nim (dawniej 315-165)
-    e0, e1 = st["esaaL"]
+    # 0.13.5: połączone okienko z dwóch kolumn to jeden kafelek w komórce lewego górnego członka z granicami całego
+    # okienka – ESAA 9+6+8+7 nad L: 660 nad nim, 0 pod nim, 195 nad L; EDMM MEI+SPE1 nad SAS: 660 nad nim, 165 wspólna
+    # z SAS; ESAA 8+7 (365-0) nad L (195-0): pod nim 0 i 195 nad L (rząd liczb na dwie)
+    e0, e1, e2 = st["esaaL"]
     assert e0["marks"] == [["1", "1", 660], ["2", "1", 660], ["1", "3", 365], ["2", "3", 365], ["1", "5", 195], ["2", "5", 0],
                            ["1", "7", 0]]
-    assert e1["tiles"] == [["7", "1 / 3", "2 / 5"], ["L", "1 / 2", "6 / 7"]]
-    assert e1["marks"] == [["1", "1", 660], ["1", "5", 195], ["2", "5", 0], ["1", "7", 0]] and e1["at"][1:3] == ["sh", "dn"]
+    assert e1["tiles"] == [["7", "1 / 2", "2 / 3"], ["L", "1 / 2", "6 / 7"]]
+    assert e1["marks"] == [["1", "1", 660], ["1", "3", 0], ["1", "5", 195], ["1", "7", 0]] and e1["at"][1:3] == ["dn", "up"]
+    assert e2["tiles"][2:] == [["8+7", "1 / 2", "4 / 5"], ["L", "1 / 2", "6 / 7"]]
+    assert e2["marks"][4:] == [["1", "5", 0, 195], ["1", "7", 0]] and e2["rows"] == [*e0["rows"][:4], "l2", *e0["rows"][5:]]
     m0, m1 = st["edmmSas"]
-    assert m0["marks"] == m1["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315], ["1", "5", 0]]
+    assert m0["marks"] == [["1", "1", 315], ["2", "1", 660], ["1", "3", 165], ["2", "3", 315], ["1", "5", 0]]
+    assert m1["tiles"] == [["MEI", "1 / 2", "2 / 3"], ["SAS", "1 / 2", "4 / 5"]]
+    assert m1["marks"] == [["1", "1", 660], ["1", "3", 165], ["1", "5", 0]]
     assert (e1["rows"], m1["rows"]) == (e0["rows"], m0["rows"])  # rzędy liczb jak bez łączenia
-    # LKAA NU+SU nad NL i SL: 660 raz (ta sama granica w obu kolumnach), pod nim 305 w obu kolumnach jak dotąd
+    # LKAA NU+SU nad NL i SL: kafelek w komórce NU, 660 nad nim, 305 nad NL i SL
     assert st["lkaaNs"]["marks"] == [["1", "1", 660], ["1", "3", 305], ["2", "3", 305], ["1", "5", 125], ["2", "5", 125], ["2", "7", 0]]
     fb = st["fallback"]
     assert (fb["ncols"], fb["nrows"]) == (1, 5) and fb["tiles"][0] == ["A", "1 / 2", "2 / 3"]
@@ -853,7 +905,10 @@ def test_js_stack_size_fixed_all_merges(tmp_path):
     okienko FIR-u z łączeniem bez nikogo albo u jednego z dwóch stanowisk) i stackGrid strony: te same tory co bez
     nikogo, żadna liczba poza swoim rzędem. EDUU_H12_CTR we wszystkich czterech okienkach EDUU łączy je przez puste
     wiersze szkicu 9 i 10 (dawniej stos o dwa rzędy kafelków wyższy, strona skakała przy logowaniu). 0.13.2 (issue #27):
-    stackGrid na wszystkich kolumnach i wierszach siatki strony (jak pageGrid), więc tory są torami strony."""
+    stackGrid na wszystkich kolumnach i wierszach siatki strony (jak pageGrid), więc tory są torami strony.
+    0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki z granicami całego
+    okienka. Tory kafelków i kolumn bez zmian; rząd liczb rośnie z jednej do dwóch tylko tam, gdzie pod kafelkiem albo nad
+    nim stoją teraz dwie liczby: EDUU OSE1 + HVL2 (660) pod OSE2 (365) i ESAA 8 + 7 (do 0) nad L (od 195)."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -883,15 +938,26 @@ def test_js_stack_size_fixed_all_merges(tmp_path):
     # łączenie naprawdę zachodzi (także przez puste wiersze szkicu EDUU), a stos zawsze ma tory jak bez nikogo
     assert sum(any(b["merged"] for b in c["boxes"]) for c in cases) > 200
     full = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=A_CTR", "HVL1=A_CTR"])
-    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "10 / 21"]] and full["rows"] == base["EDUU"]["rows"]
+    assert full["tiles"] == [["OSE2+OSE1+HVL2+HVL1", "10 / 11"]] and full["rows"] == base["EDUU"]["rows"]
+    assert full["marks"] == [["3", "9", 660], ["3", "11", 285]]
     assert len(full["rows"]) == 2 * len(rows) + 1 and full["cols"] == ["t"] * 13
-    # dwa połączone okienka o tym samym zakresie (660-285): na stronie między nimi puste wiersze szkicu 9 i 10, więc
-    # każde ma swoje granice nad i pod sobą (w kolumnie C, rzędy liczb wierszy 7, 9, 11 i 13 szkicu)
+    # dwa połączone okienka o tym samym zakresie (660-285): każde to kafelek w komórce swojego górnego członka (wiersze
+    # 7 i 11 szkicu) ze swoimi granicami nad i pod sobą
     pair = next(g for g in out if g["fir"] == "EDUU" and g["on"] == ["OSE2=A_CTR", "OSE1=A_CTR", "HVL2=B_CTR", "HVL1=B_CTR"])
-    assert [t[0] for t in pair["tiles"]] == ["OSE2+OSE1", "HVL2+HVL1"] and pair["rows"] == base["EDUU"]["rows"]
-    assert pair["marks"] == [["3", "9", 660], ["3", "13", 285], ["3", "17", 660], ["3", "21", 285]], pair["marks"]
-    changed = [f"{g['fir']} {g['on']}" for g in out if (g["cols"], g["rows"]) != (base[g["fir"]]["cols"], base[g["fir"]]["rows"])]
-    assert changed == []
+    assert pair["tiles"] == [["OSE2+OSE1", "10 / 11"], ["HVL2+HVL1", "18 / 19"]] and pair["rows"] == base["EDUU"]["rows"]
+    assert pair["marks"] == [["3", "9", 660], ["3", "11", 285], ["3", "17", 660], ["3", "19", 285]], pair["marks"]
+    # tory kafelków i kolumn zawsze jak bez nikogo; rząd liczb rośnie (l1 → l2) tylko pod dwie liczby i tylko w EDUU
+    # (rząd między wierszami 7 i 8 szkicu) i ESAA (między 6 i 7)
+    grown = {}
+    for g in out:
+        b = base[g["fir"]]
+        assert g["cols"] == b["cols"] and len(g["rows"]) == len(b["rows"]), (g["fir"], g["on"])
+        for j, (x, y) in enumerate(zip(g["rows"], b["rows"])):
+            if x != y:
+                assert j % 2 == 0 and (y, x) == ("l1", "l2"), (g["fir"], g["on"], j)
+                assert any(int(m[1]) == j + 1 and len(m) == 4 for m in g["marks"]), (g["fir"], g["on"], j)
+                grown.setdefault(g["fir"], set()).add(j)
+    assert grown == {"EDUU": {10}, "ESAA": {8}}
     assert [(g["fir"], g["on"], g["over"]) for g in out if g["over"]] == []
 
 

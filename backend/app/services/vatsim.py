@@ -62,7 +62,12 @@ def controller_info(c: dict) -> dict:
 def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
-    Najpierw dokładny callsign, potem jak w EuroScope: prefiks, typ (końcówka) i częstotliwość.
+    0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): najpierw aktywna
+    częstotliwość, jak w EuroScope – stanowisko o tym samym prefiksie, typie (końcówce) i częstotliwości; przy kilku
+    takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF. Sam
+    dokładny znak tylko wtedy, gdy częstotliwość nie pasuje do żadnego stanowiska (199.998, spoza pliku). Dwóch
+    kontrolerów na jednym stanowisku (uczeń i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej
+    częstotliwości (w kolejności danych), na końcu po samym znaku.
     prefer: stanowiska z kolejności przejmowania sektorów sąsiadów. Kontroler dopasowany do innego stanowiska
     (np. EKDK_CTR z vacs-data) jest też wpisany pod stanowiskiem z `prefer` o tym samym prefiksie, typie
     i częstotliwości (EKDK_UN_CTR 136.555 w pliku Danii), z polem `alias_of`: tak rozpozna go EuroScope sąsiada."""
@@ -72,21 +77,22 @@ def match_positions(controllers: list[dict], positions: list, prefer: Collection
     for i, p in enumerate(positions):
         if p.prefix:
             by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
-    online: dict[str, dict] = {}
-    alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
+    # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość, 2 – sam znak
+    hits: list[tuple[int, str, dict, list]] = []
     for c in controllers:
         cs, freq = c.get("callsign", ""), c.get("frequency", "")
         parts = cs.split("_")
         cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
-                 if freq[:7] == (ip[1].frequency or "")[:7]]
-        if cs in by_cs:
-            hit = cs
-            online[cs] = controller_info(c)
-        elif cands:
-            hit = min(cands, key=lambda ip: ip[0])[1].callsign
-            online.setdefault(hit, controller_info(c))
-        else:
-            continue
+                 if freq and freq[:7] == (ip[1].frequency or "")[:7]]
+        if cands:
+            mine = [ip for ip in cands if ip[1].callsign == cs]
+            hits.append((0, cs, c, cands) if mine else (1, min(cands, key=lambda ip: ip[0])[1].callsign, c, cands))
+        elif cs in by_cs:
+            hits.append((2, cs, c, cands))
+    online: dict[str, dict] = {}
+    alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
+    for _, hit, c, cands in sorted(hits, key=lambda h: h[0]):
+        online.setdefault(hit, controller_info(c))
         twins = [ip for ip in cands if ip[1].callsign in prefer]
         if hit not in prefer and twins:
             alias.setdefault(min(twins, key=lambda ip: ip[0])[1].callsign, controller_info(c) | {"alias_of": hit})

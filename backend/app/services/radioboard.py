@@ -630,25 +630,29 @@ def merged_label(members: list[dict], owner: str, fir: str) -> str:
 
 
 def _merged(members: list[dict], fir: str) -> dict:
+    """Połączone okienko (0.13.5, Marek: "napraw te ogromne kwadraty"): zwykły kafelek jednej komórki, jak na zdjęciu
+    PANDORY (EYVL 660 / 133.305 / 95), w komórce najwyższego członka (przy kilku w tym wierszu – lewego), z granicami
+    od najwyższej górnej do najniższej dolnej; komórki pozostałych członków zostają puste. members: okienka w środku
+    z ich komórkami (dymek; strona liczy z nich wysokości rzędów liczb jak bez łączenia)."""
     members = sorted(members, key=lambda b: (b["row"], b["col"]))
     owner = Counter(b["owner"] for b in members).most_common(1)[0][0]
     label = merged_label(members, owner, fir)
     head = next((b for b in members if b["id"] == label), None)
-    c0, c1 = min(b["col"] for b in members), max(b["col"] + b["cols"] - 1 for b in members)
-    r0, r1 = min(b["row"] for b in members), max(b["row"] + b["rows"] - 1 for b in members)
-    return {"id": "+".join(b["id"] for b in members), "label": label, "col": c0, "row": r0, "cols": c1 - c0 + 1,
-            "rows": r1 - r0 + 1, "upper": max(b["upper"] for b in members), "lower": min(b["lower"] for b in members),
-            "callsign": head["callsign"] if head else owner, "chain": head["chain"] if head else [], "owner": owner,
-            "staffed": True, "frequency": next((b["frequency"] for b in members if b["owner"] == owner), None),
+    return {"id": "+".join(b["id"] for b in members), "label": label, "col": members[0]["col"],
+            "row": members[0]["row"], "cols": 1, "rows": 1, "upper": max(b["upper"] for b in members),
+            "lower": min(b["lower"] for b in members), "callsign": head["callsign"] if head else owner,
+            "chain": head["chain"] if head else [], "owner": owner, "staffed": True,
+            "frequency": next((b["frequency"] for b in members if b["owner"] == owner), None),
             "members": [_member(b) for b in members], "merged": True}
 
 
 def merge_boxes(boxes: list[dict], occupied: dict, fir: str) -> list[dict]:
     """Łączenie okienek jednego FIR-u, które teraz obsługuje to samo stanowisko (merge_key: ten sam znak albo ta sama
-    częstotliwość); nieobsadzonych nie łączymy. Jedno okienko na prostokąt komórek wszystkich takich okienek, gdy
-    w prostokącie są tylko one i puste komórki (ESAA 9, 6, 8, 7 i pusta obok L; LKAA NU i SU obok siebie), inaczej
-    tylko ciągi jedno pod drugim w kolumnie (bez innego okienka między nimi: EDUU OSE2 i HVL2 rozdziela OSE1).
-    Połączone: granice od najwyższej górnej do najniższej dolnej, nazwa – merged_label, members – okienka w środku.
+    częstotliwość); nieobsadzonych nie łączymy. Łączymy wszystkie takie okienka, gdy w prostokącie ich komórek są
+    tylko one i puste komórki (ESAA 9, 6, 8, 7 i pusta obok L; LKAA NU i SU obok siebie), inaczej tylko ciągi jedno
+    pod drugim w kolumnie (bez innego okienka między nimi: EDUU OSE2 i HVL2 rozdziela OSE1). Połączone (_merged):
+    jeden zwykły kafelek w komórce najwyższego członka, granice od najwyższej górnej do najniższej dolnej, nazwa –
+    merged_label, members – okienka w środku.
     boxes: [{id, col, row, cols, rows, upper, lower, callsign, chain, owner, staffed, frequency, key}]."""
     groups: dict[str, list[dict]] = {}
     for b in boxes:
@@ -663,7 +667,9 @@ def merge_boxes(boxes: list[dict], occupied: dict, fir: str) -> list[dict]:
 
     def accept(members: list[dict]):
         m = _merged(members, fir)
-        taken.update(_cells_of(m))
+        cells = set().union(*(_cells_of(b) for b in members))
+        xs, ys = [x for x, _ in cells], [y for _, y in cells]
+        taken.update((x, y) for x in range(min(xs), max(xs) + 1) for y in range(min(ys), max(ys) + 1))
         done.update(b["id"] for b in members)
         out.append(m)
 
