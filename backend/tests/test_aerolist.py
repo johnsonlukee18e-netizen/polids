@@ -172,6 +172,26 @@ def test_airport_positions_order_and_online():
     assert airport_positions("LKPR", [], []) == []
 
 
+def test_airport_positions_every_controller_shown():
+    """0.13.5: stanowisko wg częstotliwości, a każdy zalogowany zostaje na karcie lotniska (jak w MAP)."""
+    known = [{"callsign": "EPWA_APP", "frequency": "128.805"}, {"callsign": "EPWA_F_APP", "frequency": "129.380"},
+             {"callsign": "EPWA_TWR", "frequency": "118.305"}]
+    ctrl = lambda cs, fq, cid: {"callsign": cs, "frequency": fq, "cid": cid, "name": f"K{cid}"}  # noqa: E731
+
+    def rows(ctrls):
+        return [(p["callsign"], p["known"], (p["online"] or {}).get("cid")) for p in airport_positions("EPWA", known, ctrls)]
+
+    # EPWA_F_APP na 128.805 obsługuje EPWA_APP; EPWA_APP na 199.998 (spoza pliku) – osobny wiersz, nie znika
+    assert rows([ctrl("EPWA_APP", "199.998", 1), ctrl("EPWA_F_APP", "128.805", 2)]) == [
+        ("EPWA_APP", True, 2), ("EPWA_APP", False, 1), ("EPWA_F_APP", True, None), ("EPWA_TWR", True, None)]
+    # obaj na 128.805: EPWA_APP ma swoje stanowisko, EPWA_F_APP zostaje w wolnym wierszu swojego znaku
+    assert rows([ctrl("EPWA_APP", "128.805", 1), ctrl("EPWA_F_APP", "128.805", 2)]) == [
+        ("EPWA_APP", True, 1), ("EPWA_F_APP", True, 2), ("EPWA_TWR", True, None)]
+    # znak spoza danych na częstotliwości zajętego stanowiska: własny wiersz
+    assert rows([ctrl("EPWA_APP", "128.805", 1), ctrl("EPWA_X_APP", "128.805", 3)]) == [
+        ("EPWA_APP", True, 1), ("EPWA_F_APP", True, None), ("EPWA_X_APP", False, 3), ("EPWA_TWR", True, None)]
+
+
 @pytest.fixture(scope="module")
 def client():
     with TestClient(main.app) as c:

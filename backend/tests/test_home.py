@@ -168,7 +168,7 @@ const api = await import(new URL("./api.mjs", process.argv[2]));
 const now = new Date("2026-10-15T12:00:00Z");
 const list = [
   { callsign: "EPWW_DBT_CTR", goto: null }, { callsign: "EPWA_APP", goto: null },
-  { callsign: "EPWA_TWR", goto: "EPWA" }, { callsign: "EPKK_TWR", goto: "EPKK" },
+  { callsign: "EPWA_TWR", goto: "EPWA" }, { callsign: "EPKK_TWR", goto: "EPKK" }, { callsign: "EPWW_DBF_CTR", goto: null },
 ];
 const on = (callsign, extra = {}) => ({ callsign, frequency: "127.025", logon_time: "2026-10-15T10:12:30Z", facility: 6, ...extra });
 const bk = (callsign, start, end, extra = {}) => ({ callsign, start, end, type: "booking", active: false, ...extra });
@@ -255,6 +255,7 @@ console.log(JSON.stringify({
   listed: [
     ["EPWW_DBT_CTR"], ["EPWW_CTR", "EPWW_DBT_CTR"], ["EPWW_CTR", null], ["EPWA__APP"], ["EPWA_GND"],
     ["EPWA_N_TWR"], ["EPKK_DEL"], ["EPGD_TWR"], ["EDDB_TWR"], [""], [null],
+    ["EPWW_DBF_CTR", "EPWW_DBT_CTR"], ["EPWW_DBF_CTR", null], ["EPWW_DBF_CTR", "EPWW_DBF_CTR"],
   ].map(([cs, alt]) => home.listedPosition(cs, list, alt)),
   initial: [
     {},
@@ -268,6 +269,7 @@ console.log(JSON.stringify({
     { list, stored: "EPWA_APP", online: [on("EPWW_CTR", { position: "EPWW_DBT_CTR" })] },
     { list, stored: "EPWA_APP", online: [on("EPWA_ATIS", { facility: 4 }), on("EPKK_OBS", { facility: 0 })] },
     { list, online: [on("EDDB_TWR")], bookings: [bk("EPWA_TWR", "2026-10-15T18:00:00+00:00", "x")] },
+    { list, stored: "EPWA_APP", online: [on("EPWW_DBF_CTR", { position: "EPWW_DBT_CTR" })] },
   ].map(home.initialPosition),
   target: [null, list[0], list[2]].map(home.sessionTarget),
   hello: home.greeting({ user: { cid: "1234567", name: "Jan Kowalski", rating: 4 } }),
@@ -323,7 +325,9 @@ def test_times_and_lines(js):
 def test_listed_position(js):
     # znak z sieci → stanowisko z listy OVERVIEW: dokładny, dopasowany przez serwer, zastępstwo "__", wieża lotniska
     assert js["listed"] == ["EPWW_DBT_CTR", "EPWW_DBT_CTR", "", "EPWA_APP", "EPWA_TWR", "EPWA_TWR", "EPKK_TWR", "", "",
-                            "", ""]
+                            "", "",
+                            # 0.13.5: wg częstotliwości – EPWW_DBF_CTR na 127.025 to DBT, choć znak DBF też jest na liście
+                            "EPWW_DBT_CTR", "EPWW_DBF_CTR", "EPWW_DBF_CTR"]
 
 
 def test_initial_position(js):
@@ -339,6 +343,8 @@ def test_initial_position(js):
         {"callsign": "EPWW_DBT_CTR", "source": "online"},
         {"callsign": "EPWA_APP", "source": "stored"},
         {"callsign": "EPWA_TWR", "source": "booking"},
+        # 0.13.5: stanowisko z częstotliwości (serwer), nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT
+        {"callsign": "EPWW_DBT_CTR", "source": "online"},
     ]
 
 

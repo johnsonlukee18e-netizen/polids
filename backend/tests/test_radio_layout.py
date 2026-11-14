@@ -215,7 +215,9 @@ def test_nobody_online_no_merge_advisory(client):
 def test_merge_eyvl_alone(client):
     d = get(client, [ctl("EYVL_CTR", "133.305", "Vilnius")])
     (b,) = boxes(d, "EYVL")
-    assert short(b) == ("L", 660, 95, 12, 3, 1, 4, "EYVL_CTR") and b["merged"] and b["frequency"] == "133.305"
+    # 0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (U), jak EYVL
+    # na zdjęciu PANDORY: 660 nad nim, 95 pod nim
+    assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR") and b["merged"] and b["frequency"] == "133.305"
     assert [m["id"] for m in b["members"]] == ["U", "M", "L", "E"]
     f = next(f for f in d["firs"] if f["fir"] == "EYVL")
     assert f["staffed"] and not f["advisory"]
@@ -223,15 +225,15 @@ def test_merge_eyvl_alone(client):
 
 
 def test_merge_lkaa(client):
-    # LKAA_U_CTR: NU i SU obok siebie (jedno stanowisko w obu) → jedno okienko U na dwie kolumny
+    # LKAA_U_CTR: NU i SU obok siebie (jedno stanowisko w obu) → jedno okienko U, zwykły kafelek w komórce NU
     d = get(client, [ctl("LKAA_U_CTR", "124.775")])
     lk = boxes(d, "LKAA")
-    assert short(lk[0]) == ("U", 660, 305, 5, 19, 2, 1, "LKAA_U_CTR")
+    assert short(lk[0]) == ("U", 660, 305, 5, 19, 1, 1, "LKAA_U_CTR")
     assert [(b["label"], b["merged"], b["owner"]) for b in lk[1:]] == [("NL", False, None), ("SL", False, None),
                                                                        ("MT", False, None)]
-    # LKAA_CTR wszędzie: jedno okienko na prostokąt z pustą komórką pod NL
+    # LKAA_CTR wszędzie (prostokąt z pustą komórką pod NL): jeden kafelek w komórce NU, 660 nad nim, 0 pod nim
     (b,) = boxes(get(client, [ctl("LKAA_CTR", "127.125")]), "LKAA")
-    assert short(b) == ("LKAA", 660, 0, 5, 19, 2, 3, "LKAA_CTR")
+    assert short(b) == ("LKAA", 660, 0, 5, 19, 1, 1, "LKAA_CTR")
     assert sorted(m["id"] for m in b["members"]) == ["MT", "NL", "NU", "SL", "SU"]
 
 
@@ -254,12 +256,13 @@ def test_stack_axes_fixed_when_merged(client):
 
 
 def test_merge_esaa(client):
-    # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 3 z pustą komórką obok L (0.13.2: L znów jest, jak w 0.13.0)
+    # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 3 z pustą komórką obok L (0.13.2: L znów jest, jak w 0.13.0) – jeden
+    # kafelek w komórce 9
     (b,) = boxes(get(client, [ctl("ESAA_CTR", "128.180")]), "ESAA")
-    assert short(b) == ("ESAA", 660, 0, 5, 5, 2, 3, "ESAA_CTR") and len(b["members"]) == 5
+    assert short(b) == ("ESAA", 660, 0, 5, 5, 1, 1, "ESAA_CTR") and len(b["members"]) == 5
     # ESMM_6 i ESMM_9: 6 obsługuje 6, 8, 7 – prostokąt z 9 w środku nie, więc tylko ciąg 6 + 7 w kolumnie F
     es = {b["label"]: b for b in boxes(get(client, [ctl("ESMM_6_CTR", "135.805"), ctl("ESMM_9_CTR", "135.985")]), "ESAA")}
-    assert short(es["6"]) == ("6", 660, 0, 6, 5, 1, 2, "ESMM_6_CTR") and es["6"]["id"] == "6+7"
+    assert short(es["6"]) == ("6", 660, 0, 6, 5, 1, 1, "ESMM_6_CTR") and es["6"]["id"] == "6+7"
     assert short(es["8"]) == ("8", 365, 195, 5, 6, 1, 1, "ESMM_6_CTR") and not es["8"]["merged"]
     assert es["9"]["owner"] == "ESMM_9_CTR" and es["L"]["owner"] is None and set(es) == {"9", "6", "8", "L"}
     # sam ESMS_APP: tylko okienko L (APP, nie łączy się z sektorami ESMM)
@@ -280,11 +283,11 @@ def test_merge_eduu_runs(client):
     assert set(ed) == {"OSE2", "OSE1", "HVL2", "HVL1"}
     assert ed["OSE2"]["owner"] == ed["HVL2"]["owner"] == "EDUU_O22_CTR" and ed["OSE1"]["owner"] is None
     assert not any(b["merged"] for b in ed.values())
-    # EDUU_H12_CTR obsługuje całe EDUU: jedno okienko na kolumnę C (puste komórki między nimi) – do HVL1 (wiersz 12),
+    # EDUU_H12_CTR obsługuje całe EDUU: jedno okienko z kolumny C (puste komórki między nimi) – do HVL1 (wiersz 12),
     # nie przez nazwę EDMM do SPE1 (dawniej 9 wierszy do wiersza 15: SPE1 było w bloku EDUU); SPE1 w bloku EDMM osobno
     d = get(client, [ctl("EDUU_H12_CTR", "128.235")])
     (b,) = boxes(d, "EDUU")
-    assert short(b) == ("HVL1", 660, 285, 3, 7, 1, 6, "EDUU_H12_CTR")
+    assert short(b) == ("HVL1", 660, 285, 3, 7, 1, 1, "EDUU_H12_CTR")
     em = {b["label"]: b for b in boxes(d, "EDMM")}
     assert (em["SPE1"]["owner"], em["SPE1"]["frequency"], em["SPE1"]["merged"]) == ("EDUU_H12_CTR", "128.235", False)
     assert em["MEI"]["owner"] is None and em["SAS"]["owner"] is None and set(em) == {"MEI", "SPE1", "SAS"}
@@ -295,7 +298,7 @@ def test_merge_edmm_with_spree(client):
     w bloku EDUU obok MEI z tą samą częstotliwością, bez łączenia; 0.13.2: SAS znów jest, jak w 0.13.0)."""
     d = get(client, [ctl("EDMM_MEI_CTR", "124.960")])
     (b,) = boxes(d, "EDMM")
-    assert short(b) == ("MEI", 660, 0, 2, 15, 2, 2, "EDMM_MEI_CTR") and b["frequency"] == "124.960"
+    assert short(b) == ("MEI", 660, 0, 2, 15, 1, 1, "EDMM_MEI_CTR") and b["frequency"] == "124.960"
     assert sorted(m["id"] for m in b["members"]) == ["MEI", "SAS", "SPE1"]
     assert all(x["owner"] is None for x in boxes(d, "EDUU"))
     f = next(f for f in d["firs"] if f["fir"] == "EDMM")
@@ -332,12 +335,18 @@ def test_box_chains_follow_sector_files(client):
 
 
 def test_merge_same_frequency(client):
-    # dwa znaki na jednej częstotliwości to jedno okienko (nazwa wg najczęstszego właściciela)
+    # dwa znaki na jednej częstotliwości to jedno okienko (nazwa wg najczęstszego właściciela); 0.13.5: EYVL_U_CTR na
+    # 133.305 to stanowisko EYVL_CTR (częstotliwość, nie znak), a EYVL_CTR na niej siedzi pod swoim znakiem
     (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "133.305"), ctl("EYVL_CTR", "133.305")]), "EYVL")
-    assert short(b) == ("L", 660, 95, 12, 3, 1, 4, "EYVL_CTR")
+    assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR")
+    # dwa różne stanowiska na jednej częstotliwości spoza pliku (każdy pod swoim znakiem): łączy je częstotliwość,
+    # nazwa wg najczęstszego właściciela (EYVL_CTR: M, L, E)
+    (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "118.000"), ctl("EYVL_CTR", "118.000")]), "EYVL")
+    assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR") and b["merged"]
+    assert [m["id"] for m in b["members"]] == ["U", "M", "L", "E"]
     # różne częstotliwości: osobno
     ey = boxes(get(client, [ctl("EYVL_U_CTR", "132.280"), ctl("EYVL_CTR", "133.305")]), "EYVL")
-    assert [short(b) for b in ey] == [("U", 660, 365, 12, 3, 1, 1, "EYVL_U_CTR"), ("L", 365, 95, 12, 4, 1, 3, "EYVL_CTR")]
+    assert [short(b) for b in ey] == [("U", 660, 365, 12, 3, 1, 1, "EYVL_U_CTR"), ("L", 365, 95, 12, 4, 1, 1, "EYVL_CTR")]
 
 
 def test_merge_pure():
@@ -353,7 +362,8 @@ def test_merge_pure():
                          occ, "XXXX")
     assert [(b["id"], b["merged"]) for b in out] == [("a", False), ("b", False), ("c", False), ("d", False)]
     out = rb.merge_boxes([bx("a", 1, 1, "X_a_CTR"), bx("c", 1, 2, "X_a_CTR"), bx("d", 1, 3, "X_a_CTR")], occ, "XXXX")
-    assert [(b["id"], b["label"], b["rows"], b["upper"], b["lower"]) for b in out] == [("a+c+d", "a", 3, 300, 0)]
+    assert [(b["id"], b["label"], b["col"], b["row"], b["cols"], b["rows"], b["upper"], b["lower"]) for b in out] == [
+        ("a+c+d", "a", 1, 1, 1, 1, 300, 0)]
     assert rb.merged_label([{"id": "NU", "callsign": "LKAA_U_CTR"}, {"id": "SU", "callsign": "LKAA_U_CTR"}],
                            "LKAA_U_CTR", "LKAA") == "U"
     assert rb.merged_label([{"id": "9", "callsign": "ESMM_9_CTR"}], "ESAA_CTR", "ESAA") == "ESAA"
@@ -370,10 +380,10 @@ def test_fir_box_owner_and_tooltip(client):
     (b,) = boxes(d, "UMMV")
     f = next(f for f in d["firs"] if f["fir"] == "UMMV")
     assert b["owner"] is None and f["advisory"] and [w["callsign"] for w in f["online"]] == ["UMBB_TWR"]
-    d = get(client, [ctl("UMMV_W_CTR", "135.700"), ctl("UMBB_TWR", "118.500")])
+    d = get(client, [ctl("UMMV_W_CTR", "124.825"), ctl("UMBB_TWR", "118.500")])
     (b,) = boxes(d, "UMMV")
     f = next(f for f in d["firs"] if f["fir"] == "UMMV")
-    assert (b["label"], b["owner"], b["frequency"]) == ("ACC", "UMMV_W_CTR", "135.700") and not f["advisory"]
+    assert (b["label"], b["owner"], b["frequency"]) == ("ACC", "UMMV_W_CTR", "124.825") and not f["advisory"]
     assert [w["callsign"] for w in f["online"]] == ["UMBB_TWR", "UMMV_W_CTR"]
     # APP Kaliningradu (tylko TMA, do FL265) nie obsadza okienka ACC 999-0 (dawniej obsadzał), ale jest w dymku FIR-u
     d = get(client, [ctl("UMKK_APP", "126.000")])

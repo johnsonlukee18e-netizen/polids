@@ -180,20 +180,24 @@ def test_simplify_line_keeps_ends_and_closed_circles():
 
 
 def test_match_positions_index_same_as_full_scan():
-    """Indeks (prefiks, typ) daje to samo, co przeglądanie całej listy stanowisk po kolei (wersja do rundy 9)."""
+    """Indeks (prefiks, typ) daje to samo, co przeglądanie całej listy stanowisk po kolei (reguły 0.13.5: najpierw
+    aktywna częstotliwość – przy kilku stanowiskach to o znaku kontrolera, inaczej pierwsze z listy – a sam znak tylko
+    bez pasującej częstotliwości; o stanowisko wygrywa częstotliwość ze znakiem, potem sama częstotliwość, potem znak)."""
     def old(controllers, positions):
         by_cs = {p.callsign: p for p in positions}
-        online = {}
+        ranked = []
         for c in controllers:
             cs, freq = c.get("callsign", ""), c.get("frequency", "")
-            if cs in by_cs:
-                online[cs] = controller_info(c)
-                continue
-            for p in positions:
-                if (p.prefix and cs.startswith(p.prefix + "_") and cs.split("_")[-1] == p.callsign.split("_")[-1]
-                        and freq[:7] == p.frequency[:7]):
-                    online.setdefault(p.callsign, controller_info(c))
-                    break
+            same = [p for p in positions
+                    if p.prefix and cs.startswith(p.prefix + "_") and cs.split("_")[-1] == p.callsign.split("_")[-1]
+                    and freq and freq[:7] == p.frequency[:7]]
+            if same:
+                ranked.append((0, cs, c) if any(p.callsign == cs for p in same) else (1, same[0].callsign, c))
+            elif cs in by_cs:
+                ranked.append((2, cs, c))
+        online = {}
+        for _, hit, c in sorted(ranked, key=lambda r: r[0]):
+            online.setdefault(hit, controller_info(c))
         return online
 
     rnd = random.Random(7)
@@ -326,11 +330,16 @@ def test_match_positions_neighbour_twin():
     r = match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555", "cid": 1},
                          {"callsign": "EKDK_UN_CTR", "frequency": "136.555", "cid": 2}], pos, prefer)
     assert r["EKDK_UN_CTR"]["cid"] == 2 and "alias_of" not in r["EKDK_UN_CTR"]
-    # EKDK_CTR zajęty przez kogoś innego (dokładny znak): drugi kontroler jest pod EKDK_UN_CTR jako osobna osoba
+    # 0.13.5: o stanowisku decyduje aktywna częstotliwość, nie znak. Na 136.555 siedzi EKDK_1_CTR, więc to on jest
+    # EKDK_CTR (i EKDK_UN_CTR dla EuroScope Danii); EKDK_CTR na 118.000 (spoza pliku) nie zajmuje żadnego stanowiska
     for feed in ([{"callsign": "EKDK_1_CTR", "frequency": "136.555", "cid": 1}, {"callsign": "EKDK_CTR", "frequency": "118.000", "cid": 2}],
                  [{"callsign": "EKDK_CTR", "frequency": "118.000", "cid": 2}, {"callsign": "EKDK_1_CTR", "frequency": "136.555", "cid": 1}]):
         r = match_positions(feed, pos, prefer)
-        assert r["EKDK_CTR"]["cid"] == 2 and r["EKDK_UN_CTR"]["cid"] == 1 and "alias_of" not in r["EKDK_UN_CTR"]
+        assert set(r) == {"EKDK_CTR", "EKDK_UN_CTR"} and r["EKDK_CTR"]["cid"] == 1
+        assert r["EKDK_UN_CTR"]["cid"] == 1 and r["EKDK_UN_CTR"]["alias_of"] == "EKDK_CTR"
+    # dokładny znak na częstotliwości innego stanowiska: stanowisko z częstotliwości (EKDK_CTR na 128.100 to EKDK_A_CTR)
+    r = match_positions([{"callsign": "EKDK_CTR", "frequency": "128.100", "cid": 3}], pos, prefer)
+    assert set(r) == {"EKDK_A_CTR"} and r["EKDK_A_CTR"]["callsign"] == "EKDK_CTR"
 
 
 def test_merge_positions_frequency_from_neighbour_file():

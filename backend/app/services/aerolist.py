@@ -287,7 +287,10 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
 
     known: stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów); controllers: data feed VATSIM
     (kontrolerzy i ATIS). Zalogowany pod znakiem spoza danych (np. EDDB_ATIS) dostaje własny wiersz.
-    Dopasowanie jak w EuroScope (match_positions): dokładny znak, potem prefiks, typ i częstotliwość."""
+    Dopasowanie jak w EuroScope (match_positions, 0.13.5): najpierw aktywna częstotliwość (prefiks, typ
+    i częstotliwość), sam znak tylko bez pasującej częstotliwości. Każdy zalogowany jest na karcie: kto nie dostał
+    stanowiska (jego stanowisko zajął ktoś na tej częstotliwości), stoi w wierszu swojego znaku, gdy ten jest wolny,
+    inaczej we własnym wierszu."""
     icao = icao.upper()
     rows: dict[str, dict] = {}
     for p in known:
@@ -298,13 +301,17 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
                         "known": True, "online": None}
     mine = [c for c in controllers if _type(c.get("callsign", ""), icao)]
     online = match_positions(mine, [_Pos(r["callsign"], icao, r["frequency"]) for r in rows.values()])
-    taken = {v["callsign"] for v in online.values()}
+    taken = {(v["callsign"], v["cid"]) for v in online.values()}
     for cs, info in online.items():
         rows[cs]["online"] = info
     for c in mine:
-        cs = c.get("callsign", "").upper()
-        if cs in taken or cs in rows:
+        if (c.get("callsign", ""), c.get("cid")) in taken:
             continue
-        rows[cs] = {"type": _type(cs, icao), "callsign": cs, "name": None, "frequency": c.get("frequency") or "",
-                    "known": False, "online": controller_info(c)}
+        cs = c.get("callsign", "").upper()
+        if cs in rows and rows[cs]["known"] and rows[cs]["online"] is None:
+            rows[cs]["online"] = controller_info(c)
+            continue
+        rows[cs if cs not in rows else f"{cs}#{c.get('cid')}"] = {
+            "type": _type(cs, icao), "callsign": cs, "name": None, "frequency": c.get("frequency") or "",
+            "known": False, "online": controller_info(c)}
     return sorted(rows.values(), key=lambda r: (TYPE_ORDER.index(r["type"]), r["callsign"]))

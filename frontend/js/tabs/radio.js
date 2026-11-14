@@ -263,8 +263,8 @@ export function boxTip(b, f, x) {
   return lines.join("\n");
 }
 // kafelek jak na zdjęciu PANDORY (stos LKAA): obsadzony – jasne pole z szarą częstotliwością tego, kto go teraz obsługuje,
-// i małym ID w prawym górnym rogu; bez nikogo – ciemne pole z samym ID; zawsze ten sam rozmiar (radio.css), połączony
-// na swoich komórkach. Granice nie na kafelku, tylko między kafelkami (markHtml) i w dymku. t: kafelek ze stackGrid
+// i małym ID w prawym górnym rogu; bez nikogo – ciemne pole z samym ID; zawsze ten sam rozmiar (radio.css), także
+// połączony (0.13.5: jedna komórka). Granice nie na kafelku, tylko między kafelkami (markHtml) i w dymku. t: kafelek ze stackGrid
 // (tory siatki strony z pageGrid)
 export function tileHtml(t, f, x) {
   const b = t.b, fq = b.owner ? b.frequency || x.freq(b.owner) : "";

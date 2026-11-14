@@ -282,36 +282,32 @@ export const ADVISORY_FQ = "122.800";
 // data/seed/radio_layout.json). Siatka CSS z kolumn i wierszy szkicu, w których stoją okienka (f.cols, f.rows
 // z /api/radio/board; bez nich – z okienek): kolumna stosu = kolumna szkicu, na przemian rząd liczb (wysokości między
 // kafelkami, k = 0..m) i rząd kafelków (m = liczba wierszy). Kolumny i wiersze tylko ze szkicu i z okienek bez łączenia
-// (połączone rozłożone na members z komórkami), więc stos nigdy nie zmienia rozmiaru: połączone okienko zajmuje te
-// kolumny i wiersze stosu, które leżą w jego prostokącie (EDUU_H12_CTR w OSE2 … HVL1, wiersze szkicu 7–12 z pustymi
-// 9 i 10: cztery rzędy kafelków jak bez łączenia, nie sześć).
-// Liczby w kolumnie i, rząd k: nad = kafelek w (i, k-1), pod = kafelek w (i, k); liczy tylko kafelek w swojej pierwszej
-// kolumnie, ten sam nad i pod = zakryte (bez liczby). Tylko pod: jego górna granica; tylko nad: jego dolna; ten sam
-// zakres (EDWW MRZ, MAR, FLG: 285-0; też dwa połączone okienka, EDUU OSE2+OSE1 nad HVL2+HVL1: 660-285): nic
-// między nimi; ta sama granica (nad.lower = pod.upper): jedna liczba; inaczej
-// dwie z kreską między nimi (nowy ciąg okienek: EDUU OSE1 285, HVL2 660). Liczby jak na szkicu i zdjęciu PANDORY (660,
-// 365, 999, 0); nad i pod połączonym okienkiem granice jego członków przy tej krawędzi (jak bez łączenia). Wysokość
-// rzędów liczb stała, z podziału bez łączenia: l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows,
+// (połączone rozłożone na members z komórkami), więc stos nigdy nie zmienia rozmiaru.
+// 0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (radioboard.py
+// _merged: komórka najwyższego członka, granice od najwyższej górnej do najniższej dolnej), jak EYVL na zdjęciu PANDORY
+// (660 / 133.305 / 95); komórki pozostałych członków zostają puste. Każdy kafelek ma więc jedną komórkę, a liczby przy
+// nim to jego własne granice.
+// Liczby w kolumnie i, rząd k: nad = kafelek w (i, k-1), pod = kafelek w (i, k). Tylko pod: jego górna granica; tylko
+// nad: jego dolna; ten sam zakres (EDWW MRZ, MAR, FLG: 285-0): nic między nimi; ta sama granica (nad.lower =
+// pod.upper): jedna liczba; inaczej dwie z kreską między nimi (nowy ciąg okienek: EDUU OSE1 285, HVL2 660). Liczby jak
+// na szkicu i zdjęciu PANDORY (660, 365, 999, 0). Wysokość rzędów liczb stała, z podziału bez łączenia: l0 bez liczb,
+// l1 jedna, l2 dwie z kreską. Gdy granice połączonego kafelka nie mieszczą się w swoim rzędzie (dwie liczby w rzędzie
+// na jedną: EDUU OSE1 + HVL2 pod OSE2, ESAA 8 + 7 nad L), przy tej krawędzi stoi granica członka z jego komórki (jak
+// bez łączenia: 365 pod OSE2, 195 nad L), więc strona nie skacze przy logowaniu (0.13.1). Wynik {ncols, nrows,
 // cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek, l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column,
 // grid-row), marks: [{gc, gr, n: [liczby], at: up | dn | sh | two}]}.
 // 0.13.2 (issue #27): ta sama siatka dla całej strony – pageGrid podaje każdemu FIR-owi wszystkie kolumny i wiersze
 // szkicu (f.cols, f.rows), więc tory stosów są torami strony, a kafelki różnych FIR-ów w jednym wierszu stoją równo.
-// Połączone okienko na kilka kolumn (przegląd 0.13.2): w dalszej kolumnie granica jego członka z tej kolumny, gdy
-// inna niż w kolumnie obok (ESAA 9+6+8+7 nad L: 195 pod 8 i 0 pod 7; EDMM MEI+SPE1: 315 i 660 nad nim)
 export function stackGrid(f) {
   const num = (v, d = 0) => (Number(v) > 0 ? Math.round(Number(v)) : d);
   const cellOf = (b) => ({ b, col: num(b?.col, 1), row: num(b?.row, 1), cols: num(b?.cols, 1), rows: num(b?.rows, 1) });
   const boxes = (Array.isArray(f?.boxes) ? f.boxes : []).map(cellOf);
-  // komórki bez łączenia: połączone okienko rozłożone na members, gdy wszyscy mają komórki w jego prostokącie (inaczej
-  // samo okienko); of = okienko na stronie, do którego należy komórka
-  const inside = (x, c) => x.col >= c.col && x.row >= c.row && x.col + x.cols <= c.col + c.cols && x.row + x.rows <= c.row + c.rows;
+  // komórki bez łączenia: połączone okienko rozłożone na members, gdy wszyscy mają komórki (inaczej samo okienko)
   const base = boxes.flatMap((c) => {
-    const ms = Array.isArray(c.b.members) ? c.b.members : [], cs = ms.map(cellOf);
-    return c.b.merged && ms.length && ms.every((x) => num(x?.col) && num(x?.row)) && cs.every((x) => inside(x, c))
-      ? cs.map((x) => ({ ...x, of: c.b })) : [{ ...c, of: c.b }];
+    const ms = Array.isArray(c.b.members) ? c.b.members : [];
+    return c.b.merged && ms.length && ms.every((x) => num(x?.col) && num(x?.row)) ? ms.map(cellOf) : [c];
   });
-  // kolumny i wiersze stosu: ze szkicu (część stała) i z komórek bez łączenia (żadne okienko nie wypada poza stos);
-  // prostokąt połączonego okienka nie dodaje pustych wierszy szkicu między członkami
+  // kolumny i wiersze stosu: ze szkicu (część stała) i z komórek bez łączenia (żadne okienko nie wypada poza stos)
   const axis = (fixed, k, s) => [...new Set([...(Array.isArray(fixed) ? fixed.map(Number).filter((v) => v > 0) : []),
     ...base.flatMap((c) => Array.from({ length: c[s] }, (_, i) => c[k] + i))])].sort((a, b) => a - b);
   const cols = axis(f?.cols, "col", "cols"), rows = axis(f?.rows, "row", "rows"), m = rows.length;
@@ -326,48 +322,35 @@ export function stackGrid(f) {
     return { occ, placed };
   };
   const up = (t) => Math.round(Number(t.b.upper) || 0), lo = (t) => Math.round(Number(t.b.lower) || 0);
-  // granice kafelka t przy jego krawędzi w wierszu r stosu (pierwszym albo ostatnim): z jego komórek bez łączenia
-  // w tym wierszu (najwyższa górna, najniższa dolna), bez nich – samo okienko. Połączone EDUU OSE1 + HVL2 (660-285):
-  // nad nim 365 (OSE1), pod nim 365 (HVL2) jak bez łączenia, nie 365/660 i 285/365 w rzędzie na jedną liczbę.
-  // 0.13.2 (issue #27): liczba stoi w pierwszej kolumnie kafelka, więc najpierw komórka z tej kolumny – ESAA 8 + 7
-  // nad L: 195 (dolna granica 8, ta sama co górna L), nie 0/195, i rząd liczb strony nie rośnie przy łączeniu
-  const rim = (t, r) => {
-    const row = st.occ.map((c) => c[r]).filter((s) => s && s.of === t.b), mine = row.filter((s) => s.c0 === t.c0);
-    const cs = mine.length ? mine : row;
-    return cs.length ? { ...t, b: { upper: Math.max(...cs.map(up)), lower: Math.min(...cs.map(lo)) } } : t;
-  };
   // {n: liczby, at: przy czym stoją}: up = górna granica kafelka pod spodem (liczba przy nim, na dole rzędu), dn = dolna
   // granica kafelka nad nią (na górze rzędu), sh = wspólna granica obu (w środku), two = dwie (dolna nad kreską,
   // górna pod nią; rząd liczb wyższy niż zwykle na stronie rozciąga się między nimi)
   const NONE = { n: [], at: "" };
-  // Dalsza kolumna połączonego okienka (0.13.2, przegląd: ESAA 9+6+8+7 nad L pokazywało 660-195, choć 7 sięga ziemi;
-  // EDMM MEI+SPE1 – 315-165 bez 660 nad SPE1): granica jego komórki bez łączenia w tej kolumnie przy krawędzi w wierszu
-  // r (f = up albo lo), gdy różni się od granicy w kolumnie przed nią (ta sama – liczba już stoi obok; 660 nad ESAA 6)
-  const cellAt = (t, r, i) => { const s = st.occ[i]?.[r]; return s && s.of === t.b ? s : null; };
-  const later = (t, r, i, f) => {
-    const s = cellAt(t, r, i);
-    if (!s) return null;
-    let p = null;
-    for (let j = i - 1; j > t.c0 && !p; j--) p = cellAt(t, r, j);
-    return f(s) === f(p || rim(t, r)) ? null : { ...t, b: { upper: up(s), lower: lo(s) } };
-  };
-  const nums = (occ, i, k, at = null) => {
+  // pick: które granice kafelka (domyślnie jego własne)
+  const nums = (occ, i, k, pick = (t) => t) => {
     const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
     if (aT && aT === bT) return NONE;
-    const a0 = aT && aT.c0 === i ? aT : null, b0 = bT && bT.c0 === i ? bT : null;
-    if (a0 && b0 && up(a0) === up(b0) && lo(a0) === lo(b0)) return NONE;
-    const a = a0 ? (at ? at(a0, k - 1) : a0) : at && aT ? later(aT, k - 1, i, lo) : null;
-    const b = b0 ? (at ? at(b0, k) : b0) : at && bT ? later(bT, k, i, up) : null;
+    // liczy tylko kafelek w swojej pierwszej kolumnie
+    const a = aT && aT.c0 === i ? pick(aT) : null, b = bT && bT.c0 === i ? pick(bT) : null;
     if (a && b) {
       return up(a) === up(b) && lo(a) === lo(b) ? NONE : lo(a) === up(b) ? { n: [up(b)], at: "sh" } : { n: [lo(a), up(b)], at: "two" };
     }
     return a ? { n: [lo(a)], at: "dn" } : b ? { n: [up(b)], at: "up" } : NONE;
   };
   const cur = grid(boxes), st = grid(base), marks = [];
-  // rząd liczb k: wysokość z podziału bez łączenia; po łączeniu liczb nie przybywa (granice członków), max – żeby
-  // żadna liczba nie wyszła poza swój rząd także przy nietypowym połączeniu
-  const now = Array.from({ length: m + 1 }, (_, k) => cols.map((_, i) => nums(cur.occ, i, k, rim)));
-  const lv = now.map((n, k) => Math.max(0, ...cols.map((_, i) => Math.max(nums(st.occ, i, k).n.length, n[i].n.length))));
+  // połączony kafelek z granicami członka, który bez łączenia stoi w jego komórce (najwyższy)
+  const own = (t) => {
+    const s = t.b.merged ? st.occ[t.c0]?.[t.r0] : null;
+    return s ? { ...t, b: { upper: up(s), lower: lo(s) } } : t;
+  };
+  // rząd liczb k: wysokość z podziału bez łączenia; za dużo liczb przy połączonym kafelku – granice członka z jego
+  // komórki; max – żeby żadna liczba nie wyszła poza swój rząd także przy nietypowym połączeniu
+  const fix = Array.from({ length: m + 1 }, (_, k) => Math.max(0, ...cols.map((_, i) => nums(st.occ, i, k).n.length)));
+  const now = fix.map((l, k) => cols.map((_, i) => {
+    const v = nums(cur.occ, i, k);
+    return v.n.length > l ? nums(cur.occ, i, k, own) : v;
+  }));
+  const lv = now.map((n, k) => Math.max(fix[k], ...n.map((v) => v.n.length)));
   now.forEach((n, k) => n.forEach((v, i) => { if (v.n.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n: v.n, at: v.at }); }));
   return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
     tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };

@@ -107,9 +107,9 @@ async def _feed() -> dict:
 
 @router.get("/online")
 async def online(db: Session = Depends(get_db)):
-    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data): najpierw dokładny znak,
-    potem jak w EuroScope (prefiks, typ i częstotliwość). `controllers`: wszyscy zalogowani z EP** i z prefiksów
-    znanych stanowisk (także ci, których nie udało się dopasować)."""
+    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data): najpierw aktywna częstotliwość
+    jak w EuroScope (prefiks, typ i częstotliwość; 0.13.5), sam znak tylko bez pasującej częstotliwości. `controllers`:
+    wszyscy zalogowani z EP** i z prefiksów znanych stanowisk (także ci, których nie udało się dopasować)."""
     data = await _feed()
     ctrls = data.get("controllers", []) + data.get("atis", [])
     merged = all_positions(db)
