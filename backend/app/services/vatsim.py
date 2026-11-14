@@ -59,36 +59,46 @@ def controller_info(c: dict) -> dict:
             "text_atis": c.get("text_atis"), "atis_code": c.get("atis_code")}
 
 
+# częstotliwość "bez stanowiska" w sieci VATSIM (obserwator, kontroler przed wybraniem stanowiska)
+NO_FREQ = "199.998"
+
+
+def active_frequency(c: dict) -> str:
+    """Aktywna częstotliwość połączenia (pierwsze 7 znaków, np. 127.025); pusta przy 199.998 i bez częstotliwości.
+
+    0.13.6 (Marek): kontroler na 199.998 to tak, jakby go nie było."""
+    f = str(c.get("frequency") or "").strip()[:7]
+    return "" if not f or f == NO_FREQ else f
+
+
 def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
     0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): najpierw aktywna
     częstotliwość, jak w EuroScope – stanowisko o tym samym prefiksie, typie (końcówce) i częstotliwości; przy kilku
-    takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF. Sam
-    dokładny znak tylko wtedy, gdy częstotliwość nie pasuje do żadnego stanowiska (199.998, spoza pliku). Dwóch
-    kontrolerów na jednym stanowisku (uczeń i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej
-    częstotliwości (w kolejności danych), na końcu po samym znaku.
+    takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF.
+    0.13.6 (Marek: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
+    częstotliwościach aktywnych poprawnych dla sektorów, nie po nazwach"): sam znak nic nie daje – kontroler na 199.998
+    albo na częstotliwości żadnego stanowiska nie obsługuje niczego. Dwóch kontrolerów na jednym stanowisku (uczeń
+    i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej częstotliwości (w kolejności danych).
     prefer: stanowiska z kolejności przejmowania sektorów sąsiadów. Kontroler dopasowany do innego stanowiska
     (np. EKDK_CTR z vacs-data) jest też wpisany pod stanowiskiem z `prefer` o tym samym prefiksie, typie
     i częstotliwości (EKDK_UN_CTR 136.555 w pliku Danii), z polem `alias_of`: tak rozpozna go EuroScope sąsiada."""
-    by_cs = {p.callsign: p for p in positions}
     # indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu całej listy
     by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
     for i, p in enumerate(positions):
         if p.prefix:
             by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
-    # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość, 2 – sam znak
+    # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość
     hits: list[tuple[int, str, dict, list]] = []
     for c in controllers:
-        cs, freq = c.get("callsign", ""), c.get("frequency", "")
+        cs, freq = c.get("callsign", ""), active_frequency(c)
         parts = cs.split("_")
         cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
-                 if freq and freq[:7] == (ip[1].frequency or "")[:7]]
+                 if freq and freq == (ip[1].frequency or "")[:7]]
         if cands:
             mine = [ip for ip in cands if ip[1].callsign == cs]
             hits.append((0, cs, c, cands) if mine else (1, min(cands, key=lambda ip: ip[0])[1].callsign, c, cands))
-        elif cs in by_cs:
-            hits.append((2, cs, c, cands))
     online: dict[str, dict] = {}
     alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
     for _, hit, c, cands in sorted(hits, key=lambda h: h[0]):
