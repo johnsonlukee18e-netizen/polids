@@ -16,11 +16,11 @@ from ..services.eptraffic import ep_traffic
 from ..services.flightplan import CALLSIGN_BAD, HOURS_DOWN, find_flight_plan, hours_pending, member_hours
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
-from ..services.positions import known_stations, online_stations
+from ..services.positions import alt_stations, known_stations, online_stations
 from ..services.route import RouteResolver
 from ..services.vatsim import (BOOKINGS_DOWN, FEED_DOWN, airport_atc, airport_traffic, bookings_by_callsign,
                                controller_info, fir_boundaries, get_bookings, get_feed, match_positions, on_frequency,
-                               online_firs, pilot_info, position_of, user_bookings, user_connections)
+                               frequency_position, online_firs, pilot_info, user_bookings, user_connections)
 
 router = APIRouter(prefix="/api/vatsim", tags=["vatsim"])
 log = logging.getLogger("polids.vatsim")
@@ -43,8 +43,10 @@ async def online(db: Session = Depends(get_db)):
     częstotliwości stanowiska z danych (on_frequency) – kto jest na 199.998 albo poza nimi, tego nie ma."""
     data = await _feed()
     ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known_stations(db))
-    positions = match_positions(ctrls, online_stations(db), nb_owners(db))
-    return {"positions": positions, "firs": online_firs(ctrls, position_of(positions)),
+    stations = online_stations(db)
+    stations += alt_stations(db, stations)   # te same stanowiska z częstotliwością z innego źródła (ETNH_TWR 122.100)
+    return {"positions": match_positions(ctrls, stations, nb_owners(db)),
+            "firs": online_firs(ctrls, frequency_position(ctrls, stations)),
             "controllers": [controller_info(c) for c in ctrls if c.get("callsign", "").startswith("EP")],
             "updated": data.get("general", {}).get("update_timestamp")}
 
@@ -63,7 +65,8 @@ async def atc(db: Session = Depends(get_db)):
         a = ads.get(icao) or pts.get(icao)
         if a:  # prefiksów spoza bazy lotnisk (np. 3-literowych z USA) nie umiemy postawić na mapie
             airports.append({"icao": icao, "name": a.name, "lat": a.lat, "lon": a.lon, "facilities": facilities})
-    firs = online_firs(ctrls, position_of(match_positions(ctrls, online_stations(db), nb_owners(db))))
+    stations = online_stations(db)
+    firs = online_firs(ctrls, frequency_position(ctrls, stations + alt_stations(db, stations)))
     return {"airports": airports, "firs": firs,
             "updated": data.get("general", {}).get("update_timestamp")}
 

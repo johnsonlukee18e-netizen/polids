@@ -91,6 +91,12 @@ def _candidates(by_key: dict, c: dict) -> list[tuple[int, object]]:
             if freq == (ip[1].frequency or "")[:7]]
 
 
+def _hit(cands: list[tuple[int, object]], c: dict) -> str:
+    """Stanowisko połączenia z kandydatów (_candidates): to o jego znaku, inaczej pierwsze z listy."""
+    cs = c.get("callsign")
+    return cs if any(ip[1].callsign == cs for ip in cands) else min(cands, key=lambda ip: ip[0])[1].callsign
+
+
 def on_frequency(conns: list[dict], positions: list) -> list[dict]:
     """Połączenia (kontrolerzy i ATIS) na częstotliwości któregoś stanowiska z danych (jak w match_positions).
 
@@ -121,10 +127,10 @@ def match_positions(controllers: list[dict], positions: list, prefer: Collection
     # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość
     hits: list[tuple[int, str, dict, list]] = []
     for c in controllers:
-        cs, cands = c.get("callsign", ""), _candidates(by_key, c)
+        cands = _candidates(by_key, c)
         if cands:
-            mine = [ip for ip in cands if ip[1].callsign == cs]
-            hits.append((0, cs, c, cands) if mine else (1, min(cands, key=lambda ip: ip[0])[1].callsign, c, cands))
+            hit = _hit(cands, c)
+            hits.append((0 if hit == c.get("callsign") else 1, hit, c, cands))
     online: dict[str, dict] = {}
     alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
     for _, hit, c, cands in sorted(hits, key=lambda h: h[0]):
@@ -194,15 +200,22 @@ def fir_boundaries() -> dict:
     return json.loads((settings.seed_dir / "vatspy_firs.geojson").read_text("utf-8"))
 
 
-def position_of(online: dict[str, dict]) -> dict[str, str]:
-    """Znak zalogowanego → stanowisko, które obsługuje (wynik match_positions bez wpisów pod drugim znakiem sąsiada)."""
-    return {info["callsign"]: cs for cs, info in online.items() if info.get("callsign") and not info.get("alias_of")}
+def frequency_position(controllers: list[dict], positions: list) -> dict[str, str]:
+    """Znak zalogowanego → stanowisko z jego częstotliwości, jak w match_positions (własny znak, inaczej pierwsze
+    z listy), także gdy to stanowisko zajął już ktoś inny (uczeń i instruktor na jednej częstotliwości)."""
+    by_key = _index(positions)
+    out = {}
+    for c in controllers:
+        if isinstance(c, dict) and (cands := _candidates(by_key, c)):
+            out[str(c.get("callsign") or "")] = _hit(cands, c)
+    return out
 
 
 def online_firs(controllers: list[dict], by_position: dict[str, str] | None = None) -> dict[str, list[dict]]:
     """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa.
-    by_position (position_of): znak → stanowisko dopasowane po częstotliwości; 0.13.6 (Marek: "nie po nazwach"):
-    granica wg stanowiska, nie znaku – EPWW_N_CTR na 133.475 (częstotliwość C) to EPWW-C, nie EPWW-N."""
+    by_position (frequency_position): znak → stanowisko z częstotliwości; 0.13.6 (Marek: "nie po nazwach"): granica
+    wg stanowiska, nie znaku – EPWW_N_CTR na 133.475 (częstotliwość C) to EPWW-C, nie EPWW-N. Stanowisko bez granicy
+    w VATSpy (EKCH_FW_CTR z vacs-data, prefiks EKDK): granica wg znaku zalogowanego (jest na poprawnej częstotliwości)."""
     data = fir_boundaries()
     prefixes = []
     for f in data["features"]:
@@ -214,12 +227,12 @@ def online_firs(controllers: list[dict], by_position: dict[str, str] | None = No
     prefixes.sort(key=lambda x: -len(x[0]))
     out: dict[str, list[dict]] = {}
     for c in controllers:
-        cs = str(c.get("callsign") or "")
-        cs = (by_position or {}).get(cs, cs)
-        if cs.split("_")[-1] not in ("CTR", "FSS"):
-            continue
-        for pre, ids in prefixes:
-            if cs == pre or cs.startswith(pre + "_"):
+        own = str(c.get("callsign") or "")
+        for cs in dict.fromkeys(((by_position or {}).get(own, own), own)):
+            if cs.split("_")[-1] not in ("CTR", "FSS"):
+                continue
+            ids = next((ids for pre, ids in prefixes if cs == pre or cs.startswith(pre + "_")), None)
+            if ids:
                 for i in ids:
                     out.setdefault(i, []).append(controller_info(c))
                 break

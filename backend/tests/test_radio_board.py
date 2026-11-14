@@ -219,10 +219,16 @@ def test_board_atis_from_aip(client, monkeypatch):
     assert (d["pos"]["EPRA_ATIS"]["frequency"], d["online"]["EPRA_ATIS"]["atis_code"]) == ("125.230", "M")
     twra = {p["icao"]: p["atis"] for p in d["plates"]["twr"]}
     assert twra["EPWA"] == ["EPWA_ATIS", "EPWA_D_ATIS"] and twra["EPRA"] == ["EPRA_ATIS"]
+    # znak stanowiska z pliku (EPWA_ATIS) na drugiej częstotliwości z AIP: w swoim wierszu, z częstotliwością z sieci
+    d = get(feed_with(("EPWA_ATIS", "123.430", "N")))
+    row = next(a for a in d["atis"] if a["callsign"] == "EPWA_ATIS")
+    assert row["online"] and not row.get("extra") and d["pos"]["EPWA_ATIS"]["frequency"] == "123.430"
+    assert d["online"]["EPWA_ATIS"]["atis_code"] == "N" and {p["icao"]: p["atis"] for p in d["plates"]["twr"]} == {
+        "EPWA": ["EPWA_ATIS"]}
     for fq in ("199.998", "121.130"):
-        d = get(feed_with(("EPWA_D_ATIS", fq, "L"), ("EPRA_ATIS", fq, "M")))
+        d = get(feed_with(("EPWA_D_ATIS", fq, "L"), ("EPRA_ATIS", fq, "M"), ("EPWA_ATIS", fq, "N")))
         assert not any(a["online"] for a in d["atis"]) and d["plates"]["twr"] == [], fq
-        assert not {"EPWA_D_ATIS", "EPRA_ATIS"} & set(d["online"]), fq
+        assert not {"EPWA_D_ATIS", "EPRA_ATIS", "EPWA_ATIS"} & set(d["online"]), fq
 
 
 def test_board_neighbour_firs(board):

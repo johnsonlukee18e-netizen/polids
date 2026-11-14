@@ -56,8 +56,11 @@ def known_stations(db: Session) -> list:
 def alt_stations(db: Session, stations: list, code: str = "") -> list:
     """Stanowiska z częstotliwością, którą znak ma w innym źródle niż to, które wygrało w all_positions (vacs-data albo
     plik .ese sąsiada; pierwszeństwo: plik EPWW, vacs-data, pliki sąsiadów – ETNH_TWR 122.100 z pliku EDWW obok
-    125.600 z vacs-data). code: tylko stanowiska lotniska (karta lotniska). Bez EP** i bez FMP/TMU, jak merge_positions."""
+    125.600 z vacs-data). Tylko znaki ze `stations` (drugie częstotliwości znanych stanowisk, nie nowe stanowiska); idą
+    na koniec listy, więc pierwszeństwo źródeł zostaje. code: tylko stanowiska lotniska (karta lotniska). Bez EP**
+    i bez FMP/TMU, jak merge_positions."""
     seen = {(s.callsign, s.prefix, (s.frequency or "")[:7]) for s in stations}
+    names = {s.callsign for s in stations}
     rows = [(v["id"], pre, v.get("frequency") or "") for v in vacs_positions()
             if v.get("facility_type") not in ("FMP", "TMU") for pre in (v.get("prefixes") or [v["id"].split("_")[0]])]
     stmt = select(NbPosition.callsign, NbPosition.prefix, NbPosition.frequency)
@@ -67,7 +70,7 @@ def alt_stations(db: Session, stations: list, code: str = "") -> list:
     out = []
     for cs, pre, fq in rows:
         if (not fq or cs.upper().startswith("EP") or facility(cs) in ("FMP", "TMU")
-                or (code and not cs.upper().startswith(code + "_")) or (cs, pre, fq[:7]) in seen):
+                or cs not in names or (code and not cs.upper().startswith(code + "_")) or (cs, pre, fq[:7]) in seen):
             continue
         seen.add((cs, pre, fq[:7]))
         out.append(Station(cs, pre, fq))
