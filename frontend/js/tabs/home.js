@@ -79,12 +79,13 @@ export function onlineText(c) {
   return `You are connected to VATSIM as ${c.callsign}${freq}${since}`;
 }
 
-// stanowisko z listy OVERVIEW dla znaku z sieci: dokładnie ten znak, stanowisko dopasowane przez serwer (`alt`, jak
-// w EuroScope), znak bez pustych członów (zastępstwo EPWA__APP), a DEL/GND/TWR/RMP lotniska to wieża z listy
+// stanowisko z listy OVERVIEW dla znaku z sieci: stanowisko dopasowane przez serwer (`alt`; od 0.13.5 wg aktywnej
+// częstotliwości, jak w EuroScope: EPWW_DBF_CTR na 127.025 to EPWW_DBT_CTR), dokładnie ten znak, znak bez pustych
+// członów (zastępstwo EPWA__APP), a DEL/GND/TWR/RMP lotniska to wieża z listy
 export function listedPosition(cs, list, alt = null) {
   const has = new Set(list.map((p) => p.callsign));
   const parts = String(cs || "").toUpperCase().split("_").filter(Boolean);
-  for (const c of [cs, alt, parts.join("_")]) if (c && has.has(c)) return c;
+  for (const c of [alt, cs, parts.join("_")]) if (c && has.has(c)) return c;
   if (parts.length >= 2 && /^(DEL|GND|TWR|RMP)$/.test(parts[parts.length - 1])) {
     const twr = list.find((p) => p.goto && p.goto === parts[0]);
     if (twr) return twr.callsign;

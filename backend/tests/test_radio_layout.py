@@ -339,6 +339,11 @@ def test_merge_same_frequency(client):
     # 133.305 to stanowisko EYVL_CTR (częstotliwość, nie znak), a EYVL_CTR na niej siedzi pod swoim znakiem
     (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "133.305"), ctl("EYVL_CTR", "133.305")]), "EYVL")
     assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR")
+    # dwa różne stanowiska na jednej częstotliwości spoza pliku (każdy pod swoim znakiem): łączy je częstotliwość,
+    # nazwa wg najczęstszego właściciela (EYVL_CTR: M, L, E)
+    (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "118.000"), ctl("EYVL_CTR", "118.000")]), "EYVL")
+    assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR") and b["merged"]
+    assert [m["id"] for m in b["members"]] == ["U", "M", "L", "E"]
     # różne częstotliwości: osobno
     ey = boxes(get(client, [ctl("EYVL_U_CTR", "132.280"), ctl("EYVL_CTR", "133.305")]), "EYVL")
     assert [short(b) for b in ey] == [("U", 660, 365, 12, 3, 1, 1, "EYVL_U_CTR"), ("L", 365, 95, 12, 4, 1, 1, "EYVL_CTR")]

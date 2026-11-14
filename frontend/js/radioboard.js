@@ -290,8 +290,10 @@ export const ADVISORY_FQ = "122.800";
 // Liczby w kolumnie i, rząd k: nad = kafelek w (i, k-1), pod = kafelek w (i, k). Tylko pod: jego górna granica; tylko
 // nad: jego dolna; ten sam zakres (EDWW MRZ, MAR, FLG: 285-0): nic między nimi; ta sama granica (nad.lower =
 // pod.upper): jedna liczba; inaczej dwie z kreską między nimi (nowy ciąg okienek: EDUU OSE1 285, HVL2 660). Liczby jak
-// na szkicu i zdjęciu PANDORY (660, 365, 999, 0). Wysokość rzędów liczb stała, z podziału bez łączenia (po łączeniu
-// liczb nie przybywa, a rząd nie maleje): l0 bez liczb, l1 jedna, l2 dwie z kreską. Wynik {ncols, nrows,
+// na szkicu i zdjęciu PANDORY (660, 365, 999, 0). Wysokość rzędów liczb stała, z podziału bez łączenia: l0 bez liczb,
+// l1 jedna, l2 dwie z kreską. Gdy granice połączonego kafelka nie mieszczą się w swoim rzędzie (dwie liczby w rzędzie
+// na jedną: EDUU OSE1 + HVL2 pod OSE2, ESAA 8 + 7 nad L), przy tej krawędzi stoi granica członka z jego komórki (jak
+// bez łączenia: 365 pod OSE2, 195 nad L), więc strona nie skacze przy logowaniu (0.13.1). Wynik {ncols, nrows,
 // cols: ["t", …], rows: ["l1", "t", …] (tory: t = kafelek, l0..l2 = rząd liczb), tiles: [{b, gc, gr}] (grid-column,
 // grid-row), marks: [{gc, gr, n: [liczby], at: up | dn | sh | two}]}.
 // 0.13.2 (issue #27): ta sama siatka dla całej strony – pageGrid podaje każdemu FIR-owi wszystkie kolumny i wiersze
@@ -324,21 +326,31 @@ export function stackGrid(f) {
   // granica kafelka nad nią (na górze rzędu), sh = wspólna granica obu (w środku), two = dwie (dolna nad kreską,
   // górna pod nią; rząd liczb wyższy niż zwykle na stronie rozciąga się między nimi)
   const NONE = { n: [], at: "" };
-  const nums = (occ, i, k) => {
+  // pick: które granice kafelka (domyślnie jego własne)
+  const nums = (occ, i, k, pick = (t) => t) => {
     const aT = k > 0 ? occ[i][k - 1] : null, bT = k < m ? occ[i][k] : null;
     if (aT && aT === bT) return NONE;
     // liczy tylko kafelek w swojej pierwszej kolumnie
-    const a = aT && aT.c0 === i ? aT : null, b = bT && bT.c0 === i ? bT : null;
+    const a = aT && aT.c0 === i ? pick(aT) : null, b = bT && bT.c0 === i ? pick(bT) : null;
     if (a && b) {
       return up(a) === up(b) && lo(a) === lo(b) ? NONE : lo(a) === up(b) ? { n: [up(b)], at: "sh" } : { n: [lo(a), up(b)], at: "two" };
     }
     return a ? { n: [lo(a)], at: "dn" } : b ? { n: [up(b)], at: "up" } : NONE;
   };
   const cur = grid(boxes), st = grid(base), marks = [];
-  // rząd liczb k: wysokość z podziału bez łączenia; max – żeby żadna liczba nie wyszła poza swój rząd także przy
-  // nietypowym połączeniu
-  const now = Array.from({ length: m + 1 }, (_, k) => cols.map((_, i) => nums(cur.occ, i, k)));
-  const lv = now.map((n, k) => Math.max(0, ...cols.map((_, i) => Math.max(nums(st.occ, i, k).n.length, n[i].n.length))));
+  // połączony kafelek z granicami członka, który bez łączenia stoi w jego komórce (najwyższy)
+  const own = (t) => {
+    const s = t.b.merged ? st.occ[t.c0]?.[t.r0] : null;
+    return s ? { ...t, b: { upper: up(s), lower: lo(s) } } : t;
+  };
+  // rząd liczb k: wysokość z podziału bez łączenia; za dużo liczb przy połączonym kafelku – granice członka z jego
+  // komórki; max – żeby żadna liczba nie wyszła poza swój rząd także przy nietypowym połączeniu
+  const fix = Array.from({ length: m + 1 }, (_, k) => Math.max(0, ...cols.map((_, i) => nums(st.occ, i, k).n.length)));
+  const now = fix.map((l, k) => cols.map((_, i) => {
+    const v = nums(cur.occ, i, k);
+    return v.n.length > l ? nums(cur.occ, i, k, own) : v;
+  }));
+  const lv = now.map((n, k) => Math.max(fix[k], ...n.map((v) => v.n.length)));
   now.forEach((n, k) => n.forEach((v, i) => { if (v.n.length) marks.push({ gc: `${i + 1}`, gr: `${2 * k + 1}`, n: v.n, at: v.at }); }));
   return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
     tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };
