@@ -79,7 +79,10 @@ export const isPosition = (c) => !/_ATIS$/i.test(c?.callsign || "") && !isObserv
 export function onlineText(c) {
   const since = utcHm(c.logon_time) ? ` since ${utcHm(c.logon_time)}` : "";
   const freq = c.frequency ? ` (${c.frequency})` : "";
-  if (/_ATIS$/i.test(c.callsign || "")) return `ATIS ${c.callsign}${freq}${since}${c.atis_code ? ` · information ${c.atis_code}` : ""}`;
+  if (/_ATIS$/i.test(c.callsign || "")) {
+    if (!onFrequency(c)) return `ATIS ${c.callsign}${freq}${since}, not on a position frequency`;
+    return `ATIS ${c.callsign}${freq}${since}${c.atis_code ? ` · information ${c.atis_code}` : ""}`;
+  }
   if (isObserver(c)) return `You are connected to VATSIM as an observer (${c.callsign})${since}`;
   if (!onFrequency(c)) return `You are connected to VATSIM as ${c.callsign}${freq}${since}, not on a position frequency`;
   return `You are connected to VATSIM as ${c.callsign}${freq}${since}`;

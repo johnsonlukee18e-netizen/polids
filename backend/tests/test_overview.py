@@ -497,7 +497,8 @@ def test_overview_tylko_na_czestotliwosci(client, monkeypatch):
         {"callsign": "EPWA_APP", "frequency": "199.998", "name": "Bez", "cid": 1},
         {"callsign": "EPWA_TWR", "frequency": "118.000", "name": "Nie swoja", "cid": 2},
         {"callsign": "EPWW_S_CTR", "frequency": "199.998", "name": "Bez", "cid": 3},
-        {"callsign": "EPKK_TWR", "frequency": "123.255", "name": "Swoja", "cid": 4}],
+        {"callsign": "EPKK_TWR", "frequency": "123.255", "name": "Swoja", "cid": 4},
+        {"callsign": None, "frequency": "127.025", "cid": 5}, "x"],   # zepsute wpisy feedu: pominięte, bez 500
         "atis": [{**FEED["atis"][0], "frequency": "199.998"}]}
 
     async def fake_feed():
@@ -512,6 +513,27 @@ def test_overview_tylko_na_czestotliwosci(client, monkeypatch):
     st = client.get("/api/aerodromes/EPWA/status").json()
     assert st["atc_online"] == [] and st["runway_in_use"]["source"] != "ATIS" and not (st.get("atis") or {}).get("letter")
     assert [c["callsign"] for c in client.get("/api/aerodromes/EPKK/status").json()["atc_online"]] == ["EPKK_TWR"]
+
+
+def test_drugi_atis_z_aip(client, monkeypatch):
+    """0.13.6: ATIS odlotowy EPWA na częstotliwości z AIP (EPWA ATIS DEP 123.430; w pliku .ese jest tylko EPWA_ATIS
+    120.455) jest poprawny – pas do startów z niego w OVERVIEW i AERODROME; ten sam ATIS na 199.998 jakby go nie było."""
+    from backend.app.routers import aerodromes
+
+    def feed_with(dep_freq):
+        return {**FEED, "controllers": [], "atis": [
+            {"callsign": "EPWA_A_ATIS", "frequency": "120.455", "atis_code": "K", "text_atis": ["RWY 33 IN USE FOR LANDING"]},
+            {"callsign": "EPWA_D_ATIS", "frequency": dep_freq, "atis_code": "L",
+             "text_atis": ["RWY 29 IN USE FOR DEPARTURE"]}]}
+
+    for fq, dep in (("123.430", "29"), ("199.998", "33")):
+        async def fake_feed(fq=fq):
+            return feed_with(fq)
+        monkeypatch.setattr(vatsim_api, "get_feed", fake_feed)
+        monkeypatch.setattr(aerodromes, "get_feed", fake_feed)
+        st = client.get("/api/aerodromes/EPWA/status").json()["runway_in_use"]
+        rw = next(a for a in client.get("/api/overview").json()["aerodromes"] if a["icao"] == "EPWA")["runway"]
+        assert (st["arr"], st["dep"], st["source"]) == ("33", dep, "ATIS") == (rw["arr"], rw["dep"], rw["source"]), fq
 
 
 def test_overview_pas_w_uzyciu_jak_aerodrome(client, monkeypatch):

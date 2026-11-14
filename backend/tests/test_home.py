@@ -273,7 +273,9 @@ console.log(JSON.stringify({
   ].map((b) => home.bookingText(b, now)),
   online: [on("EPWW_DBT_CTR"), on("EPWA_ATIS", { frequency: "120.455", facility: 4, atis_code: "K" }),
            on("EPKK_OBS", { facility: 0 }), on("EPWA_APP", { logon_time: null, frequency: "" }),
-           on("EPWW_ALL_CTR", { frequency: "199.998" }), on("EPWW_X_CTR", { frequency: "118.000", active: false })
+           on("EPWW_ALL_CTR", { frequency: "199.998" }), on("EPWW_X_CTR", { frequency: "118.000", active: false }),
+           on("EPKK_ATIS", { frequency: "199.998", facility: 4, atis_code: "B", active: false }),
+           on("EPWA_X_ATIS", { frequency: "121.130", facility: 4, atis_code: "C", active: false })
           ].map(home.onlineText),
   onFreq: [on("EPWW_DBT_CTR"), on("EPWW_DBT_CTR", { active: true }), on("EPWW_DBT_CTR", { frequency: "199.998" }),
            on("EPWW_DBT_CTR", { active: false }), on("EPKK_OBS", { facility: 0, frequency: "199.998" })]
@@ -350,7 +352,10 @@ def test_times_and_lines(js):
                             "You are connected to VATSIM as EPWA_APP",
                             # 0.13.6 (Marek: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
                             "You are connected to VATSIM as EPWW_ALL_CTR (199.998) since 10:12Z, not on a position frequency",
-                            "You are connected to VATSIM as EPWW_X_CTR (118.000) since 10:12Z, not on a position frequency"]
+                            "You are connected to VATSIM as EPWW_X_CTR (118.000) since 10:12Z, not on a position frequency",
+                            # ATIS poza częstotliwością stanowiska: bez litery (nie nadaje jako ATIS lotniska)
+                            "ATIS EPKK_ATIS (199.998) since 10:12Z, not on a position frequency",
+                            "ATIS EPWA_X_ATIS (121.130) since 10:12Z, not on a position frequency"]
     assert js["onFreq"] == [[True, True], [True, True], [False, False], [False, False], [False, False]]
     assert js["hello"] == "Welcome, Jan Kowalski (1234567)"
 

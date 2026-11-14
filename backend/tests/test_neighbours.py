@@ -144,6 +144,23 @@ def test_pack_positions_airports_and_owners():
     assert all(src.get("airports") for src in NB_SOURCES.values())
 
 
+def test_pack_positions_danish_atis_renamed():
+    """0.13.6: duński plik ma ATIS-y pod prefiksem XK (XKCH_A_ATIS), a w sieci to EKCH_A_ATIS – do nb_positions pod
+    znakiem z sieci, z prefiksem EKCH i częstotliwością z pliku (filtr on_frequency je zna)."""
+    data = {"sectors": [], "positions": [
+        {"callsign": "XKCH_A_ATIS", "name": "Copenhagen ARR ATIS", "frequency": "122.755", "position_id": "ZCA",
+         "prefix": "XKCH"},
+        {"callsign": "EKCH_A_TWR", "name": "Kastrup Tower", "frequency": "118.105", "position_id": "CT", "prefix": "EKCH"}]}
+    got = {p["callsign"]: (p["prefix"], p["frequency"]) for p in pack_positions(data, "EKDK")}
+    assert got == {"EKCH_A_ATIS": ("EKCH", "122.755"), "EKCH_A_TWR": ("EKCH", "118.105")}
+    assert {p["callsign"] for p in pack_positions(data, "LKAA")} == set()   # rename tylko w pakiecie EKDK
+    path = DATA_DIR / "import" / "neighbours" / "EKDK.ese"
+    real = {p["callsign"]: p for p in pack_positions(parse_ese(read_text(path)), "EKDK")}
+    assert not [cs for cs in real if cs.startswith("XK")]
+    assert (real["EKCH_A_ATIS"]["prefix"], real["EKCH_A_ATIS"]["frequency"]) == ("EKCH", "122.755")
+    assert (real["EKCH_D_ATIS"]["prefix"], real["EKCH_D_ATIS"]["frequency"]) == ("EKCH", "122.855")
+
+
 def test_select_sectors_outside_region_and_above_fl660():
     text = NB_TEXT.replace("N050.00.00.000:E015", "N040.00.00.000:E005").replace("N051.00.00.000:E015", "N041.00.00.000:E005")
     text = text.replace("N050.00.00.000:E016", "N040.00.00.000:E006").replace("N051.00.00.000:E016", "N041.00.00.000:E006")

@@ -191,6 +191,8 @@ zapamiętanego stanu.
   wcale: kontroler albo ATIS na 199.998 albo na częstotliwości, której nie ma żadne stanowisko z danych (plik `.ese` EPWW,
   vacs-data, pliki `.ese` sąsiadów), jest pomijany, jakby go nie było (`services/vatsim.py` `on_frequency`). Dotyczy
   RADIO, MAP, AERODROME (z OVERVIEW i kartami lotnisk) i HOME; nowe stanowisko trzeba najpierw dopisać do danych.
+  Do filtra liczą się też ATIS-y polskich lotnisk z AIP (`data/seed/frequencies.csv`, np. EPWA ATIS DEP 123.430, którego
+  plik `.ese` nie ma), a duńskie ATIS-y z pliku EKDK (XKCH_A_ATIS) importer zapisuje pod znakami z sieci (EKCH_A_ATIS).
 - Sektory sąsiadów: z każdego pliku tylko FIR-y tego vACC (z ukraińskiego tylko Lwów), sektory zależne od pasa w jednym układzie
   na lotnisko (kierunek najbliższy wiatrowi z ok. 250°), granice uproszczone o ok. 100 m, Białoruś (UMMV) z kopii w pliku EPWW.
   Zasięg stanowisk bez sektora w żadnym pliku jest przybliżony (VATSpy albo okrąg 30/10 NM).

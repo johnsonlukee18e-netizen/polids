@@ -83,7 +83,7 @@ def _index(positions: list) -> dict[tuple[str, str], list[tuple[int, object]]]:
 def _candidates(by_key: dict, c: dict) -> list[tuple[int, object]]:
     """Stanowiska, które połączenie obsługuje jak w EuroScope: prefiks znaku (EPWA, EPWA_N…), ten sam typ (końcówka)
     i ta sama aktywna częstotliwość; bez aktywnej częstotliwości (199.998) – żadne."""
-    cs, freq = c.get("callsign", ""), active_frequency(c)
+    cs, freq = str(c.get("callsign") or "").upper(), active_frequency(c)
     if not freq:
         return []
     parts = cs.split("_")

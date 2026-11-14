@@ -152,7 +152,8 @@ async def status(icao: str, db: Session = Depends(get_db)):
         feed = await get_feed()
         # 0.13.6 (Marek): tylko na częstotliwości stanowiska z danych – ATC i ATIS na 199.998 jakby ich nie było
         stations = feed.get("controllers", []) + feed.get("atis", [])
-        mine = on_frequency([c for c in stations if c.get("callsign", "").startswith(ad.icao + "_")], known_stations(db))
+        mine = on_frequency([c for c in stations if isinstance(c, dict)
+                             and str(c.get("callsign") or "").startswith(ad.icao + "_")], known_stations(db))
         atc = [controller_info(c) for c in mine if not c["callsign"].endswith("_ATIS")]
         atis = atis_state(mine, ad.icao, [r["designator"] for r in rwys])
     except (UpstreamError, ValueError):

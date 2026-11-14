@@ -138,18 +138,28 @@ def test_online_only_on_position_frequency(client, monkeypatch):
         {"callsign": "EDWW_EMS_CTR", "frequency": "199.998", "name": "Sasiad bez", "cid": 4},
         {"callsign": "KZNY_CTR", "frequency": "125.000", "name": "Daleko", "cid": 5}],
         "atis": [{"callsign": "EPKK_ATIS", "frequency": "199.998", "cid": 6, "atis_code": "A"},
-                 {"callsign": "EPGD_ATIS", "frequency": "129.630", "cid": 7, "atis_code": "B"}]}
+                 {"callsign": "EPGD_ATIS", "frequency": "129.630", "cid": 7, "atis_code": "B"},
+                 # drugi ATIS z AIP (EPWA ATIS DEP 123.430; w pliku .ese go nie ma) i ten sam znak poza AIP
+                 {"callsign": "EPWA_D_ATIS", "frequency": "123.430", "cid": 8, "atis_code": "C"},
+                 {"callsign": "EPWA_X_ATIS", "frequency": "121.130", "cid": 9, "atis_code": "D"},
+                 # duński ATIS: w pliku EKDK jako XKCH_A_ATIS 122.755, w sieci EKCH_A_ATIS
+                 {"callsign": "EKCH_A_ATIS", "frequency": "122.755", "cid": 10, "atis_code": "E"},
+                 {"callsign": None, "frequency": "127.025", "cid": 11}]}
 
     async def other():
         return feed
     monkeypatch.setattr(vatsim_api, "get_feed", other)
-    ok = {"EPWA_APP", "EPGD_ATIS"}
+    gone = {"EPWA_TWR", "EPWW_N_CTR", "EDWW_EMS_CTR", "KZNY_CTR", "EPKK_ATIS", "EPWA_X_ATIS"}
     for url in ("/api/radio/online", "/api/vatsim/online"):
         on = client.get(url).json()
-        assert set(on["positions"]) == ok, url
-        assert {c["callsign"] for c in on["controllers"]} == ok and on["firs"] == {}, url
+        assert set(on["positions"]) == {"EPWA_APP", "EPGD_ATIS"}, url  # EPWA_D_ATIS: nie stanowisko z pliku .ese
+        cs = {c["callsign"] for c in on["controllers"]}
+        assert {"EPWA_APP", "EPGD_ATIS", "EPWA_D_ATIS"} <= cs and not cs & gone and on["firs"] == {}, url
     atc = client.get("/api/vatsim/atc").json()
-    assert {a["icao"]: sorted(a["facilities"]) for a in atc["airports"]} == {"EPGD": ["ATIS"], "EPWA": ["APP"]}
+    assert {a["icao"]: sorted(a["facilities"]) for a in atc["airports"]} == {
+        "EKCH": ["ATIS"], "EPGD": ["ATIS"], "EPWA": ["APP", "ATIS"]}
+    assert [c["callsign"] for c in next(a for a in atc["airports"] if a["icao"] == "EPWA")["facilities"]["ATIS"]] == [
+        "EPWA_D_ATIS"]
     assert atc["firs"] == {}
 
 

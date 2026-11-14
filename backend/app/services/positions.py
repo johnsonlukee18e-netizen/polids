@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import Aerodrome, AtcPosition, NavPoint
+from ..models import Aerodrome, AtcPosition, Frequency, NavPoint
 from .neighbours import listed_callsigns, nb_owners, nb_positions
 from .radio import INFO_MID, Station, merge_positions, neighbour_tab
 from .vatsim import match_positions
@@ -41,8 +41,13 @@ def online_stations(db: Session, positions: list[dict] | None = None) -> list:
 
 def known_stations(db: Session) -> list:
     """Wszystkie stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów razem ze stanowiskami lotnisk bez
-    sektora): do filtra on_frequency – zalogowany liczy się tylko na częstotliwości któregoś z nich (0.13.6)."""
-    return online_stations(db, all_positions(db, airports=True))
+    sektora): do filtra on_frequency – zalogowany liczy się tylko na częstotliwości któregoś z nich (0.13.6). Do tego
+    ATIS-y polskich lotnisk z AIP (data/seed/frequencies.csv): plik .ese ma jeden ATIS na lotnisko, a AIP także drugi,
+    np. EPWA ATIS DEP 123.430 – EPWA_D_ATIS na nim to poprawna częstotliwość (pas startowy w AERODROME i OVERVIEW).
+    Tylko do filtra: stanowisk na tablicy RADIO i w kolejności przejmowania to nie dodaje."""
+    aip = [Station(f"{f.aerodrome_icao}_ATIS", f.aerodrome_icao, f.mhz or "")
+           for f in db.scalars(select(Frequency).where(Frequency.kind == "ATIS"))]
+    return online_stations(db, all_positions(db, airports=True)) + aip
 
 
 def sim_twins(stations: list, prefer: Collection[str]) -> dict[str, str]:
