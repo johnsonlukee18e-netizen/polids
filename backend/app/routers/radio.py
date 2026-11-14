@@ -21,10 +21,11 @@ from ..services.viff import sectors as viff_sectors
 from ..services.weather import get_metars
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
-from ..services.positions import all_positions
+from ..services.positions import all_positions, known_stations
 from ..services.radio import (Station, neighbour_tab, position_range, radio_names, sector_group, sector_kind,
                               seed_json)
-from ..services.vatsim import BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
+from ..services.vatsim import (BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions,
+                               on_frequency, online_firs)
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
@@ -107,11 +108,12 @@ async def _feed() -> dict:
 
 @router.get("/online")
 async def online(db: Session = Depends(get_db)):
-    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data): najpierw aktywna częstotliwość
-    jak w EuroScope (prefiks, typ i częstotliwość; 0.13.5), sam znak tylko bez pasującej częstotliwości. `controllers`:
-    wszyscy zalogowani z EP** i z prefiksów znanych stanowisk (także ci, których nie udało się dopasować)."""
+    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data) po aktywnej częstotliwości jak
+    w EuroScope (prefiks, typ i częstotliwość; 0.13.5). 0.13.6: tylko połączenia na częstotliwości stanowiska z danych
+    (on_frequency) – sam znak nic nie daje, 199.998 to brak kontrolera. `controllers`: ci z nich z EP** i z prefiksów
+    znanych stanowisk."""
     data = await _feed()
-    ctrls = data.get("controllers", []) + data.get("atis", [])
+    ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), await run_in_threadpool(known_stations, db))
     merged = all_positions(db)
     stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
     prefixes = {p["callsign"].split("_")[0] for p in merged}
@@ -264,10 +266,10 @@ def _build_static(db: Session, positions: dict) -> dict:
                                    nb_chains=nb_chains, layout=layout)
 
 
-def _board_data(db: Session) -> tuple[list[dict], dict, dict, set]:
+def _board_data(db: Session) -> tuple[list[dict], dict, dict, set, list]:
     merged = all_positions(db)
     positions = {p["callsign"]: p for p in merged}
-    return merged, positions, _board_static(db, positions), nb_owners(db)
+    return merged, positions, _board_static(db, positions), nb_owners(db), known_stations(db)
 
 
 # Dodatki tablicy z innych serwisów: METAR Berlina (BERLIN bez ATIS) i sektory vIFF (czerwone tło). Każdy czeka
@@ -338,15 +340,16 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     i FIS online → id kształtów TMA/CTA i FIS, które teraz obsługuje: granica sumy na LOW) i `acc_short` (skróty
     stanowisk ACC na plakietkach). Od 0.13.2 bez geometrii sąsiadów (`nb`): jedyne zagraniczne granice to FIR-y."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
-    merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
+    merged, positions, static, prefer, known = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}
-    online, feed_atis, ctrls = {}, [], []
+    online, ctrls = {}, []
     try:
         data = await vatsim_api.get_feed()
-        ctrls = data.get("controllers", []) + data.get("atis", [])
+        # 0.13.6: tylko połączenia na częstotliwości stanowiska z danych (199.998 i inne – jakby ich nie było); także
+        # ATIS EDDB do BERLIN
+        ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known)
         stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
         online = match_positions(ctrls, stations, prefer)
-        feed_atis = data.get("atis", [])
         net["updated"] = data.get("general", {}).get("update_timestamp")
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)
@@ -369,7 +372,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             flow = {"ok": True, **radioboard.flow_alerts(tvs, now, [s["id"] for s in static["sectors"]], static["tma"])}
         except Exception as exc:  # noqa: BLE001 - dane vIFF bez opisu: każdy błąd to brak czerwonego tła
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
-    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
+    out = radioboard.board(static, online, positions, net_ok=net["ok"], berlin=berlin, flow=flow)
     out["net"] = net
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego

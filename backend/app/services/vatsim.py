@@ -71,6 +71,39 @@ def active_frequency(c: dict) -> str:
     return "" if not f or f == NO_FREQ else f
 
 
+def _index(positions: list) -> dict[tuple[str, str], list[tuple[int, object]]]:
+    """Indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu listy."""
+    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
+    for i, p in enumerate(positions):
+        if p.prefix:
+            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
+    return by_key
+
+
+def _candidates(by_key: dict, c: dict) -> list[tuple[int, object]]:
+    """Stanowiska, które połączenie obsługuje jak w EuroScope: prefiks znaku (EPWA, EPWA_N…), ten sam typ (końcówka)
+    i ta sama aktywna częstotliwość; bez aktywnej częstotliwości (199.998) – żadne."""
+    cs, freq = c.get("callsign", ""), active_frequency(c)
+    if not freq:
+        return []
+    parts = cs.split("_")
+    return [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
+            if freq == (ip[1].frequency or "")[:7]]
+
+
+def on_frequency(conns: list[dict], positions: list) -> list[dict]:
+    """Połączenia (kontrolerzy i ATIS) na częstotliwości któregoś stanowiska z danych (jak w match_positions).
+
+    0.13.6 (Marek: "wyświetlaj tylko kontrolerów po częstotliwościach aktywnych poprawnych dla sektorów, nie po
+    nazwach"): pozostałych – na 199.998, na częstotliwości spoza danych albo cudzej – aplikacja nie pokazuje nigdzie,
+    jakby ich nie było. positions: obiekty z callsign, prefix i frequency (AtcPosition, Station). Lista innego kształtu
+    (null, napis z zepsutego feedu) to brak połączeń."""
+    if not isinstance(conns, list):
+        return []
+    by_key = _index(positions)
+    return [c for c in conns if isinstance(c, dict) and _candidates(by_key, c)]
+
+
 def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
@@ -84,18 +117,11 @@ def match_positions(controllers: list[dict], positions: list, prefer: Collection
     prefer: stanowiska z kolejności przejmowania sektorów sąsiadów. Kontroler dopasowany do innego stanowiska
     (np. EKDK_CTR z vacs-data) jest też wpisany pod stanowiskiem z `prefer` o tym samym prefiksie, typie
     i częstotliwości (EKDK_UN_CTR 136.555 w pliku Danii), z polem `alias_of`: tak rozpozna go EuroScope sąsiada."""
-    # indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu całej listy
-    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
-    for i, p in enumerate(positions):
-        if p.prefix:
-            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
+    by_key = _index(positions)
     # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość
     hits: list[tuple[int, str, dict, list]] = []
     for c in controllers:
-        cs, freq = c.get("callsign", ""), active_frequency(c)
-        parts = cs.split("_")
-        cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
-                 if freq and freq == (ip[1].frequency or "")[:7]]
+        cs, cands = c.get("callsign", ""), _candidates(by_key, c)
         if cands:
             mine = [ip for ip in cands if ip[1].callsign == cs]
             hits.append((0, cs, c, cands) if mine else (1, min(cands, key=lambda ip: ip[0])[1].callsign, c, cands))

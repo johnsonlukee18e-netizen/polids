@@ -108,8 +108,29 @@ def test_vatsim_me_logged_in(client, monkeypatch):
     # EPWW_CTR na 127.025 to EPWW_DBT_CTR z pliku .ese (jak w EuroScope); ATIS EPWA też jest w .ese
     assert [(c["callsign"], c["position"]) for c in d["online"]] == [("EPWW_CTR", "EPWW_DBT_CTR"), ("EPKK_OBS", None),
                                                                      ("EPWA_ATIS", "EPWA_ATIS")]
+    assert [c["active"] for c in d["online"]] == [True, False, True]
     assert d["online"][0]["logon_time"].startswith("2026-10-15T10:12") and d["online"][0]["rating"] == 4
     assert [b["callsign"] for b in d["bookings"]] == ["EDDB_TWR", "EPWA_TWR"]
+
+
+def test_vatsim_me_active_frequency(client, monkeypatch):
+    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): połączenie na 199.998 albo na
+    częstotliwości, której nie ma stanowisko z danych, nie ma stanowiska i ma active: false (HOME pisze je osobno)."""
+    _login(client, monkeypatch)
+    me = int(CID)
+    feed = {**FEED, "controllers": [
+        {"cid": me, "callsign": "EPWW_N_CTR", "frequency": "199.998", "facility": 6, "logon_time": "2026-10-15T10:00:00Z"},
+        {"cid": me, "callsign": "EPWA_TWR", "frequency": "118.000", "facility": 4, "logon_time": "2026-10-15T10:01:00Z"},
+        {"cid": me, "callsign": "EPWA_APP", "frequency": "128.805", "facility": 5, "logon_time": "2026-10-15T10:02:00Z"}],
+        "atis": [{"cid": me, "callsign": "EPKK_ATIS", "frequency": "199.998", "facility": 4,
+                  "logon_time": "2026-10-15T10:03:00Z"}]}
+
+    async def other():
+        return feed
+    monkeypatch.setattr(vatsim_api, "get_feed", other)
+    d = client.get("/api/vatsim/me").json()
+    assert [(c["callsign"], c["position"], c["active"]) for c in d["online"]] == [
+        ("EPWW_N_CTR", None, False), ("EPWA_TWR", None, False), ("EPWA_APP", "EPWA_APP", True), ("EPKK_ATIS", None, False)]
 
 
 def test_vatsim_me_upstream_errors(client, monkeypatch):
@@ -251,7 +272,12 @@ console.log(JSON.stringify({
     bk("EDDB_TWR", "2026-10-15T11:00:00+00:00", "2026-10-15T13:00:00+00:00", { type: "event", active: true }),
   ].map((b) => home.bookingText(b, now)),
   online: [on("EPWW_DBT_CTR"), on("EPWA_ATIS", { frequency: "120.455", facility: 4, atis_code: "K" }),
-           on("EPKK_OBS", { facility: 0 }), on("EPWA_APP", { logon_time: null, frequency: "" })].map(home.onlineText),
+           on("EPKK_OBS", { facility: 0 }), on("EPWA_APP", { logon_time: null, frequency: "" }),
+           on("EPWW_ALL_CTR", { frequency: "199.998" }), on("EPWW_X_CTR", { frequency: "118.000", active: false })
+          ].map(home.onlineText),
+  onFreq: [on("EPWW_DBT_CTR"), on("EPWW_DBT_CTR", { active: true }), on("EPWW_DBT_CTR", { frequency: "199.998" }),
+           on("EPWW_DBT_CTR", { active: false }), on("EPKK_OBS", { facility: 0, frequency: "199.998" })]
+    .map((c) => [home.onFrequency(c), home.isPosition(c)]),
   listed: [
     ["EPWW_DBT_CTR"], ["EPWW_CTR", "EPWW_DBT_CTR"], ["EPWW_CTR", null], ["EPWA__APP"], ["EPWA_GND"],
     ["EPWA_N_TWR"], ["EPKK_DEL"], ["EPGD_TWR"], ["EDDB_TWR"], [""], [null],
@@ -270,6 +296,9 @@ console.log(JSON.stringify({
     { list, stored: "EPWA_APP", online: [on("EPWA_ATIS", { facility: 4 }), on("EPKK_OBS", { facility: 0 })] },
     { list, online: [on("EDDB_TWR")], bookings: [bk("EPWA_TWR", "2026-10-15T18:00:00+00:00", "x")] },
     { list, stored: "EPWA_APP", online: [on("EPWW_DBF_CTR", { position: "EPWW_DBT_CTR" })] },
+    { list, stored: "EPWA_APP", online: [on("EPWW_DBT_CTR", { frequency: "199.998", position: "EPWW_DBT_CTR" })] },
+    { list, stored: "EPWA_APP", online: [on("EPWW_DBT_CTR", { active: false, position: "EPWW_DBT_CTR" })] },
+    { list, stored: "EPWA_APP", online: [on("EPWA_TWR", { frequency: "118.000" })] },
   ].map(home.initialPosition),
   target: [null, list[0], list[2]].map(home.sessionTarget),
   hello: home.greeting({ user: { cid: "1234567", name: "Jan Kowalski", rating: 4 } }),
@@ -318,7 +347,11 @@ def test_times_and_lines(js):
     assert js["online"] == ["You are connected to VATSIM as EPWW_DBT_CTR (127.025) since 10:12Z",
                             "ATIS EPWA_ATIS (120.455) since 10:12Z · information K",
                             "You are connected to VATSIM as an observer (EPKK_OBS) since 10:12Z",
-                            "You are connected to VATSIM as EPWA_APP"]
+                            "You are connected to VATSIM as EPWA_APP",
+                            # 0.13.6 (Marek: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
+                            "You are connected to VATSIM as EPWW_ALL_CTR (199.998) since 10:12Z, not on a position frequency",
+                            "You are connected to VATSIM as EPWW_X_CTR (118.000) since 10:12Z, not on a position frequency"]
+    assert js["onFreq"] == [[True, True], [True, True], [False, False], [False, False], [False, False]]
     assert js["hello"] == "Welcome, Jan Kowalski (1234567)"
 
 
@@ -345,6 +378,11 @@ def test_initial_position(js):
         {"callsign": "EPWA_TWR", "source": "booking"},
         # 0.13.5: stanowisko z częstotliwości (serwer), nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT
         {"callsign": "EPWW_DBT_CTR", "source": "online"},
+        # 0.13.6: na 199.998, poza częstotliwością stanowiska (active: false) albo bez stanowiska od serwera (sam znak
+        # z listy) – jak bez połączenia
+        {"callsign": "EPWA_APP", "source": "stored"},
+        {"callsign": "EPWA_APP", "source": "stored"},
+        {"callsign": "EPWA_APP", "source": "stored"},
     ]
 
 

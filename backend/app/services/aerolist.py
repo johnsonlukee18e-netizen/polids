@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from ..models import Aerodrome, NavPoint
 from .positions import all_positions
 from .radio import INFO_MID
-from .vatsim import FACILITY_TYPES, controller_info, fir_boundaries, match_positions
+from .vatsim import FACILITY_TYPES, fir_boundaries, match_positions
 
 # kolejność podzakładek AERODROME (po "()" = OVERVIEW, w adresie "0")
 FIR_KEYS = ("EPWW", "ESAA", "ED", "ET", "LKAA", "LZBB", "UMKK", "EYVL", "UMMV", "UKLV")
@@ -286,11 +286,9 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
     """Stanowiska lotniska w kolejności APP, TWR, GND, DEL, ATIS (w grupie alfabetycznie) ze stanem online.
 
     known: stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów); controllers: data feed VATSIM
-    (kontrolerzy i ATIS). Zalogowany pod znakiem spoza danych (np. EDDB_ATIS) dostaje własny wiersz.
-    Dopasowanie jak w EuroScope (match_positions, 0.13.5): najpierw aktywna częstotliwość (prefiks, typ
-    i częstotliwość), sam znak tylko bez pasującej częstotliwości. Każdy zalogowany jest na karcie: kto nie dostał
-    stanowiska (jego stanowisko zajął ktoś na tej częstotliwości), stoi w wierszu swojego znaku, gdy ten jest wolny,
-    inaczej we własnym wierszu."""
+    (kontrolerzy i ATIS). Dopasowanie jak w EuroScope (match_positions, 0.13.5): prefiks, typ i aktywna częstotliwość.
+    0.13.6 (Marek: "nie po nazwach"): na karcie tylko zalogowani na częstotliwości stanowiska tego lotniska; na
+    199.998, na częstotliwości spoza danych albo drugi na zajętym stanowisku – jakby ich nie było."""
     icao = icao.upper()
     rows: dict[str, dict] = {}
     for p in known:
@@ -301,17 +299,6 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict]) -> 
                         "known": True, "online": None}
     mine = [c for c in controllers if _type(c.get("callsign", ""), icao)]
     online = match_positions(mine, [_Pos(r["callsign"], icao, r["frequency"]) for r in rows.values()])
-    taken = {(v["callsign"], v["cid"]) for v in online.values()}
     for cs, info in online.items():
         rows[cs]["online"] = info
-    for c in mine:
-        if (c.get("callsign", ""), c.get("cid")) in taken:
-            continue
-        cs = c.get("callsign", "").upper()
-        if cs in rows and rows[cs]["known"] and rows[cs]["online"] is None:
-            rows[cs]["online"] = controller_info(c)
-            continue
-        rows[cs if cs not in rows else f"{cs}#{c.get('cid')}"] = {
-            "type": _type(cs, icao), "callsign": cs, "name": None, "frequency": c.get("frequency") or "",
-            "known": False, "online": controller_info(c)}
     return sorted(rows.values(), key=lambda r: (TYPE_ORDER.index(r["type"]), r["callsign"]))

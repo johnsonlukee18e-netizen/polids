@@ -127,6 +127,32 @@ def test_radio_online_matches_vacs_positions(client):
     assert on["firs"]["EDWW-EMS"][0]["name"] == "Tylko VACS"
 
 
+def test_online_only_on_position_frequency(client, monkeypatch):
+    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo. wyswietlaj tylko kontrolerow po
+    czestotliwosciach aktywnych poprawnych dla sektorow, nie po nazwach"): /api/radio/online, /api/vatsim/online
+    i /api/vatsim/atc (MAP) pokazują tylko połączenia na częstotliwości stanowiska z danych – znak nie wystarcza."""
+    feed = {"general": {}, "pilots": [], "controllers": [
+        {"callsign": "EPWA_APP", "frequency": "128.805", "name": "Na swojej", "cid": 1},
+        {"callsign": "EPWA_TWR", "frequency": "118.000", "name": "Nie swoja", "cid": 2},       # EPWA_TWR to 118.305
+        {"callsign": "EPWW_N_CTR", "frequency": "199.998", "name": "Bez", "cid": 3},
+        {"callsign": "EDWW_EMS_CTR", "frequency": "199.998", "name": "Sasiad bez", "cid": 4},
+        {"callsign": "KZNY_CTR", "frequency": "125.000", "name": "Daleko", "cid": 5}],
+        "atis": [{"callsign": "EPKK_ATIS", "frequency": "199.998", "cid": 6, "atis_code": "A"},
+                 {"callsign": "EPGD_ATIS", "frequency": "129.630", "cid": 7, "atis_code": "B"}]}
+
+    async def other():
+        return feed
+    monkeypatch.setattr(vatsim_api, "get_feed", other)
+    ok = {"EPWA_APP", "EPGD_ATIS"}
+    for url in ("/api/radio/online", "/api/vatsim/online"):
+        on = client.get(url).json()
+        assert set(on["positions"]) == ok, url
+        assert {c["callsign"] for c in on["controllers"]} == ok and on["firs"] == {}, url
+    atc = client.get("/api/vatsim/atc").json()
+    assert {a["icao"]: sorted(a["facilities"]) for a in atc["airports"]} == {"EPGD": ["ATIS"], "EPWA": ["APP"]}
+    assert atc["firs"] == {}
+
+
 def test_radio_online_upstream_error(client, monkeypatch):
     async def down():
         raise UpstreamError("timeout")

@@ -16,11 +16,11 @@ from ..services import viff as viff_service
 from ..services.aerolist import FIR_KEYS, FIR_LABELS, airport_entry, airport_positions, fir_key, fir_lists
 from ..services.http_cache import UpstreamError
 from ..services.lvp import evaluate as evaluate_lvp
-from ..services.positions import all_positions
+from ..services.positions import all_positions, known_stations
 from ..services.metar import parse_metar, qfe_from_qnh
 from ..services.procedures import procedures, strip_board
 from ..services.runways import atis_state, config_now, runway_in_use, runway_state
-from ..services.vatsim import airport_traffic, controller_info, get_feed
+from ..services.vatsim import airport_traffic, controller_info, get_feed, on_frequency
 from ..services.weather import get_metars, get_tafs
 from ..services.sun import sun_times
 
@@ -150,8 +150,9 @@ async def status(icao: str, db: Session = Depends(get_db)):
     atc, atis, net_error = [], None, None
     try:
         feed = await get_feed()
+        # 0.13.6 (Marek): tylko na częstotliwości stanowiska z danych – ATC i ATIS na 199.998 jakby ich nie było
         stations = feed.get("controllers", []) + feed.get("atis", [])
-        mine = [c for c in stations if c.get("callsign", "").startswith(ad.icao + "_")]
+        mine = on_frequency([c for c in stations if c.get("callsign", "").startswith(ad.icao + "_")], known_stations(db))
         atc = [controller_info(c) for c in mine if not c["callsign"].endswith("_ATIS")]
         atis = atis_state(mine, ad.icao, [r["designator"] for r in rwys])
     except (UpstreamError, ValueError):

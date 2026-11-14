@@ -17,7 +17,7 @@ from backend.app.importers.sct import read_text
 from backend.app.models import AtcPosition, NbPosition, NbSector, Sector
 from backend.app.routers.nav import slices
 from backend.app.services.neighbours import nb_positions
-from backend.app.services.vatsim import controller_info, match_positions
+from backend.app.services.vatsim import controller_info, match_positions, on_frequency
 
 NB_DIR = DATA_DIR / "import" / "neighbours"
 
@@ -180,21 +180,19 @@ def test_simplify_line_keeps_ends_and_closed_circles():
 
 
 def test_match_positions_index_same_as_full_scan():
-    """Indeks (prefiks, typ) daje to samo, co przeglądanie całej listy stanowisk po kolei (reguły 0.13.5: najpierw
-    aktywna częstotliwość – przy kilku stanowiskach to o znaku kontrolera, inaczej pierwsze z listy – a sam znak tylko
-    bez pasującej częstotliwości; o stanowisko wygrywa częstotliwość ze znakiem, potem sama częstotliwość, potem znak)."""
+    """Indeks (prefiks, typ) daje to samo, co przeglądanie całej listy stanowisk po kolei (reguły 0.13.5: aktywna
+    częstotliwość – przy kilku stanowiskach to o znaku kontrolera, inaczej pierwsze z listy; o stanowisko wygrywa
+    częstotliwość ze znakiem, potem sama częstotliwość). 0.13.6: sam znak nic nie daje, 199.998 to brak częstotliwości
+    (także gdy stanowisko w pliku ma 199.998, jak FMP)."""
     def old(controllers, positions):
-        by_cs = {p.callsign: p for p in positions}
         ranked = []
         for c in controllers:
             cs, freq = c.get("callsign", ""), c.get("frequency", "")
             same = [p for p in positions
                     if p.prefix and cs.startswith(p.prefix + "_") and cs.split("_")[-1] == p.callsign.split("_")[-1]
-                    and freq and freq[:7] == p.frequency[:7]]
+                    and freq and freq[:7] != "199.998" and freq[:7] == p.frequency[:7]]
             if same:
                 ranked.append((0, cs, c) if any(p.callsign == cs for p in same) else (1, same[0].callsign, c))
-            elif cs in by_cs:
-                ranked.append((2, cs, c))
         online = {}
         for _, hit, c in sorted(ranked, key=lambda r: r[0]):
             online.setdefault(hit, controller_info(c))
@@ -204,12 +202,17 @@ def test_match_positions_index_same_as_full_scan():
     pre = ["EPWA", "EPKK", "EDWW", "EDDB", "RU-NWC", "EPWW"]
     mid = ["", "N", "S", "FLG", "I", "X"]
     typ = ["APP", "TWR", "CTR", "FSS", "GND"]
-    freqs = ["128.805", "120.030", "133.475", "125.055"]
+    freqs = ["128.805", "120.030", "133.475", "125.055", "199.998"]
     mk = lambda: "_".join(x for x in (rnd.choice(pre), rnd.choice(mid), rnd.choice(typ)) if x)  # noqa: E731
     positions = [SimpleNamespace(callsign=cs, prefix=cs.split("_")[0], frequency=rnd.choice(freqs))
                  for cs in dict.fromkeys(mk() for _ in range(60))]
     ctrls = [{"callsign": mk(), "frequency": rnd.choice(freqs), "cid": i} for i in range(300)]
     assert match_positions(ctrls, positions) == old(ctrls, positions)
+    # on_frequency: dokładnie ci, których match_positions w ogóle bierze pod uwagę (mają kandydata)
+    kept = on_frequency(ctrls, positions)
+    assert kept and len(kept) < len(ctrls) and all(c["frequency"] != "199.998" for c in kept)
+    assert match_positions(kept, positions) == match_positions(ctrls, positions)
+    assert on_frequency([c for c in ctrls if c not in kept], positions) == []
 
 
 @pytest.fixture
@@ -324,7 +327,8 @@ def test_match_positions_neighbour_twin():
     assert on("EKCH_F_APP", "120.205")["EKCH_P_APP"]["alias_of"] == "EKCH_F_APP"
     assert set(on("EKDK_UN_CTR", "136.555")) == {"EKDK_UN_CTR"}  # już stanowisko sąsiada: bez kopii
     assert set(on("EKDK_A_CTR", "128.100")) == {"EKDK_A_CTR"}
-    assert set(on("EKDK_CTR", "121.500")) == {"EKDK_CTR"}  # inna częstotliwość: brak bliźniaka
+    # 0.13.6: częstotliwość spoza pliku albo 199.998 – sam znak nic nie daje (jakby go nie było)
+    assert on("EKDK_CTR", "121.500") == {} and on("EKDK_CTR", "199.998") == {} and on("EKDK_CTR", "") == {}
     assert set(match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555"}], pos)) == {"EKDK_CTR"}
     # wpis pod znakiem sąsiada nie zajmuje stanowiska, na którym ktoś naprawdę siedzi (też gdy przyszedł później)
     r = match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555", "cid": 1},

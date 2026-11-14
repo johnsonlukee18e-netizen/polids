@@ -258,7 +258,7 @@ def test_stack_axes_fixed_when_merged(client):
 def test_merge_esaa(client):
     # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 3 z pustą komórką obok L (0.13.2: L znów jest, jak w 0.13.0) – jeden
     # kafelek w komórce 9
-    (b,) = boxes(get(client, [ctl("ESAA_CTR", "128.180")]), "ESAA")
+    (b,) = boxes(get(client, [ctl("ESAA_CTR", "126.825")]), "ESAA")
     assert short(b) == ("ESAA", 660, 0, 5, 5, 1, 1, "ESAA_CTR") and len(b["members"]) == 5
     # ESMM_6 i ESMM_9: 6 obsługuje 6, 8, 7 – prostokąt z 9 w środku nie, więc tylko ciąg 6 + 7 w kolumnie F
     es = {b["label"]: b for b in boxes(get(client, [ctl("ESMM_6_CTR", "135.805"), ctl("ESMM_9_CTR", "135.985")]), "ESAA")}
@@ -266,13 +266,13 @@ def test_merge_esaa(client):
     assert short(es["8"]) == ("8", 365, 195, 5, 6, 1, 1, "ESMM_6_CTR") and not es["8"]["merged"]
     assert es["9"]["owner"] == "ESMM_9_CTR" and es["L"]["owner"] is None and set(es) == {"9", "6", "8", "L"}
     # sam ESMS_APP: tylko okienko L (APP, nie łączy się z sektorami ESMM)
-    es = {b["label"]: b for b in boxes(get(client, [ctl("ESMS_APP", "120.000")]), "ESAA")}
+    es = {b["label"]: b for b in boxes(get(client, [ctl("ESMS_APP", "134.980")]), "ESAA")}
     assert short(es["L"]) == ("L", 195, 0, 5, 7, 1, 1, "ESMS_APP") and set(es) == {"9", "6", "8", "7", "L"}
     assert all(b["owner"] is None for k, b in es.items() if k != "L")
 
 
 def test_merge_never_edww(client):
-    d = get(client, [ctl("EDWW_CTR", "129.050")])
+    d = get(client, [ctl("EDWW_CTR", "133.725")])
     assert [(b["label"], b["owner"], b["merged"]) for b in boxes(d, "EDWW")] == [
         ("MRZ", "EDWW_CTR", False), ("MAR", "EDWW_CTR", False), ("FLG", "EDWW_CTR", False)]
 
@@ -304,13 +304,13 @@ def test_merge_edmm_with_spree(client):
     f = next(f for f in d["firs"] if f["fir"] == "EDMM")
     assert f["staffed"] and not f["advisory"]
     # sam Spree: EDMM obsadzone (okienko SPE1), EDUU bez nikogo – ADVISORY pod EDUU
-    d = get(client, [ctl("EDUU_SPE_CTR", "133.840")])
+    d = get(client, [ctl("EDUU_SPE_CTR", "133.285")])
     em = {b["label"]: b for b in boxes(d, "EDMM")}
     assert em["SPE1"]["owner"] == "EDUU_SPE_CTR" and em["MEI"]["owner"] is None and em["SAS"]["owner"] is None
     assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDUU"] is True
     assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDMM"] is False
     # sam EDDC_SAS_APP: tylko okienko SAS pod MEI (APP Drezno), EDMM obsadzone
-    d = get(client, [ctl("EDDC_SAS_APP", "120.130")])
+    d = get(client, [ctl("EDDC_SAS_APP", "125.875")])
     em = {b["label"]: b for b in boxes(d, "EDMM")}
     assert short(em["SAS"]) == ("SAS", 165, 0, 2, 16, 1, 1, "EDDC_SAS_APP") and em["MEI"]["owner"] is None
     assert {f["fir"]: f["advisory"] for f in d["firs"]}["EDMM"] is False
@@ -326,7 +326,7 @@ def test_box_chains_follow_sector_files(client):
     assert ch[("UMMV", "ACC")][:3] == ["UMMV_W_CTR", "UMMV_N_CTR", "UMMV_CTR"] and "RU-WRC_FSS" in ch[("UMMV", "ACC")]
     assert "UMKK_APP" not in ch[("UMKK", "ACC")] and ch[("UMKK", "ACC")][0] == "UMKK_CTR"
     assert "UKLL_APP" not in ch[("UKLV", "RLV")] and ch[("UKLV", "RLV")][:2] == ["UKLV_CTR", "UKR_CTR"]
-    ed = {b["id"]: b for b in boxes(get(client, [ctl("EDWW_BOR_CTR", "131.330"), ctl("EDWW_MRZ_CTR", "124.175")]), "EDWW")}
+    ed = {b["id"]: b for b in boxes(get(client, [ctl("EDWW_BOR_CTR", "123.225"), ctl("EDWW_MRZ_CTR", "124.175")]), "EDWW")}
     assert ed["MAR"]["owner"] == "EDWW_BOR_CTR" and ed["MRZ"]["owner"] == "EDWW_MRZ_CTR"
     (b,) = boxes(get(client, [ctl("UMMV_N_CTR", "119.125"), ctl("UMMV_CTR", "135.700")]), "UMMV")
     assert (b["owner"], b["frequency"]) == ("UMMV_N_CTR", "119.125")
@@ -339,11 +339,10 @@ def test_merge_same_frequency(client):
     # 133.305 to stanowisko EYVL_CTR (częstotliwość, nie znak), a EYVL_CTR na niej siedzi pod swoim znakiem
     (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "133.305"), ctl("EYVL_CTR", "133.305")]), "EYVL")
     assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR")
-    # dwa różne stanowiska na jednej częstotliwości spoza pliku (każdy pod swoim znakiem): łączy je częstotliwość,
-    # nazwa wg najczęstszego właściciela (EYVL_CTR: M, L, E)
-    (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "118.000"), ctl("EYVL_CTR", "118.000")]), "EYVL")
-    assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR") and b["merged"]
-    assert [m["id"] for m in b["members"]] == ["U", "M", "L", "E"]
+    # 0.13.6 (Marek): częstotliwość spoza pliku (118.000) albo 199.998 to jakby nikogo nie było, choć znaki pasują
+    for fq in ("118.000", "199.998", ""):
+        ey = boxes(get(client, [ctl("EYVL_U_CTR", fq), ctl("EYVL_CTR", fq)]), "EYVL")
+        assert all(b["owner"] is None and not b["merged"] for b in ey), fq
     # różne częstotliwości: osobno
     ey = boxes(get(client, [ctl("EYVL_U_CTR", "132.280"), ctl("EYVL_CTR", "133.305")]), "EYVL")
     assert [short(b) for b in ey] == [("U", 660, 365, 12, 3, 1, 1, "EYVL_U_CTR"), ("L", 365, 95, 12, 4, 1, 1, "EYVL_CTR")]
@@ -376,11 +375,11 @@ def test_merge_pure():
 def test_fir_box_owner_and_tooltip(client):
     """Okienko FIR-u z kilku kafelków (ACC UMMV): pierwsze stanowisko online z ich kolejności; wieża (UMBB TWR) nie
     obsługuje okienka ACC, ale jest w dymku FIR-u."""
-    d = get(client, [ctl("UMBB_TWR", "118.500")])
+    d = get(client, [ctl("UMBB_TWR", "127.700")])
     (b,) = boxes(d, "UMMV")
     f = next(f for f in d["firs"] if f["fir"] == "UMMV")
     assert b["owner"] is None and f["advisory"] and [w["callsign"] for w in f["online"]] == ["UMBB_TWR"]
-    d = get(client, [ctl("UMMV_W_CTR", "124.825"), ctl("UMBB_TWR", "118.500")])
+    d = get(client, [ctl("UMMV_W_CTR", "124.825"), ctl("UMBB_TWR", "127.700")])
     (b,) = boxes(d, "UMMV")
     f = next(f for f in d["firs"] if f["fir"] == "UMMV")
     assert (b["label"], b["owner"], b["frequency"]) == ("ACC", "UMMV_W_CTR", "124.825") and not f["advisory"]
@@ -533,7 +532,7 @@ def test_berlin_pure():
 
 
 def test_berlin_board(client):
-    d = get(client, atis_=[atis("EDDB_ATIS", "C", ["BERLIN BRANDENBURG INFORMATION C", "RWY 25R 25L"])])
+    d = get(client, atis_=[atis("EDDB_ATIS", "C", ["BERLIN BRANDENBURG INFORMATION C", "RWY 25R 25L"], "123.780")])
     assert {k: d["berlin"][k] for k in ("config", "source", "tip")} == {
         "config": "WEST", "source": "ATIS", "tip": "ATIS C: 25R 25L"}
     # 0.13.1: miejsce BERLIN (pod stosem EDWW na podglądzie LOW) wybiera strona, nie seed
@@ -542,6 +541,10 @@ def test_berlin_board(client):
     d = get(client, metar={"EDDB": "EDDB 281220Z 09012KT 9999 FEW030 12/05 Q1012"})
     assert (d["berlin"]["config"], d["berlin"]["source"]) == ("EAST", "WIND") and SIDE["metar_calls"] == 1
     assert get(client)["berlin"]["source"] == "DEFAULT"
+    # 0.13.6: ATIS Berlina na 199.998 albo na nie swojej częstotliwości to jak bez ATIS
+    for fq in ("199.998", "123.180"):
+        b = get(client, atis_=[atis("EDDB_ATIS", "C", ["BERLIN BRANDENBURG INFORMATION C", "RWY 25R 25L"], fq)])["berlin"]
+        assert b["source"] == "DEFAULT", fq
 
 
 def test_berlin_error_safe(client, monkeypatch):
@@ -709,7 +712,7 @@ def test_plates_app_alone_and_directors(client):
 
 
 def test_plates_twr(client):
-    d = get(client, [ctl("EPKK_TWR", "123.255")], [atis("EPGD_ATIS", "A", ["GDANSK INFO A"], "136.000")])
+    d = get(client, [ctl("EPKK_TWR", "123.255")], [atis("EPGD_ATIS", "A", ["GDANSK INFO A"], "129.630")])
     twr = {p["icao"]: p for p in d["plates"]["twr"]}
     assert set(twr) == {"EPKK", "EPGD"}
     assert (twr["EPKK"]["twr"], twr["EPKK"]["frequency"], twr["EPKK"]["layers"]) == (["EPKK_TWR"], "123.255",

@@ -67,15 +67,21 @@ export function bookingText(b, now = new Date()) {
   return `Booking: ${b?.callsign || "?"} ${bookingTime(b, now)}${type}${b?.active ? " · in progress" : ""}`;
 }
 
-// obserwator i ATIS to też połączenia z CID kontrolera, ale nie stanowiska
-export const isPosition = (c) => !/_(ATIS|OBS)$/i.test(c?.callsign || "") && c?.facility !== 0;
+// na częstotliwości stanowiska z danych (`active` z /api/vatsim/me; 0.13.6, Marek: na 199.998 "jakby go nie było")
+export const onFrequency = (c) => c?.active !== false && !/^199\.998/.test(String(c?.frequency || ""));
 
-// "You are connected to VATSIM as EPWW_DBT_CTR (127.025) since 10:12Z"; ATIS i obserwator osobnymi słowami
+// obserwator i ATIS to też połączenia z CID kontrolera, ale nie stanowiska; bez częstotliwości stanowiska też nie
+export const isObserver = (c) => /_OBS$/i.test(c?.callsign || "") || c?.facility === 0;
+export const isPosition = (c) => !/_ATIS$/i.test(c?.callsign || "") && !isObserver(c) && onFrequency(c);
+
+// "You are connected to VATSIM as EPWW_DBT_CTR (127.025) since 10:12Z"; ATIS, obserwator i połączenie bez
+// częstotliwości stanowiska (199.998) osobnymi słowami
 export function onlineText(c) {
   const since = utcHm(c.logon_time) ? ` since ${utcHm(c.logon_time)}` : "";
   const freq = c.frequency ? ` (${c.frequency})` : "";
   if (/_ATIS$/i.test(c.callsign || "")) return `ATIS ${c.callsign}${freq}${since}${c.atis_code ? ` · information ${c.atis_code}` : ""}`;
-  if (!isPosition(c)) return `You are connected to VATSIM as an observer (${c.callsign})${since}`;
+  if (isObserver(c)) return `You are connected to VATSIM as an observer (${c.callsign})${since}`;
+  if (!onFrequency(c)) return `You are connected to VATSIM as ${c.callsign}${freq}${since}, not on a position frequency`;
   return `You are connected to VATSIM as ${c.callsign}${freq}${since}`;
 }
 
@@ -93,10 +99,11 @@ export function listedPosition(cs, list, alt = null) {
   return "";
 }
 
-// stanowisko na start HOME: zalogowany w sieci > zapisane (HOME albo OVERVIEW) > najbliższa rezerwacja > nic (cały FIR)
+// stanowisko na start HOME: zalogowany w sieci > zapisane (HOME albo OVERVIEW) > najbliższa rezerwacja > nic (cały FIR).
+// Zalogowany tylko przez stanowisko dopasowane przez serwer po częstotliwości (0.13.6: nie po znaku)
 export function initialPosition({ online = [], bookings = [], stored = "", list = [] } = {}) {
   for (const c of online.filter(isPosition)) {
-    const p = listedPosition(c.callsign, list, c.position);
+    const p = c.position ? listedPosition(c.position, list) : "";
     if (p) return { callsign: p, source: "online" };
   }
   if (stored && list.some((p) => p.callsign === stored)) return { callsign: stored, source: "stored" };

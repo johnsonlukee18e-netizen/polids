@@ -489,6 +489,31 @@ def test_overview_mine_moj_cid(client, monkeypatch):
     assert next(a for a in other["aerodromes"] if a["icao"] == "EPKK")["covered_by"] == "EPWW_S_CTR"
 
 
+def test_overview_tylko_na_czestotliwosci(client, monkeypatch):
+    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): chip ATC, ATIS (litera i pas)
+    i covered_by tylko z połączeń na częstotliwości stanowiska z danych; sam znak nie wystarcza."""
+    from backend.app.routers import aerodromes
+    feed = {**FEED, "controllers": [
+        {"callsign": "EPWA_APP", "frequency": "199.998", "name": "Bez", "cid": 1},
+        {"callsign": "EPWA_TWR", "frequency": "118.000", "name": "Nie swoja", "cid": 2},
+        {"callsign": "EPWW_S_CTR", "frequency": "199.998", "name": "Bez", "cid": 3},
+        {"callsign": "EPKK_TWR", "frequency": "123.255", "name": "Swoja", "cid": 4}],
+        "atis": [{**FEED["atis"][0], "frequency": "199.998"}]}
+
+    async def fake_feed():
+        return feed
+    monkeypatch.setattr(vatsim_api, "get_feed", fake_feed)
+    monkeypatch.setattr(aerodromes, "get_feed", fake_feed)
+    d = client.get("/api/overview?position=EPWW_ALL_CTR").json()
+    ad = {a["icao"]: a for a in d["aerodromes"]}
+    assert ad["EPWA"]["atc"] == [] and ad["EPWA"]["atis"] is None and ad["EPWA"]["runway"]["source"] != "ATIS"
+    assert [c["callsign"] for c in ad["EPKK"]["atc"]] == ["EPKK_TWR"]
+    assert all(a["covered_by"] is None for a in d["aerodromes"])
+    st = client.get("/api/aerodromes/EPWA/status").json()
+    assert st["atc_online"] == [] and st["runway_in_use"]["source"] != "ATIS" and not (st.get("atis") or {}).get("letter")
+    assert [c["callsign"] for c in client.get("/api/aerodromes/EPKK/status").json()["atc_online"]] == ["EPKK_TWR"]
+
+
 def test_overview_pas_w_uzyciu_jak_aerodrome(client, monkeypatch):
     """Pas w użyciu w OVERVIEW: z ATIS (litera), a bez ATIS pas preferowany – te same wartości co AERODROME › INFO."""
     from backend.app.routers import aerodromes

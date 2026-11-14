@@ -187,8 +187,10 @@ zapamiętanego stanu.
   przy nowym AIRAC trzeba wkleić ponownie); od 0.13.5 wszystkie kolumny wprost z tabeli, jak w ACC Ownership Manager
   (plvacc.pl/acc-sectors; do 0.13.4 B, C, D HIGH i T MID wg pliku `.ese`). TMA/CTR: najpierw APP/TWR z `.ese`, potem ACC.
 - Zalogowany kontroler obsługuje stanowisko z częstotliwości, na której pracuje (od 0.13.5, jak w EuroScope: prefiks, typ
-  i częstotliwość z pliku `.ese`), nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT. Sam znak liczy się tylko wtedy, gdy
-  częstotliwość nie pasuje do żadnego stanowiska (199.998, częstotliwość spoza pliku). Dotyczy RADIO, MAP, AERODROME i HOME.
+  i częstotliwość z pliku `.ese`), nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT. Od 0.13.6 sam znak nie liczy się
+  wcale: kontroler albo ATIS na 199.998 albo na częstotliwości, której nie ma żadne stanowisko z danych (plik `.ese` EPWW,
+  vacs-data, pliki `.ese` sąsiadów), jest pomijany, jakby go nie było (`services/vatsim.py` `on_frequency`). Dotyczy
+  RADIO, MAP, AERODROME (z OVERVIEW i kartami lotnisk) i HOME; nowe stanowisko trzeba najpierw dopisać do danych.
 - Sektory sąsiadów: z każdego pliku tylko FIR-y tego vACC (z ukraińskiego tylko Lwów), sektory zależne od pasa w jednym układzie
   na lotnisko (kierunek najbliższy wiatrowi z ok. 250°), granice uproszczone o ok. 100 m, Białoruś (UMMV) z kopii w pliku EPWW.
   Zasięg stanowisk bez sektora w żadnym pliku jest przybliżony (VATSpy albo okrąg 30/10 NM).

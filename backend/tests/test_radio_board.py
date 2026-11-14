@@ -188,9 +188,10 @@ def test_board_atis(board):
     atis = {a["callsign"]: a for a in board["atis"]}
     assert atis["EPWA_ATIS"]["online"] and not atis["EPKK_ATIS"]["online"]
     assert board["online"]["EPWA_ATIS"]["atis_code"] == "K"
-    # zalogowany ATIS spoza pliku .ese też jest na pasku, z częstotliwością z sieci
-    assert atis["EPWA_D_ATIS"]["extra"] and board["pos"]["EPWA_D_ATIS"]["frequency"] == "121.130"
-    assert board["online"]["EPWA_D_ATIS"]["atis_code"] == "D"
+    # 0.13.6 (Marek: "wyswietlaj tylko kontrolerow po czestotliwosciach aktywnych poprawnych dla sektorow"): ATIS na
+    # częstotliwości, której nie ma żadne stanowisko z danych (EPWA_D_ATIS na 121.130), jakby go nie było
+    assert "EPWA_D_ATIS" not in atis and "EPWA_D_ATIS" not in board["online"] and "EPWA_D_ATIS" not in board["pos"]
+    assert not any(a.get("extra") for a in board["atis"])
     assert [a["icao"] for a in board["atis"]] == sorted(a["icao"] for a in board["atis"])
     assert "EPKK_OBS" not in board["online"]  # tylko stanowiska z tablicy
 
@@ -1046,7 +1047,7 @@ EMPTY_FEED = {**FEED, "controllers": [], "atis": []}
 # 0.13.2 (przegląd): same informacje FIS (Gdańsk z EPWW-MIDSEA nad Bałtykiem) i wieże; informacja Warszawa
 FIS_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Fis", "cid": 80 + i} for i, (cs, fq) in enumerate((
-        ("EPGD_I_APP", "129.850"), ("EPKK_I_APP", "119.275"), ("EPPO_I_APP", "122.525"), ("EPWA_I_APP", "123.975"),
+        ("EPGD_I_APP", "125.275"), ("EPKK_I_APP", "119.275"), ("EPPO_I_APP", "126.300"), ("EPWA_I_APP", "123.975"),
         ("EPSC_TWR", "121.255"), ("EPKK_TWR", "123.255")))], "atis": []}
 INFO_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Info", "cid": 90 + i} for i, (cs, fq) in enumerate((

@@ -16,11 +16,11 @@ from ..services.eptraffic import ep_traffic
 from ..services.flightplan import CALLSIGN_BAD, HOURS_DOWN, find_flight_plan, hours_pending, member_hours
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
-from ..services.positions import online_stations
+from ..services.positions import known_stations, online_stations
 from ..services.route import RouteResolver
 from ..services.vatsim import (BOOKINGS_DOWN, FEED_DOWN, airport_atc, airport_traffic, bookings_by_callsign,
-                               controller_info, fir_boundaries, get_bookings, get_feed, match_positions, online_firs,
-                               pilot_info, user_bookings, user_connections)
+                               controller_info, fir_boundaries, get_bookings, get_feed, match_positions, on_frequency,
+                               online_firs, pilot_info, user_bookings, user_connections)
 
 router = APIRouter(prefix="/api/vatsim", tags=["vatsim"])
 log = logging.getLogger("polids.vatsim")
@@ -39,9 +39,10 @@ async def online(db: Session = Depends(get_db)):
     """Zalogowani kontrolerzy: dopasowani do stanowisk (`positions`) i wszyscy z FIR-ów wokół EPWW (`firs`).
 
     Stanowiska: najpierw plik .ese EPWW (w kolejności z pliku), potem pozostałe stanowiska sąsiadów z vacs-data
-    i z plików .ese sąsiadów (właściciele sektorów sąsiadów na mapie)."""
+    i z plików .ese sąsiadów (właściciele sektorów sąsiadów na mapie). 0.13.6: wszędzie tylko połączenia na
+    częstotliwości stanowiska z danych (on_frequency) – kto jest na 199.998 albo poza nimi, tego nie ma."""
     data = await _feed()
-    ctrls = data.get("controllers", []) + data.get("atis", [])
+    ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known_stations(db))
     return {"positions": match_positions(ctrls, online_stations(db), nb_owners(db)), "firs": online_firs(ctrls),
             "controllers": [controller_info(c) for c in ctrls if c.get("callsign", "").startswith("EP")],
             "updated": data.get("general", {}).get("update_timestamp")}
@@ -49,9 +50,10 @@ async def online(db: Session = Depends(get_db)):
 
 @router.get("/atc")
 async def atc(db: Session = Depends(get_db)):
-    """Kontrolerzy online do plakietek na mapie: lotniska (DEL/GND/TWR/APP/ATIS) z pozycją i FIR-y (CTR/FSS)."""
+    """Kontrolerzy online do plakietek na mapie: lotniska (DEL/GND/TWR/APP/ATIS) z pozycją i FIR-y (CTR/FSS).
+    0.13.6: tylko na częstotliwości stanowiska z danych (on_frequency)."""
     data = await _feed()
-    ctrls = data.get("controllers", []) + data.get("atis", [])
+    ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known_stations(db))
     groups = airport_atc(ctrls)
     ads = {a.icao: a for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.in_(groups)))}
     pts = {p.ident: p for p in db.scalars(select(NavPoint).where(NavPoint.kind == "AD", NavPoint.ident.in_(groups)))}
@@ -91,7 +93,8 @@ async def bookings(prefix: str = "EP", hours: int | None = Query(None, ge=1, le=
 async def me(request: Request, db: Session = Depends(get_db)):
     """Zalogowany użytkownik PolIDS (CID z sesji) w sieci VATSIM, do HOME: jego połączenia z data feed (`online`:
     callsign, częstotliwość, od kiedy, rating, facility; `position` = stanowisko z pliku .ese EPWW dopasowane jak
-    w EuroScope, np. EPWW_CTR na częstotliwości sektora) i jego rezerwacje z atc-bookings (dowolny znak), które się
+    w EuroScope, np. EPWW_CTR na częstotliwości sektora; `active` = na częstotliwości stanowiska z danych, 0.13.6)
+    i jego rezerwacje z atc-bookings (dowolny znak), które się
     jeszcze nie skończyły i zaczynają w ciągu 24 h (UTC). Bez logowania (tryb none) puste listy i cid null.
     Awaria jednego ze źródeł nie psuje drugiego: zostaje to, co się udało, a powód jest w `error` (oba razem)
     i osobno w `online_error` / `bookings_error` (HOME nie pisze wtedy "nie jesteś zalogowany")."""
@@ -108,10 +111,12 @@ async def me(request: Request, db: Session = Depends(get_db)):
             raise feed
         online = user_connections(feed, cid)
         stations = list(db.scalars(select(AtcPosition)))
-        hits = match_positions([{"callsign": c["callsign"] or "", "frequency": c["frequency"] or ""} for c in online],
-                               stations)
+        conns = [{"callsign": c["callsign"] or "", "frequency": c["frequency"] or ""} for c in online]
+        hits = match_positions(conns, stations)
         pos = {info["callsign"]: cs for cs, info in hits.items()}
-        out["online"] = [c | {"position": pos.get(c["callsign"])} for c in online]
+        # active: na częstotliwości któregoś stanowiska z danych (0.13.6: na 199.998 i poza danymi – jakby go nie było)
+        active = {c["callsign"] for c in on_frequency(conns, known_stations(db))}
+        out["online"] = [c | {"position": pos.get(c["callsign"]), "active": c["callsign"] in active} for c in online]
         out["updated"] = (feed.get("general") or {}).get("update_timestamp")
     except Exception as exc:  # noqa: BLE001 - błąd sieci (UpstreamError), zły JSON albo nieoczekiwany kształt danych
         log.warning("data feed: %s", exc)

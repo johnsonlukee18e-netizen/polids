@@ -39,6 +39,12 @@ def online_stations(db: Session, positions: list[dict] | None = None) -> list:
                        for p in (positions if positions is not None else all_positions(db)) if p["callsign"] not in known]
 
 
+def known_stations(db: Session) -> list:
+    """Wszystkie stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów razem ze stanowiskami lotnisk bez
+    sektora): do filtra on_frequency – zalogowany liczy się tylko na częstotliwości któregoś z nich (0.13.6)."""
+    return online_stations(db, all_positions(db, airports=True))
+
+
 def sim_twins(stations: list, prefer: Collection[str]) -> dict[str, str]:
     """Drugi znak stanowiska: zalogowany na nim kontroler jest w /api/vatsim/online także pod stanowiskiem sąsiada
     z `prefer` o tym samym prefiksie, typie i częstotliwości (alias_of z match_positions, np. EKDK_CTR → EKDK_UN_CTR,
