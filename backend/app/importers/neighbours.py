@@ -26,7 +26,8 @@ NB_SOURCES = {
     "EDMM": {"firs": ["EDMM"], "vacs": "EDMM", "airports": ("ED", "ET")},  # München z sektorami EDUU (Rhein) nad nim
     "EDGG": {"firs": ["EDGG"], "vacs": "EDGG", "airports": ("ED", "ET")},  # Langen z sektorami EDUU (Rhein) nad nim
     "ESAA": {"firs": ["ESAA"], "vacs": "ES", "airports": ("ES",)},
-    "EKDK": {"firs": ["EKDK"], "vacs": "EK", "airports": ("EK",)},
+    # duński plik ma ATIS-y pod prefiksem XK (XKCH_A_ATIS), a w sieci to EKCH_A_ATIS: rename XK → EK (0.13.6)
+    "EKDK": {"firs": ["EKDK"], "vacs": "EK", "airports": ("EK",), "rename": ("XK", "EK")},
     "EYVL": {"firs": ["EYVL"], "vacs": "EY", "airports": ("EY",)},
     "LKAA": {"firs": ["LKAA"], "vacs": "LK", "airports": ("LK",)},
     "LZBB": {"firs": ["LZBB"], "vacs": "LZ", "airports": ("LZ",)},
@@ -155,11 +156,23 @@ def pack_positions(data: dict, key: str) -> list[dict]:
     wszystkie."""
     src = NB_SOURCES[key]
     firs, prefixes = set(src["firs"]), tuple(src.get("airports") or ())
-    by_id = {p["position_id"]: p for p in data["positions"]}
+    positions = [_renamed(p, src.get("rename")) for p in data["positions"]]
+    by_id = {p["position_id"]: p for p in positions}
     owners = {by_id[o]["callsign"] for s in data["sectors"] if s["fir"].upper() in firs
               for o in s["owners"].split(":") if o in by_id}
-    return [p for p in data["positions"] if not p["callsign"].upper().startswith("EP")
+    return [p for p in positions if not p["callsign"].upper().startswith("EP")
             and (p["callsign"] in owners or p["callsign"].split("_")[0].upper().startswith(prefixes))]
+
+
+def _renamed(p: dict, rename: tuple[str, str] | None) -> dict:
+    """Znak i prefiks stanowiska pod nazwą z sieci VATSIM (rename = (w pliku, w sieci), np. XKCH_A_ATIS → EKCH_A_ATIS
+    w pakiecie EKDK): stanowisko z częstotliwością z pliku dopasowuje się wtedy do zalogowanego (0.13.6)."""
+    old, new = rename or ("", "")
+    if not old or not p["callsign"].upper().startswith(old):
+        return p
+    prefix = p.get("prefix") or ""
+    return {**p, "callsign": new + p["callsign"][len(old):],
+            "prefix": new + prefix[len(old):] if prefix.upper().startswith(old) else prefix}
 
 
 def import_nb_ese(db: Session, path: Path) -> dict:

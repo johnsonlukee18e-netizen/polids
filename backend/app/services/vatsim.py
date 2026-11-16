@@ -59,36 +59,78 @@ def controller_info(c: dict) -> dict:
             "text_atis": c.get("text_atis"), "atis_code": c.get("atis_code")}
 
 
+# częstotliwość "bez stanowiska" w sieci VATSIM (obserwator, kontroler przed wybraniem stanowiska)
+NO_FREQ = "199.998"
+
+
+def active_frequency(c: dict) -> str:
+    """Aktywna częstotliwość połączenia (pierwsze 7 znaków, np. 127.025); pusta przy 199.998 i bez częstotliwości.
+
+    0.13.6 (Marek): kontroler na 199.998 to tak, jakby go nie było."""
+    f = str(c.get("frequency") or "").strip()[:7]
+    return "" if not f or f == NO_FREQ else f
+
+
+def _index(positions: list) -> dict[tuple[str, str], list[tuple[int, object]]]:
+    """Indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu listy."""
+    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
+    for i, p in enumerate(positions):
+        if p.prefix:
+            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
+    return by_key
+
+
+def _candidates(by_key: dict, c: dict) -> list[tuple[int, object]]:
+    """Stanowiska, które połączenie obsługuje jak w EuroScope: prefiks znaku (EPWA, EPWA_N…), ten sam typ (końcówka)
+    i ta sama aktywna częstotliwość; bez aktywnej częstotliwości (199.998) – żadne."""
+    cs, freq = str(c.get("callsign") or "").upper(), active_frequency(c)
+    if not freq:
+        return []
+    parts = cs.split("_")
+    return [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
+            if freq == (ip[1].frequency or "")[:7]]
+
+
+def _hit(cands: list[tuple[int, object]], c: dict) -> str:
+    """Stanowisko połączenia z kandydatów (_candidates): to o jego znaku, inaczej pierwsze z listy."""
+    cs = c.get("callsign")
+    return cs if any(ip[1].callsign == cs for ip in cands) else min(cands, key=lambda ip: ip[0])[1].callsign
+
+
+def on_frequency(conns: list[dict], positions: list) -> list[dict]:
+    """Połączenia (kontrolerzy i ATIS) na częstotliwości któregoś stanowiska z danych (jak w match_positions).
+
+    0.13.6 (Marek: "wyświetlaj tylko kontrolerów po częstotliwościach aktywnych poprawnych dla sektorów, nie po
+    nazwach"): pozostałych – na 199.998, na częstotliwości spoza danych albo cudzej – aplikacja nie pokazuje nigdzie,
+    jakby ich nie było. positions: obiekty z callsign, prefix i frequency (AtcPosition, Station). Lista innego kształtu
+    (null, napis z zepsutego feedu) to brak połączeń."""
+    if not isinstance(conns, list):
+        return []
+    by_key = _index(positions)
+    return [c for c in conns if isinstance(c, dict) and _candidates(by_key, c)]
+
+
 def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
     0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): najpierw aktywna
     częstotliwość, jak w EuroScope – stanowisko o tym samym prefiksie, typie (końcówce) i częstotliwości; przy kilku
-    takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF. Sam
-    dokładny znak tylko wtedy, gdy częstotliwość nie pasuje do żadnego stanowiska (199.998, spoza pliku). Dwóch
-    kontrolerów na jednym stanowisku (uczeń i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej
-    częstotliwości (w kolejności danych), na końcu po samym znaku.
+    takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF.
+    0.13.6 (Marek: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
+    częstotliwościach aktywnych poprawnych dla sektorów, nie po nazwach"): sam znak nic nie daje – kontroler na 199.998
+    albo na częstotliwości żadnego stanowiska nie obsługuje niczego. Dwóch kontrolerów na jednym stanowisku (uczeń
+    i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej częstotliwości (w kolejności danych).
     prefer: stanowiska z kolejności przejmowania sektorów sąsiadów. Kontroler dopasowany do innego stanowiska
     (np. EKDK_CTR z vacs-data) jest też wpisany pod stanowiskiem z `prefer` o tym samym prefiksie, typie
     i częstotliwości (EKDK_UN_CTR 136.555 w pliku Danii), z polem `alias_of`: tak rozpozna go EuroScope sąsiada."""
-    by_cs = {p.callsign: p for p in positions}
-    # indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu całej listy
-    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
-    for i, p in enumerate(positions):
-        if p.prefix:
-            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
-    # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość, 2 – sam znak
+    by_key = _index(positions)
+    # (ranga, stanowisko, kontroler, kandydaci): 0 – częstotliwość i znak, 1 – sama częstotliwość
     hits: list[tuple[int, str, dict, list]] = []
     for c in controllers:
-        cs, freq = c.get("callsign", ""), c.get("frequency", "")
-        parts = cs.split("_")
-        cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
-                 if freq and freq[:7] == (ip[1].frequency or "")[:7]]
+        cands = _candidates(by_key, c)
         if cands:
-            mine = [ip for ip in cands if ip[1].callsign == cs]
-            hits.append((0, cs, c, cands) if mine else (1, min(cands, key=lambda ip: ip[0])[1].callsign, c, cands))
-        elif cs in by_cs:
-            hits.append((2, cs, c, cands))
+            hit = _hit(cands, c)
+            hits.append((0 if hit == c.get("callsign") else 1, hit, c, cands))
     online: dict[str, dict] = {}
     alias: dict[str, dict] = {}  # wpisy pod znakiem sąsiada mają najniższy priorytet: dopisujemy je na końcu
     for _, hit, c, cands in sorted(hits, key=lambda h: h[0]):
@@ -158,8 +200,22 @@ def fir_boundaries() -> dict:
     return json.loads((settings.seed_dir / "vatspy_firs.geojson").read_text("utf-8"))
 
 
-def online_firs(controllers: list[dict]) -> dict[str, list[dict]]:
-    """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa."""
+def frequency_position(controllers: list[dict], positions: list) -> dict[str, str]:
+    """Znak zalogowanego → stanowisko z jego częstotliwości, jak w match_positions (własny znak, inaczej pierwsze
+    z listy), także gdy to stanowisko zajął już ktoś inny (uczeń i instruktor na jednej częstotliwości)."""
+    by_key = _index(positions)
+    out = {}
+    for c in controllers:
+        if isinstance(c, dict) and (cands := _candidates(by_key, c)):
+            out[str(c.get("callsign") or "")] = _hit(cands, c)
+    return out
+
+
+def online_firs(controllers: list[dict], by_position: dict[str, str] | None = None) -> dict[str, list[dict]]:
+    """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa.
+    by_position (frequency_position): znak → stanowisko z częstotliwości; 0.13.6 (Marek: "nie po nazwach"): granica
+    wg stanowiska, nie znaku – EPWW_N_CTR na 133.475 (częstotliwość C) to EPWW-C, nie EPWW-N. Stanowisko bez granicy
+    w VATSpy (EKCH_FW_CTR z vacs-data, prefiks EKDK): granica wg znaku zalogowanego (jest na poprawnej częstotliwości)."""
     data = fir_boundaries()
     prefixes = []
     for f in data["features"]:
@@ -171,11 +227,12 @@ def online_firs(controllers: list[dict]) -> dict[str, list[dict]]:
     prefixes.sort(key=lambda x: -len(x[0]))
     out: dict[str, list[dict]] = {}
     for c in controllers:
-        cs = c.get("callsign", "")
-        if cs.split("_")[-1] not in ("CTR", "FSS"):
-            continue
-        for pre, ids in prefixes:
-            if cs == pre or cs.startswith(pre + "_"):
+        own = str(c.get("callsign") or "")
+        for cs in dict.fromkeys(((by_position or {}).get(own, own), own)):
+            if cs.split("_")[-1] not in ("CTR", "FSS"):
+                continue
+            ids = next((ids for pre, ids in prefixes if cs == pre or cs.startswith(pre + "_")), None)
+            if ids:
                 for i in ids:
                     out.setdefault(i, []).append(controller_info(c))
                 break

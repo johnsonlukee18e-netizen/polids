@@ -1158,23 +1158,31 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     tma = [local(g) for g in static["tma"]]
     twr = [local(g) for g in static["twr"]]
     fis = [local(g) for g in static["fis"]]
-    # ATIS: polskie stanowiska ATIS z pliku .ese oraz zalogowane EP**_ATIS spoza niego (np. EPWA_D_ATIS)
-    atis = [{"callsign": cs, "icao": cs[:4], "online": cs in online} for cs in static["atis"]]
-    known = {online[a["callsign"]]["callsign"] for a in atis if a["online"]}
-    extra = {}
+    # ATIS: polskie stanowiska ATIS z pliku .ese oraz zalogowane EP**_ATIS spoza niego (np. EPWA_D_ATIS). 0.13.6
+    # (Marek: "nie po nazwach"): feed_atis to już tylko ATIS-y na poprawnej częstotliwości (on_frequency, z drugim
+    # ATIS-em z AIP: EPWA ATIS DEP 123.430) – na 199.998 albo na częstotliwości spoza danych ich tu nie ma
+    # Znak stanowiska z pliku na drugiej częstotliwości z AIP (EPWA_ATIS na 123.430), gdy stanowisko jest wolne:
+    # w jego wierszu, z częstotliwością z sieci (rozstrzyga częstotliwość, nie to, że znak jest na liście)
+    known = {online[cs]["callsign"] for cs in static["atis"] if cs in online}
+    extra, own = {}, {}
     for c in feed_atis:
         cs = str(c.get("callsign") or "").upper()
-        if cs.startswith("EP") and cs.endswith("_ATIS") and cs not in known and cs not in static["atis"]:
+        if not (cs.startswith("EP") and cs.endswith("_ATIS")) or cs in known:
+            continue
+        if cs not in static["atis"]:
             extra[cs] = {"callsign": cs, "icao": cs[:4], "online": True, "extra": True}
+            own[cs] = c
+        elif cs not in online:
+            own[cs] = c
+    atis = [{"callsign": cs, "icao": cs[:4], "online": cs in online or cs in own} for cs in static["atis"]]
     atis = sorted(atis + list(extra.values()), key=lambda a: (a["icao"], a["callsign"]))
     refs = _referenced(static) | set(extra)
     pos = {}
     for cs in sorted(refs):
         p = positions.get(cs) or {}
         pos[cs] = {"frequency": p.get("frequency") or "", "name": p.get("radio") or p.get("name")}
-    for cs, a in extra.items():
-        info = next((c for c in feed_atis if str(c.get("callsign") or "").upper() == cs), {})
-        pos[cs]["frequency"] = info.get("frequency") or ""
+    for cs, info in own.items():
+        pos.setdefault(cs, {"frequency": "", "name": None})["frequency"] = info.get("frequency") or ""
         online = {**online, cs: {"callsign": cs, "frequency": info.get("frequency"), "name": info.get("name"),
                                  "cid": info.get("cid"), "logon_time": info.get("logon_time"),
                                  "atis_code": info.get("atis_code"), "text_atis": info.get("text_atis")}}

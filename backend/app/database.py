@@ -12,7 +12,8 @@ from .config import settings
 # 10: 0.12.5 – angielskie godziny i uwagi w frequencies.csv, kategoria dokumentów OTHER i tytuły DOCS,
 # typy samolotów z ICAO_Aircraft.json.
 # 11: 0.12.6 – godziny i uwagi w frequencies.csv bez odnośników do rozdziałów AIP.
-SCHEMA_VERSION = 11
+# 12: 0.13.6 – duńskie ATIS-y z pliku EKDK pod znakami z sieci (XKCH_A_ATIS → EKCH_A_ATIS).
+SCHEMA_VERSION = 12
 
 
 class Base(DeclarativeBase):

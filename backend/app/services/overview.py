@@ -35,8 +35,9 @@ from .http_cache import UpstreamError
 from .lvp import evaluate as evaluate_lvp
 from .metar import parse_metar
 from .notam import get_notams
+from .positions import known_stations
 from .runways import atis_state, runway_in_use, runway_state
-from .vatsim import FACILITY_TYPES, controller_info, match_positions, parse_atis
+from .vatsim import FACILITY_TYPES, controller_info, match_positions, on_frequency, parse_atis
 from .weather import get_metars, get_tafs
 
 # Lotniska kontrolowane w FIR EPWW – ta sama lista co w podmenu AERODROME (frontend/js/tabs/aerodrome.js)
@@ -401,11 +402,17 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     # QNH liczymy ze wszystkich kontrolowanych lotnisk (zasada TL dotyczy całego FIR-u), nawet przy filtrze
     (metars, tafs, wx_errors), feed, notams, flow, monitor = await asyncio.gather(
         _weather(AERODROMES), _feed(), _notams(shown, now), _flow(shown, now), _monitor(shown, now))
-    info = feed_info(feed["feed"], AERODROMES)
+    # 0.13.6 (Marek: "nie po nazwach"): kontrolerzy i ATIS tylko na częstotliwości stanowiska z danych; na 199.998
+    # i poza danymi – jakby ich nie było (chip ATC i ATIS, pas z ATIS, zajęte stanowiska)
+    known = known_stations(db)
+    net = feed["feed"]
+    net = {**net, "controllers": on_frequency(net.get("controllers", []), known),
+           "atis": on_frequency(net.get("atis", []), known)}
+    info = feed_info(net, AERODROMES)
     parsed = {i: parse_metar(m) for i, m in metars.items() if m}
     qnhs = {i: (p.qnh if p else None) for i, p in parsed.items()}
     tl = tl_service.fir_level({i: qnhs.get(i) for i in AERODROMES})
-    stations = feed["feed"].get("controllers", []) + feed["feed"].get("atis", [])
+    stations = net.get("controllers", []) + net.get("atis", [])
     # kto obsługuje lotnisko przede mną: tylko przy stanowisku ACC / APP (wieża przeskakuje do PRZEGLĄDU lotniska)
     mine = pos["callsign"] if pos and pos["kind"] in ("ACC", "APP") else None
     sl = _slices(db) if mine else []
@@ -414,7 +421,7 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     if mine in directors(sl):
         mine = None
     orders = coverage_orders(db, sl) if mine else {}
-    others = online_others(feed["feed"], list(db.scalars(select(AtcPosition))), mine, cid) if mine else set()
+    others = online_others(net, list(db.scalars(select(AtcPosition))), mine, cid) if mine else set()
     aerodromes = []
     for icao in shown:
         p = parsed.get(icao)

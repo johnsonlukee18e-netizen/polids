@@ -127,6 +127,57 @@ def test_radio_online_matches_vacs_positions(client):
     assert on["firs"]["EDWW-EMS"][0]["name"] == "Tylko VACS"
 
 
+def test_online_only_on_position_frequency(client, monkeypatch):
+    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo. wyswietlaj tylko kontrolerow po
+    czestotliwosciach aktywnych poprawnych dla sektorow, nie po nazwach"): /api/radio/online, /api/vatsim/online
+    i /api/vatsim/atc (MAP) pokazują tylko połączenia na częstotliwości stanowiska z danych – znak nie wystarcza."""
+    feed = {"general": {}, "pilots": [], "controllers": [
+        {"callsign": "EPWA_APP", "frequency": "128.805", "name": "Na swojej", "cid": 1},
+        {"callsign": "EPWA_TWR", "frequency": "118.000", "name": "Nie swoja", "cid": 2},       # EPWA_TWR to 118.305
+        {"callsign": "EPWW_N_CTR", "frequency": "199.998", "name": "Bez", "cid": 3},
+        {"callsign": "EDWW_EMS_CTR", "frequency": "199.998", "name": "Sasiad bez", "cid": 4},
+        {"callsign": "KZNY_CTR", "frequency": "125.000", "name": "Daleko", "cid": 5},
+        # znak DBF na częstotliwości C (133.475): obsługuje C – plakietka FIR-u na MAP wg stanowiska, nie znaku
+        {"callsign": "EPWW_DBF_CTR", "frequency": "133.475", "name": "Na C", "cid": 12},
+        # ETNH_TWR: 125.600 w vacs-data, 122.100 w pliku EDWW – obie poprawne
+        {"callsign": "ETNH_TWR", "frequency": "122.100", "name": "Nordholz", "cid": 13},
+        # instruktor na częstotliwości C (stanowisko C już zajęte): też plakietka C, nie N
+        {"callsign": "EPWW_N_CTR", "frequency": "133.475", "name": "Instruktor", "cid": 14},
+        # stanowisko z vacs-data bez własnej granicy w VATSpy (EKCH_FW_CTR, prefiks EKDK): granica wg znaku
+        {"callsign": "EKDK_FW_CTR", "frequency": "127.080", "name": "Dania", "cid": 15}],
+        "atis": [{"callsign": "EPKK_ATIS", "frequency": "199.998", "cid": 6, "atis_code": "A"},
+                 {"callsign": "EPGD_ATIS", "frequency": "129.630", "cid": 7, "atis_code": "B"},
+                 # drugi ATIS z AIP (EPWA ATIS DEP 123.430; w pliku .ese go nie ma) i ten sam znak poza AIP
+                 {"callsign": "EPWA_D_ATIS", "frequency": "123.430", "cid": 8, "atis_code": "C"},
+                 {"callsign": "EPWA_X_ATIS", "frequency": "121.130", "cid": 9, "atis_code": "D"},
+                 # duński ATIS: w pliku EKDK jako XKCH_A_ATIS 122.755, w sieci EKCH_A_ATIS
+                 {"callsign": "EKCH_A_ATIS", "frequency": "122.755", "cid": 10, "atis_code": "E"},
+                 {"callsign": None, "frequency": "127.025", "cid": 11}]}
+
+    async def other():
+        return feed
+    monkeypatch.setattr(vatsim_api, "get_feed", other)
+    gone = {"EPWA_TWR", "EDWW_EMS_CTR", "KZNY_CTR", "EPKK_ATIS", "EPWA_X_ATIS"}
+    for url in ("/api/radio/online", "/api/vatsim/online"):
+        on = client.get(url).json()
+        # EPWA_D_ATIS: nie stanowisko z pliku .ese (drugi ATIS z AIP)
+        assert {"EPWA_APP", "EPGD_ATIS", "EPWW_C_CTR", "ETNH_TWR"} <= set(on["positions"]), url
+        assert not set(on["positions"]) & gone and "EPWW_N_CTR" not in on["positions"], url
+        assert on["positions"]["EPWW_C_CTR"]["callsign"] == "EPWW_DBF_CTR", url
+        assert on["positions"]["ETNH_TWR"]["frequency"] == "122.100", url
+        cs = {c["callsign"] for c in on["controllers"]}
+        assert {"EPWA_APP", "EPGD_ATIS", "EPWA_D_ATIS", "EPWW_DBF_CTR", "EPWW_N_CTR"} <= cs and not cs & gone, url
+        firs = {k: [c["callsign"] for c in v] for k, v in on["firs"].items()}
+        assert firs == {"EPWW-C": ["EPWW_DBF_CTR", "EPWW_N_CTR"], "EKDK": ["EKDK_FW_CTR"]}, url
+    atc = client.get("/api/vatsim/atc").json()
+    assert {a["icao"]: sorted(a["facilities"]) for a in atc["airports"]} == {
+        "EKCH": ["ATIS"], "EPGD": ["ATIS"], "EPWA": ["APP", "ATIS"], "ETNH": ["TWR"]}
+    assert [c["callsign"] for c in next(a for a in atc["airports"] if a["icao"] == "EPWA")["facilities"]["ATIS"]] == [
+        "EPWA_D_ATIS"]
+    assert {k: [c["callsign"] for c in v] for k, v in atc["firs"].items()} == {
+        "EPWW-C": ["EPWW_DBF_CTR", "EPWW_N_CTR"], "EKDK": ["EKDK_FW_CTR"]}
+
+
 def test_radio_online_upstream_error(client, monkeypatch):
     async def down():
         raise UpstreamError("timeout")

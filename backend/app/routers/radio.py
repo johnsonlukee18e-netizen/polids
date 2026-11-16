@@ -21,10 +21,11 @@ from ..services.viff import sectors as viff_sectors
 from ..services.weather import get_metars
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
-from ..services.positions import all_positions
+from ..services.positions import all_positions, alt_stations, known_stations
 from ..services.radio import (Station, neighbour_tab, position_range, radio_names, sector_group, sector_kind,
                               seed_json)
-from ..services.vatsim import BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
+from ..services.vatsim import (BOOKINGS_DOWN, bookings_by_callsign, controller_info, fir_boundaries, match_positions,
+                               frequency_position, on_frequency, online_firs)
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
@@ -107,16 +108,19 @@ async def _feed() -> dict:
 
 @router.get("/online")
 async def online(db: Session = Depends(get_db)):
-    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data): najpierw aktywna częstotliwość
-    jak w EuroScope (prefiks, typ i częstotliwość; 0.13.5), sam znak tylko bez pasującej częstotliwości. `controllers`:
-    wszyscy zalogowani z EP** i z prefiksów znanych stanowisk (także ci, których nie udało się dopasować)."""
+    """Zalogowani kontrolerzy dopasowani do stanowisk RADIO (plik .ese i vacs-data) po aktywnej częstotliwości jak
+    w EuroScope (prefiks, typ i częstotliwość; 0.13.5). 0.13.6: tylko połączenia na częstotliwości stanowiska z danych
+    (on_frequency) – sam znak nic nie daje, 199.998 to brak kontrolera. `controllers`: ci z nich z EP** i z prefiksów
+    znanych stanowisk."""
     data = await _feed()
-    ctrls = data.get("controllers", []) + data.get("atis", [])
+    ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), await run_in_threadpool(known_stations, db))
     merged = all_positions(db)
     stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
+    stations += alt_stations(db, stations)   # te same stanowiska z częstotliwością z innego źródła (ETNH_TWR 122.100)
     prefixes = {p["callsign"].split("_")[0] for p in merged}
     near = [c for c in ctrls if (cs := c.get("callsign", "")).split("_")[0] in prefixes or cs.startswith("EP")]
-    return {"positions": match_positions(ctrls, stations, nb_owners(db)), "firs": online_firs(ctrls),
+    return {"positions": match_positions(ctrls, stations, nb_owners(db)),
+            "firs": online_firs(ctrls, frequency_position(ctrls, stations)),
             "controllers": [controller_info(c) for c in near if not c.get("callsign", "").endswith("_OBS")],
             "updated": data.get("general", {}).get("update_timestamp")}
 
@@ -264,10 +268,12 @@ def _build_static(db: Session, positions: dict) -> dict:
                                    nb_chains=nb_chains, layout=layout)
 
 
-def _board_data(db: Session) -> tuple[list[dict], dict, dict, set]:
+def _board_data(db: Session) -> tuple[list, dict, dict, set, list]:
     merged = all_positions(db)
     positions = {p["callsign"]: p for p in merged}
-    return merged, positions, _board_static(db, positions), nb_owners(db)
+    stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
+    stations += alt_stations(db, stations)   # te same stanowiska z częstotliwością z innego źródła (ETNH_TWR 122.100)
+    return stations, positions, _board_static(db, positions), nb_owners(db), known_stations(db)
 
 
 # Dodatki tablicy z innych serwisów: METAR Berlina (BERLIN bez ATIS) i sektory vIFF (czerwone tło). Każdy czeka
@@ -338,15 +344,16 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     i FIS online → id kształtów TMA/CTA i FIS, które teraz obsługuje: granica sumy na LOW) i `acc_short` (skróty
     stanowisk ACC na plakietkach). Od 0.13.2 bez geometrii sąsiadów (`nb`): jedyne zagraniczne granice to FIR-y."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
-    merged, positions, static, prefer = await run_in_threadpool(_board_data, db)
+    stations, positions, static, prefer, known = await run_in_threadpool(_board_data, db)
     net = {"ok": True, "error": None, "updated": None}
     online, feed_atis, ctrls = {}, [], []
     try:
         data = await vatsim_api.get_feed()
-        ctrls = data.get("controllers", []) + data.get("atis", [])
-        stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
+        # 0.13.6: tylko połączenia na częstotliwości stanowiska z danych (199.998 i inne – jakby ich nie było); także
+        # ATIS EDDB do BERLIN
+        ctrls = on_frequency(data.get("controllers", []) + data.get("atis", []), known)
         online = match_positions(ctrls, stations, prefer)
-        feed_atis = data.get("atis", [])
+        feed_atis = [c for c in ctrls if str(c.get("callsign") or "").upper().endswith("_ATIS")]
         net["updated"] = data.get("general", {}).get("update_timestamp")
     except (UpstreamError, ValueError) as exc:
         log.warning("RADIO: dane o zalogowanych niedostępne (%s)", exc)

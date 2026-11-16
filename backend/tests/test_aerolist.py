@@ -151,12 +151,16 @@ def test_airport_positions_order_and_online():
              {"callsign": "EDDB_N_DEP", "frequency": "120.340", "name": "Bremen Radar"},
              {"callsign": "EDDB_AN_APP", "frequency": "136.105", "name": "Berlin Arrival"},
              {"callsign": "EDWW_FLG_CTR", "frequency": "136.450"},   # nie lotnisko
-             {"callsign": "EDDBX_TWR", "frequency": "118.000"}]      # inny prefiks
+             {"callsign": "EDDBX_TWR", "frequency": "118.000"},      # inny prefiks
+             {"callsign": "EDDB_ATIS", "frequency": "123.780"}]
     ctrls = [{"callsign": "EDDB_TWR", "frequency": "120.030", "name": "Hans Weber", "cid": 5, "logon_time": "2026-10-12T11:00:00Z"},
-             {"callsign": "EDDB_ATIS", "frequency": "123.180", "name": "Hans Weber", "atis_code": "C",
+             {"callsign": "EDDB_ATIS", "frequency": "123.780", "name": "Hans Weber", "atis_code": "C",
               "text_atis": ["BERLIN BRANDENBURG INFORMATION C"]},
              {"callsign": "EDDB_CTR", "frequency": "130.000"},          # CTR to nie stanowisko lotniska
-             {"callsign": "EDWW_FLG_CTR", "frequency": "136.450"}]
+             {"callsign": "EDWW_FLG_CTR", "frequency": "136.450"},
+             # 0.13.6: ATIS i wieża spoza częstotliwości stanowisk (także 199.998) – jakby ich nie było
+             {"callsign": "EDDB_D_ATIS", "frequency": "121.130", "atis_code": "D", "cid": 8},
+             {"callsign": "EDDB_S_TWR", "frequency": "199.998", "cid": 9}]
     ps = airport_positions("eddb", known, ctrls)
     assert [(p["type"], p["callsign"]) for p in ps] == [
         ("APP", "EDDB_AN_APP"), ("APP", "EDDB_N_DEP"), ("TWR", "EDDB_N_TWR"), ("TWR", "EDDB_S_TWR"),
@@ -165,31 +169,35 @@ def test_airport_positions_order_and_online():
     # EDDB_TWR na 120.030 to stanowisko EDDB_N_TWR z danych (prefiks, typ, częstotliwość jak w EuroScope)
     assert by["EDDB_N_TWR"]["online"]["name"] == "Hans Weber" and by["EDDB_N_TWR"]["online"]["callsign"] == "EDDB_TWR"
     assert by["EDDB_S_TWR"]["online"] is None and by["EDDB_DEL"]["online"] is None
-    # ATIS spoza danych: własny wiersz z literą i tekstem
+    # ATIS na częstotliwości stanowiska: litera i tekst
     atis = by["EDDB_ATIS"]
-    assert not atis["known"] and atis["frequency"] == "123.180" and atis["online"]["atis_code"] == "C"
+    assert atis["known"] and atis["frequency"] == "123.780" and atis["online"]["atis_code"] == "C"
     assert atis["online"]["text_atis"] == ["BERLIN BRANDENBURG INFORMATION C"]
+    assert all(p["known"] for p in ps)
     assert airport_positions("LKPR", [], []) == []
 
 
-def test_airport_positions_every_controller_shown():
-    """0.13.5: stanowisko wg częstotliwości, a każdy zalogowany zostaje na karcie lotniska (jak w MAP)."""
+def test_airport_positions_only_on_frequency():
+    """0.13.6 (Marek: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
+    częstotliwościach aktywnych poprawnych dla sektorów, nie po nazwach"): na karcie lotniska tylko zalogowani na
+    częstotliwości stanowiska tego lotniska."""
     known = [{"callsign": "EPWA_APP", "frequency": "128.805"}, {"callsign": "EPWA_F_APP", "frequency": "129.380"},
              {"callsign": "EPWA_TWR", "frequency": "118.305"}]
     ctrl = lambda cs, fq, cid: {"callsign": cs, "frequency": fq, "cid": cid, "name": f"K{cid}"}  # noqa: E731
 
     def rows(ctrls):
-        return [(p["callsign"], p["known"], (p["online"] or {}).get("cid")) for p in airport_positions("EPWA", known, ctrls)]
+        return [(p["callsign"], (p["online"] or {}).get("cid")) for p in airport_positions("EPWA", known, ctrls)]
 
-    # EPWA_F_APP na 128.805 obsługuje EPWA_APP; EPWA_APP na 199.998 (spoza pliku) – osobny wiersz, nie znika
+    off = [("EPWA_APP", None), ("EPWA_F_APP", None), ("EPWA_TWR", None)]
+    # EPWA_F_APP na 128.805 obsługuje EPWA_APP; EPWA_APP na 199.998 – jakby go nie było (nie po znaku)
     assert rows([ctrl("EPWA_APP", "199.998", 1), ctrl("EPWA_F_APP", "128.805", 2)]) == [
-        ("EPWA_APP", True, 2), ("EPWA_APP", False, 1), ("EPWA_F_APP", True, None), ("EPWA_TWR", True, None)]
-    # obaj na 128.805: EPWA_APP ma swoje stanowisko, EPWA_F_APP zostaje w wolnym wierszu swojego znaku
-    assert rows([ctrl("EPWA_APP", "128.805", 1), ctrl("EPWA_F_APP", "128.805", 2)]) == [
-        ("EPWA_APP", True, 1), ("EPWA_F_APP", True, 2), ("EPWA_TWR", True, None)]
-    # znak spoza danych na częstotliwości zajętego stanowiska: własny wiersz
-    assert rows([ctrl("EPWA_APP", "128.805", 1), ctrl("EPWA_X_APP", "128.805", 3)]) == [
-        ("EPWA_APP", True, 1), ("EPWA_F_APP", True, None), ("EPWA_X_APP", False, 3), ("EPWA_TWR", True, None)]
+        ("EPWA_APP", 2), ("EPWA_F_APP", None), ("EPWA_TWR", None)]
+    # obaj na 128.805: stanowisko ma ten o tym znaku, drugi nie zajmuje cudzego wiersza po swoim znaku
+    assert rows([ctrl("EPWA_F_APP", "128.805", 2), ctrl("EPWA_APP", "128.805", 1)]) == [
+        ("EPWA_APP", 1), ("EPWA_F_APP", None), ("EPWA_TWR", None)]
+    # znak spoza danych na 199.998 albo na częstotliwości spoza danych: nic
+    assert rows([ctrl("EPWA_X_APP", "199.998", 3), ctrl("EPWA_TWR", "199.998", 4), ctrl("EPWA_D_ATIS", "121.130", 5),
+                 ctrl("EPWA_APP", "118.000", 6)]) == off
 
 
 @pytest.fixture(scope="module")
@@ -210,7 +218,7 @@ def fakes(monkeypatch):
         return {"general": {"update_timestamp": "2026-10-12T12:30:00Z"},
                 "controllers": [{"callsign": "UKLL_TWR", "frequency": "128.000", "name": "Ivan", "cid": 7,
                                  "logon_time": "2026-10-12T12:00:00Z"}],
-                "atis": [{"callsign": "UKLL_ATIS", "frequency": "126.300", "atis_code": "D", "text_atis": ["LVIV D"]}],
+                "atis": [{"callsign": "UKLL_ATIS", "frequency": "128.700", "atis_code": "D", "text_atis": ["LVIV D"]}],
                 "pilots": [], "prefiles": []}
     monkeypatch.setattr(aerodromes, "get_metars", metars)
     monkeypatch.setattr(aerodromes, "get_tafs", tafs)
@@ -281,6 +289,28 @@ def test_card_german_airport_positions_from_neighbour_files(client, fakes):
     assert by["EDDF_GND"]["frequency"] == "121.805" and by["EDDF_GND"]["known"] and by["EDDF_GND"]["online"] is None
     assert any(p["type"] == "APP" for p in client.get("/api/aerodromes/EDDL/card").json()["positions"])
     assert {"TWR", "APP"} <= {p["type"] for p in client.get("/api/aerodromes/ETHN/card").json()["positions"]}
+
+
+def test_card_frequency_from_any_source(client, fakes, monkeypatch):
+    """0.13.6: zalogowany liczy się tylko na częstotliwości stanowiska z danych – z każdego źródła: ETNH_TWR ma 125.600
+    w vacs-data (ta jest na karcie) i 122.100 w pliku EDWW, oba są poprawne; duński ATIS (w pliku EKDK XKCH_A_ATIS)
+    pod znakiem z sieci EKCH_A_ATIS; na 199.998 i na obcej częstotliwości – jakby go nie było."""
+    def feed_of(*rows):
+        async def feed():
+            return {"general": {}, "pilots": [], "prefiles": [], "atis": [r for r in rows if r["callsign"].endswith("ATIS")],
+                    "controllers": [r for r in rows if not r["callsign"].endswith("ATIS")]}
+        monkeypatch.setattr(aerodromes, "get_feed", feed)
+
+    def on(code):
+        return {p["callsign"]: (p["online"] or {}).get("frequency") for p in
+                client.get(f"/api/aerodromes/{code}/card").json()["positions"] if p["online"]}
+
+    feed_of({"callsign": "ETNH_TWR", "frequency": "122.100", "cid": 1}, {"callsign": "EKCH_A_ATIS", "frequency": "122.755",
+                                                                         "cid": 2, "atis_code": "B"})
+    assert on("ETNH") == {"ETNH_TWR": "122.100"} and on("EKCH") == {"EKCH_A_ATIS": "122.755"}
+    for fq in ("199.998", "118.000"):
+        feed_of({"callsign": "ETNH_TWR", "frequency": fq, "cid": 1}, {"callsign": "EKCH_A_ATIS", "frequency": fq, "cid": 2})
+        assert on("ETNH") == {} and on("EKCH") == {}, fq
 
 
 ED_FIR_CODES = {"EDGG", "EDWW", "EDMM", "EDUU", "EDYY", "EDXX", "ETXX"}

@@ -188,11 +188,47 @@ def test_board_atis(board):
     atis = {a["callsign"]: a for a in board["atis"]}
     assert atis["EPWA_ATIS"]["online"] and not atis["EPKK_ATIS"]["online"]
     assert board["online"]["EPWA_ATIS"]["atis_code"] == "K"
-    # zalogowany ATIS spoza pliku .ese też jest na pasku, z częstotliwością z sieci
-    assert atis["EPWA_D_ATIS"]["extra"] and board["pos"]["EPWA_D_ATIS"]["frequency"] == "121.130"
-    assert board["online"]["EPWA_D_ATIS"]["atis_code"] == "D"
+    # 0.13.6 (Marek: "wyswietlaj tylko kontrolerow po czestotliwosciach aktywnych poprawnych dla sektorow"): ATIS na
+    # częstotliwości, której nie ma żadne stanowisko z danych (EPWA_D_ATIS na 121.130), jakby go nie było
+    assert "EPWA_D_ATIS" not in atis and "EPWA_D_ATIS" not in board["online"] and "EPWA_D_ATIS" not in board["pos"]
+    assert not any(a.get("extra") for a in board["atis"])   # drugi ATIS z AIP (123.430): test_board_atis_from_aip
     assert [a["icao"] for a in board["atis"]] == sorted(a["icao"] for a in board["atis"])
     assert "EPKK_OBS" not in board["online"]  # tylko stanowiska z tablicy
+
+
+def test_board_atis_from_aip(client, monkeypatch):
+    """0.13.6: drugi ATIS z AIP (EPWA ATIS DEP 123.430) i ATIS lotniska bez ATIS w pliku .ese (EPRA 125.230) są na
+    poprawnej częstotliwości: na pasku ATIS jako dodatkowe wiersze z częstotliwością z sieci i z plakietką TWR/A; ten
+    sam znak na 199.998 albo na częstotliwości spoza danych – jakby go nie było."""
+    def feed_with(*atis):
+        return {**FEED, "controllers": [], "atis": [
+            {"callsign": cs, "frequency": fq, "name": "Atis", "cid": 70 + i, "atis_code": code}
+            for i, (cs, fq, code) in enumerate(atis)]}
+
+    def get(feed):
+        async def other():
+            return feed
+        monkeypatch.setattr(vatsim_api, "get_feed", other)
+        return client.get("/api/radio/board").json()
+
+    d = get(feed_with(("EPWA_A_ATIS", "120.455", "K"), ("EPWA_D_ATIS", "123.430", "L"), ("EPRA_ATIS", "125.230", "M")))
+    atis = {a["callsign"]: a for a in d["atis"]}
+    assert atis["EPWA_ATIS"]["online"] and d["online"]["EPWA_ATIS"]["callsign"] == "EPWA_A_ATIS"
+    assert atis["EPWA_D_ATIS"]["extra"] and atis["EPWA_D_ATIS"]["online"] and atis["EPRA_ATIS"]["extra"]
+    assert (d["pos"]["EPWA_D_ATIS"]["frequency"], d["online"]["EPWA_D_ATIS"]["atis_code"]) == ("123.430", "L")
+    assert (d["pos"]["EPRA_ATIS"]["frequency"], d["online"]["EPRA_ATIS"]["atis_code"]) == ("125.230", "M")
+    twra = {p["icao"]: p["atis"] for p in d["plates"]["twr"]}
+    assert twra["EPWA"] == ["EPWA_ATIS", "EPWA_D_ATIS"] and twra["EPRA"] == ["EPRA_ATIS"]
+    # znak stanowiska z pliku (EPWA_ATIS) na drugiej częstotliwości z AIP: w swoim wierszu, z częstotliwością z sieci
+    d = get(feed_with(("EPWA_ATIS", "123.430", "N")))
+    row = next(a for a in d["atis"] if a["callsign"] == "EPWA_ATIS")
+    assert row["online"] and not row.get("extra") and d["pos"]["EPWA_ATIS"]["frequency"] == "123.430"
+    assert d["online"]["EPWA_ATIS"]["atis_code"] == "N" and {p["icao"]: p["atis"] for p in d["plates"]["twr"]} == {
+        "EPWA": ["EPWA_ATIS"]}
+    for fq in ("199.998", "121.130"):
+        d = get(feed_with(("EPWA_D_ATIS", fq, "L"), ("EPRA_ATIS", fq, "M"), ("EPWA_ATIS", fq, "N")))
+        assert not any(a["online"] for a in d["atis"]) and d["plates"]["twr"] == [], fq
+        assert not {"EPWA_D_ATIS", "EPRA_ATIS", "EPWA_ATIS"} & set(d["online"]), fq
 
 
 def test_board_neighbour_firs(board):
@@ -1046,7 +1082,7 @@ EMPTY_FEED = {**FEED, "controllers": [], "atis": []}
 # 0.13.2 (przegląd): same informacje FIS (Gdańsk z EPWW-MIDSEA nad Bałtykiem) i wieże; informacja Warszawa
 FIS_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Fis", "cid": 80 + i} for i, (cs, fq) in enumerate((
-        ("EPGD_I_APP", "129.850"), ("EPKK_I_APP", "119.275"), ("EPPO_I_APP", "122.525"), ("EPWA_I_APP", "123.975"),
+        ("EPGD_I_APP", "125.275"), ("EPKK_I_APP", "119.275"), ("EPPO_I_APP", "126.300"), ("EPWA_I_APP", "123.975"),
         ("EPSC_TWR", "121.255"), ("EPKK_TWR", "123.255")))], "atis": []}
 INFO_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Info", "cid": 90 + i} for i, (cs, fq) in enumerate((

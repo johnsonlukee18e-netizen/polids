@@ -8,9 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import Aerodrome, AtcPosition, NavPoint
+from ..models import Aerodrome, AtcPosition, Frequency, NavPoint, NbPosition
 from .neighbours import listed_callsigns, nb_owners, nb_positions
-from .radio import INFO_MID, Station, merge_positions, neighbour_tab
+from .radio import INFO_MID, Station, facility, merge_positions, neighbour_tab
 from .vatsim import match_positions
 
 
@@ -37,6 +37,44 @@ def online_stations(db: Session, positions: list[dict] | None = None) -> list:
     known = {p.callsign for p in stations}
     return stations + [Station(p["callsign"], p["prefix"], p["frequency"] or "")
                        for p in (positions if positions is not None else all_positions(db)) if p["callsign"] not in known]
+
+
+def known_stations(db: Session) -> list:
+    """Wszystkie stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów razem ze stanowiskami lotnisk bez
+    sektora): do filtra on_frequency – zalogowany liczy się tylko na częstotliwości któregoś z nich (0.13.6). Znak,
+    który w dwóch źródłach ma różne częstotliwości (ETNH_TWR: 122.100 w pliku EDWW, 125.600 w vacs-data), liczy się na
+    każdej z nich (alt_stations). Do tego ATIS-y polskich lotnisk z AIP (data/seed/frequencies.csv): plik .ese ma jeden
+    ATIS na lotnisko, a AIP także drugi, np. EPWA ATIS DEP 123.430 – EPWA_D_ATIS na nim to poprawna częstotliwość (pas
+    startowy w AERODROME i OVERVIEW, dodatkowy wiersz na pasku ATIS w RADIO). Tylko do filtra: stanowisk na tablicy
+    RADIO i w kolejności przejmowania to nie dodaje."""
+    stations = online_stations(db, all_positions(db, airports=True))
+    aip = [Station(f"{f.aerodrome_icao}_ATIS", f.aerodrome_icao, f.mhz or "")
+           for f in db.scalars(select(Frequency).where(Frequency.kind == "ATIS"))]
+    return stations + alt_stations(db, stations) + aip
+
+
+def alt_stations(db: Session, stations: list, code: str = "") -> list:
+    """Stanowiska z częstotliwością, którą znak ma w innym źródle niż to, które wygrało w all_positions (vacs-data albo
+    plik .ese sąsiada; pierwszeństwo: plik EPWW, vacs-data, pliki sąsiadów – ETNH_TWR 122.100 z pliku EDWW obok
+    125.600 z vacs-data). Tylko znaki ze `stations` (drugie częstotliwości znanych stanowisk, nie nowe stanowiska); idą
+    na koniec listy, więc pierwszeństwo źródeł zostaje. code: tylko stanowiska lotniska (karta lotniska). Bez EP**
+    i bez FMP/TMU, jak merge_positions."""
+    seen = {(s.callsign, s.prefix, (s.frequency or "")[:7]) for s in stations}
+    names = {s.callsign for s in stations}
+    rows = [(v["id"], pre, v.get("frequency") or "") for v in vacs_positions()
+            if v.get("facility_type") not in ("FMP", "TMU") for pre in (v.get("prefixes") or [v["id"].split("_")[0]])]
+    stmt = select(NbPosition.callsign, NbPosition.prefix, NbPosition.frequency)
+    if code:
+        stmt = stmt.where(NbPosition.callsign.like(f"{code}\\_%", escape="\\"))
+    rows += [(cs, pre or cs.split("_")[0], fq or "") for cs, pre, fq in db.execute(stmt)]
+    out = []
+    for cs, pre, fq in rows:
+        if (not fq or cs.upper().startswith("EP") or facility(cs) in ("FMP", "TMU")
+                or cs not in names or (code and not cs.upper().startswith(code + "_")) or (cs, pre, fq[:7]) in seen):
+            continue
+        seen.add((cs, pre, fq[:7]))
+        out.append(Station(cs, pre, fq))
+    return out
 
 
 def sim_twins(stations: list, prefer: Collection[str]) -> dict[str, str]:
