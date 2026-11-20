@@ -5,7 +5,11 @@ dane (plik ICAO, baza osiągów, Wikipedia) w interfejsie.
 liczbę silników, WTC (ICAO), recat. Dopiero w dodatkowym widoku wyświetl zdjęcie na górze, niżej: Wingspan, length,
 height, MLW, MTOW, dopiero potem pozostale informacje". Lista to tabela (wiersz na typ, cells/record), rozwinięcie
 to wiersz pod klikniętym (detail): zdjęcie, pięć głównych kratek zawsze (brak = półpauza), pozostałe kratki, opis,
-odnośniki. Przyciski AIRBUS, BOEING, BOMBARDIER, EMBRAER, GA; grupy GA w kolejności z issue (makerGroups)."""
+odnośniki. Przyciski AIRBUS, BOEING, BOMBARDIER, EMBRAER, GA; grupy GA w kolejności z issue (makerGroups).
+0.14.0 (issue #28): "w kolumnie silników dodaj wiadomość o typie silnika, np. 2 Jet" (engineLabel); większa czcionka
+i wyższe wiersze, kolumny bliżej siebie (tabela najwyżej 760 px); dane na prawo od zdjęcia w trzech linijkach
+(lines): wingspan, ARC, length / MTOW, MLW, WTC / VMO, MMO, ceiling; reszta (wysokość, IATA, opis, silniki, WTG,
+opis słownie) nie jest pokazywana w rozwinięciu, ale zostaje w bazie i w API."""
 import json
 import os
 import re
@@ -70,11 +74,19 @@ const ga = JSON.parse(process.argv[4]);
 const order = (k) => ac.MAKERS.find((m) => m[0] === k)[3];
 const spans = [null, 0, 9.8, 14.99, 15, 23.99, 24, 35.99, 36, 51.99, 52, 64.99, 65, 79.99, 80, 117];
 const each = (f) => Object.fromEntries(Object.entries(recs).map(([k, a]) => [k, f(a)]));
+// silniki: opis typu z liczbą i bez, liczba i rodzaj z bazy, sam rodzaj z bazy (także "turbojet/turbofan"), śmigłowiec,
+// tiltrotor, sprzężone z liczbą w bazie, nieznany rodzaj (opis "---", rodzaj spoza listy), nic
+const ENGINES = [{ description: "LCT" }, { description: "L4J", engine_count: 4, engine_type: "turbofan" },
+  { description: "L2J" }, { engine_type: "piston" }, { description: "H1T" }, {}, { description: "T2T" },
+  { description: "L4T", engine_count: 4, engine_type: "turboprop" }, { description: "L1P", engine_count: 1 },
+  { engine_count: 2, engine_type: "Turbojet/turbofan" }, { description: "LCT", engine_count: 2, engine_type: "turboprop" },
+  { description: "L2E" }, { description: "L1R" }, { description: "---", engine_count: 3 }, { engine_count: 1, engine_type: "steam" },
+  { description: "H2T", engine_count: 2, engine_type: "turboshaft" }, { description: "A2P" }, { engine_type: "propfan" }];
 console.log(JSON.stringify({
   makers: ac.MAKERS.map(([k, l, t]) => [k, l, t]),
   columns: ac.COLUMNS.map(([k, l]) => [k, l]),
   head: ac.tableHead(),
-  boxes: each(ac.boxes),
+  lines: each(ac.lines),
   cells: each(ac.cells),
   record: each((a) => ac.record(a, 7)),
   detail: each(ac.detail),
@@ -86,13 +98,12 @@ console.log(JSON.stringify({
     order("bombardier")).map(([name]) => name),
   arc: spans.map((s) => ac.arcCode({ wingspan: s, description: "L2J" })),
   arcHeli: ac.arcCode({ wingspan: 10.2, description: "H2T" }),
-  engines: [{ description: "LCT" }, { description: "L4J", engine_count: 4, engine_type: "turbofan" },
-    { description: "L2J" }, { engine_type: "piston" }, { description: "H1T" }, {}, { description: "T2T" }].map(ac.engines),
+  engines: ENGINES.map(ac.engines),
+  engineLabel: ENGINES.map(ac.engineLabel),
   mlw: [[1970, 2047], [1202, 1247], [490, 522], [122000, 136000], [21850, null], [21850, 21850]]
-    .map(([lo, hi]) => ac.boxes({ icao: "X", mlw: lo, mlw_max: hi }).find((b) => b.label === "MLW").value),
+    .map(([lo, hi]) => ac.lines({ icao: "X", mlw: lo, mlw_max: hi })[1][1].find((b) => b.label === "MLW").value),
   credit: [{ credit: "Wikipedia: ATR 72", page: "https://en.wikipedia.org/wiki/ATR_72" },
     { credit: "J. Kowalski <own>", page: null }, { credit: "", page: null }].map(ac.photoCredit),
-  describe: ["L2J", "LCT", "H2T", null].map(ac.describe),
 }));
 """
 
@@ -112,10 +123,6 @@ def js(tmp_path_factory):
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
-
-
-def _rows(boxes):
-    return [(b["cat"], b["label"], b["value"]) for b in boxes]
 
 
 # --- przyciski producentów i grupy ----------------------------------------------------------------------------------
@@ -155,16 +162,20 @@ def test_columns_in_issue_order(js):
 def test_cells_six_values(js):
     def kv(name):
         return [(c["key"], c["value"]) for c in js["cells"][name]]
-    assert kv("AT76") == [("icao", "AT76"), ("mk", "ATR"), ("name", "ATR-72-600"), ("eng", "2"), ("wtc", "M"),
+    # 0.14.0 (issue #28): silniki z liczbą i rodzajem ("2 Turboprop", "2 Jet")
+    assert kv("AT76") == [("icao", "AT76"), ("mk", "ATR"), ("name", "ATR-72-600"), ("eng", "2 Turboprop"), ("wtc", "M"),
                           ("recat", "E|M↓")]
     by = {c["key"]: c for c in js["cells"]["AT76"]}
-    assert by["eng"]["title"] == "2 turboprop" and by["wtc"]["title"] == "Medium"
+    # dymek silników tylko, gdy mówi więcej niż kolumna (tu to samo: bez dymku)
+    assert by["eng"]["title"] == "" and by["wtc"]["title"] == "Medium"
     assert by["recat"]["title"] == "RECAT-EU E – Lower Medium" and by["recat"]["cls"] == "recat-E"
-    # pełna nazwa ICAO bez skracania; silniki z opisu typu, gdy brak w bazie (H2T: 2, LCT: C = sprzężone)
+    # pełna nazwa ICAO bez skracania; odrzutowiec: w kolumnie "Jet", w dymku rodzaj z bazy (turbofan)
     assert kv("A30B")[2] == ("name", "A-300(B2/B4/C4/F4)") and kv("A30B")[5] == ("recat", "C|H↓")
-    assert kv("EC35") == [("icao", "EC35"), ("mk", "AIRBUS HELICOPTERS"), ("name", "EC-135 <test>"), ("eng", "2"),
+    assert kv("A30B")[3] == ("eng", "2 Jet") and {c["key"]: c for c in js["cells"]["A30B"]}["eng"]["title"] == "2 turbofan"
+    # silniki z opisu typu, gdy brak w bazie (H2T: 2 turbiny wałowe, LCT: sprzężone)
+    assert kv("EC35") == [("icao", "EC35"), ("mk", "AIRBUS HELICOPTERS"), ("name", "EC-135 <test>"), ("eng", "2 Turboshaft"),
                           ("wtc", "L"), ("recat", "")]
-    assert kv("C08T")[3] == ("eng", "C") and kv("C08T")[5] == ("recat", "F|L")
+    assert kv("C08T")[3] == ("eng", "Coupled Turboprop") and kv("C08T")[5] == ("recat", "F|L")
     assert kv("ZZZZ") == [("icao", "ZZZZ"), ("mk", ""), ("name", ""), ("eng", ""), ("wtc", ""), ("recat", "")]
     assert not {c["key"]: c for c in js["cells"]["EC35"]}["recat"]["cls"]
 
@@ -172,9 +183,10 @@ def test_cells_six_values(js):
 def test_record_markup(js):
     html = js["record"]["AT76"]
     assert html == ('<tr class="ac-rec" data-i="7"><td class="icao">AT76</td><td class="mk">ATR</td>'
-                    '<td class="name">ATR-72-600</td><td class="eng" title="2 turboprop">2</td>'
+                    '<td class="name">ATR-72-600</td><td class="eng">2 Turboprop</td>'
                     '<td class="wtc" title="Medium">M</td>'
                     '<td class="recat recat-E" title="RECAT-EU E – Lower Medium">E|M↓</td></tr>')
+    assert '<td class="eng" title="2 turbofan">2 Jet</td>' in js["record"]["A30B"]
     # w wierszu nic więcej (odnośnik do osiągów i kratki są w rozwinięciu)
     for k in ("AT76", "A30B", "EC35", "C08T", "ZZZZ"):
         rec = js["record"][k]
@@ -183,68 +195,88 @@ def test_record_markup(js):
     # nazwa z bazy escapowana
     assert '<td class="name">EC-135 &lt;test&gt;</td>' in js["record"]["EC35"] and "<test>" not in js["record"]["EC35"]
     assert '<td class="recat"></td>' in js["record"]["EC35"]
+    assert '<td class="eng"></td>' in js["record"]["ZZZZ"]
 
 
 # --- rozwinięcie -----------------------------------------------------------------------------------------------------
 
-def test_boxes_main_five_first(js):
-    # pięć głównych w kolejności z issue, potem pozostałe; ICAO, WTC i RECAT są w wierszu, nie w kratkach
-    assert _rows(js["boxes"]["AT76"]) == [
-        ("dim", "WINGSPAN", "27.05 m"), ("dim", "LENGTH", "27.2 m"), ("dim", "HEIGHT", "7.7 m"),
-        ("wake", "MLW", "21.9 t"), ("wake", "MTOW", "23 t"),
-        ("id", "IATA", "AT7"), ("id", "DESC", "L2T"), ("perf", "ENG", "2 turboprop"), ("perf", "VMO", "250 kt"),
-        ("perf", "MMO", "M0.55"), ("perf", "CEILING", "FL250"), ("wake", "WTG", "F"), ("dim", "ARC", "C")]
-    assert [bool(b.get("main")) for b in js["boxes"]["AT76"]] == [True] * 5 + [False] * 8
-    assert not any(b.get("none") for b in js["boxes"]["AT76"])
-    by = {b["label"]: b for b in js["boxes"]["AT76"]}
-    assert by["DESC"]["title"] == "landplane, 2 × turboprop/turboshaft"
+def _lines(name, js):
+    return [(cat, [(b["cat"], b["label"], b["value"]) for b in row]) for cat, row in js["lines"][name]]
 
 
-def test_boxes_ranges_of_production_variants(js):
-    by = {b["label"]: b["value"] for b in js["boxes"]["A30B"]}
+def test_three_lines_of_data(js):
+    """0.14.0 (issue #28): 1) wingspan, ARC, length (bez wysokości), 2) MTOW, MLW, WTC, 3) VMO, MMO, ceiling;
+    każda linijka w kolorze swojej kategorii."""
+    assert _lines("AT76", js) == [
+        ("dim", [("dim", "WINGSPAN", "27.05 m"), ("dim", "ARC", "C"), ("dim", "LENGTH", "27.2 m")]),
+        ("wake", [("wake", "MTOW", "23 t"), ("wake", "MLW", "21.9 t"), ("wake", "WTC", "M")]),
+        ("perf", [("perf", "VMO", "250 kt"), ("perf", "MMO", "M0.55"), ("perf", "CEILING", "FL250")])]
+    rows = [b for _, row in js["lines"]["AT76"] for b in row]
+    assert not any(b.get("none") for b in rows)
+    by = {b["label"]: b for b in rows}
+    assert by["WTC"]["title"] == "Medium" and by["ARC"]["title"] == "Aerodrome reference code (wingspan)"
+    assert "title" not in by["LENGTH"] and "title" not in by["WINGSPAN"]
+    # reszta danych nie jest pokazywana (zostaje w bazie i w API, test_api_keeps_hidden_values)
+    for name in ("AT76", "A30B", "EC35", "C08T", "ZZZZ"):
+        labels = [b["label"] for _, row in js["lines"][name] for b in row]
+        assert len(labels) == 9 and not {"HEIGHT", "IATA", "DESC", "ENG", "WTG"} & set(labels), name
+
+
+def test_lines_ranges_of_production_variants(js):
+    by = {b["label"]: b["value"] for _, row in js["lines"]["A30B"] for b in row}
     assert by["VMO"] == "345–360 kt" and by["MMO"] == "M0.82–0.86" and by["MLW"] == "122–136 t"
-    assert by["CEILING"] == "FL370–410" and by["MTOW"] == "165 t" and by["ARC"] == "D"
-    assert by["WINGSPAN"] == "44.84 m" and by["LENGTH"] == "53.62 m" and by["HEIGHT"] == "16.53 m"
+    assert by["CEILING"] == "FL370–410" and by["MTOW"] == "165 t" and by["ARC"] == "D" and by["WTC"] == "H"
+    assert by["WINGSPAN"] == "44.84 m" and by["LENGTH"] == "53.62 m"
     # zakres tylko, gdy wartości różnią się po zaokrągleniu (lekkie typy: MLW 1970 i 2047 kg to "2 t", nie "2–2 t")
     assert js["mlw"] == ["2 t", "1.2 t", "0.5 t", "122–136 t", "21.9 t", "21.9 t"]
 
 
-def test_missing_main_values_are_dashes(js):
-    # śmigłowiec: pole rozpiętości to średnica wirnika (ROTOR), bez ARC; brak długości, wysokości, MLW i MTOW to
-    # półpauza w tej samej kratce (blok się nie przesuwa), pozostałe puste wartości bez kratek
-    assert _rows(js["boxes"]["EC35"]) == [("dim", "ROTOR", "10.2 m"), ("dim", "LENGTH", "–"), ("dim", "HEIGHT", "–"),
-                                          ("wake", "MLW", "–"), ("wake", "MTOW", "–"),
-                                          ("id", "DESC", "H2T"), ("perf", "ENG", "2 turboshaft")]
-    assert [bool(b.get("none")) for b in js["boxes"]["EC35"]] == [False, True, True, True, True, False, False]
+def test_missing_values_are_dashes(js):
+    # śmigłowiec: pole rozpiętości to średnica wirnika (ROTOR), bez ARC; każdy brak to półpauza w tej samej kratce
+    # (siatka się nie przesuwa)
+    assert _lines("EC35", js) == [
+        ("dim", [("dim", "ROTOR", "10.2 m"), ("dim", "ARC", "–"), ("dim", "LENGTH", "–")]),
+        ("wake", [("wake", "MTOW", "–"), ("wake", "MLW", "–"), ("wake", "WTC", "L")]),
+        ("perf", [("perf", "VMO", "–"), ("perf", "MMO", "–"), ("perf", "CEILING", "–")])]
+    assert [bool(b.get("none")) for _, row in js["lines"]["EC35"] for b in row] == [False, True, True, True, True,
+                                                                                     False, True, True, True]
     html = js["detail"]["EC35"]
-    assert '<div class="acb dim none"><span class="lbl">LENGTH</span><span class="val">–</span></div>' in html
-    assert '<div class="acb dim"><span class="lbl">ROTOR</span><span class="val">10.2 m</span></div>' in html
+    assert '<div class="acb dim none" title="Aerodrome reference code (wingspan)"><span class="lbl">ARC</span>' in html
+    assert '<div class="acb dim" title="Rotor diameter"><span class="lbl">ROTOR</span><span class="val">10.2 m</span></div>' in html
+    assert '<div class="acb wake" title="Light"><span class="lbl">WTC</span><span class="val">L</span></div>' in html
     assert '<span class="val"></span>' not in html
-    # typ bez żadnych wartości: pięć kratek z półpauzą, bez pustego rzędu pozostałych kratek i bez opisu
+    # typ bez żadnych wartości: dziewięć kratek z półpauzą (WTC bez dymku)
     zz = js["detail"]["ZZZZ"]
-    assert zz.count('class="acb ') == 5 and zz.count("none") == 5
-    assert zz.count('class="ac-boxes') == 1 and "ac-info" not in zz
+    assert zz.count('class="acb ') == 9 and zz.count(" none") == 9
+    assert '<div class="acb wake none"><span class="lbl">WTC</span><span class="val">–</span></div>' in zz
 
 
-def _main_labels(html):
-    main = re.search(r'<div class="ac-boxes main">(.*?)</div>\s*(?:<div class="ac-(?:boxes|info|links)")', html, re.S).group(1)
-    return re.findall(r'<span class="lbl">([A-Z]+)</span>', main)
+def _line_labels(html):
+    return [re.findall(r'<span class="lbl">([A-Z]+)</span>', m)
+            for m in re.findall(r'<div class="ac-line [a-z]+">(.*?</div>)</div>', html)]
 
 
 def test_detail_markup(js):
     html = js["detail"]["AT76"]
     # wiersz pod klikniętym na całą szerokość tabeli (6 kolumn)
-    assert html.startswith('<tr class="ac-detail-row"><td colspan="6"><div class="ac-detail">')
-    assert html.rstrip().endswith("</div></td></tr>")
-    # kolejność: zdjęcie na górze, pięć głównych kratek, pozostałe kratki, opis słownie, odnośniki
-    marks = ['class="photo-box"', 'class="ac-boxes main"', '<div class="ac-boxes">', 'class="ac-info"', 'class="ac-links"']
+    assert html.startswith('<tr class="ac-detail-row"><td colspan="6"><div class="ac-detail"><div class="ac-split">')
+    assert html.rstrip().endswith("</div></div></td></tr>")
+    # 0.14.0 (issue #28): zdjęcie, na prawo od niego dane (kratki w trzech linijkach, pod nimi odnośniki)
+    marks = ['class="photo-box"', 'class="ac-data"', 'class="ac-boxes"', 'class="ac-line dim"', 'class="ac-line wake"',
+             'class="ac-line perf"', 'class="ac-links"']
     assert [html.index(m) for m in marks] == sorted(html.index(m) for m in marks)
-    assert html.index('class="photo-box"') < html.index('class="acb')
-    assert _main_labels(html) == ["WINGSPAN", "LENGTH", "HEIGHT", "MLW", "MTOW"]
-    assert _main_labels(js["detail"]["EC35"]) == ["ROTOR", "LENGTH", "HEIGHT", "MLW", "MTOW"]
-    assert "L2T – landplane, 2 × turboprop/turboshaft" in html and "RECAT-EU E – Lower Medium" in html
-    assert "Loading photo…" in html
-    # strona osiągów typu (dawniej w linii tytułu rekordu) jako pierwszy odnośnik, potem zdjęcia i wyszukiwarki
+    split = html[html.index('<div class="ac-split">'):]
+    assert re.match(r'<div class="ac-split">\s*<div class="photo-box"><span class="hint">Loading photo…</span></div>\s*'
+                    r'<div class="ac-data">', split)
+    assert _line_labels(html) == [["WINGSPAN", "ARC", "LENGTH"], ["MTOW", "MLW", "WTC"], ["VMO", "MMO", "CEILING"]]
+    assert _line_labels(js["detail"]["EC35"])[0] == ["ROTOR", "ARC", "LENGTH"]
+    # reszta danych zniknęła z rozwinięcia: wysokość, IATA, opis typu i kategorii słownie, silniki, WTG
+    for k in ("AT76", "A30B", "EC35", "C08T", "ZZZZ"):
+        d = js["detail"][k]
+        assert not re.search(r">(HEIGHT|IATA|DESC|ENG|WTG)<", d), k
+        assert "ac-info" not in d and "landplane" not in d and "RECAT-EU" not in d, k
+    assert "7.7 m" not in html and "AT7<" not in html
+    # strona osiągów typu jako pierwszy odnośnik, potem zdjęcia i wyszukiwarki
     links = re.findall(r"<a[^>]*>([^<]+)</a>", html[html.index('class="ac-links"'):])
     assert links == ["Performance ↗", "More photos ↗", "Image search ↗", "Performance search ↗"]
     assert re.search(r'<a class="ac-perf" href="[^"]*details\.aspx\?ICAO=AT76"[^>]*>Performance ↗</a>', html)
@@ -253,7 +285,6 @@ def test_detail_markup(js):
     assert re.search(r'<a href="[^"]*/default\.aspx"[^>]*>Performance search ↗</a>', html)
     for k in ("AT76", "A30B", "EC35", "C08T", "ZZZZ"):
         assert not PROVENANCE.search(_visible(js["detail"][k])), k
-    assert "RECAT-EU" not in js["detail"]["EC35"]
     # nazwa z bazy w adresach wyszukiwarek zakodowana
     assert "<test>" not in js["detail"]["EC35"] and "EC-135%20%3Ctest%3E" in js["detail"]["EC35"]
     # 0.13.3: Airbus bez łącznika po A w wyszukiwarkach zdjęć (jak photo_query), inni producenci bez zmian
@@ -269,15 +300,25 @@ def test_no_bold_markup(js):
 
 
 def test_arc_code_letters(js):
+    # ICAO Annex 14: A < 15 m, B < 24 m, C < 36 m, D < 52 m, E < 65 m, F < 80 m
     assert js["arc"] == ["", "", "A", "A", "B", "B", "C", "C", "D", "D", "E", "E", "F", "F", "", ""]
     assert js["arcHeli"] == ""
 
 
-def test_engines_and_description(js):
-    # tiltrotor (T2T) ma turbiny wałowe jak śmigłowiec
-    assert js["engines"] == ["coupled turboprop", "4 turbofan", "2 jet", "piston", "1 turboshaft", "", "2 turboshaft"]
-    assert js["describe"] == ["landplane, 2 × jet", "landplane, coupled turboprop/turboshaft",
-                              "helicopter, 2 × turboprop/turboshaft", ""]
+def test_engine_label_count_and_type(js):
+    """0.14.0 (issue #28): liczba i rodzaj silników ("2 Jet"): kategoria z opisu ICAO (J Jet, T Turboprop, u śmigłowca
+    i tiltrotora Turboshaft, P Piston, E Electric, R Rocket), bez opisu z engine_type z bazy; nieznany rodzaj: sama
+    liczba; sprzężone bez liczby w bazie: Coupled."""
+    assert js["engineLabel"] == ["Coupled Turboprop", "4 Jet", "2 Jet", "Piston", "1 Turboshaft", "", "2 Turboshaft",
+                                 "4 Turboprop", "1 Piston", "2 Jet", "2 Turboprop", "2 Electric", "1 Rocket", "3", "1",
+                                 "2 Turboshaft", "2 Piston", "Turboprop"]
+
+
+def test_engines_detail_for_title(js):
+    # dymek kolumny silników: rodzaj z bazy; tiltrotor (T2T) ma turbiny wałowe jak śmigłowiec
+    assert js["engines"][:7] == ["coupled turboprop", "4 turbofan", "2 jet", "piston", "1 turboshaft", "",
+                                 "2 turboshaft"]
+    assert js["engines"][9] == "2 Turbojet/turbofan"
 
 
 def _visible(html):
@@ -349,18 +390,48 @@ def test_css_flat_and_linked():
     assert 'href="/static/css/aircraft.css"' in index
     text = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
     assert all(r.strip() == "0" for r in re.findall(r"border-radius:\s*([^;}]+)", text))
-    assert "text-shadow" not in text
+    assert "text-shadow" not in text and "font-weight" not in text and "bold" not in text
     assert all(v.strip().startswith("inset") for v in re.findall(r"box-shadow:\s*([^;}]+)", text))
-    # wartość wyraźnie większa od etykiety; kratki się zawijają
+    # wartość wyraźnie większa od etykiety
     label = int(re.search(r"\.acb > \.lbl \{[^}]*font: (\d+)px", text).group(1))
     value = int(re.search(r"\.acb > \.val \{[^}]*font: (\d+)px", text).group(1))
     assert value >= label + 6
-    assert re.search(r"\.ac-boxes \{[^}]*flex-wrap: wrap", text)
     assert "color: var(--muted);" in _css_rule(".acb.none > .val")
-    # cztery kategorie w różnych kolorach
+    # trzy kategorie (linijki) w różnych kolorach
     bgs = {c: re.search(rf"\.acb\.{c} \{{[^}}]*background: (#[0-9a-f]{{6}})", text).group(1)
-           for c in ("id", "perf", "wake", "dim")}
-    assert len(set(bgs.values())) == 4
+           for c in ("perf", "wake", "dim")}
+    assert len(set(bgs.values())) == 3
+    # bez nazw, które chowają blokery reklam
+    assert not re.search(r"[.#](ad-|ads|advert|banner|sponsor|promo)", text, re.I)
+    assert not re.search(r'class="[^"]*\b(ad-|ads\b|advert|banner|sponsor|promo)', SRC, re.I)
+
+
+def test_css_three_lines_right_of_photo():
+    """0.14.0 (issue #28): dane na prawo od zdjęcia (flex w rzędzie, zdjęcie się zmniejsza, dane nie), trzy linijki
+    po trzy kratki w siatce; pod zdjęcie dane schodzą tylko w wąskim panelu (zapytanie o kontener rozwinięcia).
+    Rozwinięcie najwyżej na widoczną szerokość listy i przyklejone do jej lewej krawędzi (lista przewijana w bok)."""
+    text = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    split = _css_rule(".ac-split")
+    assert "display: flex;" in split and "flex-direction" not in split and "flex-wrap" not in split
+    assert "align-items: flex-start;" in split
+    photo = _css_rule(".ac-split > .photo-box")
+    assert "flex: 0 1 auto;" in photo and "min-width: 0;" in photo
+    data = _css_rule(".ac-data")
+    assert "flex: none;" in data and "width: min-content;" in data
+    # siatka 3 x 3: linijka bez własnego pudełka, kratki w kolumnach
+    assert "grid-template-columns: repeat(3, max-content);" in _css_rule(".ac-boxes")
+    assert "display: contents;" in _css_rule(".ac-line")
+    # dane pod zdjęciem dopiero w wąskim kontenerze rozwinięcia
+    detail = _css_rule(".ac-detail")
+    assert "container: ac-detail / inline-size;" in detail
+    assert "position: sticky;" in detail and "width: min(100%, calc(100cqi - 22px));" in detail
+    assert "container-type: inline-size;" in _css_rule(".ac-list")
+    q = re.search(r"@container ac-detail \(max-width: (\d+)px\) \{\s*\.ac-split \{ flex-direction: column; \}\s*\}", text)
+    assert q and 520 <= int(q.group(1)) <= 640
+    # zdjęcie w proporcjach pliku
+    img = _css_rule(".ac-detail .photo-box img")
+    assert "max-height: 300px;" in img and "max-width: min(640px, 100%);" in img and "object-fit" not in img
+    assert "ac-info" not in text and ".acb.id" not in text
 
 
 def test_css_table():
@@ -375,16 +446,29 @@ def test_css_table():
     assert "padding-top: var(--col-pad);" in _css_rule(".ac-pane")
     # tabela o stałych kolumnach, nazwa się zawija
     table = _css_rule("table.ac-table")
-    assert "table-layout: fixed;" in table and "max-width: 980px;" in table
-    assert "nowrap" in _css_rule(".ac-table td.icao") and "nowrap" not in _css_rule(".ac-table td.name")
+    assert "table-layout: fixed;" in table
+    assert "nowrap" in _css_rule(".ac-table tr.ac-rec td.icao") and "nowrap" not in _css_rule(".ac-table td.name")
+    # 0.14.0 (issue #28): większa czcionka i wyższe wiersze (dawniej 13 px i padding 4 px), kolumny bliżej siebie:
+    # tabela najwyżej 760 px (dawniej 980), na nazwę zostaje najwyżej 280 px
+    rec = _css_rule(".ac-table tr.ac-rec td")
+    assert int(re.search(r"font-size: (\d+)px;", rec).group(1)) >= 16
+    assert int(re.search(r"padding: (\d+)px", rec).group(1)) >= 6
+    assert int(re.search(r"font-size: (\d+)px;", _css_rule(".ac-table tr.ac-rec td.icao")).group(1)) >= 17
+    ceiling = float(re.search(r"max-width: (\d+)px;", table).group(1))
     # w wąskim panelu (tablet pionowo) kolumna nazwy nie znika: tabela co najmniej 640 px (lista przewija się w bok),
     # na nazwę zostaje co najmniej 160 px poza stałymi kolumnami; nazwa łamana na spacjach, nie po jednej literze
     floor = re.search(r"min-width: (\d+)px;", table)
     assert floor, "table.ac-table bez min-width"
     floor = float(floor.group(1))
-    fixed = sum(float(re.search(r"width: (\d+)px;", _css_rule(f".ac-table th.{c}")).group(1))
-                for c in ("icao", "mk", "eng", "wtc", "recat"))
-    assert floor == 640 and fixed == 460 and floor - fixed >= 160
+    widths = {c: float(re.search(r"width: (\d+)px;", _css_rule(f".ac-table th.{c}")).group(1))
+              for c in ("icao", "mk", "eng", "wtc", "recat")}
+    fixed = sum(widths.values())
+    assert floor == 640 and fixed == 480 and floor - fixed >= 160
+    assert ceiling == 760 and ceiling - fixed <= 280
+    # kolumna silników mieści "2 Turboshaft" przy 16 px (ok. 89 px tekstu + 16 px paddingu), łamana tylko na spacji
+    assert widths["eng"] >= 108
+    eng = _css_rule(".ac-table td.eng")
+    assert "overflow-wrap: normal;" in eng and "nowrap" not in eng
     assert "overflow: auto;" in _css_rule(".ac-list")
     assert "overflow-wrap: break-word;" in _css_rule(".ac-table td.name")
     # RECAT-EU w kolorze kategorii, także w zaznaczonym wierszu
@@ -395,10 +479,6 @@ def test_css_table():
     assert "table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--row-alt); }" in text
     assert "background: var(--sel) !important;" in _css_rule("table.ac-table tbody tr.ac-detail-row td")
     assert "background: var(--head) !important;" in _css_rule("table.ac-table tbody tr.ac-gh td")
-    # zdjęcie u góry rozwinięcia w proporcjach pliku
-    assert "flex-direction: column;" in _css_rule(".ac-detail")
-    img = _css_rule(".ac-detail .photo-box img")
-    assert "max-height: 300px;" in img and "object-fit" not in img
 
 
 @pytest.fixture(scope="module")
@@ -411,6 +491,16 @@ def test_api_has_no_source_field(client):
     a = client.get("/api/aircraft", params={"q": "AT76"}).json()[0]
     assert a["icao"] == "AT76" and "source" not in a
     assert "source" not in client.get(f"/api/aircraft/{a['id']}").json()
+
+
+def test_api_keeps_hidden_values(client):
+    """0.14.0 (issue #28): wartości, których rozwinięcie już nie pokazuje (wysokość, IATA, opis typu, WTG, rodzaj
+    i liczba silników), zostają w bazie i w API "na wszelki wypadek"."""
+    a = client.get("/api/aircraft", params={"q": "AT76"}).json()[0]
+    assert a["icao"] == "AT76"
+    assert a["height"] and a["iata"] and a["description"] == "L2T" and a["wtg"] and a["engine_count"] == 2
+    assert {"engine_type", "use", "mlw_max", "ceiling_ft_max", "vmo_kt_max", "mmo_max"} <= set(a)
+    assert client.get(f"/api/aircraft/{a['id']}").json()["height"] == a["height"]
 
 
 def test_photo_error_is_neutral(client, monkeypatch, tmp_path):
