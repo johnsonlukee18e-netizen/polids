@@ -1,4 +1,5 @@
-"""AERODROME › OVERVIEW we froncie (frontend/js/overview.js): pas w użyciu i przełącznik MINE / ALL (0.12.6).
+"""HOME › SELF CHECK-IN (do 0.13.6 AERODROME › OVERVIEW; 0.14.0, issue #28: krok 2 HOME) we froncie
+(frontend/js/overview.js): pas w użyciu i przełącznik MINE / ALL (0.12.6), przycisk powrotu do kroku 1 HOME.
 
 Czyste funkcje sprawdzamy w Node (overview.js bez METEO i checklisty, jak w test_home.py)."""
 
@@ -137,6 +138,15 @@ def test_overview_js_english_without_provenance():
         assert word in code, word
     # przełącznik zapamiętany w tej przeglądarce (lsGet / lsSet), jak inne ustawienia PRZEGLĄDU
     assert 'const SCOPE_KEY = "overview.scope";' in code and "lsSet(SCOPE_KEY, scope)" in code
+
+
+def test_back_button_only_with_on_back():
+    """0.14.0 (issue #28): przycisk CHANGE POSITION (powrót do kroku 1 HOME) na początku paska tylko z onBack; napis
+    w kodzie przez \\u, bez polskich znaków; wieża dalej przez onGoto."""
+    src = OVERVIEW_JS.read_text("utf-8")
+    bar = src[src.index('<div class="toolbar ov-bar">'):src.index('<label class="sc">Position')]
+    assert '${onBack ? `<button type="button" class="gbtn ov-back" title="Back to the welcome page and the position choice">\\u2190 CHANGE POSITION</button>` : ""}' in bar
+    assert "onGoto?.(goto);" in src and '$(".ov-back")?.addEventListener("click", () => onBack());' in src
 
 
 def test_overview_css_look():

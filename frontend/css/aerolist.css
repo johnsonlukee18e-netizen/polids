@@ -1,7 +1,9 @@
 /* AERODROME: listy lotnisk FIR-ów (runda 10) */
 /* Podzakładki 0, EPWW … UKLV; lista jak w PANDORZE: wyszukiwarka z SHOW / CLEAR u góry, wiersze "ICAO NAZWA"
-   w jednej kolumnie, w pasach, przewijane w swoim okienku (strona się nie przewija). Lotnisko spoza bazy: karta. */
+   w jednej kolumnie, w pasach, przewijane w swoim okienku (strona się nie przewija). Lotnisko spoza bazy: karta.
+   0.14.0 (issue #28): "()" (adres 0) to wyszukiwarka wszystkich lotnisk z klawiaturą dotykową, w tym samym układzie */
 .aero-pane.list-mode > .toolbar { display: none; }               /* lista ma własny pasek z wyszukiwarką */
+.aero-pane.find-mode > .toolbar { display: none; }               /* wyszukiwarka "()" też */
 .aero-pane.card-mode > .toolbar .aero-view { display: none; }    /* INFO/AWOS/TRAFFIC tylko dla lotnisk z bazy */
 /* ostre krawędzie (0.12.5) w całej zakładce AERODROME: wspólne panele, pola, przyciski i plakietki ze style.css */
 .aero-pane .card, .aero-pane .card > h3:first-child, .aero-pane .field, .aero-pane .toolbar select, .aero-pane .toolbar input,
@@ -53,6 +55,11 @@
 .alist-row.sel:hover { box-shadow: inset 4px 0 0 var(--green-hi), inset 0 0 0 1px var(--green-hi); }
 .alist-msg { padding: 10px 14px; font-size: 14px; }
 .alist-msg b { color: #fff; }
+/* 0.14.0 (issue #28): wyszukiwarka "()": w wierszu zamiast plakietek stanowisk klucz podzakładki (FIR) lotniska; pod
+   listą klawiatura dotykowa (keyboard.css), w wąskim panelu klawisze węższe jak w AIRCRAFT i CALLSIGN (cqw panelu) */
+.aero-find { container-type: inline-size; }
+.aero-find > .tkbd { --tk-w: min(56px, calc((100cqw - 41px) / 10)); margin-top: 8px; }
+.aero-find-fir { grid-column: 4; color: var(--muted); font: 14px var(--mono); }
 
 /* karta lotniska zagranicznego: METAR na całą szerokość, niżej TAF i stanowiska (APP, TWR, GND, DEL, ATIS) */
 .acard { flex: 1; min-height: 0; display: flex; flex-direction: column; }

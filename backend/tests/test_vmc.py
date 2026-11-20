@@ -284,12 +284,13 @@ def test_awos_has_no_own_vmc_rule():
     assert all(ln.lstrip().startswith("//") or ln.isascii() for ln in body.splitlines())
 
 
-# --- AERODROME: przycisk OVERVIEW "()" -----------------------------------------------------------------------------
+# --- AERODROME: przycisk "()" (do 0.13.6 OVERVIEW, od 0.14.0 wyszukiwarka lotnisk) ---------------------------------
 
 def test_overview_button_label():
     src = (JS / "tabs" / "aerodrome.js").read_text("utf-8")
-    assert '<button data-fir="0" title="OVERVIEW: whole FIR EPWW">()</button>' in src
-    assert '">0</button>' not in src
+    # 0.14.0 (issue #28): OVERVIEW przeszło do HOME, "()" to wyszukiwarka wszystkich lotnisk
+    assert '<button data-fir="0" title="Search all aerodromes">()</button>' in src
+    assert '">0</button>' not in src and "OVERVIEW: whole FIR EPWW" not in src
     # identyfikator i adres bez zmian: #aerodrome/0, kliknięcie przycisku i zapisany ostatni ekran
     assert 'goto(b.dataset.fir === "0" ? "0" : "fir/" + b.dataset.fir' in src
-    assert 'if (a === "0") showOverview();' in src
+    assert 'if (a === "0") showFind();' in src

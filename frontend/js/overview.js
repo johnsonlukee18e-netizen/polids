@@ -1,4 +1,5 @@
-// AERODROME › OVERVIEW: jeden ekran dla całego FIR EPWW, coś jak self-checkin przed otwarciem stanowiska.
+// HOME › SELF CHECK-IN (0.14.0, issue #28: dawne AERODROME › OVERVIEW, teraz krok 2 zakładki HOME, adres #home/checkin):
+// jeden ekran dla całego FIR EPWW, self-checkin przed otwarciem stanowiska.
 // Panele (dane z /api/overview, każdy z własnym komunikatem błędu):
 //   1. poziom przejściowy (TL): jeden dla całego kraju, FL080, a FL090, gdy gdziekolwiek QNH ≤ 995 hPa,
 //   2. METAR + TAF wszystkich kontrolowanych lotnisk ze stanem LVP i pasem w użyciu (z ATIS albo preferowany,
@@ -7,8 +8,9 @@
 //   4. restrykcje ECFMP dla FIR EPWW i regulacje vIFF na sektorach EP,
 //   5. Airport Monitor vIFF (przepustowość, ruch, loty z CTOT) + liczby lotów z sieci VATSIM.
 // Filtr stanowiska u góry: ACC / APP / TWR. APP i ACC zawężają panele do swoich lotnisk i pokazują checklistę
-// otwarcia stanowiska, TWR przeskakuje od razu do PRZEGLĄDU danego lotniska (onGoto). Przy ACC / APP przełącznik
-// MINE / ALL: MINE ukrywa lotniska, które przed wybranym stanowiskiem obsługuje teraz ktoś inny (covered_by z serwera).
+// otwarcia stanowiska, TWR przeskakuje od razu do strony INFO danego lotniska w AERODROME (onGoto). Przy ACC / APP
+// przełącznik MINE / ALL: MINE ukrywa lotniska, które przed wybranym stanowiskiem obsługuje teraz ktoś inny (covered_by
+// z serwera). Przycisk CHANGE POSITION na początku paska (onBack) wraca do kroku 1 HOME (powitanie i wybór stanowiska).
 import { api, choiceGet, choiceSet, esc, h, lsGet, lsSet, lvpState, lvpTip, ONLINE_EVENT, POS_KEY } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 import { renderChecklist } from "./checklist.js";
@@ -224,9 +226,11 @@ export function emptyNote(shown, hidden) {
 export const tipUp = (r, box) => r.top + r.bottom > box.top + box.bottom;
 
 // --- widok -----------------------------------------------------------------------------------------------------
-export function mountOverview(el, { onGoto } = {}) {
+export function mountOverview(el, { onGoto, onBack } = {}) {
+  // 0.14.0 (issue #28): onBack = przycisk powrotu do kroku 1 HOME (zmiana stanowiska) na początku paska
   el.innerHTML = `<div class="ov">
     <div class="toolbar ov-bar">
+      ${onBack ? `<button type="button" class="gbtn ov-back" title="Back to the welcome page and the position choice">\u2190 CHANGE POSITION</button>` : ""}
       <label class="sc">Position
         <select class="field ov-pos"><option value="">All aerodromes of FIR EPWW</option></select></label>
       <span class="ov-scope" hidden><button type="button" data-scope="mine" title="Only aerodromes not covered now by other controllers">MINE</button><button type="button" data-scope="all" title="All aerodromes of the position">ALL</button></span>
@@ -368,6 +372,7 @@ export function mountOverview(el, { onGoto } = {}) {
     chk = null;
     load();
   });
+  $(".ov-back")?.addEventListener("click", () => onBack());
   // MINE / ALL: tylko inny widok tych samych danych (bez nowego zapytania), wybór zapamiętany w przeglądarce
   $(".ov-scope").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-scope]");
@@ -400,7 +405,7 @@ export function mountOverview(el, { onGoto } = {}) {
   loadPositions().then(load);
   timer = setInterval(load, REFRESH_MS);
   return {
-    // ponowne pokazanie otwartego PRZEGLĄDU: stanowisko wybrane w międzyczasie w HOME (tego okna) zamiast starego
+    // ponowne pokazanie otwartego check-inu: stanowisko wybrane w międzyczasie w kroku 1 HOME (tego okna) zamiast starego
     sync() {
       const next = syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed);
       seen = next.seen;

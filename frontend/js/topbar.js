@@ -41,11 +41,14 @@ export function takeReload(store = session()) {
   try { hash = store?.getItem(RELOAD_KEY) ?? null; store?.removeItem(RELOAD_KEY); } catch { /* zablokowane */ }
   return hash;
 }
-// ekran do przywrócenia po Reload: {tab, arg} z zapisanego adresu; HOME albo pusty adres = nic (HOME już otwarty)
+// ekran do przywrócenia po Reload: {tab, arg} z zapisanego adresu; HOME albo pusty adres = nic (HOME już otwarty).
+// 0.14.0 (issue #28): krok 2 HOME (#home/checkin, SELF CHECK-IN) to osobny ekran, więc wraca jak każdy inny (krok po
+// kroku 1, ← wraca do powitania); inny #home/x to krok 1, czyli nic
 export function reloadTarget(hash) {
   if (!hash) return null;
   const { tab, arg } = parseHash(hash);
-  return tab && tab !== "home" ? { tab, arg } : null;
+  if (tab === "home") return arg.toLowerCase() === "checkin" ? { tab, arg: "checkin" } : null;
+  return tab ? { tab, arg } : null;
 }
 
 // bar: header#topbar; root: element z filtrem (<html>); here/reload/store/win: do testów w Node.

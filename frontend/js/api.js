@@ -227,11 +227,14 @@ export const KEYBOARD_KEY = "letters.keyboard";
 // bez zapisanego wyboru klawiatura otwarta tylko przy dotykowym wskaźniku (pointer: coarse).
 // Zwraca { el, sync }: el zakładka wstawia na koniec panelu, sync() w activate() ustawia stan wg wyboru (zmienionego
 // może w drugiej zakładce).
-export function touchKeyboard(input, button) {
+// 0.14.0 (issue #28): opts.key = własny klucz wyboru (AERODROME "()", wyszukiwarka lotnisk: osobno od AIRCRAFT
+// i CALLSIGN), opts.open = stan bez zapisanego wyboru zamiast sprawdzania wskaźnika dotykowego (tam: otwarta)
+export function touchKeyboard(input, button, { key = KEYBOARD_KEY, open = null } = {}) {
   const el = h(`<div class="tkbd" role="group" aria-label="Touch keyboard" hidden>${keyboardHtml()}</div>`);
   const wanted = () => {
-    const c = choiceGet(KEYBOARD_KEY);
-    return c ? c === "1" : !!globalThis.matchMedia?.("(pointer: coarse)").matches;
+    const c = choiceGet(key);
+    if (c) return c === "1";
+    return open ?? !!globalThis.matchMedia?.("(pointer: coarse)").matches;
   };
   const show = (on) => {
     el.hidden = !on;
@@ -241,7 +244,7 @@ export function touchKeyboard(input, button) {
   };
   button?.addEventListener("click", () => {
     const on = el.hidden;
-    choiceSet(KEYBOARD_KEY, on ? "1" : "0");
+    choiceSet(key, on ? "1" : "0");
     show(on);
     if (on) input.focus({ preventScroll: true });
   });

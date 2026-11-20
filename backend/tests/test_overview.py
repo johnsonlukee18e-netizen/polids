@@ -1,4 +1,5 @@
-"""AERODROME › OVERVIEW: poziom przejściowy, przypisanie lotnisk do stanowisk, ECFMP/vIFF i jedno zapytanie /api/overview.
+"""HOME › SELF CHECK-IN (do 0.13.6 AERODROME › OVERVIEW, od 0.14.0 krok 2 HOME): poziom przejściowy, przypisanie
+lotnisk do stanowisk, ECFMP/vIFF i jedno zapytanie /api/overview.
 
 Wszystkie źródła zewnętrzne (METAR/TAF, VATSIM, NOTAM, ECFMP, vIFF) są podstawione, żeby testy działały bez sieci."""
 

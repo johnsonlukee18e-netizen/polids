@@ -399,6 +399,38 @@ console.log(JSON.stringify({
   step: [[-1, 10, 1], [-1, 10, -1], [-1, 10, 18], [0, 10, -1], [3, 10, 1], [3, 10, -1], [9, 10, 1], [2, 10, 18],
     [9, 10, -18], [5, 0, 1], [-1, 0, -1]].map(([i, n, d]) => m.stepSel(i, n, d)),
   page: [[684, 38], [708, 38], [38, 38], [0, 38], [684, 0], [684, NaN]].map(([h, r]) => m.pageRows(h, r)),
+  find: (() => {
+    // 0.14.0 (issue #28): "()" – wszystkie lotniska: baza polskich lotnisk i listy FIR-ów (każde ICAO raz)
+    const db = [{ icao: "EPWA", name: "Warszawa Chopin", city: "Warszawa", kind: "civil" },
+      { icao: "EPKK", name: "Kraków Balice", city: "Kraków" }, { icao: "EPXX", name: "Testowo", city: "Nowe Miasto", kind: "military" }];
+    const lists = {
+      ED: [{ icao: "EDDB", name: "BERLIN BRANDENBURG", kind: null, rank: 0, alias: [] },
+           { icao: "EDDK", name: "COLOGNE-BONN", kind: null, rank: 0, alias: ["KOELN"] },
+           { icao: "EDWA", name: "WARSZAWA TEST DE", kind: null, rank: 2, alias: [] }],
+      EPWW: [{ icao: "EPWA", name: "WARSZAWA CHOPIN", kind: null, rank: 0, alias: [] },
+             { icao: "EPBC", name: "WARSZAWA BABICE", kind: null, rank: 1, alias: [] },
+             { icao: "EPKK", name: "KRAKOW BALICE", kind: null, rank: 0, alias: [] },
+             { icao: "EPMM", name: "MINSK MAZOWIECKI", kind: "MIL", rank: 1, alias: [] }],
+      UMMV: [{ icao: "UMMS", name: "MINSK NATIONAL", kind: null, rank: 0, alias: [] }],
+      ET: "broken",
+    };
+    const idx = m.aeroIndex(db, lists);
+    const F = (q) => m.findAeros(idx, q);
+    const f = (q) => F(q).map((a) => a.icao);
+    return {
+      index: idx.map((a) => [a.i, a.icao, a.fir, a.kind, a.rank]),
+      empty: [m.aeroIndex().length, m.aeroIndex(null, null).length, m.aeroIndex([], { EPWW: [{ icao: "EPWA", name: "X" }] }).map((a) => a.rank)],
+      q: Object.fromEntries(["warszawa", "EPW", "epwa", "krakow", "kraków", "minsk", "nowe miasto", "berlin", "koln", "", "  ", "zzzz", "E"]
+        .map((q) => [q, f(q).slice(0, 6)])),
+      count: f("E").length,
+      enter: [
+        [F("warszawa"), "warszawa", null], [F("warszawa"), "warszawa", "EPBC"], [F("warszawa"), "warszawa", "EDDB"],
+        [F("epwa"), "epwa", null], [F("EP WA"), "EP WA", null], [F("berlin"), "berlin", null], [F("zzzz"), "zzzz", null],
+        [F("zzzzz"), "zzzzz", null], [[], "", null], [F("EPK"), "EPK", null], [F("EP"), "EP", null],
+      ].map(([found, q, sel]) => m.enterTarget(found, q, sel)),
+      limit: m.FIND_LIMIT, kbdKey: m.FIND_KBD_KEY,
+    };
+  })(),
 }));
 """
 
@@ -491,3 +523,78 @@ def test_list_css_contract():
     hover, sel = rule(".alist-row:hover"), rule(".alist-row.sel")
     assert "var(--row-hover)" not in hover and "box-shadow" in hover and hover != sel
     assert "text-shadow" not in css
+
+
+def test_js_find_all_aerodromes(aerojs):
+    """0.14.0 (issue #28): "zostaw () jako stronę do wyszukiwania lotniska, wraz z klawiaturą". Jeden indeks dla bazy
+    polskich lotnisk i list FIR-ów: każde ICAO raz, EPWW pierwsze (polskie przed zagranicznymi), lotnisko z bazy spoza
+    list zaraz po EPWW, lista, która nie jest tablicą, pominięta."""
+    f = aerojs["find"]
+    assert f["index"] == [[0, "EPWA", "EPWW", None, 0], [1, "EPBC", "EPWW", None, 1], [2, "EPKK", "EPWW", None, 0],
+                          [3, "EPMM", "EPWW", "MIL", 1], [4, "EPXX", "EPWW", "MIL", 1],
+                          [5, "EDDB", "ED", None, 0], [6, "EDDK", "ED", None, 0], [7, "EDWA", "ED", None, 2],
+                          [8, "UMMS", "UMMV", None, 0]]
+    assert f["empty"] == [0, 0, [2]]
+    q = f["q"]
+    # nazwa: główne lotnisko miasta pierwsze, polskie przed zagranicznymi; nazwa i miasto z bazy też (bez polskich znaków)
+    assert q["warszawa"] == ["EPWA", "EPBC", "EDWA"]
+    assert q["EPW"] == ["EPWA"] and q["epwa"] == ["EPWA"]
+    assert q["krakow"] == ["EPKK"] and q["kraków"] == ["EPKK"]
+    assert q["minsk"] == ["UMMS", "EPMM"]
+    assert q["nowe miasto"] == ["EPXX"] and q["berlin"] == ["EDDB"] and q["koln"] == ["EDDK"]
+    assert q[""] == [] and q["  "] == [] and q["zzzz"] == []
+    # "E": wszystkie ICAO od E (MINSK NATIONAL bez E), w kolejności podzakładek
+    assert q["E"][:5] == ["EPWA", "EPBC", "EPKK", "EPMM", "EPXX"] and f["count"] == 8
+    # Enter: wybrany wiersz, dokładny ICAO, jedyne trafienie, kod ICAO bez trafień; kilka trafień bez wyboru: nic
+    assert f["enter"] == [None, "EPBC", None, "EPWA", "EPWA", "EDDB", "ZZZZ", None, None, "EPKK", None]
+    assert f["limit"] == 100 and f["kbdKey"] == "aerodrome.keyboard"
+
+
+def test_find_page_contract():
+    """Strona "()": pole, SHOW, CLEAR, przełącznik klawiatury (własny klucz, domyślnie otwarta), wyniki jak lista FIR-u
+    (kliknięcie otwiera lotnisko jak na liście), nazwy klas bez "ad-"; AERODROME montuje ją dla "0" (stare adresy
+    #aerodrome/0, #aerodrome/OVERVIEW i zapisany ekran "0") i pamięta tekst w historii (stash z kluczem "0")."""
+    import re
+
+    from backend.app.config import ROOT_DIR
+    js = (ROOT_DIR / "frontend" / "js" / "aerolist.js").read_text("utf-8")
+    body = js[js.index("export function mountAeroSearch("):js.index("// --- karta lotniska zagranicznego")]
+    assert 'touchKeyboard(input, $(".aero-find-kbd"), { key: FIND_KBD_KEY, open: true });' in body
+    assert '$(".aero-find").append(kbd.el);' in body and "kbd.sync();" in body
+    assert "if (icao) { select(icao, false); onOpen(icao); }" in body
+    assert "const t = enterTarget(found, input.value, sel);" in body and "if (t) { onOpen(t); return; }" in body
+    assert "found.slice(0, FIND_LIMIT)" in body and "window.addEventListener(ONLINE_EVENT, online);" in body
+    assert 'api("/api/aerodromes"), ...FIR_KEYS.map((k) => firList(k))' in body
+    assert not re.search(r'class="[^"]*\b(ad-|ads\b|advert|banner|sponsor|promo)', body)
+    for n, line in enumerate(body.splitlines(), 1):
+        assert line.lstrip().startswith("//") or line.isascii(), (n, line)
+    aero = (ROOT_DIR / "frontend" / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
+    assert "find = mountAeroSearch($(\".content\"), saved?.key === \"0\" ? saved : findState, {" in aero
+    assert "onOpen: (code) => goto(code)," in aero
+    assert 'if (mode === "find" && find) stash("aerodrome", { key: "0", ...find.save() });' in aero
+    assert 'else if (a === state && mode === "find" && find) find.focus();' in aero
+    assert 'pane.classList.toggle("find-mode", m === "find");' in aero and '"ov-mode"' not in aero
+    css = (ROOT_DIR / "frontend" / "css" / "aerolist.css").read_text("utf-8")
+    assert ".aero-pane.find-mode > .toolbar { display: none; }" in css
+    assert ".aero-find > .tkbd { --tk-w: min(56px, calc((100cqw - 41px) / 10));" in css
+
+
+def test_aerodrome_without_aip_hours(client):
+    """0.14.0 (issue #28): "usuń informacje o godzinach otwarcia pozycji, bo to godziny z reala, a nie na VATSIM": AERODROME
+    nie pokazuje godzin pracy z AIP (wiersz częstotliwości, objaśnienie, dymek), karta lotniska też nie; dane zostają
+    w bazie i w API."""
+    import re
+
+    from backend.app.config import ROOT_DIR
+    js = ROOT_DIR / "frontend" / "js"
+    for name in ("tabs/aerodrome.js", "aerolist.js"):
+        code = "\n".join(ln for ln in (js / name).read_text("utf-8").splitlines() if not ln.lstrip().startswith("//"))
+        assert not re.search(r"\.hours\b|hours UTC|hours: |class=\"hrs\"|summer in brackets", code), name
+    aero = (js / "tabs" / "aerodrome.js").read_text("utf-8")
+    assert "esc([x.description, x.note].filter(Boolean).join(" in aero
+    assert '...aipOf(p).map((x) => [x.kind, x.note].filter(Boolean).join(" \\u00b7 "))' in aero
+    css = (ROOT_DIR / "frontend" / "css" / "style.css").read_text("utf-8")
+    assert ".hrs" not in css
+    freqs = client.get("/api/aerodromes/EPKK").json()["frequencies"]
+    assert freqs and all("hours" in f for f in freqs)
+    assert any(f["hours"] for f in freqs)

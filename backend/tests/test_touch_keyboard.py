@@ -92,6 +92,17 @@ out.firstSynced = st(kb, input, button);
 // bez przycisku (null) też działa
 const kb3 = api.touchKeyboard(new El("input"), null);
 out.noButton = kb3.el.hidden;
+// 0.14.0 (issue #28): własny klucz i stan domyślny (AERODROME "()": otwarta bez zapisanego wyboru, bez wskaźnika
+// dotykowego); przełącznik zapisuje pod swoim kluczem, wspólny wybór AIRCRAFT / CALLSIGN bez zmian
+const i5 = new El("input"), b5 = new El("button");
+const kb5 = api.touchKeyboard(i5, b5, { key: "test.find.kbd", open: true });
+out.own = { start: kb5.el.hidden, im: i5.getAttribute("inputmode"), shared: api.choiceGet(api.KEYBOARD_KEY) };
+b5.fire("click", {});
+out.own.closed = [kb5.el.hidden, api.choiceGet("test.find.kbd"), api.choiceGet(api.KEYBOARD_KEY)];
+const kb6 = api.touchKeyboard(new El("input"), null, { key: "test.find.kbd", open: true });
+out.own.again = kb6.el.hidden;
+const kb7 = api.touchKeyboard(new El("input"), null, { key: "test.other.kbd", open: false });
+out.own.closedDefault = kb7.el.hidden;
 // świeży moduł (nic nie zapisano) przy dotykowym wskaźniku: otwarta od razu
 globalThis.matchMedia = (q) => ({ matches: q === "(pointer: coarse)" });
 const fresh = await import(url + "?coarse");
@@ -186,6 +197,11 @@ def test_touch_keyboard_toggle_and_typing(js):
     assert js["noButton"] is True
     # nic nie zapisano: otwarta tylko przy dotykowym wskaźniku (pointer: coarse)
     assert js["coarse"] == {"hidden": False, "active": True, "im": "none"}
+    # 0.14.0 (issue #28): własny klucz (AERODROME "()"): otwarta bez zapisu, zamknięcie zapisane tylko pod tym kluczem
+    # (wspólny wybór AIRCRAFT / CALLSIGN zostaje "0" z kroku wyżej), druga klawiatura z tym kluczem też zamknięta
+    own = js["own"]
+    assert own["start"] is False and own["im"] == "none" and own["shared"] == "0"
+    assert own["closed"] == [True, "0", "0"] and own["again"] is True and own["closedDefault"] is True
 
 
 def test_touch_keyboard_contract():
@@ -196,7 +212,10 @@ def test_touch_keyboard_contract():
     assert 'el.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) e.preventDefault(); });' in body
     assert 'input.dispatchEvent(new Event("input", { bubbles: true }))' in body
     assert 'input.inputMode = "none"' in body and 'input.removeAttribute("inputmode")' in body
-    assert "choiceSet(KEYBOARD_KEY" in body and "choiceGet(KEYBOARD_KEY)" in body and '"(pointer: coarse)"' in body
+    # 0.14.0 (issue #28): klucz wyboru z opts.key (domyślnie wspólny KEYBOARD_KEY AIRCRAFT / CALLSIGN)
+    assert "{ key = KEYBOARD_KEY, open = null } = {}" in body
+    assert "choiceSet(key, " in body and "choiceGet(key)" in body and '"(pointer: coarse)"' in body
+    assert "return open ?? !!globalThis.matchMedia" in body
     assert "document.activeElement === input" in body and "input.setSelectionRange(r.caret, r.caret)" in body
     assert "remember(" not in body and "navigate(" not in body
     assert "return { el, sync: () => show(wanted()) };" in body
