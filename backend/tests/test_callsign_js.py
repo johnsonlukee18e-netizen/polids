@@ -4,6 +4,7 @@ Zakładka montowana w Node z zastępczym api.js (h, api, letterMenu, touchKeyboa
 0.13.1 (issue #25): klawiatura dotykowa (przycisk "()" pod ALL, do 0.13.2 KEYBOARD) na końcu panelu, przewija się
 tylko lista (.cs-list)."""
 import json
+import re
 import shutil
 import subprocess
 
@@ -35,8 +36,12 @@ export const touchKeyboard = (input, button) => {
   keyboards.push({ inputIsQ: input === parts[".q"], buttonIsKbd: button === KBD, k });
   return k;
 };
+// 0.14.0 (issue #28): wiersze z prawdziwymi polami (operator, kraj, kategoria) zamiast pustych
+export let ROWS = null;
+export const setRows = (r) => { ROWS = r; };
 export async function api(url) {
   calls.push(url);
+  if (ROWS) return ROWS;
   const limit = Number(new URL(url, "http://x").searchParams.get("limit"));
   const n = Math.min(TOTAL, limit || 200);
   return Array.from({ length: n }, (_, i) => ({ icao: `C${i}`, name: "", telephony: "", country: "", category: "" }));
@@ -60,6 +65,11 @@ const tab2 = tab.mount(root);
 tab2.activate(undefined);
 out.keyboards = stub.keyboards.map(({ inputIsQ, buttonIsKbd, k }) => ({ inputIsQ, buttonIsKbd, syncs: k.syncs }));
 out.appended = stub.appended.map((x) => x.name);
+stub.setRows([{ icao: "LOT", name: "LOT POLISH AIRLINES", telephony: "POLLOT", country: "POLAND", category: "" },
+  { icao: "PLF", name: "POLISH AIR FORCE", telephony: "POLISH AIRFORCE", country: "POLAND", category: "MIL" }]);
+tab.mount(root);
+await tick(); await tick();
+out.rows = stub.pane.querySelector("tbody").innerHTML;
 console.log(JSON.stringify(out));
 """
 
@@ -108,3 +118,37 @@ def test_touch_keyboard_last_in_pane(js):
     assert '<div class="cs-list"><table class="data callsigns">' in SRC and "</tbody></table></div>\n    </div>`);" in SRC
     assert "const kbd = touchKeyboard(q, letters.kbd);\n    pane.append(kbd.el);" in SRC
     assert "kbd.sync();\n      q.focus();" in SRC
+
+
+STYLE = (ROOT_DIR / "frontend" / "css" / "style.css").read_text("utf-8")
+
+
+def test_operator_and_country_like_icao(js):
+    """0.14.0 (issue #28): "Nazwa operatora oraz kraj pochodzenia powinny być w tej samej czcionce i w tym samym
+    rozmiarze. Możesz zostawić kolorowanie callsignu". Operator (op) i kraj (ctry) w swoich klasach, bez dawnej minor
+    (12 px, szary); kolumna Info z tagiem bez zmian."""
+    rows = re.sub(r"\s+", " ", js["rows"])
+    assert ('<tr><td class="icao">LOT</td><td class="tel">POLLOT</td> <td class="op">LOT POLISH AIRLINES</td>'
+            '<td class="ctry">POLAND</td> <td></td></tr>') in rows
+    assert '<td class="op">POLISH AIR FORCE</td><td class="ctry">POLAND</td> <td><span class="tag mil">MILITARY</span></td>' in rows
+    assert "minor" not in SRC and "minor" not in rows
+
+
+def test_callsign_table_one_font():
+    """ICAO, callsign, operator i kraj: 20 px var(--mono); ICAO, operator i kraj białe, callsign żółty; komórki wiersza
+    wyrównane do pierwszej linii. Tabela mieści się w panelu: długa nazwa łamie się w komórce, słowo dłuższe niż kolumna
+    także w środku, ale kolumny operatora i kraju nie węższe niż min-width (sprawdzone w Chrome na danych
+    ICAO_Airlines.txt: bez przewijania w bok od 692 px, jak dawniej z operatorem i krajem 12 px). Bez pogrubień, cieni
+    i zaokrągleń w tych regułach; bez nowrap (nazwy muszą się łamać)."""
+    css = re.sub(r"/\*.*?\*/", "", STYLE, flags=re.S)
+    assert "table.callsigns td.icao { font: 20px var(--mono); color: #fff; width: 90px; }" in css
+    assert "table.callsigns td.tel { font: 20px var(--mono); color: var(--yellow); }" in css
+    assert ("table.callsigns td.op, table.callsigns td.ctry { font: 20px var(--mono); color: #fff; overflow-wrap: anywhere; }"
+            in css)
+    assert "table.callsigns td.op { min-width: 9em; }" in css and "table.callsigns td.ctry { min-width: 6em; }" in css
+    assert "table.callsigns td { vertical-align: baseline; }" in css
+    assert "td.minor" not in css
+    rules = [line for line in css.splitlines() if "callsigns" in line]
+    assert len(rules) == 6 and not any(re.search(r"bold|[6-9]00|shadow|radius|white-space", r) for r in rules)
+    # tag kategorii (Info) jak dotąd
+    assert ".tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }" in css
