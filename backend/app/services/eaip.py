@@ -12,7 +12,15 @@ wcześniej, najwyżej BACK_CYCLES razy; błąd sieci albo serwera → zostaje wy
 /api/config (od niego zależy otwarcie HOME i menu) nie czeka na PAŻP dłużej niż CONFIG_WAIT: jedno sprawdzenie na
 pakiet naraz (wspólne dla wszystkich zapytań, single-flight), po CONFIG_WAIT ostatni znany adres albo wyliczony, a
 sprawdzenie kończy się w tle i uzupełnia pamięć. Po upływie ważności wpisu odpowiedź od razu z poprzedniego wyniku
-tego cyklu, sprawdzenie ponownie w tle. Pierwsze sprawdzenie startuje razem z serwerem (warm, main.lifespan)."""
+tego cyklu, sprawdzenie ponownie w tle. Pierwsze sprawdzenie startuje razem z serwerem (warm, main.lifespan).
+
+0.14.0 (issue #28): "dodaj opcję przy eAIP (next airac), gdzie będzie link do AIP na kolejny airac". Ten sam wzór
+katalogu dla cyklu po bieżącym (next_airac, package_url): PAŻP publikuje poprawkę z wyprzedzeniem, ale nie zawsze
+(cykl bez poprawki, jeszcze nieopublikowana). Katalog sprawdzamy tak samo (folder_exists, pamięć na cykl, jedno
+sprawdzenie naraz, /api/config czeka najwyżej CONFIG_WAIT): jest → adres; brak (4xx) → "" (przycisk NEXT AIRAC pokazuje
+wtedy komunikat z numerem cyklu i datą wejścia), ponowne sprawdzenie po TTL_NEXT_MISSING; nie wiadomo (sieć, 5xx,
+ponad CONFIG_WAIT) → wyliczony adres, jak przy bieżącym cyklu. Bez wstecznego szukania i bez adresu z .env (ten
+dotyczy bieżącej poprawki)."""
 
 import asyncio
 import logging
@@ -38,13 +46,23 @@ CONFIG_WAIT = 1.5        # s: najdłużej /api/config i /api/embed-check czekaj�
 TTL_FOUND = 28 * 86400   # katalog bieżącego cyklu jest: do końca cyklu (klucz pamięci zawiera numer cyklu)
 TTL_FALLBACK = 6 * 3600  # bieżącego nie ma: sprawdzamy znowu co kilka godzin (PAŻP może dołożyć katalog później)
 TTL_UNKNOWN = 600        # brak połączenia z PAŻP: wyliczony adres, ponowna próba po 10 min
+TTL_NEXT_MISSING = 3600  # 0.14.0 (issue #28): poprawki następnego cyklu jeszcze nie ma: sprawdzamy znowu co godzinę
+NEXT = ":next"           # 0.14.0 (issue #28): przyrostek linku w kluczu pamięci dla następnego cyklu (inny klucz niż
+                         # bieżący cykl o tym samym numerze po zmianie cyklu: "" z braku nie może trafić do bieżącego)
 
-_resolved: dict[tuple[str, str], tuple[float, str]] = {}   # (link, cykl) -> (ważny do, adres); po terminie: stary wynik
+# (link, cykl) -> (ważny do, adres); po terminie: stary wynik; następny cykl pod (link + NEXT, cykl), adres "" = brak
+_resolved: dict[tuple[str, str], tuple[float, str]] = {}
 _inflight: dict[tuple[str, str], asyncio.Task] = {}        # (link, cykl) -> sprawdzenie w toku (silna referencja)
 
 
 def utc_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def next_airac(today: date | None = None) -> dict:
+    """0.14.0 (issue #28): cykl po bieżącym (ident, effective, next jak current_airac): ten, który zaczyna się w dniu
+    "next" bieżącego cyklu."""
+    return current_airac(date.fromisoformat(current_airac(today or utc_today())["next"]))
 
 
 def package_url(link: str, airac: dict) -> str:
@@ -123,12 +141,28 @@ async def _resolve(client: httpx.AsyncClient, link: str, airac: dict) -> tuple[s
     return computed, TTL_FALLBACK
 
 
-async def _refresh(link: str, airac: dict) -> str:
-    """Sprawdzenie jednego pakietu u PAŻP i zapis w pamięci (zadanie w tle, wspólne dla zapytań)."""
-    key = (link, airac["ident"])
+async def _resolve_next(client: httpx.AsyncClient, link: str, airac: dict) -> tuple[str, float]:
+    """0.14.0 (issue #28): (adres albo "", ile trzymać w pamięci) dla poprawki następnego cyklu: jedno sprawdzenie, bez
+    szukania wstecz (poprzednia poprawka to bieżący eAIP). Katalog jest: do końca cyklu; brak: "" i ponownie po
+    TTL_NEXT_MISSING (PAŻP może go dołożyć); nie wiadomo: wyliczony adres na TTL_UNKNOWN."""
+    url = package_url(link, airac)
+    ok = await folder_exists(client, url)
+    if ok is None:
+        return url, TTL_UNKNOWN
+    return (url, TTL_FOUND) if ok else ("", TTL_NEXT_MISSING)
+
+
+def _key(link: str, airac: dict, nxt: bool = False) -> tuple[str, str]:
+    return (link + NEXT if nxt else link, airac["ident"])
+
+
+async def _refresh(link: str, airac: dict, nxt: bool = False) -> str:
+    """Sprawdzenie jednego pakietu u PAŻP i zapis w pamięci (zadanie w tle, wspólne dla zapytań); nxt: poprawka
+    następnego cyklu (airac = next_airac())."""
+    key = _key(link, airac, nxt)
     try:
         async with _client() as client:
-            url, ttl = await _resolve(client, link, airac)
+            url, ttl = await (_resolve_next if nxt else _resolve)(client, link, airac)
     except Exception:   # nieprzewidziany błąd: jak brak połączenia, bez wyjątku w zadaniu, którego nikt nie odbierze
         log.exception("eAIP %s: sprawdzenie katalogu nie powiodło się", link)
         url, ttl = _resolved.get(key, (0.0, package_url(link, airac)))[1], TTL_UNKNOWN
@@ -136,41 +170,43 @@ async def _refresh(link: str, airac: dict) -> str:
     return url
 
 
-def _start(link: str, airac: dict) -> asyncio.Task:
+def _start(link: str, airac: dict, nxt: bool = False) -> asyncio.Task:
     """Sprawdzenie (link, cykl) w toku albo nowe: jedno naraz, niezależnie od liczby zapytań (single-flight)."""
-    key = (link, airac["ident"])
+    key = _key(link, airac, nxt)
     task = _inflight.get(key)
     if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
-        task = asyncio.get_running_loop().create_task(_refresh(link, airac))
+        task = asyncio.get_running_loop().create_task(_refresh(link, airac, nxt))
         _inflight[key] = task
         task.add_done_callback(lambda t: _inflight.pop(key) if _inflight.get(key) is t else None)
     return task
 
 
 def warm() -> None:
-    """Start serwera: sprawdzenie bieżących katalogów w tle, zanim pierwsza przeglądarka zapyta o /api/config."""
-    airac = current_airac(utc_today())
+    """Start serwera: sprawdzenie bieżących katalogów w tle, zanim pierwsza przeglądarka zapyta o /api/config;
+    0.14.0 (issue #28): także katalogów następnego cyklu (przycisk NEXT AIRAC)."""
+    today = utc_today()
+    airac = current_airac(today)
     for link in PACKAGES:
         if not override(link):
             _start(link, airac)
+    nxt = next_airac(today)
+    for link in PACKAGES:
+        _start(link, nxt, True)
 
 
-async def resolved_links(today: date | None = None, links=tuple(PACKAGES)) -> dict[str, str]:
-    """Adresy dla /api/config i /api/embed-check: z .env bez zmian, inaczej katalog poprawki sprawdzony u PAŻP.
-    Bez wyniku dla tego cyklu czeka na sprawdzenie najwyżej CONFIG_WAIT, potem wyliczony adres (sprawdzenie trwa dalej
-    w tle); wynik po terminie ważności: od razu on, a nowe sprawdzenie w tle."""
-    airac = current_airac(today or utc_today())
-    out = {link: override(link) for link in links}
+async def _cached(airac: dict, links, nxt: bool = False) -> dict[str, str]:
+    """Wynik z pamięci albo sprawdzenie u PAŻP (wspólne dla bieżącego i następnego cyklu). Bez wyniku dla tego cyklu
+    czeka na sprawdzenie najwyżej CONFIG_WAIT, potem wyliczony adres (sprawdzenie trwa dalej w tle); wynik po terminie
+    ważności: od razu on, a nowe sprawdzenie w tle."""
+    out: dict[str, str] = {}
     now = time.monotonic()
     waiting: dict[str, asyncio.Task] = {}
     for link in links:
-        if out[link]:
-            continue
-        hit = _resolved.get((link, airac["ident"]))
+        hit = _resolved.get(_key(link, airac, nxt))
         if hit and hit[0] > now:
             out[link] = hit[1]
             continue
-        task = _start(link, airac)
+        task = _start(link, airac, nxt)
         if hit:
             out[link] = hit[1]
         else:
@@ -181,6 +217,22 @@ async def resolved_links(today: date | None = None, links=tuple(PACKAGES)) -> di
             ok = task.done() and not task.cancelled() and task.exception() is None
             out[link] = task.result() if ok else package_url(link, airac)
     return out
+
+
+async def resolved_links(today: date | None = None, links=tuple(PACKAGES)) -> dict[str, str]:
+    """Adresy dla /api/config i /api/embed-check: z .env bez zmian, inaczej katalog poprawki sprawdzony u PAŻP
+    (_cached: najwyżej CONFIG_WAIT czekania)."""
+    airac = current_airac(today or utc_today())
+    out = {link: override(link) for link in links}
+    out.update(await _cached(airac, [link for link in links if not out[link]]))
+    return out
+
+
+async def next_links(today: date | None = None, links=tuple(PACKAGES)) -> dict[str, str]:
+    """0.14.0 (issue #28): index-v2.html poprawki następnego cyklu dla /api/config (przycisk NEXT AIRAC w AD CIV, AD MIL
+    i AD VFR): adres, gdy katalog jest (albo nie wiadomo), "" gdy PAŻP go (jeszcze) nie opublikował. Najwyżej CONFIG_WAIT
+    czekania, równolegle z resolved_links."""
+    return await _cached(next_airac(today), links, nxt=True)
 
 
 async def resolved_url(link: str, today: date | None = None) -> str:
