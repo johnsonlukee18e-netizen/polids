@@ -57,8 +57,11 @@ export const h = (html) => ({ html });
 METARFMT_STUB = r"""
 export const MODE_KEY = "meteo.wx.mode";
 export const wxMode = (m) => m || "coloured";
-export const wxTable = (kind, rows) => JSON.stringify({ kind, icao: rows.map((r) => r.icao),
-  nil: rows.filter((r) => !r.raw).map((r) => r.icao) });
+// 0.14.0 (issue #28): DECODED / RAW; wxTable oddaje też, czy z opisem zjawisk
+export const DECODE_KEY = "meteo.wx.decode";
+export const wxDecode = (v) => (v === "raw" ? "raw" : "decoded");
+export const wxTable = (kind, rows, opts) => JSON.stringify({ kind, icao: rows.map((r) => r.icao),
+  nil: rows.filter((r) => !r.raw).map((r) => r.icao), decode: opts.decode });
 """
 
 NODE_SCRIPT = r"""
@@ -116,6 +119,25 @@ out.metarIntl = await run("metar-intl", (pane) => {
   pane.querySelector(".go").on.click();
 });
 out.tafIntl = await run("taf-intl");
+// 0.14.0 (issue #28): DECODED / RAW: kliknięcie zapisuje wybór we wspólnym kluczu i rysuje ostatnią listę od nowa bez
+// pytania serwera; następna lista startuje z zapisanym wyborem; kliknięcie obok przycisku nic nie zmienia
+const decodeClick = (pane, decode) => pane.querySelector(".mt-decsw").on.click({ target: {
+  closest: (s) => (s === "button[data-decode]" && decode ? { dataset: { decode } } : null) } });
+const listNow = (pane) => JSON.parse(pane.querySelector(".mtr-list").innerHTML);
+const seen = {};
+out.decodeMil = await run("metar-mil", (pane) => {
+  seen.milBefore = listNow(pane);
+  decodeClick(pane, "raw");
+  seen.milAfter = listNow(pane);
+});
+out.decodeTaf = await run("taf-intl", (pane) => {
+  seen.tafBefore = listNow(pane);
+  decodeClick(pane, null);
+  seen.tafMiss = listNow(pane);
+  decodeClick(pane, "decoded");
+  seen.tafAfter = listNow(pane);
+});
+out.decodeSeen = seen;
 out.log = { set: api.log.set, del: api.log.del };
 out.store = Object.fromEntries(api.store);
 console.log(JSON.stringify(out));
@@ -182,7 +204,7 @@ def test_pl_lists_all_ifr_without_field(js, key, kind, old):
     o = js[key]
     want = f"/api/meteo/{kind}?ids=" + ",".join(IFR)
     assert o["urls"] == [want, want] and o["timer"] == 120000
-    assert o["list"] == {"kind": kind, "icao": IFR, "nil": ["EPZG"]}
+    assert o["list"] == {"kind": kind, "icao": IFR, "nil": ["EPZG"], "decode": True}
     assert o["ids"] is None and o["go"] is False
     assert 'class="ids"' not in o["html"] and ">Show</button>" not in o["html"] and 'type="text"' not in o["html"]
     assert '<div class="mtr fixed">' in o["html"]
@@ -208,7 +230,7 @@ def test_other_lists_keep_field(js):
                             "/api/meteo/metar?ids=EDDB,LKPR"]
     assert intl["ids"] == "EDDB LKPR" and js["store"]["meteo.metar.intl"] == "EDDB LKPR"
     taf = js["tafIntl"]
-    assert taf["list"] == {"kind": "taf", "icao": default.split(), "nil": ["LZIB"]} and taf["go"] is True
+    assert taf["list"] == {"kind": "taf", "icao": default.split(), "nil": ["LZIB"], "decode": True} and taf["go"] is True
     assert js["store"]["meteo.metar.mil"] == "EPKS EPLK" and "meteo.metar.mil" not in js["log"]["del"]
     assert sorted(js["log"]["del"]) == ["meteo.metar.pl", "meteo.taf.pl"]
 
@@ -236,3 +258,26 @@ def test_fixed_bar_height_like_field():
     rule = css[css.index(".mtr.fixed .mtr-bar"):]
     rule = rule[:rule.index("}")]
     assert not re.search(r"font-weight|shadow|radius", rule)
+
+
+def test_decode_switch(js):
+    """0.14.0 (issue #28): "w METAR i TAF dodaj opcję wyłączenia dekodowania depeszy". DECODED / RAW obok COLOURED /
+    MONO w każdej z pięciu list; domyślnie DECODED (opis zjawisk jak dotąd). RAW zapisany pod meteo.wx.decode rysuje
+    ostatnią listę od nowa bez opisu i bez ponownego pytania serwera, odświeżanie co 2 min zostaje przy RAW, a następna
+    lista (inna podzakładka) startuje w RAW; DECODED wraca do opisu."""
+    seen = js["decodeSeen"]
+    mil = js["decodeMil"]
+    assert seen["milBefore"]["decode"] is True and seen["milAfter"]["decode"] is False
+    assert seen["milAfter"]["icao"] == ["EPKS", "EPLK"]
+    # zapytania: pierwsze wczytanie i odświeżenie po 2 min, kliknięcie bez zapytania
+    assert mil["urls"] == ["/api/meteo/metar?ids=EPKS,EPLK"] * 2 and mil["list"]["decode"] is False
+    taf = js["decodeTaf"]
+    assert seen["tafBefore"]["decode"] is False and seen["tafMiss"]["decode"] is False
+    assert seen["tafAfter"]["decode"] is True and taf["list"]["decode"] is True and len(taf["urls"]) == 2
+    assert [v for k, v in js["log"]["set"] if k == "meteo.wx.decode"] == ["raw", "decoded"]
+    assert js["store"]["meteo.wx.decode"] == "decoded"
+    for o in (js["metarPl"], js["tafPl"], js["metarMil"], js["metarIntl"], js["tafIntl"]):
+        bar = o["html"][o["html"].index('<div class="toolbar mtr-bar">'):o["html"].index('<div class="mtr-list">')]
+        order = [bar.index(x) for x in (">COLOURED</button>", ">MONO</button>", '<span class="mt-mode mt-decsw">',
+                                        ">DECODED</button>", ">RAW</button>", "refresh every 2 min")]
+        assert order == sorted(order)

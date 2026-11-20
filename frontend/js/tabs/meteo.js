@@ -1,7 +1,7 @@
 import { api, BASEMAPS, esc, frameGo, h, splitTaf, subtabs, lsDel, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
 import { CIVIL_ALT, SR_ALT, latLonTxt, nightRings, subsolarPoint, sunElevation, sunState, wrapLon } from "../solar.js";
 import { qnhMap } from "../qnhmap.js";
-import { MODE_KEY, wxMode, wxTable } from "../metarfmt.js";
+import { DECODE_KEY, MODE_KEY, wxDecode, wxMode, wxTable } from "../metarfmt.js";
 import { AD2 } from "./aip.js";
 
 // listy domyślne alfabetycznie (wyniki i tak są sortowane po ICAO)
@@ -48,6 +48,9 @@ const normIds = (s) => [...new Set(String(s || "").toUpperCase().split(/[\s,;]+/
 // w starszej wersji pod key (meteo.metar.pl, meteo.taf.pl) niczego już nie zawęża i jest usuwany. Lotnisko bez
 // komunikatu stoi na liście z NIL (backend zwraca każdy kod, metarfmt.js wxRow). METAR MIL, METAR INTL i TAF INTL
 // bez zmian: pole stacji (lista zapamiętana pod key) i Show.
+// 0.14.0 (issue #28): obok COLOURED / MONO przełącznik DECODED / RAW (opis zjawisk [EN / PL] albo sam komunikat),
+// zapamiętany w przeglądarce pod DECODE_KEY i wspólny dla pięciu list jak MODE_KEY; domyślnie DECODED. Zmiana rysuje
+// ostatnio pobraną listę od nowa, bez ponownego pytania serwera.
 function wxList(kind, defaults, key, { fixed = false } = {}) {
   return (pane) => {
     if (fixed) lsDel(key);
@@ -57,7 +60,9 @@ function wxList(kind, defaults, key, { fixed = false } = {}) {
     pane.append(h(`<div class="mtr${fixed ? " fixed" : ""}">
       <div class="toolbar mtr-bar">
         <span class="mt-mode"><button data-mode="coloured" title="Groups in colour">COLOURED</button><button data-mode="mono"
-          title="All text in one colour">MONO</button></span>${field}
+          title="All text in one colour">MONO</button></span><span class="mt-mode mt-decsw"><button data-decode="decoded"
+          title="Weather groups with their meaning [EN / PL]">DECODED</button><button data-decode="raw"
+          title="Messages only, without decoding">RAW</button></span>${field}
         <label class="sc"><input type="checkbox" class="auto" checked> refresh every 2 min</label>
         <span class="hint upd"></span>
       </div>
@@ -67,14 +72,29 @@ function wxList(kind, defaults, key, { fixed = false } = {}) {
     const wrap = $(".mtr");
     const setMode = (m) => {
       wrap.classList.toggle("mono", m === "mono");
-      wrap.querySelectorAll(".mt-mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+      wrap.querySelectorAll(".mt-mode button[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
     };
+    // rows: ostatnia lista z serwera (null po błędzie), rysowana od nowa po zmianie DECODED / RAW
+    let decode = wxDecode(lsGet(DECODE_KEY)), rows = null;
+    const draw = () => { $(".mtr-list").innerHTML = wxTable(kind, rows, { decode: decode === "decoded" }); };
+    const setDecode = (d) => {
+      decode = d;
+      wrap.querySelectorAll(".mt-decsw button").forEach((b) => b.classList.toggle("on", b.dataset.decode === d));
+    };
+    setDecode(decode);
     setMode(wxMode(lsGet(MODE_KEY)));
     $(".mt-mode").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-mode]");
       if (!b) return;
       lsSet(MODE_KEY, b.dataset.mode);
       setMode(b.dataset.mode);
+    });
+    $(".mt-decsw").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-decode]");
+      if (!b) return;
+      lsSet(DECODE_KEY, b.dataset.decode);
+      setDecode(wxDecode(b.dataset.decode));
+      if (rows) draw();
     });
     // dead: podzakładka zamknięta w trakcie pobierania (np. szybkie przejście na TURB); pane zostaje w DOM i trafia do
     // następnej podzakładki, więc spóźniona odpowiedź nie może do niego pisać
@@ -87,11 +107,16 @@ function wxList(kind, defaults, key, { fixed = false } = {}) {
       }
       try {
         // METAR i TAF alfabetycznie po ICAO (odpowiedź też sortujemy, gdyby backend zmienił kolejność)
-        const rows = (await api(`/api/meteo/${kind}?ids=${encodeURIComponent(ids.split(" ").join(","))}`)).sort((a, b) => a.icao.localeCompare(b.icao));
+        const got = (await api(`/api/meteo/${kind}?ids=${encodeURIComponent(ids.split(" ").join(","))}`)).sort((a, b) => a.icao.localeCompare(b.icao));
         if (dead) return;
-        $(".mtr-list").innerHTML = wxTable(kind, rows, { decode: true });
+        rows = got;
+        draw();
         $(".upd").textContent = "Updated " + new Date().toISOString().slice(11, 16) + "Z";
-      } catch (e) { if (!dead) $(".mtr-list").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+      } catch (e) {
+        if (dead) return;
+        rows = null;
+        $(".mtr-list").innerHTML = `<p class="error">${esc(e.message)}</p>`;
+      }
     };
     if (!fixed) {
       $(".go").addEventListener("click", load);
