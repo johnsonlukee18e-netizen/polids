@@ -189,7 +189,7 @@ def test_layout_boxes_map_to_known_callsigns(client):
     assert [s["fir"] for s in rb.STACKS] == ["ESAA", "EDWW", "EDUU", "EDMM", "LKAA", "UMKK", "EYVL", "UMMV", "UKLV", "LZBB"]
     assert all(set(s) == {"fir", "title"} and s["title"] for s in rb.STACKS)
     assert g["tracks"] == rb.col_kinds(rb.layout_static(lay, {})["occupied"], 13, 8)
-    assert all(i["tip"] and set(i) == {"id", "tip", "value", "positions"} for i in d["indicators"])
+    assert all(i["tip"] and set(i) == {"id", "tip", "value", "note", "positions"} for i in d["indicators"])
     # HVL2: w plikach sektorów nie ma osobnego stanowiska HVL2, obsługuje je OSE2 (EDUU_O22_CTR)
     eduu = {b["id"]: b for b in boxes(d, "EDUU")}
     assert eduu["HVL2"]["chain"][0] == "EDUU_O22_CTR" and eduu["HVL1"]["chain"][0] == "EDUU_H12_CTR"
@@ -418,8 +418,10 @@ def test_indicators_sketch_example(client):
                      ctl("EPGD_APP", "127.280"), ctl("EPWA_APP", "128.805"), ctl("EPWA_N_APP", "125.055"),
                      ctl("EPWA_F_APP", "129.380"), ctl("EPKK_APP", "121.075"), ctl("EPPO_I_APP", "126.300")])
     ind = {i["id"]: i for i in d["indicators"]}
-    assert {k: i["value"] for k, i in ind.items()} == {"ACC GAT": "ALL+S", "APP GD": "1", "APP WA": "H+L+D",
+    # 0.14.2: ALL+S to konfiguracja 2S z tabeli FMP – ACC GAT pokazuje jej kod, litery sektorów w dymku (note)
+    assert {k: i["value"] for k, i in ind.items()} == {"ACC GAT": "2S", "APP GD": "1", "APP WA": "H+L+D",
                                                        "APP KK": "1", "APP PO": "0"}  # informacja się nie liczy
+    assert ind["ACC GAT"]["note"].startswith("Configuration 2S: ") and ind["ACC GAT"]["note"].endswith("(sectors ALL+S)")
     assert ind["ACC GAT"]["positions"] == [
         {"callsign": "EPWW_ALL_CTR", "position": "EPWW_ALL_CTR", "frequency": "125.450", "name": "Anna"},
         {"callsign": "EPWW_S_CTR", "position": "EPWW_S_CTR", "frequency": "123.625", "name": "Bartek"}]

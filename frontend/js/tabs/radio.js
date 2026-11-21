@@ -257,11 +257,13 @@ const onlineLine = (o) => `${o.callsign} ${o.frequency || ""} \u2013 ${o.name ||
 // wskaźnik (0.13.1: dużo mniejszy, w rzędzie u góry strony): mała żółta nazwa nad małym szarym polem z wartością (ALL+S,
 // 2H+L+D, 2); w dymku znaczenie i liczone stanowiska. Wartość dłuższa niż pole od początku, z wielokropkiem na końcu
 // (rb-indt). 0.14.1: ACC GAT szerszy (wide), APP GD, APP KK i APP PO węższe (narrow) – cały rząd tej samej szerokości;
-// 0 i kreska (nikogo, brak danych) przygaszone (nil)
+// 0 i kreska (nikogo, brak danych) przygaszone (nil). 0.14.2: ACC GAT z kodem konfiguracji FMP (2N), litery sektorów
+// w dymku (note z /api/radio/board)
 const IND_W = { "ACC GAT": " wide", "APP GD": " narrow", "APP KK": " narrow", "APP PO": " narrow" };
 export function indicatorHtml(i, x) {
   const ps = arr(i.positions);
-  const rt = [`${i.id}${i.tip ? `: ${i.tip}` : ""}`, ...(x.net === false ? ["Now: no data"] : ps.length ? ps.map(onlineLine) : ["Nobody online"])].join("\n");
+  const rt = [`${i.id}${i.tip ? `: ${i.tip}` : ""}`, ...(x.net !== false && i.note ? [i.note] : []),
+    ...(x.net === false ? ["Now: no data"] : ps.length ? ps.map(onlineLine) : ["Nobody online"])].join("\n");
   const v = x.net === false ? "\u2013" : String(i.value ?? "0"), nil = v === "0" || v === "\u2013";
   return `<div class="rb-indc" data-rt="${esc(rt)}"><div class="rb-ind">${esc(i.id)}</div>`
     + `<div class="rb-indv${IND_W[i.id] || ""}${nil ? " nil" : ""}"><span class="rb-indt">${esc(v)}</span></div></div>`;

@@ -812,11 +812,19 @@ def indicator_value(rule: dict, online: dict, sectors: list[dict], acc_short: di
     return str(frequencies_on(n, online)), n
 
 
-def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str, str]) -> list[dict]:
+def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str, str],
+               fmp: dict | None = None) -> list[dict]:
+    """Wskaźniki u góry strony. 0.14.2 (właściciel projektu: "use here the config name so 2N in this case"): wskaźnik ACC
+    (rule acc, ACC GAT) pokazuje kod konfiguracji z tabeli FMP (fmp: {code, label} z /api/radio/board), gdy zalogowani
+    pasują do jednej z nich, a litery sektorów (N+ALL) zostają w dymku (note); bez pasującej konfiguracji – litery jak dotąd."""
     out = []
     for r in lay.get("indicators") or ():
         value, counted = indicator_value(r, online, sectors, acc_short)
-        out.append({"id": r["id"], "tip": r.get("tip") or "", "value": value,
+        note = ""
+        if r.get("rule") == "acc" and (fmp or {}).get("code"):
+            note = f"Configuration {fmp['code']}" + (f": {fmp['label']}" if fmp.get("label") else "") + f" (sectors {value})"
+            value = fmp["code"]
+        out.append({"id": r["id"], "tip": r.get("tip") or "", "value": value, "note": note,
                     "positions": [_who(cs, online) for cs in counted]})
     return out
 
@@ -1196,13 +1204,14 @@ def _referenced(static: dict) -> set[str]:
 
 
 def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (), net_ok: bool = True,
-          berlin: dict | None = None, flow: dict | None = None) -> dict:
+          berlin: dict | None = None, flow: dict | None = None, fmp: dict | None = None) -> dict:
     """Stan tablicy dla zestawu zalogowanych (online: znak stanowiska → kontroler, jak /api/radio/online).
     Także grid (siatka strony wg szkicu: kolumny, rodzaje kolumn, BERLIN, przyciski, podglądy, stan danych, legenda;
     0.13.2), firs (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu; kod FIR-u: name i room), indicators,
     plates (APP, TWR i ATZ tylko dla zalogowanych), areas (0.13.2: kto obsługuje kształty TMA/CTA i FIS – obrysy
     zalogowanych na LOW), acc_short (skróty stanowisk ACC do plakietek), berlin (berlin_config z feedu i METAR, liczy
-    endpoint) i flow (flow_alerts z vIFF, liczy endpoint; None = brak danych)."""
+    endpoint), flow (flow_alerts z vIFF, liczy endpoint; None = brak danych) i fmp (konfiguracja z tabeli FMP do wskaźnika ACC,
+    liczy endpoint)."""
     sectors = [{**s, "owner": first_online(s["chain"], online)} for s in static["sectors"]]
     # APP, TWR, FIS: właściciel spośród stanowisk tej przestrzeni (APP, TWR, informacja); sektor ACC, który przejmuje
     # ją top-down, osobno (topdown) – ACC widać już na podglądach LOW/MID/HIGH
@@ -1254,7 +1263,7 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
             "fis": fis, "atis": atis, "areas": areas, "acc_short": static.get("acc_short") or {}, "pos": pos,
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra},
             "grid": lay.get("grid") or {}, "firs": fir_blocks(lay, online, positions, net_ok),
-            "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),
+            "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}, fmp),
             "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions),
                        "atz": atz_plates(static, online, positions)},
             "berlin": berlin or berlin_config([], net_ok=net_ok),

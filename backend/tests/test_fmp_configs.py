@@ -239,6 +239,36 @@ def test_board_fmp_and_same_rule_as_radio(client):
     assert client.get("/api/radio/board").json()["fmp"] == {"code": None, "label": None}
 
 
+def test_board_acc_indicator_shows_config_code(client):
+    """0.14.2 (właściciel projektu: "use here the config name so 2N in this case"): ACC GAT pokazuje kod konfiguracji
+    z tabeli FMP, a litery sektorów są w dymku (note); zestaw spoza tabeli i brak danych – jak dotąd."""
+    by = {c["code"]: c for c in fmpconfig.configs(DATA, OWN)}
+
+    def acc(b):
+        return next(i for i in b["indicators"] if i["id"] == "ACC GAT")
+    for code in ("2N", "1X", "3T", "5X"):
+        STATE["feed"] = feed_of(*(ctl(p["callsign"], cid=i) for i, p in enumerate(by[code]["positions"])))
+        b = client.get("/api/radio/board").json()
+        i = acc(b)
+        assert i["value"] == code, code
+        assert i["note"].startswith(f"Configuration {code}: {by[code]['label']} (sectors ") and i["note"].endswith(")"), i["note"]
+        assert {p["callsign"] for p in i["positions"]} == {p["callsign"] for p in by[code]["positions"]}, code
+        # pozostałe wskaźniki bez zmian i bez notki
+        assert all(not x["note"] for x in b["indicators"] if x["id"] != "ACC GAT")
+    STATE["feed"] = feed_of(ctl("EPWW_N_CTR"), ctl("EPWW_ALL_CTR", cid=2))
+    assert acc(client.get("/api/radio/board").json())["value"] == "2N"
+    # zestaw spoza tabeli: litery sektorów, bez notki
+    STATE["feed"] = feed_of(ctl("EPWW_ALL_CTR"), ctl("EPWW_C_CTR", cid=2))
+    i = acc(client.get("/api/radio/board").json())
+    assert i["value"] != "" and "+" in i["value"] and i["note"] == ""
+    STATE["feed"] = feed_of()
+    i = acc(client.get("/api/radio/board").json())
+    assert i["value"] == "0" and i["note"] == ""
+    STATE["feed"] = UpstreamError("timeout")
+    i = acc(client.get("/api/radio/board").json())
+    assert i["note"] == ""
+
+
 def test_radio_layout_fmp_button(client):
     """Przycisk FMP w wolnej komórce kolumny przycisków (H3, nad ATIS): nic się nie przesuwa, połączone okienka i nazwy
     FIR-ów jej nie zajmują."""

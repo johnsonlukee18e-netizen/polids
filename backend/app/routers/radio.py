@@ -379,10 +379,12 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             flow = {"ok": True, **radioboard.flow_alerts(tvs, now, [s["id"] for s in static["sectors"]], static["tma"])}
         except Exception as exc:  # noqa: BLE001 - dane vIFF bez opisu: każdy błąd to brak czerwonego tła
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
-    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
+    # 0.14.0 (właściciel projektu): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli;
+    # 0.14.2: ten sam kod konfiguracji (2N) we wskaźniku ACC GAT
+    fmp = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
+    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow, fmp=fmp)
     out["net"] = net
-    # 0.14.0 (właściciel projektu): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli
-    out["fmp"] = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
+    out["fmp"] = fmp
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego
     # odpowiedź z geo=1 wstrzymywała serwer na 50–140 ms przy każdym otwarciu RADIO
