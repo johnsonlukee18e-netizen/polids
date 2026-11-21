@@ -4,7 +4,9 @@ z całodobowych /etfms/airspaces (tv_flights), regulacje jako przedziały minut 
 doba jako dodatek także o 23Z (sectors() i wykres) i endpoint GET /api/viff/sectors/{tv} (400 / 404 / 502 / 200).
 Frontend w Node: entrySvg / occSvg / fmpChartHtml (klasy obciążenia, przygaszona przeszłość, linia "teraz",
 przepustowość i regulacja, dymki, oś przez północ, escapowanie), cleanTv, fmpHtml z wybranym wierszem i zachowanie
-mountFmp na atrapie DOM (wybór z adresu, klik, drugi klik, ✕, spóźniona odpowiedź, błąd odświeżenia, destroy)."""
+mountFmp na atrapie DOM (wybór z adresu, klik, drugi klik, ✕, spóźniona odpowiedź, błąd odświeżenia, destroy).
+0.14.2 (issue #35): wykres z przepustowością ze scenariusza (scnChart, fmpChartHtml z opts.scenario) i widok
+SCENARIOS na atrapie DOM (lista, podgląd, wykresy w podglądzie, przełącznik widoku, adresy, poprawki adresu)."""
 import asyncio
 import json
 import os
@@ -349,6 +351,12 @@ console.log(JSON.stringify({
   entry: fmp.entrySvg(c), occ: fmp.occSvg(c), html: fmp.fmpChartHtml(c), emptyHtml: fmp.fmpChartHtml(empty),
   nightEntry: fmp.entrySvg(night), withRow: fmp.fmpChartHtml(empty, { code: "BH", label: "sector B upper", active: true }, "Not refreshed: x"),
   real: fmp.fmpChartHtml(series), pick: fmp.fmpPickHtml(), wait: fmp.fmpWaitHtml("EP-DM"), err: fmp.fmpWaitHtml("EP-DM", null, "Flow <data>"),
+  // 0.14.2: przepustowość ze scenariusza (wejść 44, zajętości 15; bez limitu wejść); dane wejściowe bez zmian
+  scn: fmp.fmpChartHtml(fmp.scnChart(c, { entries_cap: 44, occupancy_cap: 15 }), null, "", { scenario: "EP_<N>" }),
+  scnNoLimit: fmp.entrySvg(fmp.scnChart(c, { entries_cap: null, occupancy_cap: 15 })),
+  scnSame: [c.entries_cap, c.occupancy_cap, c.entries[0].cap, c.entries[3].cap],
+  scnObj: (() => { const x = fmp.scnChart(c, { entries_cap: 44, occupancy_cap: "15" }); return [x.entries_cap, x.occupancy_cap,
+    [...new Set(x.entries.map((e) => e.cap))], x.entries_reg === c.entries_reg, x.entries[4].reg, x.id]; })(),
   clean: ["ep-bh", " EP-WATMA ", "EP BH", "X", "", null, undefined, "ED-EDWW-ALR", "EP-" + "A".repeat(21), "EP-B_H"].map(fmp.cleanTv),
 }));
 """
@@ -357,14 +365,17 @@ API_STUB = r"""
 // atrapa DOM: elementy z innerHTML, nasłuchami i classList; wiersze tabeli (tr[data-tv]) z ostatniego innerHTML
 const classes = (init = "") => { const set = new Set(init.split(/\s+/).filter(Boolean));
   return { toggle(c, on) { if (on) set.add(c); else set.delete(c); }, contains: (c) => set.has(c), list: () => [...set].sort() }; };
-const row = (tv, cls) => ({ dataset: { tv }, classList: classes(cls), scrollIntoView() { globalThis.__scrolled.push(tv); } });
-const makeEl = () => ({ _html: "", kids: {}, on: {}, rows: [], isConnected: true, offsetParent: {}, scrollTop: 0, textContent: "",
+// 0.14.2: także wiersze scenariuszy (tr[data-scn]) listy w widoku SCENARIOS
+const row = (tv, cls, scn = null) => ({ dataset: scn === null ? { tv } : { scn }, classList: classes(cls),
+  scrollIntoView() { globalThis.__scrolled.push(scn === null ? tv : scn); } });
+const makeEl = () => ({ _html: "", kids: {}, on: {}, rows: [], scnRows: [], isConnected: true, offsetParent: {}, scrollTop: 0, textContent: "",
   classList: classes(),
   get innerHTML() { return this._html; },
-  set innerHTML(v) { this._html = v; this.rows = [...v.matchAll(/<tr class="([^"]*)" data-tv="([^"]*)">/g)].map((m) => row(m[2], m[1])); },
+  set innerHTML(v) { this._html = v; this.rows = [...v.matchAll(/<tr class="([^"]*)" data-tv="([^"]*)">/g)].map((m) => row(m[2], m[1]));
+    this.scnRows = [...v.matchAll(/<tr class="([^"]*)" data-scn="([^"]*)">/g)].map((m) => row(null, m[1], m[2])); },
   addEventListener(t, f) { (this.on[t] ||= []).push(f); },
-  querySelector(sel) { return sel === "tr.sel" ? this.rows.find((r) => r.classList.contains("sel")) || null : (this.kids[sel] ||= makeEl()); },
-  querySelectorAll(sel) { return sel === "tr[data-tv]" ? this.rows : []; } });
+  querySelector(sel) { return sel === "tr.sel" ? [...this.rows, ...this.scnRows].find((r) => r.classList.contains("sel")) || null : (this.kids[sel] ||= makeEl()); },
+  querySelectorAll(sel) { return sel === "tr[data-tv]" ? this.rows : sel === "tr[data-scn]" ? this.scnRows : []; } });
 export const ONLINE_EVENT = "polids:online";
 export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const h = () => makeEl();
@@ -576,6 +587,27 @@ def test_chart_panel(js):
     assert '<p class="error fmc-err">Flow &lt;data&gt;</p>' in js["err"]
 
 
+def test_scenario_chart(js):
+    """0.14.2: wykres traffic volume w podglądzie scenariusza: ruch ten sam, linie i kolory wobec przepustowości ze
+    scenariusza (regulacje TV zostają), nagłówek mówi, z którego scenariusza jest przepustowość."""
+    h = js["scn"]
+    assert '<div class="fmc-meta">scenario EP_&lt;N&gt; capacity: 44 entries/h · 15 aircraft at once' in h and "EP_<N>" not in h
+    assert 'class="fmc-capt">44<' in h and 'class="fmc-capt">15<' in h
+    # przy 44: 39 wejść poniżej 90 %, 44 = 90-100 % (przy 43 było "near" i "over"); słupek bez limitu też z limitem 44
+    bars = [b[0] for b in _rects(h.split("OCC <span>")[0])]
+    assert bars[:6] == ["fmc-ok past", "fmc-ok past", "fmc-near past", "fmc-ok", "fmc-ok", "fmc-ok"]
+    assert "regulated 30, declared 44" in h
+    # bez limitu wejść w scenariuszu: bez przerywanej linii przepustowości, słupki niebieskie (poza regulowanym)
+    nl = js["scnNoLimit"]
+    assert 'class="fmc-cap"' not in nl and nl.count('class="fmc-reg"') == 1
+    assert {b[0].split()[0] for b in _rects(nl)} == {"fmc-nolim", "fmc-ok"}
+    # dane wykresu nie zmienione (ten sam obiekt dla innego scenariusza albo widoku SECTORS)
+    assert js["scnSame"] == [43, 4, 43, None]
+    assert js["scnObj"] == [44, None, [44], True, 30, "EP-<X>"]
+    # bez opts nagłówek jak dotąd
+    assert "scenario" not in js["html"] and "<div class=\"fmc-meta\">capacity: 43 entries/h" in js["html"]
+
+
 def test_clean_tv(js):
     assert js["clean"] == ["EP-BH", "EP-WATMA", "", "", "", "", "", "ED-EDWW-ALR", "", ""]
 
@@ -709,3 +741,348 @@ def test_fmp_page_configurations(tmp_path):
     assert o["tvOnly"] == [[], ["EP-JL"], 3, ["/api/viff/sectors/EP-JL"]]
     assert o["refresh"] == ["/api/viff/sectors", "/api/radio/configs?have=v1", "/api/viff/sectors/EP-JL"]
     assert o["refreshErr"] == [True, True]
+
+
+# 0.14.2 (issue #35, właściciel projektu: "scenario preview oraz listę scenariuszy aktywnych i nieaktywnych"): widok SCENARIOS
+# na atrapie DOM. Lista i podgląd z tej samej odpowiedzi /api/viff/sectors (bez nowych zapytań), wykres TV podglądu
+# z tego samego /api/viff/sectors/<TV>
+SCN_SCRIPT = r"""
+globalThis.__pending = [];
+globalThis.__scrolled = [];
+globalThis.__ls = {};
+const timers = [], cleared = [], listeners = {};
+globalThis.setInterval = (f) => { timers.push(f); return timers.length; };
+globalThis.clearInterval = (id) => cleared.push(id);
+globalThis.window = { addEventListener(t, f) { (listeners[t] ||= []).push(f); },
+  removeEventListener(t, f) { listeners[t] = (listeners[t] || []).filter((x) => x !== f); } };
+const fmp = await import(process.argv[2]);
+const tick = () => new Promise((r) => setImmediate(r));
+const tv = (id, o) => ({ id, hours: [], occupancy: [], peak_60: 0, entries_cap: 40, occupancy_cap: 14, restrictions: [], ...o });
+const scn = (id, active, tvs, o) => ({ id, active, tvs: tvs.map((t) => ({ id: t, occupancy_cap: 15, entries_cap: 44 })),
+  positions: [], anypositions: [], nopositions: [], start: "0000", end: "2359", times: [], booked: false, description: "opis", ...o });
+const sectors = { prefix: "EP", now: "1310", scenarios_ok: true,
+  sectors: [tv("EP-DH", { active: true }), tv("EP-DM", { active: true }), tv("EP-JH", { active: true }), tv("EP-BH")],
+  scenarios: [scn("EP_DBFG", true, ["EP-DH", "EP-DM"], { positions: ["EPWW_DBF_CTR"] }), scn("EP_ALL", true, ["EP-JH"], { positions: ["EPWW_ALL_CTR"] }),
+    scn("EP_NFIR", false, ["EP-BH"], { positions: ["EPWW_N_CTR"], start: "1600", end: "2200", booked: true }),
+    scn("EP_JX", false, [], { tvs: [{ id: "EP-JH", occupancy_cap: 10, entries_cap: 30 }] })] };
+const chart = (id) => ({ id, label: "x", now: "1310", start: "1200", minutes: 300, now_at: 70, step: 20, span: 60, active: true,
+  restricted: false, entries_cap: 40, occupancy_cap: 14, entries: [{ from: 0, count: 3, cap: 40, reg: null }],
+  occupancy: [1, 2, 3], entries_reg: [], occupancy_reg: [], peak: 3, peak_at: "1312" });
+const pos = (name, callsign, ...letters) => ({ name, callsign, short: name, frequency: "125.450",
+  sectors: { LOW: letters, MID: letters, HIGH: letters } });
+const none = { LOW: [], MID: [], HIGH: [] };
+const cd = { ver: "v1", layers: {}, geo: { border: [], acc: [] },
+  current: { ok: true, error: null, positions: ["EPWW_ALL_CTR", "EPWW_N_CTR"], names: ["ALL", "NFIR"], code: "2N" },
+  configs: [{ code: "1X", label: "ALL", size: 1, positions: [pos("ALL", "EPWW_ALL_CTR", "B", "D", "J")], free: none },
+    { code: "2N", label: "ALL+NFIR", size: 2, positions: [pos("ALL", "EPWW_ALL_CTR", "J"), pos("NFIR", "EPWW_N_CTR", "B", "D")], free: none }] };
+const picks = [];
+const pane = { append(x) { this.root = x; } };
+const page = fmp.mountFmp(pane, { start: "scenarios/ep_nfir", onPick: (a, fix) => picks.push([a, !!fix]) });
+const root = pane.root, box = root.querySelector(".fmp-scroll"), side = root.querySelector(".fmp-side");
+const main = root.querySelector(".fmp-main"), vw = root.querySelector(".fmp-vw"), info = root.querySelector(".fmp-info");
+const urls = () => globalThis.__pending.map((p) => p.url);
+const take = (url) => { const i = globalThis.__pending.findIndex((p) => p.url === url); return globalThis.__pending.splice(i, 1)[0]; };
+const scnSel = () => box.scnRows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.scn);
+const tvSel = () => box.rows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.tv);
+// pierwszy kod w panelu: id scenariusza w podglądzie, kod sektora w widoku SECTORS
+const head = () => (/class="fmc-code[^"]*" title="[^"]*">([^<]+)</.exec(side.innerHTML) || [])[1] || null;
+const click = (el, sel, dataset) => el.on.click.forEach((f) => f({ target: { closest: (s) => (s === sel ? { dataset } : null) } }));
+const onView = () => (/class="fmp-cb fmp-vb on" data-view="(\w+)"/.exec(vw.innerHTML) || [])[1];
+const since = (n) => picks.slice(n);
+const o = {};
+// adres z widokiem i scenariuszem: przełącznik SCENARIOS, panel "Loading" do listy; tylko tabela i konfiguracje
+o.start = [urls(), onView(), side.innerHTML, main.classList.contains("open")];
+take("/api/radio/configs?geo=1").res(cd);
+await tick();
+o.cfgFirst = side.innerHTML;
+take("/api/viff/sectors").res(sectors);
+await tick();
+// lista z wybranym scenariuszem (przewinięta do widoku), podgląd, linia nad listą; bez nowych zapytań
+o.loaded = [box.innerHTML.includes('<table class="fmp-table fmp-scn-table">'), scnSel(), [...globalThis.__scrolled], head(), info.textContent,
+  side.innerHTML.includes("Preview only: nothing is activated."), side.innerHTML.includes("opis"), urls(), picks.length];
+// klik w scenariusz: krok historii, podgląd, bez zapytań; drugi klik: bez podglądu
+click(box, "tr[data-scn]", { scn: "EP_DBFG" });
+o.click = [since(0), scnSel(), head(), urls(), main.classList.contains("open")];
+click(box, "tr[data-scn]", { scn: "EP_DBFG" });
+o.toggle = [since(1), scnSel(), side.innerHTML, main.classList.contains("open")];
+click(box, "tr[data-scn]", { scn: "EP_DBFG" });
+// klik w traffic volume podglądu: krok historii z TV, zapytanie o jego wykres, "Loading" pod tabelą podglądu
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+o.tv = [since(3), urls(), side.innerHTML.includes('<tr class="on sel" data-tv="EP-DH">'), side.innerHTML.includes("Loading"), head()];
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+o.chart = [side.innerHTML.includes("scenario EP_DBFG capacity: 44 entries/h · 15 aircraft at once"), side.innerHTML.includes('class="fmc-capt">44<'),
+  side.innerHTML.includes("fmc-svg"), head()];
+// ✕ wykresu: podgląd zostaje
+click(side, ".fmc-close", {});
+o.closeChart = [since(4), side.innerHTML.includes("fmp-sp-chart"), head(), urls()];
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+// SECTORS: tabela sektorów z tym samym TV i od razu jego wykres z prawdziwą przepustowością (odświeżany)
+click(vw, "button[data-view]", { view: "sectors" });
+o.sectors = [since(6), onView(), box.innerHTML.includes('<table class="fmp-table">'), tvSel(), head(),
+  side.innerHTML.includes("<div class=\"fmc-meta\">capacity: 40 entries/h"), info.textContent, urls(), globalThis.__scrolled.at(-1)];
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+// SCENARIOS: lista bez wyboru
+click(vw, "button[data-view]", { view: "scenarios" });
+o.scenarios = [since(7), onView(), box.innerHTML.includes("fmp-scn-table"), scnSel(), side.innerHTML.includes("Click a scenario"), urls()];
+// ✕ podglądu
+click(box, "tr[data-scn]", { scn: "EP_NFIR" });
+click(side, ".fmp-sp-close", {});
+o.closePreview = [since(8), side.innerHTML.includes("Click a scenario"), main.classList.contains("open")];
+// adres z konfiguracją (Wstecz / Dalej): bez onPick; kolumna 2N, linia warunków w podglądzie
+page.activate("2N/scenarios/EP_ALL");
+o.addr = [picks.length, box.innerHTML.includes(">2N</th>"), scnSel(), head(), side.innerHTML.includes('class="fmp-sp-cfg yes"'),
+  side.innerHTML.includes('<table class="fmp-table fmp-sp-tab grouped">'), urls(), globalThis.__ls["fmp.config"]];
+// nieznany scenariusz i TV spoza scenariusza: adres poprawiony bez kroku historii
+page.activate("scenarios/EP_XX");
+o.unknown = [since(10), scnSel(), side.innerHTML.includes("Click a scenario"), globalThis.__ls["fmp.config"]];
+page.activate("scenarios/EP_ALL/EP-DH");
+o.outside = [since(11), urls(), side.innerHTML.includes("fmp-sp-chart"), head()];
+page.activate("scenarios/EP_ALL/EP-JH");
+o.inside = [picks.length, urls(), side.innerHTML.includes('<tr class="on sel" data-tv="EP-JH">')];
+take("/api/viff/sectors/EP-JH").res(chart("EP-JH"));
+await tick();
+// inny scenariusz z tym samym TV: podgląd nowego scenariusza od razu, z wykresem już wczytanym (zapytanie odświeża)
+page.activate("scenarios/EP_JX/EP-JH");
+o.sameTv = [picks.length, head(), side.innerHTML.includes("scenario EP_JX capacity: 30 entries/h · 10 aircraft at once"),
+  side.innerHTML.includes("fmc-svg"), scnSel(), urls()];
+take("/api/viff/sectors/EP-JH").res(chart("EP-JH"));
+await tick();
+// Wstecz do sektora z konfiguracją: SECTORS w grupach, wykres TV od razu
+page.activate("2N/EP-JH");
+o.back = [picks.length, onView(), box.innerHTML.includes('<table class="fmp-table grouped">'), tvSel(), head(), side.innerHTML.includes("fmc-svg"), urls()];
+take("/api/viff/sectors/EP-JH").res(chart("EP-JH"));
+await tick();
+// odświeżenie co 60 s: te same zapytania co dotąd; lista niedostępna (scenarios_ok: false)
+timers[0]();
+o.refresh = urls();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res({ ...sectors, scenarios: [], scenarios_ok: false });
+take("/api/viff/sectors/EP-JH").res(chart("EP-JH"));
+await tick();
+page.activate("scenarios");
+o.unavailable = [box.innerHTML, info.textContent, onView()];
+// scenariusz z adresu przy niedostępnej liście: adres zostaje (bez poprawki), w panelu komunikat
+page.activate("scenarios/EP_NFIR");
+o.unavailableSide = [side.innerHTML, picks.length, urls()];
+// destroy(): bez timera i nasłuchu
+page.destroy();
+o.destroyed = [cleared, (listeners["polids:online"] || []).length];
+console.log(JSON.stringify(o));
+"""
+
+
+def test_fmp_page_scenarios(tmp_path):
+    node = _node()
+    _page_modules(tmp_path)
+    (tmp_path / "run.mjs").write_text(SCN_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "fmp.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    # tylko tabela (z niej też scenariusze) i konfiguracje; bez wybranego TV bez wykresu
+    assert o["start"] == [["/api/viff/sectors", "/api/radio/configs?geo=1"], "scenarios", '<p class="hint fmp-pick">Loading…</p>', True]
+    assert o["cfgFirst"] == '<p class="hint fmp-pick">Loading…</p>'
+    assert o["loaded"] == [True, ["EP_NFIR"], ["EP_NFIR"], "EP_NFIR", "1310Z · 2 of 4 scenarios active (grey rows)", True, False, [], 0]
+    assert o["click"] == [[["scenarios/EP_DBFG", False]], ["EP_DBFG"], "EP_DBFG", [], True]
+    picks, sel, side, open_ = o["toggle"]
+    assert picks == [["scenarios", False]] and sel == [] and "Click a scenario to preview" in side and not open_
+    assert o["tv"] == [[["scenarios/EP_DBFG/EP-DH", False]], ["/api/viff/sectors/EP-DH"], True, True, "EP_DBFG"]
+    assert o["chart"] == [True, True, True, "EP_DBFG"]
+    assert o["closeChart"] == [[["scenarios/EP_DBFG", False]], False, "EP_DBFG", []]
+    # SECTORS zostawia TV (wiersz przewinięty do widoku) i od razu pokazuje jego wykres; zapytanie tylko odświeża
+    assert o["sectors"] == [[["EP-DH", False]], "sectors", True, ["EP-DH"], "DH", True, "1310Z · 3 of 4 active (grey rows)",
+                            ["/api/viff/sectors/EP-DH"], "EP-DH"]
+    assert o["scenarios"] == [[["scenarios", False]], "scenarios", True, [], True, []]
+    assert o["closePreview"] == [[["scenarios/EP_NFIR", False], ["scenarios", False]], True, False]
+    assert o["addr"] == [10, True, ["EP_ALL"], "EP_ALL", True, True, [], "2N"]
+    # poprawki adresu (replace) z tym, co zostaje
+    assert o["unknown"] == [[["scenarios", True]], [], True, ""]
+    assert o["outside"] == [[["scenarios/EP_ALL", True]], [], False, "EP_ALL"]
+    assert o["inside"] == [12, ["/api/viff/sectors/EP-JH"], True]
+    assert o["sameTv"] == [12, "EP_JX", True, True, ["EP_JX"], ["/api/viff/sectors/EP-JH"]]
+    assert o["back"] == [12, "sectors", True, ["EP-JH"], "JH", True, ["/api/viff/sectors/EP-JH"]]
+    assert o["refresh"] == ["/api/viff/sectors", "/api/radio/configs?have=v1", "/api/viff/sectors/EP-JH"]
+    assert o["unavailable"] == ['<p class="error fmp-empty">Scenarios unavailable.</p>', "", "scenarios"]
+    assert o["unavailableSide"] == ['<p class="error fmp-pick">Scenarios unavailable.</p>', 12, []]
+    assert o["destroyed"] == [[1], 0]
+
+
+# Przegląd 0.14.2: widok SCENARIOS na atrapie DOM – nieudane wczytanie listy bez "Loading" w panelu (bez względu na to,
+# czy konfiguracje przyjdą przed błędem, czy po nim), scenariusz z id spoza dawnego wzorca (kropka) do kliknięcia i w adresie,
+# wykres nowo wybranego traffic volume podglądu przewinięty do widoku panelu (jak scrollIntoView "nearest"; odświeżenie
+# nie przewija, także po błędzie wykresu; wykres z adresu po narysowaniu podglądu), w wąskim oknie obszar tabeli i panelu
+# (.fmp-main)
+SCN_FIX_SCRIPT = r"""
+globalThis.__pending = [];
+globalThis.__scrolled = [];
+globalThis.__ls = {};
+const timers = [], cleared = [], listeners = {};
+globalThis.setInterval = (f) => { timers.push(f); return timers.length; };
+globalThis.clearInterval = (id) => cleared.push(id);
+globalThis.window = { addEventListener(t, f) { (listeners[t] ||= []).push(f); },
+  removeEventListener(t, f) { listeners[t] = (listeners[t] || []).filter((x) => x !== f); } };
+const fmp = await import(process.argv[2]);
+const tick = () => new Promise((r) => setImmediate(r));
+const tv = (id, o) => ({ id, hours: [], occupancy: [], peak_60: 0, entries_cap: 40, occupancy_cap: 14, restrictions: [], ...o });
+const scn = (id, active, tvs, o) => ({ id, active, enabled: active, tvs: tvs.map((t) => ({ id: t, occupancy_cap: 15, entries_cap: 44 })),
+  positions: [], anypositions: [], nopositions: [], start: "0000", end: "2359", times: [], booked: false, description: "opis", ...o });
+const sectors = { prefix: "EP", now: "1310", scenarios_ok: true,
+  sectors: [tv("EP-DH", { active: true }), tv("EP-DM", { active: true }), tv("EP-KKTMA")],
+  scenarios: [scn("EP_DBFG", true, ["EP-DH", "EP-DM"]), scn("EP-KK.TMA", false, ["EP-KKTMA"], { enabled: true })] };
+const chart = (id) => ({ id, label: "x", now: "1310", start: "1200", minutes: 300, now_at: 70, step: 20, span: 60, active: true,
+  restricted: false, entries_cap: 40, occupancy_cap: 14, entries: [{ from: 0, count: 3, cap: 40, reg: null }],
+  occupancy: [1, 2, 3], entries_reg: [], occupancy_reg: [], peak: 3, peak_at: "1312" });
+const cd = { ver: "v1", layers: {}, geo: { border: [], acc: [] }, configs: [],
+  current: { ok: true, error: null, positions: [], names: [], code: null } };
+const picks = [];
+const pane = { append(x) { this.root = x; } };
+const page = fmp.mountFmp(pane, { start: "scenarios/ep_dbfg", onPick: (a, fix) => picks.push([a, !!fix]) });
+const root = pane.root, box = root.querySelector(".fmp-scroll"), side = root.querySelector(".fmp-side"), main = root.querySelector(".fmp-main");
+const urls = () => globalThis.__pending.map((p) => p.url);
+const take = (url) => { const i = globalThis.__pending.findIndex((p) => p.url === url); return globalThis.__pending.splice(i, 1)[0]; };
+const head = () => (/class="fmc-code[^"]*" title="[^"]*">([^<]+)</.exec(side.innerHTML) || [])[1] || null;
+const click = (el, sel, dataset) => el.on.click.forEach((f) => f({ target: { closest: (s) => (s === sel ? { dataset } : null) } }));
+const fail = (m) => Object.assign(new Error(m), { status: 502 });
+const o = {};
+// szybki błąd listy, konfiguracje później (kolejność, w której panel zostawał na "Loading")
+o.start = side.innerHTML;
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+o.failFirst = [box.innerHTML, side.innerHTML];
+take("/api/radio/configs?geo=1").res(cd);
+await tick();
+o.failAfterCfg = side.innerHTML;
+// odświeżenie co 60 s: ten sam błąd, konfiguracje po nim; potem odwrotna kolejność
+timers[0]();
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+take("/api/radio/configs?have=v1").res(cd);
+await tick();
+o.failRefresh = [box.innerHTML, side.innerHTML, urls()];
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+await tick();
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+o.failReverse = side.innerHTML;
+// bez wybranego scenariusza: pusto (nie ma czego kliknąć)
+page.activate("scenarios");
+o.failNoSel = [side.innerHTML, picks.length];
+// lista wraca: podgląd scenariusza z adresu
+page.activate("scenarios/EP_DBFG");
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.recovered = [head(), side.innerHTML.includes("Loading"), side.innerHTML.includes("unavailable"), box.innerHTML.includes('data-scn="EP-KK.TMA"')];
+// klik w scenariusz z kropką w id: krok historii z tym id, zaznaczenie, podgląd (włączony, ale nieobowiązujący)
+click(box, "tr[data-scn]", { scn: "EP-KK.TMA" });
+o.oddClick = [picks.at(-1), fmp.parseFmpArg(picks.at(-1)[0]).scn, head(),
+  box.scnRows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.scn),
+  side.innerHTML.includes('<span class="fmc-chip" title="Enabled, not active now">INACTIVE</span>')];
+page.activate("scenarios/ep-kk.tma");
+o.oddAddr = [head(), picks.length, urls()];
+// klik w traffic volume podglądu: wykres pod tabelą (atrapa: 700 px od góry strony, panel od 100 px, 300 px widoczne)
+page.activate("scenarios/EP_DBFG");
+side.scrollHeight = 1000; side.clientHeight = 300; side.scrollTop = 0;
+side.getBoundingClientRect = () => ({ top: 100 });
+side.kids[".fmp-sp-chart"] = { getBoundingClientRect: () => ({ top: 700 - side.scrollTop, height: 480 }) };
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+o.scrollLoading = [side.scrollTop, urls()];
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+o.scrollLoaded = [side.scrollTop, side.innerHTML.includes("fmc-svg")];
+// odświeżenie tego samego wykresu nie przewija (użytkownik przewinął panel wyżej)
+side.scrollTop = 50;
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+o.scrollRefresh = side.scrollTop;
+// wykres już cały widoczny: bez przewijania
+side.scrollTop = 0;
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 150 - side.scrollTop, height: 120 });
+click(side, "tr[data-tv]", { tv: "EP-DM" });
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.scrollVisible = side.scrollTop;
+// niższy od panelu, ale pod jego dolną krawędzią: dolna krawędź do dolnej krawędzi panelu (też z błędem wykresu)
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 300 - side.scrollTop, height: 200 });
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+take("/api/viff/sectors/EP-DH").rej(fail("No flow data"));
+await tick();
+o.scrollBottom = [side.scrollTop, side.innerHTML.includes("No flow data")];
+// odświeżenie co 60 s po błędzie wykresu (ten sam traffic volume, znów "Loading", potem błąd): bez przewijania
+side.scrollTop = 20;
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.errRefreshLoading = [side.scrollTop, side.innerHTML.includes("Loading")];
+take("/api/viff/sectors/EP-DH").rej(fail("No flow data"));
+await tick();
+o.errRefresh = [side.scrollTop, side.innerHTML.includes("No flow data")];
+// wąskie okno: panel pod listą bez własnego przewijania, przewija się .fmp-main
+side.scrollHeight = 500; side.clientHeight = 500; side.scrollTop = 0;
+main.scrollHeight = 1200; main.clientHeight = 400; main.scrollTop = 0;
+main.getBoundingClientRect = () => ({ top: 50 });
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 900 - main.scrollTop, height: 300 });
+click(side, "tr[data-tv]", { tv: "EP-DM" });
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.narrow = [side.scrollTop, main.scrollTop];
+page.destroy();
+// adres ze scenariuszem i traffic volume (przeładowanie, link): wykres przyszedł przed listą, przewinięty do widoku
+// dopiero po narysowaniu podglądu
+globalThis.__pending = [];
+const pane2 = { append(x) { this.root = x; } };
+const page2 = fmp.mountFmp(pane2, { start: "scenarios/EP_DBFG/EP-DM" });
+const side2 = pane2.root.querySelector(".fmp-side");
+side2.scrollHeight = 1000; side2.clientHeight = 300; side2.getBoundingClientRect = () => ({ top: 100 });
+side2.kids[".fmp-sp-chart"] = { getBoundingClientRect: () => ({ top: 700 - side2.scrollTop, height: 480 }) };
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.addrChartFirst = [side2.scrollTop, side2.innerHTML];
+take("/api/radio/configs?geo=1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.addrList = [side2.scrollTop, side2.innerHTML.includes("fmc-svg")];
+page2.destroy();
+console.log(JSON.stringify(o));
+"""
+
+
+def test_fmp_page_scenarios_review_fixes(tmp_path):
+    node = _node()
+    _page_modules(tmp_path)
+    (tmp_path / "run.mjs").write_text(SCN_FIX_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "fmp.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    unavailable = '<p class="error fmp-pick">Scenarios unavailable.</p>'
+    # przed pierwszą odpowiedzią "Loading"; po błędzie listy już nie (nic nie czeka), także gdy konfiguracje przyjdą później
+    assert o["start"] == '<p class="hint fmp-pick">Loading…</p>'
+    assert o["failFirst"] == ['<p class="error fmp-err">Upstream error</p>', unavailable]
+    assert o["failAfterCfg"] == unavailable and o["failReverse"] == unavailable
+    assert o["failRefresh"] == ['<p class="error fmp-err">Upstream error</p>', unavailable, []]
+    assert o["failNoSel"] == ["", 0]
+    assert o["recovered"] == ["EP_DBFG", False, False, True]
+    # id z kropką: klik = krok historii z tym id (adres go zachowuje), zaznaczony wiersz i podgląd
+    assert o["oddClick"] == [["scenarios/EP-KK.TMA", False], "EP-KK.TMA", "EP-KK.TMA", ["EP-KK.TMA"], True]
+    assert o["oddAddr"] == ["EP-KK.TMA", 1, []]
+    # wykres pod tabelą podglądu: górna krawędź 8 px pod górną krawędzią panelu (wyższy niż panel), od razu z "Loading"
+    assert o["scrollLoading"] == [592, ["/api/viff/sectors/EP-DH"]]
+    assert o["scrollLoaded"] == [592, True]
+    assert o["scrollRefresh"] == 50
+    assert o["scrollVisible"] == 0
+    assert o["scrollBottom"] == [100, True]
+    # odświeżenie po błędzie wykresu nie przewija (panel zostaje tam, gdzie go zostawił użytkownik)
+    assert o["errRefreshLoading"] == [20, True] and o["errRefresh"] == [20, True]
+    # wykres z adresu przed listą: najpierw "Loading" bez przewijania, po liście podgląd z wykresem w widoku panelu
+    assert o["addrChartFirst"] == [0, '<p class="hint fmp-pick">Loading…</p>']
+    assert o["addrList"] == [592, True]
+    assert o["narrow"] == [0, 750]

@@ -122,7 +122,8 @@ def search(q: str = "", prefix: str = "", wtc: str = "", recat: str = "", maker:
 
 @router.get("/{aircraft_id}/photo")
 async def photo(aircraft_id: int = Path(ge=1, le=2**31 - 1), db: Session = Depends(get_db)):
-    """Zdjęcie typu z data/photos/; przy pierwszym wywołaniu pobierane z Wikipedii i zapisywane lokalnie
+    """Zdjęcie typu: dodane ręcznie (data/photos-manual/, od 0.14.2 z autorem w "author") albo z data/photos/;
+    przy pierwszym wywołaniu pobierane z Wikipedii i zapisywane lokalnie
     (od 0.13.3 tylko z artykułu o tym modelu, zdjęcia z artykułów o innym modelu sprawdzane od nowa, od 0.13.4
     niepokazywane, gdy nie da się ich wymienić: 404 albo 502 przy błędzie Wikipedii; photos.type_photo)."""
     a = db.get(AircraftType, aircraft_id)

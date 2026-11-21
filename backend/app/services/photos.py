@@ -28,13 +28,21 @@ pokazywane: gdy nie ma artykułu o tym modelu, trafia do replaced/, a opis zosta
 artykuł o tym modelu, nie np. artykuł o producencie), a gdy Wikipedia nie odpowiada, typ chwilowo jest bez zdjęcia.
 Opisy z "v": 2 (0.13.3 zostawiała stare zdjęcie, gdy nie znalazła lepszego) są sprawdzane jeszcze raz. Miniatura
 ma szerokość 960 px, jedną ze standardowych szerokości Wikimedia (inne serwer miniatur ogranicza albo odrzuca).
-Każda podmiana i każde ukrycie zdjęcia trafia do logu serwera (polids.photos)."""
+Każda podmiana i każde ukrycie zdjęcia trafia do logu serwera (polids.photos).
+
+0.14.2 (issue #35, właściciel projektu: "przygotuj możliwość do manualnego wrzucania zdjęć w folder oraz dodania
+podpisu autora zdjęcia, zamiast link do zdjęcia"): zdjęcia dodane ręcznie leżą w data/photos-manual/ (manual_photo,
+<ICAO>.jpg|jpeg|png|webp, wielkość liter w nazwie dowolna, obok opcjonalnie <ICAO>.txt z autorem w pierwszej
+niepustej linijce). Katalog jest w repozytorium i w obrazie dockera, poza wolumenem data/photos (pliki z repozytorium
+nie trafiłyby do istniejącego wolumenu na serwerze). Takie zdjęcie ma pierwszeństwo przed wszystkim w data/photos/,
+bez pytania Wikipedii; program go nie przenosi ani nie podmienia, a pobranych plików typu nie rusza. W AIRCRAFT
+pod zdjęciem "Photo: <autor>" bez odnośnika."""
 
 import json
 import logging
 import re
 import time
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -47,6 +55,7 @@ THUMB_WIDTH = 960  # standardowa szerokość miniatur Wikimedia ($wgThumbnailSte
 OWN_AFTER_S = 60  # obraz nowszy od opisu o więcej sekund to własne zdjęcie (fetch_photo zapisuje obraz przed opisem)
 REPLACED = "replaced"  # podkatalog na pliki zastąpione nowym zdjęciem
 EXTS = ("jpg", "jpeg", "png", "webp")
+CAPTION_MAX = 120  # najdłuższy podpis zdjęcia dodanego ręcznie (autor z <ICAO>.txt), znaków
 _missing: set[str] = set()  # typy, dla których Wikipedia nic nie zwróciła (do restartu aplikacji)
 _own_logged: set[str] = set()  # typy z podpisem Wikipedii uznane za własne zdjęcie (log raz do restartu)
 log = logging.getLogger("polids.photos")
@@ -116,6 +125,39 @@ def local_photo(icao: str) -> dict | None:
             return {"url": f"/files/photos/{img.name}?v={int(img.stat().st_mtime)}",
                     "credit": credit if isinstance(credit, str) else "", "page": meta.get("page")}
     return None
+
+
+def manual_photo(icao: str) -> dict | None:
+    """0.14.2 (issue #35): zdjęcie dodane ręcznie z data/photos-manual/: <ICAO>.jpg, .jpeg, .png albo .webp
+    (wielkość liter w nazwie dowolna, przy kilku plikach typu kolejność EXTS) i opcjonalnie <ICAO>.txt z autorem
+    w pierwszej niepustej linijce (UTF-8, także z BOM; spacje zwinięte, najwyżej CAPTION_MAX znaków, bez
+    powtórzonego "Photo:" na początku). None: brak zdjęcia typu albo katalogu."""
+    code = _safe(icao)
+    if not code:
+        return None
+    files: dict = {}
+    try:
+        for f in sorted(settings.manual_photos_dir.iterdir()):
+            if f.is_file():
+                files.setdefault(f.name.lower(), f)
+    except OSError:
+        return None
+    img = next((files[n] for n in (f"{code.lower()}.{ext}" for ext in EXTS) if n in files), None)
+    if img is None:
+        return None
+    author = ""
+    if txt := files.get(f"{code.lower()}.txt"):
+        try:
+            line = next((s.strip() for s in txt.read_text("utf-8-sig").splitlines() if s.strip()), "")
+        except (OSError, UnicodeDecodeError):
+            line = ""
+        author = " ".join(re.sub(r"(?i)^photo\s*:\s*", "", line).split())[:CAPTION_MAX].rstrip()
+    try:
+        version = int(img.stat().st_mtime)
+    except OSError:
+        return None
+    return {"url": f"/files/photos-manual/{quote(img.name)}?v={version}", "credit": "", "page": None,
+            "author": author}
 
 
 def _model_name(manufacturer: str | None, model: str | None) -> str:
@@ -401,12 +443,15 @@ async def fetch_photo(icao: str, manufacturer: str | None, model: str | None, st
 
 
 async def type_photo(icao: str, manufacturer: str | None, model: str | None) -> dict | None:
-    """Zdjęcie typu: zapisane, a gdy go nie ma albo jest do sprawdzenia (recheck) – pobrane (fetch_photo; przy
+    """Zdjęcie typu: dodane ręcznie (manual_photo, od 0.14.2; wtedy nic więcej nie jest sprawdzane ani pobierane),
+    zapisane, a gdy go nie ma albo jest do sprawdzenia (recheck) – pobrane (fetch_photo; przy
     sprawdzaniu i po ukryciu tylko artykuł o tym modelu). Zdjęcia z artykułu o innym modelu nie pokazujemy: bez
     artykułu o tym modelu idzie do replaced/ (hide_photo, typ bez zdjęcia), a gdy Wikipedia nie odpowiada, błąd idzie
     dalej (httpx.HTTPError, ValueError; w AIRCRAFT "Photo unavailable") i zdjęcie jest sprawdzane przy następnym
     otwarciu. Podmiana i ukrycie trafiają do logu."""
     code = _safe(icao)
+    if manual := manual_photo(code):
+        return manual
     found = local_photo(code)
     if found and not recheck(code, model):
         return found

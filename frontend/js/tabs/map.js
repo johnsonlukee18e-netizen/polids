@@ -5,7 +5,7 @@ import { AC_LABEL_GAP, FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, ac
   colorFor, controllerRows, drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
-import { altScale, altScaleHtml, ctrBadges } from "../mapatc.js";
+import { altScale, altScaleHtml, ctrBadges, towerBadges, towerOnBadge } from "../mapatc.js";
 import { dissolve, mainParts, pointIn } from "../dissolve.js";
 import { displayName, loadDisplayNames } from "../posname.js";
 import { activeAtc, activeOnline, buildTree, countOf, firsOf, matchItem, toggle } from "../postree.js";
@@ -66,7 +66,7 @@ const P21_SAMPLE = p21Html({ callsign: "DOM004", groundspeed: 248, altitude: 530
 const LEGEND = [
   ["air", "Airspace", () => [
     lg(`<span class="swatch own"></span>`, "staffing by online controllers: position area (one outline and fill in its colour)"),
-    lg(`<span class="lg-freq">133.475</span>`, "position and frequency: one label per position", "w"),
+    lg(`<span class="lg-freq">133.475</span>`, "position and frequency: one label per position; a TWR in its own CTR only as T on the aerodrome badge", "w"),
     lg(`<b class="pos-sim">SYM</b>`, "position simulated in Positions (dashed outline, aerodrome or CTR badge with a dashed frame)"),
     lg(`<span class="swatch fir"></span>`, "FIR boundary (separate switch)"),
     `<p class="lgx-note"><b>Full split</b> (staffing off): each sector separately.</p>`,
@@ -381,6 +381,9 @@ function mainMap(ctx) {
   let ads = [];
   let adIdx = new Map();  // wszystkie lotniska wg ICAO (odlot / przylot samolotów)
   let atcAds = new Set();
+  // znaki wież pod T na plakietkach lotnisk (drawAtc) i zestaw, z którym drawOwned ostatnio rysował etykiety (issue #35)
+  let badgeTwr = new Set(), labelTwr = "";
+  const twrKey = () => [...badgeTwr].sort().join("|");
   const drawAds = () => {
     layers.ads.clearLayers();
     const z = map.getZoom();
@@ -728,6 +731,7 @@ function mainMap(ctx) {
   function drawOwned(all) {
     const f = all ? 0.6 : 1;  // wszystkie poziomy: nakładające się obszary słabiej
     ownColor.clear();
+    labelTwr = twrKey();
     const groups = ownedGroups().map((g) => {
       const d = dissolve(`${g.c.callsign}|${[...g.gi].sort((a, b) => a - b).join(",")}`, g.vs.map((v) => v.f.geometry));
       return { ...g, d, color: colorFor(g.keys.find((k) => POSITION_COLORS[k]) || g.keys[0] || g.c.callsign),
@@ -739,6 +743,9 @@ function mainMap(ctx) {
       const st = { color: g.color, weight: 1.5, opacity: 1, fillColor: g.color, fillOpacity: 0.16 * f, ...(g.c.sim ? { dashArray: "6 4" } : {}) };
       if (g.d) L.geoJSON(g.d.geometry, { interactive: false, style: st }).addTo(layers.air);
       else g.vs.forEach((v) => L.geoJSON(v.f, { interactive: false, style: { ...st, stroke: false } }).addTo(layers.air));
+      // 0.14.2 (issue #35): wieża tylko we własnym CTR / ATZ z T na plakietce lotniska bez etykiety obszaru (ta sama
+      // tabliczka dwa razy); kolor, kontur i podziałka w dymku zostają
+      if (towerOnBadge(g.c, g.vs.map((v) => v.pr), badgeTwr)) return;
       // etykieta w obszarze stanowiska, daleko od krawędzi i poza dziurami; u sąsiada w pobliżu Polski, ale tylko na
       // dużej części (mainParts: nie na oderwanym kawałku, np. Bornholm w obszarze EKDK); punkt w pamięci sumy
       let at = null;
@@ -1302,6 +1309,7 @@ function mainMap(ctx) {
     const shown = $(".atc").checked ? atcData.airports.map((ap) => ({ ...ap, facilities: badgeFacilities(ap) })).filter((ap) => ap.facilities) : [];
     const known = new Set(ads.map((a) => a.icao));
     atcAds = new Set(shown.map((a) => a.icao));
+    badgeTwr = towerBadges(shown);
     shown.forEach((ap) => {
       // lotniska spoza listy (zagraniczne) dostają sam symbol pod plakietką
       if (!known.has(ap.icao)) pointMarker({ ident: ap.icao, kind: "AD", lat: ap.lat, lon: ap.lon, name: ap.name }, { label: false, tooltip: false, scale: 1.1 }).addTo(layers.atc);
@@ -1313,7 +1321,10 @@ function mainMap(ctx) {
     if (atcErr) $(".atc-info").innerHTML = `<span class="error">${esc(atcErr)}</span>`;
     else $(".atc-info").textContent = $(".atc").checked ? `${plural(shown.length, "aerodrome", "aerodromes")} with a controller · ${hhmm(new Date().toISOString())}` : "";
     drawAds();
-    declutter();  // plakietki rysowane po przestrzeni: etykiety od nowa
+    // wieża weszła na plakietkę albo z niej zeszła: etykiety obszarów od nowa (drawAirspace robi też declutter);
+    // inaczej plakietki rysowane po przestrzeni: same etykiety od nowa
+    if (net.useOnline && slices && twrKey() !== labelTwr) drawAirspace();
+    else declutter();
   }
   $(".atc").addEventListener("change", () => { saveAir(); loadAtc(); });
   every(30000, loadAtc);

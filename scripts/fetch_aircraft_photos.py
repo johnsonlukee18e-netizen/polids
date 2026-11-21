@@ -3,7 +3,8 @@
 Aplikacja robi to sama przy pierwszym otwarciu typu w zakładce AIRCRAFT; ten skrypt pobiera wszystko naraz,
 np. żeby wrzucić zdjęcia do repozytorium. Istniejące pliki są pomijane; pobrane wcześniej z artykułu o innym
 modelu (photos.recheck) są sprawdzane od nowa: podmieniane, gdy znajdzie się artykuł o tym modelu, a bez niego
-przenoszone do data/photos/replaced/ (typ bez zdjęcia, photos.hide_photo).
+przenoszone do data/photos/replaced/ (typ bez zdjęcia, photos.hide_photo). Typy ze zdjęciem dodanym ręcznie
+(data/photos-manual/, od 0.14.2) są pomijane: aplikacja i tak pokazuje to zdjęcie.
 
     python scripts/fetch_aircraft_photos.py            # wszystkie typy
     python scripts/fetch_aircraft_photos.py B738 A320  # wybrane
@@ -20,14 +21,14 @@ from sqlalchemy import select  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.importers.seed import init_db  # noqa: E402
 from backend.app.models import AircraftType  # noqa: E402
-from backend.app.services.photos import local_photo, recheck, type_photo  # noqa: E402
+from backend.app.services.photos import local_photo, manual_photo, recheck, type_photo  # noqa: E402
 
 
 async def main(codes: list[str]):
     init_db()
     with SessionLocal() as db:
         types = {a.icao: a for a in db.scalars(select(AircraftType).order_by(AircraftType.icao))}  # jeden rekord na typ
-    todo = [a for code, a in types.items() if (not codes or code in codes)
+    todo = [a for code, a in types.items() if (not codes or code in codes) and not manual_photo(code)
             and (not local_photo(code) or recheck(code, a.model))]
     print(f"Do pobrania: {len(todo)} typów")
     for i, a in enumerate(todo, 1):

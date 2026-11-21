@@ -539,14 +539,44 @@ def _times(items) -> list[dict]:
     return out
 
 
+def _periods(items) -> list[dict]:
+    """0.14.2 (issue #35): activationPeriods (11.2026: [{"type": "date", "bookingFlag": 1, "start":
+    "2026-11-21T19:00:00.000Z", "end": "2026-11-21T21:00:00.000Z"}]) → [{"from": "1900", "to": "2100", "date":
+    "2026-11-21"}] jak _times; okres bez czasów (ani ISO z datą, ani "HHMM") pomijamy. Przegląd 0.14.2: okres
+    o długości doby lub dłuższy ma też datę końca ("to_date"), inaczej "1900–2100" wyglądałoby na 2 h jednego dnia;
+    krótszy (także przez północ) bez niej."""
+    out = []
+    for p in items if isinstance(items, list) else []:
+        if not isinstance(p, dict):
+            continue
+        a, b = iso_time(p.get("start")), iso_time(p.get("end"))
+        if a and b:
+            w = {"from": a.strftime("%H%M"), "to": b.strftime("%H%M"), "date": a.date().isoformat()}
+            if b - a >= timedelta(days=1):
+                w["to_date"] = b.date().isoformat()
+            out.append(w)
+        elif _hm(p.get("start")) and _hm(p.get("end")):
+            out.append({"from": p["start"], "to": p["end"], "date": None})
+    return out
+
+
 def scenario(s: dict) -> dict:
-    """trafficVolumes: [[tv, przepustowość zajętości, wejść na godzinę], ...]; 999 = bez limitu."""
+    """trafficVolumes: [[tv, przepustowość zajętości, wejść na godzinę], ...]; 999 = bez limitu. times: okna z times,
+    oneTimes i (0.14.2) activationPeriods.
+
+    Przegląd 0.14.2: active = scenariusz obowiązuje teraz, czyli isActive z vIFF (stan wyliczany przez vIFF z okien
+    i stanowisk), a tylko w rekordzie bez klucza isActive pole active; enabled = pole active z vIFF (ustawienie
+    zapisane w scenariuszu: włączony, ale może jeszcze nie obowiązywać). Żywe dane z 21.11.2026: EP-KKTMA miał
+    active=true, isActive=false i okno 19:00–21:00Z, które jeszcze się nie zaczęło. isLive nie używamy (znaczenie
+    nieznane)."""
     tvs = [{"id": t[0], "occupancy_cap": _cap(t[1]) if len(t) > 1 else None, "entries_cap": _cap(t[2]) if len(t) > 2 else None}
            for t in s.get("trafficVolumes") or [] if isinstance(t, list) and t and isinstance(t[0], str)]
-    return {"id": s.get("id"), "active": bool(s.get("isActive") or s.get("active")), "tvs": tvs,
+    on = bool(s.get("isActive")) if "isActive" in s else bool(s.get("active"))
+    return {"id": s.get("id"), "active": on, "enabled": bool(s.get("active")), "tvs": tvs,
             "positions": _list(s.get("positions")), "anypositions": _list(s.get("anypositions")),
             "nopositions": _list(s.get("nopositions")), "start": _hm(s.get("start")), "end": _hm(s.get("end")),
-            "times": _times(s.get("times")) + _times(s.get("oneTimes")), "description": s.get("description") or "",
+            "times": _times(s.get("times")) + _times(s.get("oneTimes")) + _periods(s.get("activationPeriods")),
+            "description": s.get("description") or "",
             "booked": bool(s.get("useBookedPositions"))}
 
 
@@ -580,10 +610,12 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
             nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}, ttl=60) or {}
         except (UpstreamError, ValueError):
             nxt = {}
-    try:  # scenariusze też są dodatkiem: każdy błąd = pusta lista
-        scns = await scenarios(prefix)
+    # scenariusze też są dodatkiem: każdy błąd = pusta lista; 0.14.2 (issue #35): FMP odróżnia brak scenariuszy od
+    # błędu (scenarios_ok)
+    try:
+        scns, scns_ok = await scenarios(prefix), True
     except Exception:  # noqa: BLE001
-        scns = []
+        scns, scns_ok = [], False
     cur_h, next_h = now.hour, (now.hour + 1) % 24
     info = {d["id"]: d for d in (defs if isinstance(defs, list) else []) if isinstance(d, dict) and d.get("id")}
     in_scn = {}  # TV → scenariusze, w których występuje
@@ -613,11 +645,12 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
             item["entries_cap"] = item["entries_cap"] or t["entries_cap"]
             item["occupancy_cap"] = item["occupancy_cap"] or t["occupancy_cap"]
         item["scenarios"] = [s["id"] for s, _t in in_scn.get(tv, [])]
-        # aktywny = status 1 w vIFF albo należy do aktywnego scenariusza
+        # aktywny = status 1 w vIFF albo należy do aktywnego scenariusza (przegląd 0.14.2: obowiązującego teraz,
+        # isActive; sam włączony scenariusz, enabled, sektora nie aktywuje)
         item["active"] = item["status"] == 1 or any(s["active"] for s, _t in in_scn.get(tv, []))
         out.append(item)
     out.sort(key=lambda s: (not s["active"], s["id"]))
-    return {"prefix": prefix, "now": now.strftime("%H%M"), "sectors": out, "scenarios": scns}
+    return {"prefix": prefix, "now": now.strftime("%H%M"), "sectors": out, "scenarios": scns, "scenarios_ok": scns_ok}
 
 
 # --- jeden lot: plan, CDM, ATFCM, historia i wejścia w sektory (jak szczegóły lotu w NM UI)

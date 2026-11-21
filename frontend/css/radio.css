@@ -15,8 +15,12 @@
    tytuły podglądów) najmniej 10 px (--rb-lf); nazwa FIR-u i ADVISORY zostają na dawnym --rb-hf (ich miejsce w komórce
    jest ograniczone). Granatowa granica o stopień jaśniejsza (jak jasnoniebieskie granice na zdjęciu PANDORY), szare pole
    o stopień ciemniejsze: pierwsze w oczy rzuca się to, co obsadzone. Wyłączony przycisk warstwy ciemniejszy, więc
-   włączony i wyłączony różnią się wyraźniej; FMP (niczego nie włącza) czarny z szarą ramką. */
-.rb { --rb-f: clamp(11px, .8vw, 15px);
+   włączony i wyłączony różnią się wyraźniej; FMP (niczego nie włącza) czarny z szarą ramką.
+   0.14.2 (issue #35, właściciel projektu: strona zwykle na monitorach 1920×1080, nie 2K): --rb-f zależy od szerokości
+   i od wysokości okna (--view-h z style.css, ta sama widoczna wysokość co menu): okno przeglądarki na monitorze
+   1920×1080 (ok. 1920×940–970) i każda wysokość od 821 do 1000 px mieszczą całą siatkę bez ucinania dolnego rzędu;
+   1366×768, 1600×900 i pełny ekran 1920×1080 bez zmian. */
+.rb { --rb-f: clamp(11px, min(.8vw, var(--view-h) * .022 - 7px), 15px);
   --rb-line: #6a6a6a; --rb-epww: #b4b4b4; --rb-free: #4a4a4a; --rb-navy: #4a5ed8; --rb-navy-hi: #7d8cff;
   --rb-flow: #7a1414; --rb-flow-line: #ff5245;
   --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
@@ -192,13 +196,14 @@
 .rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
 .rb-flow path.fb { stroke: none; fill-rule: nonzero; }
 .rb-flow path:hover { fill: #8e1a1a; }
-/* plakietki (radio.js: miejsce z placeLabels, bez linii prowadzących) */
-.rb-lbls { position: absolute; inset: 0; pointer-events: none; }
+/* plakietki (radio.js: miejsce z placeLabels, bez linii prowadzących). 0.14.2 (przegląd): plakietka ATZ bez wolnego
+   miejsca nigdy nie zasłania wieży, APP, ACC ani FIS – pod innymi plakietkami (under: ujemny z-index z radio.js;
+   isolation: warstwa plakietek osobno, więc under zostaje nad mapą) albo ukryta (hide) */
+.rb-lbls { position: absolute; inset: 0; pointer-events: none; isolation: isolate; }
 .rb-pl { position: absolute; left: 0; top: 0; pointer-events: auto; min-width: var(--rb-tw); height: var(--rb-th); }
+.rb-pl.under { z-index: -1; }
+.rb-pl.hide { display: none; }
 .rb-tr { align-self: start; display: inline-flex; align-items: center; gap: 3px; }
-.rb-pl .rb-code { margin-left: 0; padding: 0 2px; font: 400 var(--rb-lf)/1.1 var(--sans); }
-/* sam ATIS (TWR/A, wieża offline): ciemne pole, częstotliwość ATIS jasnofioletowa */
-.rb-pl.atis .rb-fq { color: var(--rb-atis); }
 .rb-pl.twr { cursor: pointer; }
 .rb-pl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .rb-title { position: absolute; z-index: 2; left: 2px; top: 1px; display: flex; align-items: baseline; gap: 5px; padding: 0 3px;
@@ -264,12 +269,12 @@
 /* 0.14.1: pierwsza linia (co to jest: stanowisko, sektor, FIR) białą, szczegóły pod nią jaśniej szare */
 .rb-tip::first-line { color: #fff; }
 
-/* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania; litera
-   ATIS na plakietce TWR/A tej samej wysokości co ID (przegląd 0.13.2: częstotliwość siedziała na dolnej krawędzi) */
+/* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania;
+   częstotliwość na kafelku i plakietce bez dodatkowej wysokości linii (przegląd 0.13.2: siedziała na dolnej krawędzi) */
 @media (max-height: 820px) {
   .rb { gap: 3px; padding: 2px 5px 4px; --rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: var(--rb-lf);
     --rb-lv2: calc(var(--rb-lf) * 2 + 2px); }
-  .rb-box .rb-fq, .rb-pl .rb-fq, .rb-pl .rb-code, .rb-bd { line-height: 1; }
+  .rb-box .rb-fq, .rb-pl .rb-fq, .rb-bd { line-height: 1; }
   .rb-id { line-height: .9; }
   .rb-btns button { font-size: 12px; }
 }

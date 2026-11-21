@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
-VERSION = "0.14.1"
+VERSION = "0.14.2"
 
 
 def csv_set(value: str) -> set[str]:
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     seed_dir: Path = DATA_DIR / "seed"
     docs_dir: Path = DATA_DIR / "docs"
     photos_dir: Path = DATA_DIR / "photos"
+    # 0.14.2 (issue #35): zdjęcia typów dodane ręcznie (<ICAO>.jpg + <ICAO>.txt z autorem), w repozytorium i w obrazie
+    # dockera, poza wolumenem data/photos; mają pierwszeństwo przed data/photos/ (services/photos.manual_photo)
+    manual_photos_dir: Path = DATA_DIR / "photos-manual"
     frontend_dir: Path = ROOT_DIR / "frontend"
 
     default_aerodrome: str = "EPWA"

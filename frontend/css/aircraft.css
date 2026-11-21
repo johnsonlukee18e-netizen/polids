@@ -3,14 +3,22 @@
    nazwa, liczba i rodzaj silników, WTC, RECAT-EU). Klik w wiersz otwiera pod nim rozwinięcie na całą szerokość
    tabeli: od 0.14.0 (issue #28) zdjęcie po lewej, na prawo od niego wartości w trzech linijkach kratek (mała etykieta
    nad dużą wartością, kolor kratki wg kategorii: wymiary fioletowa, masa i turbulencja bursztynowa, osiągi
-   szaroniebieska) i pod nimi odnośniki. Ciemne tła, ostre krawędzie, bez cieni (poza wewnętrznym paskiem
-   zaznaczenia), napisy zwykłej grubości. */
+   szaroniebieska) i pod nimi odnośnik do strony osiągów typu. Ciemne tła, ostre krawędzie, bez cieni (poza
+   wewnętrznym paskiem zaznaczenia), napisy zwykłej grubości.
+   0.14.2 (issue #35): "listy callsign i aircraft mają być praktycznie identyczne": tabela na całą szerokość listy,
+   czcionka 20 px i wiersze jak w CALLSIGN, paski wierszy wyraźniejsze; zdjęcie w stałej ramce, więc dane obok
+   nie przesuwają się po jego wczytaniu; bez odnośników More photos, Image search i Performance search. */
 /* padding u góry jak w kolumnach menu: rząd przycisków producentów na wysokości pierwszego rzędu menu (← i ALL) */
 .ac-pane { display: flex; flex-direction: column; gap: 8px; padding-top: var(--col-pad); }
 .ac-pane > .toolbar { margin-bottom: 0; }
-.ac-pane .toolbar .count { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* kontener rozmiaru: rozwinięcie mierzy widoczną szerokość listy (100cqi niżej), także gdy tabela przewija się w bok */
-.ac-list { flex: 1; min-height: 0; overflow: auto; container-type: inline-size; }
+/* 0.14.2 (issue #35): licznik w rzędzie pola wyszukiwania jak w CALLSIGN (dawniej zawsze w osobnej linijce), w jednej
+   linijce skracany wielokropkiem; do osobnej linijki schodzi tylko w wąskim panelu, gdy obok pól zostaje mniej niż
+   16em. Zawinięcie zależy od szerokości panelu, nie od tekstu, więc pasek nie zmienia wysokości przy pisaniu */
+.ac-pane .toolbar .count { flex: 1 1 0; min-width: min(100%, 16em); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+/* kontener rozmiaru: rozwinięcie mierzy widoczną szerokość listy (100cqi niżej), także gdy tabela przewija się w bok;
+   wg niego też węższe kolumny tabeli w wąskiej liście (@container ac-list niżej) */
+.ac-list { flex: 1; min-height: 0; overflow: auto; container-type: inline-size; container-name: ac-list; }
 
 /* przyciski producentów: 137 x --btn-h z marginesem 1,5 px jak każdy przycisk menu i podmenu (miary z style.css,
    w niskim oknie niższe razem z menu); lewa krawędź pierwszego przycisku równo z polem wyszukiwania */
@@ -21,25 +29,37 @@
 .ac-makers .gbtn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
 
 /* tabela typów: stałe szerokości kolumn (table-layout: fixed), więc nie skacze przy pisaniu w polu wyszukiwania;
-   pełna nazwa ICAO się zawija. 0.14.0 (issue #28): większa czcionka i wyższe wiersze, kolumny bliżej siebie: tabela
-   najwyżej 760 px (dawniej 980 px przy czcionce 13 px; na nazwę zostaje najwyżej 280 px, więc w szerokim oknie
-   silniki, WTC i RECAT nie odjeżdżają od nazwy), co najmniej 640 px (stałe kolumny 480 px, na nazwę zostaje 160 px):
-   w wąskim panelu (tablet pionowo) lista .ac-list przewija się w bok, a kolumna nazwy nie znika. Producent 170 px
-   (dziewięć na dziesięć nazw w jednej linijce), silniki 112 px ("2 Turboshaft" w jednej linijce) */
-table.ac-table { width: 100%; min-width: 640px; max-width: 760px; table-layout: fixed; }
-.ac-table th.icao { width: 72px; }
-.ac-table th.mk { width: 170px; }
-.ac-table th.eng { width: 112px; }
-.ac-table th.wtc { width: 56px; }
-.ac-table th.recat { width: 70px; }
+   pełna nazwa ICAO się zawija. 0.14.2 (issue #35): "popraw rozmiar listy aircraft, żeby była podobna do callsign,
+   i tak samo czcionkę powiększ, zamiast skracać ją do połowy ekranu": tabela na całą szerokość listy jak CALLSIGN
+   (dawniej najwyżej 760 px), nazwa bierze resztę szerokości, silniki, WTC i RECAT przy prawej krawędzi (jak kraj
+   i Info w CALLSIGN). Szerokości przy 20 px: ICAO 90 px jak w CALLSIGN, producent 220 px (95 na 100 nazw w jednej
+   linijce), silniki 136 px ("2 Turboshaft" w jednej linijce); stałe kolumny 590 px, na nazwę co najmniej 210 px
+   w liście od 800 px. */
+table.ac-table { width: 100%; min-width: 672px; table-layout: fixed; }
+.ac-table th.icao { width: 90px; }
+.ac-table th.mk { width: 220px; }
+.ac-table th.eng { width: 136px; }
+.ac-table th.wtc { width: 64px; }
+.ac-table th.recat { width: 80px; }
+/* lista węższa niż 800 px (okno 1024 do ok. 1150 px, tablet poziomo): producent 160 px (BOMBARDIER i EUROCOPTER
+   w jednej linijce), WTC i RECAT jak do 0.14.1; stałe kolumny 512 px, na nazwę zostaje co najmniej 160 px. Tabela
+   co najmniej 672 px, więc w oknie 1024 px (lista 692 px, z paskiem przewijania 675 px) mieści się cała, bez
+   przewijania w bok, jak CALLSIGN; w jeszcze węższym panelu (tablet pionowo) lista .ac-list przewija się w bok,
+   a kolumna nazwy nie znika. Silniki bez zmian (136 px, "2 Turboshaft" w jednej linijce) */
+@container ac-list (max-width: 799px) {
+  .ac-table th.mk { width: 160px; }
+  .ac-table th.wtc { width: 56px; }
+  .ac-table th.recat { width: 70px; }
+}
 .ac-table th.wtc, .ac-table th.recat { text-align: center; }
 .ac-table td { vertical-align: baseline; overflow-wrap: anywhere; }
 /* kliknięty wiersz przewijany do widoku nie chowa się pod przyklejonym nagłówkiem */
 .ac-table tr { scroll-margin-top: 24px; }
 .ac-table tr.ac-rec { cursor: pointer; }
-/* 0.14.0 (issue #28): wiersze typów wyższe, czcionka 16 px (kod ICAO 17 px; dawniej 13 i 15 px) */
-.ac-table tr.ac-rec td { padding: 7px 8px; font-size: 16px; line-height: 1.35; }
-.ac-table tr.ac-rec td.icao { font-size: 17px; font-family: var(--mono); color: #fff; letter-spacing: .3px; white-space: nowrap; }
+/* 0.14.2 (issue #35): czcionka, odstępy i wysokość wierszy jak w CALLSIGN (20 px var(--mono), padding 4 px 8 px,
+   wysokość linii normal: wiersz 32 px; dawniej 16 px, kod ICAO 17 px, wiersz 38 px) */
+.ac-table tr.ac-rec td { padding: 4px 8px; font: 20px var(--mono); }
+.ac-table tr.ac-rec td.icao { font: 20px var(--mono); color: #fff; white-space: nowrap; }
 .ac-table td.mk { color: #c9d1c9; }
 /* nazwa łamana na spacjach i łącznikach, w środku słowa tylko wtedy, gdy samo się nie mieści (ciąg nazw
    rozdzielonych ukośnikiem, np. Astar/Ecureuil/SuperStar, przeglądarka traktuje jak jedno słowo) */
@@ -54,9 +74,13 @@ table.ac-table { width: 100%; min-width: 640px; max-width: 760px; table-layout: 
 table.ac-table tr td.recat-A, table.ac-table tr td.recat-B { color: #ff6a5a; }
 table.ac-table tr td.recat-C, table.ac-table tr td.recat-D { color: var(--yellow); }
 table.ac-table tr td.recat-E, table.ac-table tr td.recat-F { color: var(--ok); }
-/* paski wierszy liczone tylko po wierszach typów: otwarte rozwinięcie i nagłówki grup nie przestawiają kolorów */
-table.ac-table tbody tr.ac-rec td { background: var(--row); }
-table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--row-alt); }
+/* paski wierszy liczone tylko po wierszach typów: otwarte rozwinięcie i nagłówki grup nie przestawiają kolorów.
+   0.14.2 (issue #35): "popraw kolorowanie co drugiego wiersza, by było bardziej widoczne": na przemian czarne
+   i ciemnoszare jak CALLSIGN (--list-row, --list-row-alt w style.css); pod myszą jaśniej, ale nie w zaznaczonym
+   wierszu (zielone tło zaznaczenia zostaje) */
+table.ac-table tbody tr.ac-rec td { background: var(--list-row); }
+table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--list-row-alt); }
+table.ac-table tbody tr.ac-rec:not(.selected):hover td { background: var(--list-row-hover) !important; }
 
 /* widok producenta: wiersz z nazwą producenta w bazie przed każdą grupą (bez podświetlenia pod myszą) */
 table.ac-table tbody tr.ac-gh td { padding: 7px 8px 3px; background: var(--head) !important; border-bottom: 1px solid var(--head-line);
@@ -75,21 +99,34 @@ table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; backgrou
    widoku, przy przewijaniu w bok dochodzi do prawej krawędzi komórki i odkleja się, więc resztę kratek widać po
    przewinięciu (bez tego przyklejone rozwinięcie ucinało prawe kratki na stałe) */
 .ac-detail { position: sticky; left: 12px; width: min(100%, calc(100cqi - 22px)); min-width: min-content; }
-/* zdjęcie po lewej, dane na prawo od niego; zdjęcie wypełnia miejsce obok danych, najwyżej do swojej szerokości
-   (max-content). Dane schodzą pod zdjęcie (zawinięcie) dopiero wtedy, gdy obok nich na zdjęcie zostaje mniej niż
-   220 px: próg wg szerokości kratek danego typu, nie stała szerokość panelu */
+/* zdjęcie po lewej, dane na prawo od niego. Dane schodzą pod zdjęcie (zawinięcie) dopiero wtedy, gdy obok nich na
+   zdjęcie zostaje mniej niż 220 px: próg wg szerokości kratek danego typu, nie stała szerokość panelu.
+   0.14.2 (issue #35): "dane samolotu przesuwają się po wczytaniu jego zdjęcia. ustaw blok który będzie ramką na
+   zdjęcie o dowolnym rozmiarze": kolumna zdjęcia najwyżej 450 px niezależnie od pliku (dawniej max-content, czyli
+   szerokość zdjęcia), w niej ramka 3:2 (450 x 300 px jak typowa miniatura 960 x 640) i zawsze zarezerwowana linijka
+   podpisu, więc dane obok stoją w tym samym miejscu przed wczytaniem, po nim i bez zdjęcia */
 .ac-split { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; }
-.ac-split > .photo-box { flex: 1 1 220px; min-width: 0; max-width: max-content; }
+.ac-split > .photo-box { flex: 1 1 220px; min-width: 0; max-width: 450px; display: flex; flex-direction: column; gap: 4px; }
 .ac-data { flex: none; width: min-content; display: flex; flex-direction: column; gap: 8px; }
-.ac-detail .photo-box p { margin: 0; }
-/* zdjęcie w proporcjach pliku, najwyżej 640 x 300 px (obok danych zwykle węższe) */
-.ac-detail .photo-box img { display: block; max-width: min(640px, 100%); max-height: 300px; background: #000;
-  border: 1px solid var(--line); margin-bottom: 4px; }
+/* ramka: stałe proporcje, czarne tło; w niej "Loading photo…", komunikat (brak zdjęcia, błąd) albo zdjęcie
+   w proporcjach pliku, pomniejszone lub powiększone do ramki (pionowe i bardzo szerokie z czarnymi pasami) */
+.ac-detail .photo-frame { width: 100%; aspect-ratio: 3 / 2; display: flex; align-items: center; justify-content: center;
+  background: #000; border: 1px solid var(--line); overflow: hidden; }
+.ac-detail .photo-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.ac-detail .photo-frame .hint { padding: 0 8px; text-align: center; }
+/* podpis pod ramką: odnośnik do strony zdjęcia albo autor zdjęcia dodanego ręcznie; linijka zawsze zajęta i zawsze
+   jedna (dłuższy podpis skracany wielokropkiem, cały w dymku: title z photo() w aircraft.js), więc rozwinięcie nie
+   rośnie po wczytaniu zdjęcia, także przy długim autorze (do 120 znaków) i w wąskiej ramce. contain: inline-size:
+   szerokość linijki tylko z kolumny zdjęcia, nie z tekstu; bez tego długi podpis w jednej linijce poszerzał
+   rozwinięcie (min-content w .ac-detail) w wąskim panelu, ramka rosła do 450 px, a dane pod nią zjeżdżały w dół */
+.ac-detail .photo-credit { min-height: 1.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  contain: inline-size; }
 /* tekst pomocniczy i podpis zdjęcia czytelne na zielonym tle zaznaczenia */
 .ac-detail .hint { color: #c9d1c9; }
 .ac-detail .photo-box a { color: var(--cyan); text-decoration: none; }
 .ac-detail .photo-box a:hover { text-decoration: underline; }
-/* odnośniki pod kratkami, zawijane do ich szerokości */
+/* odnośnik do strony osiągów typu pod kratkami (0.14.2, issue #35: bez More photos, Image search i Performance
+   search) */
 .ac-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .ac-links a { color: var(--cyan); text-decoration: none; }
 .ac-links a:hover { text-decoration: underline; }

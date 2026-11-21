@@ -332,7 +332,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     owner/owners = pierwsze stanowisko online z kolejności (null/[] = nikt: na stronie sektor ACC szary bez granicy
     i bez plakietki, TMA, CTR i FIS bez niczego, okienko sąsiada bez częstotliwości).
     `ver`: wersja danych z importu. `geo=1` albo `have=<ver>` inne niż bieżąca: także geometria podglądów (granica
-    EPWW, granice FIR-ów sąsiednich, wycinki ACC, kształty TMA/CTA, CTR i FIS) – strona trzyma ją, dopóki `ver` się
+    EPWW, granice FIR-ów sąsiednich, wycinki ACC, kształty TMA/CTA, CTR, FIS i ATZ) – strona trzyma ją, dopóki `ver` się
     nie zmieni (np. po imporcie).
     Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (okienka sąsiadów bez częstotliwości i bez
     ADVISORY, bo nie wiadomo, czy ktoś tam jest).
@@ -341,7 +341,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     (okienka FIR-ów sąsiednich w komórkach siatki po łączeniu okienek jednego stanowiska; `name`/`room` = kod FIR-u
     i miejsce na nazwę i ADVISORY), `indicators` (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST
     z ATIS EDDB, bez ATIS wg wiatru z METAR), `flow` (czerwone tło: ograniczenie przepływu albo zajętość > 80 %;
-    `ok=false` = brak danych vIFF), `plates` (plakietki APP i TWR tylko dla zalogowanych), `areas` (stanowisko APP
+    `ok=false` = brak danych vIFF), `plates` (plakietki APP, TWR i ATZ tylko dla zalogowanych), `areas` (stanowisko APP
     i FIS online → id kształtów TMA/CTA i FIS, które teraz obsługuje: granica sumy na LOW) i `acc_short` (skróty
     stanowisk ACC na plakietkach). Od 0.13.2 bez geometrii sąsiadów (`nb`): jedyne zagraniczne granice to FIR-y."""
     # pozycje i część stała: praca CPU i bazy (zimna ok. 1 s) w wątku, żeby nie wstrzymać innych zapytań
@@ -379,10 +379,12 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             flow = {"ok": True, **radioboard.flow_alerts(tvs, now, [s["id"] for s in static["sectors"]], static["tma"])}
         except Exception as exc:  # noqa: BLE001 - dane vIFF bez opisu: każdy błąd to brak czerwonego tła
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
-    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
+    # 0.14.0 (właściciel projektu): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli;
+    # 0.14.2: ten sam kod konfiguracji (2N) we wskaźniku ACC GAT
+    fmp = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
+    out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow, fmp=fmp)
     out["net"] = net
-    # 0.14.0 (właściciel projektu): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli
-    out["fmp"] = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
+    out["fmp"] = fmp
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego
     # odpowiedź z geo=1 wstrzymywała serwer na 50–140 ms przy każdym otwarciu RADIO

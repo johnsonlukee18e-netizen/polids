@@ -21,7 +21,8 @@ SCENARIOS = [
     {"_id": "a", "id": "EP-ALLFIR", "active": False, "isActive": False, "start": "0000", "end": "2359", "positions": "EPWW_ALL_CTR",
      "nopositions": "EPWW_S_CTR,EPWW_J_CTR,EPWW_N_CTR", "anypositions": "", "trafficVolumes": [["EP-ALLFIR", 20, 52]],
      "useBookedPositions": False, "times": [], "airports": [], "description": ""},
-    {"_id": "b", "id": "EP-KKTMA", "active": False, "isActive": False, "anypositions": "EPKK_APP", "positions": "", "nopositions": "",
+    # przegląd 0.14.2: jak żywy EP-KKTMA z 21.11.2026: włączony (active), ale nieobowiązujący teraz (isActive)
+    {"_id": "b", "id": "EP-KKTMA", "active": True, "isActive": False, "anypositions": "EPKK_APP", "positions": "", "nopositions": "",
      "trafficVolumes": [["EP-KKTMA", 17, 999], ["EP-KKTMAD", 8, 999]], "useBookedPositions": True, "times": [], "oneTimes": [],
      "description": "test"},
     {"_id": "c", "id": "EP-WATMA", "isActive": True, "anypositions": "EPWA_APP", "trafficVolumes": [["EP-WATMA", 20, 999], ["EP-WATMAD", 15, 999]],
@@ -79,6 +80,8 @@ def test_scenario_normalisation_and_label():
     assert s[1]["tvs"][1] == {"id": "EP-KKTMAD", "occupancy_cap": 8, "entries_cap": None}  # 999 = bez limitu
     assert s[1]["anypositions"] == ["EPKK_APP"] and s[1]["booked"] and s[1]["description"] == "test"
     assert s[2]["active"] and s[2]["times"] == [{"from": "1800", "to": "2000", "date": None}] and s[2]["start"] is None
+    # przegląd 0.14.2: active = obowiązuje teraz (isActive), enabled = pole active z vIFF
+    assert [(x["active"], x["enabled"]) for x in s] == [(False, False), (False, True), (True, False)]
     assert viff._times([["2026-10-07", "0600", "0900"]]) == [{"from": "0600", "to": "0900", "date": "2026-10-07"}]
     assert [viff.tv_label(t) for t in ("EP-BH", "EP-WATMA", "EP-KKTMAD", "EP-ALLFIR", "EP-SFIR2", "EP-XYZ")] == [
         "sector B upper", "TMA EPWA", "TMA EPKK (D)", "whole FIR", "FIR south 2", "sector combination"]
@@ -205,14 +208,21 @@ def test_sectors_with_scenarios(client):
     viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": SCENARIOS})
     d = client.get("/api/viff/sectors").json()
     assert [s["id"] for s in d["scenarios"]] == ["EP-WATMA", "EP-ALLFIR", "EP-KKTMA"]  # aktywne na początku
+    assert d["scenarios_ok"] is True  # 0.14.2: lista scenariuszy pobrana (OTHER › FMP, widok SCENARIOS)
     by_id = {s["id"]: s for s in d["sectors"]}
     # TV ze scenariuszy są na liście, nawet bez definicji i ruchu
     assert {"EP-ALLFIR", "EP-KKTMA", "EP-KKTMAD", "EP-WATMAD"} <= set(by_id)
     assert by_id["EP-WATMA"]["active"] and by_id["EP-WATMAD"]["active"] and by_id["EP-BH"]["active"]  # status 1 albo aktywny scenariusz
-    assert not by_id["EP-KKTMA"]["active"] and by_id["EP-KKTMA"]["scenarios"] == ["EP-KKTMA"]
+    # przegląd 0.14.2: TV samego włączonego scenariusza (EP-KKTMA: active, ale nie isActive) nieaktywne na MAP i w FMP;
+    # scenariusz w grupie nieaktywnych (MAP: "Inactive scenarios") z enabled do dymku
+    assert not by_id["EP-KKTMA"]["active"] and not by_id["EP-KKTMAD"]["active"] and by_id["EP-KKTMA"]["scenarios"] == ["EP-KKTMA"]
+    assert [(s["id"], s["active"], s["enabled"]) for s in d["scenarios"]] == [
+        ("EP-WATMA", True, False), ("EP-ALLFIR", False, False), ("EP-KKTMA", False, True)]
     assert (by_id["EP-ALLFIR"]["entries_cap"], by_id["EP-ALLFIR"]["occupancy_cap"]) == (52, 20)  # przepustowość ze scenariusza
     assert [s["id"] for s in d["sectors"]][:4] == ["EP-BH", "EP-WATMA", "EP-WATMAD", "EP-ALLFIR"]
-    # awaria /etfms/scenarios: sektory nadal działają
-    viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": UpstreamError("timeout")})
-    d = client.get("/api/viff/sectors").json()
-    assert d["scenarios"] == [] and len(d["sectors"]) == 2
+    # awaria /etfms/scenarios (także odpowiedź, która nie jest JSON-em): sektory nadal działają; 0.14.2: scenarios_ok =
+    # false, więc FMP pisze "Scenarios unavailable." zamiast "No scenarios."
+    for err in (UpstreamError("timeout"), ValueError("Expecting value")):
+        viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": err})
+        d = client.get("/api/viff/sectors").json()
+        assert d["scenarios"] == [] and d["scenarios_ok"] is False and len(d["sectors"]) == 2, err

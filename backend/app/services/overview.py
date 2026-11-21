@@ -36,7 +36,7 @@ from .lvp import evaluate as evaluate_lvp
 from .metar import parse_metar
 from .notam import get_notams
 from .positions import known_stations
-from .runways import atis_state, runway_in_use, runway_state
+from .runways import runway_now
 from .vatsim import FACILITY_TYPES, controller_info, match_positions, on_frequency, parse_atis
 from .weather import get_metars, get_tafs
 
@@ -432,7 +432,7 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
             "metar": metars.get(icao), "parsed": p.to_dict() if p else None, "taf": tafs.get(icao),
             "lvp": lvp,
             "atis": {"callsign": atis["callsign"], "letter": atis["letter"], "lines": atis["lines"]} if atis else None,
-            "runway": _runway(ads.get(icao), p, lvp, stations, now),
+            "runway": runway_now(ads.get(icao), p, lvp, stations, now),
             "atc": info.get(icao, {}).get("atc", []),
             "covered_by": covered_by(orders.get(icao, []), mine, others) if mine else None,
             "traffic": {k: info.get(icao, {}).get(k, 0) for k in ("departures", "arrivals", "prefiles")},
@@ -442,20 +442,6 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
             "all_airports": list(AERODROMES), "aerodromes": aerodromes,
             "tl": tl, "wx_error": "; ".join(wx_errors) or None, "network_error": feed["error"],
             "notams": notams["notams"], "notam_error": notams["error"], "flow": flow, "monitor_error": monitor["error"]}
-
-
-def _runway(ad: Aerodrome | None, parsed, lvp: dict, stations: list[dict], now: datetime) -> dict | None:
-    """Pas w użyciu jak w AERODROME › INFO: z ATIS (source "ATIS", litera), a bez pasa z ATIS preferowany
-    (source "SUGGESTED", powód wyboru). Lotnisko bez pasów w bazie: None."""
-    if ad is None or not ad.runways:
-        return None
-    state = runway_state(ad, parsed, lvp, now)
-    atis = atis_state(stations, ad.icao, [r["designator"] for r in state["runways"]])
-    use = runway_in_use(atis, state["preferred"])
-    if not use.get("arr"):
-        return None
-    return {"arr": use["arr"], "dep": use["dep"] or use["arr"], "source": use["source"],
-            "letter": atis["letter"] if atis and use["source"] == "ATIS" else None, "reason": use.get("reason")}
 
 
 async def _feed() -> dict:
