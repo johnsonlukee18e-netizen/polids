@@ -23,13 +23,15 @@
 // danych sektorów). Panel z wyciągiem z LOA EPWW z FIR-em sąsiada
 // (GET /api/radio/loa), z przyciskiem do dokumentu w COORDINATION › DOKUMENTY i PDF-em w nowej karcie. Kliknięcie
 // kodu FIR-u sąsiada (np. EDWW) otwiera ten panel.
+// 0.14.0 (Marek): mały przycisk FMP w wolnej komórce kolumny przycisków (grid.fmp, nad ATIS): OTHER › FMP z konfiguracją
+// sektorów zalogowanych teraz (fmp.code z /api/radio/board), gdy jest w tabeli, inaczej z ostatnio wybraną w FMP.
 import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
 import { MIN_HOLE, SLIVER, dissolve, pointIn, ringStats } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
-import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf, bboxOrDefault,
-  cellArea, controllersOn, coverGrid, flText, labelOpts, limText, limTip, loaPlace, pageGrid, parseArg, pathAll, pathOf,
-  placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
+import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, FMP_LS, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf,
+  bboxOrDefault, cellArea, controllersOn, coverGrid, flText, fmpTarget, fmpTip, labelOpts, limText, limTip, loaPlace,
+  pageGrid, parseArg, pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
 
 const LS_LAYERS = "radio.layers";
 const REFRESH_MS = 30000;
@@ -594,23 +596,27 @@ export default {
         const wraps = !!a && !e.classList.contains("down") && a.getBoundingClientRect().top >= c.getBoundingClientRect().bottom - 2;
         if (wraps || spills(e)) e.classList.add("nn");
       });
-      renderButtonCells(grid.buttons, top);
+      renderButtonCells(grid.buttons, top, grid.fmp);
       MAPS.forEach((m) => place(maps[m.key].el, grid.maps?.[m.layer] ? cellArea(grid.maps[m.layer], top) : null));
       // stan danych z rzędami liczb nad i pod swoją komórką (krótka linia nie zmienia wysokości strony)
       place($(".rb-status"), grid.status ? cellArea(grid.status, top, { above: 1, below: 1 }) : null);
       place($(".rb-legend"), grid.legend ? cellArea(grid.legend, top) : null);
     }
-    // przyciski: komórki tworzone raz na układ (fokus i najechanie zostają przy odświeżaniu), potem tylko stan
-    function renderButtonCells(buttons, top) {
-      const rows = buttonRows(buttons), key = JSON.stringify([buttons?.col, rows.map((r) => [r.row, r.layers.map((l) => l.id)]), top]);
+    // przyciski: komórki tworzone raz na układ (fokus i najechanie zostają przy odświeżaniu), potem tylko stan;
+    // 0.14.0: przycisk FMP (fmp: komórka z grid.fmp) – bez aria-pressed, bo niczego nie włącza
+    function renderButtonCells(buttons, top, fmp) {
+      const rows = buttonRows(buttons);
+      const key = JSON.stringify([buttons?.col, rows.map((r) => [r.row, r.layers.map((l) => l.id)]), top, fmp?.col, fmp?.row]);
       if (key === btnKey) return;
       btnKey = key;
       const col = Number(buttons?.col) || 1;
+      const go = fmp ? cellArea(fmp, top) : null;
       $(".rb-btns").innerHTML = rows.map((r) => {
         const a = cellArea({ col, row: r.row }, top);
         return `<div class="rb-bt" style="grid-column: ${a.gc}; grid-row: ${a.gr}">${r.layers.map((l) => `<button type="button" data-ly="${l.id}"`
           + ` data-rt="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>`;
-      }).join("");
+      }).join("") + (go ? `<div class="rb-bt rb-go" style="grid-column: ${go.gc}; grid-row: ${go.gr}">`
+        + `<button type="button" data-go="fmp" data-rt="${esc(fmpTip(d?.fmp))}">FMP</button></div>` : "");
       renderButtons();
     }
 
@@ -672,6 +678,8 @@ export default {
         b.classList.toggle("on", layers.has(b.dataset.ly));
         b.setAttribute("aria-pressed", String(layers.has(b.dataset.ly)));
       });
+      // FMP: w dymku konfiguracja zalogowanych teraz (zmienia się z odświeżeniem tablicy)
+      el.querySelectorAll(".rb-btns button[data-go]").forEach((b) => { b.dataset.rt = fmpTip(d?.fmp); });
     }
     // stan danych: sieć, brak granicy FIR-u, błąd strony i brak danych o ograniczeniach przepływu (wtedy legenda czerwonego
     // tła przygaszona: brak czerwieni nie znaczy „bez ograniczeń”); całość także w dymku (wąska kolumna)
@@ -765,6 +773,8 @@ export default {
     };
     // przyciski warstw: kliknięcie łapiemy na kontenerze
     $(".rb-btns").addEventListener("click", (e) => {
+      // FMP: OTHER › FMP (krok do cofnięcia), z konfiguracją zalogowanych albo ostatnio wybraną
+      if (e.target.closest("button[data-go]")) return navigate("other", fmpTarget(d?.fmp, lsGet(FMP_LS)));
       const b = e.target.closest("button[data-ly]");
       if (!b) return;
       const s = new Set(layers);

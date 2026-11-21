@@ -16,7 +16,7 @@ from ..config import settings
 from ..database import get_db
 from ..importers.sectors_geojson import NO_SECTORS
 from ..models import Aerodrome, AtcPosition, ImportLog, NavPoint, NbSector, Sector
-from ..services import radioboard
+from ..services import fmpconfig, radioboard
 from ..services.viff import sectors as viff_sectors
 from ..services.weather import get_metars
 from ..services.http_cache import UpstreamError
@@ -34,6 +34,7 @@ log = logging.getLogger("polids.radio")
 # komunikaty błędów widoczne na stronie: bez nazwy dostawcy danych i pliku (szczegóły w logu serwera)
 ONLINE_UNAVAILABLE = "Network data unavailable"
 LOA_UNAVAILABLE = "LOA data unavailable"
+FMP_UNAVAILABLE = "FMP configurations unavailable"
 
 
 def _seed_or_empty(name: str) -> dict:
@@ -378,6 +379,8 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
     out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
     out["net"] = net
+    # 0.14.0 (Marek): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli
+    out["fmp"] = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego
     # odpowiedź z geo=1 wstrzymywała serwer na 50–140 ms przy każdym otwarciu RADIO
@@ -385,3 +388,61 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     if geo or (have and have != static["ver"]):
         body = body[:-1] + ',"geo":' + static["geo_json"] + "}"
     return Response(body.encode("utf-8"), media_type="application/json")
+
+
+# --- OTHER › FMP: konfiguracje sektorów ACC (0.14.0, Marek): GET /api/radio/configs
+def _fmp_tables() -> tuple[dict, dict]:
+    """ownership.json i fmp_configs.json; brak pliku: FileNotFoundError, uszkodzony: OSError albo ValueError."""
+    return seed_json(settings.seed_dir / "ownership.json"), seed_json(settings.seed_dir / "fmp_configs.json")
+
+
+def _fmp_now(online: dict) -> dict:
+    """Konfiguracja z tabeli o zestawie stanowisk ACC EPWW online (code, label; None = żadna). Błąd tabeli to tylko
+    brak konfiguracji, nigdy błąd tablicy RADIO."""
+    try:
+        own, data = _fmp_tables()
+        cfgs = fmpconfig.configs(data, own)
+        code = fmpconfig.current(online, own, cfgs, data)["code"]
+    except Exception as exc:  # noqa: BLE001 - dodatek tablicy: każdy błąd to brak konfiguracji
+        log.warning("RADIO: konfiguracja FMP (%s)", exc)
+        return {"code": None, "label": None}
+    return {"code": code, "label": next((c["label"] for c in cfgs if c["code"] == code), None)}
+
+
+@router.get("/configs")
+async def fmp_configs(geo: bool = False, have: str = "", db: Session = Depends(get_db)):
+    """Konfiguracje sektorów ACC EPWW do OTHER › FMP (0.14.0, Marek; data/seed/fmp_configs.json): `configs` w kolejności
+    tabeli – kod, napis jak w tabeli ("ALL+NFIR"), liczba stanowisk (`size`), stanowiska (nazwa z tabeli, znak, skrót,
+    częstotliwość z ownership.json i warstwy sektorów, które obsługuje: `sectors` {LOW, MID, HIGH: litery}) i warstwy
+    bez nikogo (`free`); właściciel warstwy = pierwsze stanowisko jej kolejności przejmowania (ownership.json), które
+    jest w konfiguracji, jak na RADIO dla zalogowanych. `layers`: granice warstw (ownership.json).
+    `current`: stanowiska ACC EPWW online teraz, dopasowane po częstotliwości jak /api/radio/board od 0.13.6
+    (on_frequency + match_positions; 199.998 się nie liczy), ich nazwy jak w tabeli i kod konfiguracji o dokładnie tym
+    zestawie (null = żadna). Błąd VATSIM nie psuje odpowiedzi: `ok=false`, komunikat, positions/names/code = null
+    (nie wiadomo, kto jest online).
+    `ver`: wersja danych sektorów jak na RADIO; `geo=1` albo `have=<ver>` inne niż bieżąca: także geometria podglądów
+    (`geo`: granica FIR EPWW i wycinki ACC, jak geo.border i geo.acc z /api/radio/board?geo=1)."""
+    try:
+        own, data = _fmp_tables()
+    except FileNotFoundError as exc:
+        log.warning("FMP: brak pliku %s", exc.filename)
+        raise HTTPException(404, FMP_UNAVAILABLE) from exc
+    except (OSError, ValueError) as exc:
+        log.warning("FMP: nie mogę odczytać tabeli konfiguracji (%s)", exc)
+        raise HTTPException(500, FMP_UNAVAILABLE) from exc
+    cfgs = fmpconfig.configs(data, own)
+    # stanowiska i część stała tablicy (wersja i geometria): w wątku, jak /board
+    stations, _, static, prefer, known = await run_in_threadpool(_board_data, db)
+    cur = {"ok": True, "error": None, "updated": None, "positions": None, "names": None, "code": None}
+    try:
+        feed = await vatsim_api.get_feed()
+        ctrls = on_frequency(feed.get("controllers", []) + feed.get("atis", []), known)
+        cur.update(fmpconfig.current(match_positions(ctrls, stations, prefer), own, cfgs, data))
+        cur["updated"] = (feed.get("general") or {}).get("update_timestamp")
+    except Exception as exc:  # noqa: BLE001 - kto jest online to dodatek: każdy błąd sieci = nie wiadomo
+        log.warning("FMP: dane o zalogowanych niedostępne (%s)", exc)
+        cur.update(ok=False, error=ONLINE_UNAVAILABLE, positions=None, names=None, code=None)
+    out = {"layers": own.get("layers") or {}, "configs": cfgs, "current": cur, "ver": static["ver"]}
+    if geo or (have and have != static["ver"]):
+        out["geo"] = {"border": static["geo"]["border"], "acc": static["geo"]["acc"]}
+    return out

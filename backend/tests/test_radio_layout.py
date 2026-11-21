@@ -115,7 +115,9 @@ def test_layout_seed_matches_sketch():
     assert not any(k in i for i in lay["indicators"] for k in ("col", "row"))
     # 0.13.2: siatka strony wg szkicu – przyciski w kolumnie H (ATIS r5, LOW/MID/HIGH r6, APP r8, TWR r10, TWR/A r12,
     # FIS r14), podglądy LOW D–G 8–17, HIGH I–K 6–17, MID H 16–21, stan danych H15, legenda A–C 18–21
-    assert set(lay) == {"note", "grid", "indicators", "berlin", "buttons", "maps", "status", "legend", "firs"}
+    # 0.14.0 (Marek): przycisk FMP w wolnej komórce kolumny przycisków nad ATIS (H3)
+    assert set(lay) == {"note", "grid", "indicators", "berlin", "buttons", "maps", "status", "legend", "fmp", "firs"}
+    assert lay["fmp"] == {"col": 8, "row": 3}
     assert lay["grid"] == {"cols": 13, "rows": 21, "top": 2}
     assert lay["buttons"] == {"col": 8, "rows": {"atis": 5, "low": 6, "mid": 6, "high": 6, "app": 8, "twr": 10,
                                                  "twra": 12, "fis": 14}}
@@ -177,6 +179,7 @@ def test_layout_boxes_map_to_known_callsigns(client):
         take(f"map {k}", **c)
     take("status", **g["status"])
     take("legend", **g["legend"])
+    take("fmp", **g["fmp"])
     # kody przy prawej krawędzi (EYVL, UMMV, UKLV): ADVISORY pod kodem; reszta: nazwa i ADVISORY na prawo
     room = {f["fir"]: (f["room"]["cols"], f["room"]["rows"]) for f in d["firs"]}
     assert room == {"EDWW": (3, 1), "EDUU": (2, 1), "EDMM": (2, 1), "ESAA": (4, 1), "LKAA": (3, 1), "UMKK": (2, 1),

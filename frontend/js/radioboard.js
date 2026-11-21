@@ -16,6 +16,20 @@ export const LAYERS = [
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
+// 0.14.0 (Marek: "Zrób mały przycisk na stronie radio z tytułem FMP który przenosi do zakładki OTHER/FMP"): przycisk
+// FMP w wolnej komórce kolumny przycisków (grid.fmp z /api/radio/board), wygląd jak przyciski warstw, ale bez
+// włączania. Cel: OTHER › FMP z konfiguracją zalogowanych teraz (fmp.code z tablicy), gdy jest w tabeli konfiguracji,
+// inaczej z ostatnio wybraną w FMP (saved: lsGet(FMP_LS), ten sam klucz co fmp.js), bez obu samo "#other/fmp"
+export const FMP_LS = "fmp.config";
+export const FMP_TIP = "OTHER \u203a FMP: sector configurations and capacity";
+const cfgCode = (v) => { const t = String(v ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
+export function fmpTarget(fmp, saved = "") {
+  const c = cfgCode(fmp?.code) || cfgCode(saved);
+  return c ? `fmp/${c}` : "fmp";
+}
+// dymek przycisku: stały opis, a gdy zalogowani pasują do konfiguracji z tabeli – która to ("2N: ALL + NFIR")
+export const fmpTip = (fmp) => (cfgCode(fmp?.code)
+  ? `${FMP_TIP}\nConfiguration now: ${cfgCode(fmp.code)}${fmp.label ? `: ${String(fmp.label).split("+").join(" + ")}` : ""}` : FMP_TIP);
 // Stałe przekroje podglądów (0.13.2, Marek: "Dla LOW przygotuj widok na FL330", bez suwaka wysokości – widoki
 // uniwersalne): LOW na FL330 (kształty pasma FL295–FL335, bez wycięć TMA), MID na FL350, HIGH na FL400
 export const LEVEL_FT = { LOW: 33000, MID: 35000, HIGH: 40000 };
