@@ -1,6 +1,6 @@
 /* MAP (runda 8): warstwy przestrzeni wg poziomu, listy wyboru sektorów, dymek "co jest w tym miejscu",
    kolory samolotów wg odlot / przylot / tranzyt. Bez poświaty: etykiety na pełnym ciemnym tle, dymki bez cienia.
-   0.12.5 (Marek): ostre krawędzie jak w systemach PAŻP (border-radius 0 poza kropkami), mniejsze symbole na mapie,
+   0.12.5 (właściciel projektu): ostre krawędzie jak w systemach PAŻP (border-radius 0 poza kropkami), mniejsze symbole na mapie,
    etykiety samolotów jak w PEGASUS_21 (0.12.6: tylko po najechaniu). */
 
 /* --- VISIBILITY SETTINGS (0.13.1, issue #25): wszystkie ustawienia wyświetlania w jednej sekcji panelu; podtytuły grup
@@ -110,17 +110,24 @@
 .swatch.atz { background: rgba(224,138,214,.2); border: 1px solid #e08ad6; }
 .swatch.nb { border: 1px dashed #8d99a6; }
 
-/* --- dymek po najechaniu: wszystkie widoczne przestrzenie w tym miejscu. Szerokość wg wierszy (każdy w jednej
-   linijce, z godziną "since"), najwyżej szerokość mapy; dopiero na wąskiej mapie zawija się ostatnia kolumna (kto) */
+/* --- dymek po najechaniu na przestrzeń: najwyżej szerokość mapy; dopiero na wąskiej mapie zawija się ostatnia kolumna.
+   0.14.0 (issue #28): podziałka wysokości w punkcie kursora (mapatc.js altScaleHtml): granica w osobnej linijce (żółta),
+   pod nią stanowisko i imię i nazwisko kontrolera, wcięte za pionową kreską w kolorze obszaru stanowiska (bez koloru:
+   szara); pasmo z rysowanym poziomem na ciemnozielonym tle, nieobsadzone "–" szare */
 .leaflet-tooltip.atc-tip.as-tip { left: 0; top: 0; z-index: 750; box-shadow: none; max-width: calc(100% - 8px); pointer-events: none; }
 .leaflet-tooltip.as-tip::before { display: none; }
-.as-tip td { padding: 1px 5px; }
 .as-tip td:last-child { white-space: normal; }
-.as-tip td.lv { color: var(--yellow); }
-.as-tip .fq { color: #9dff6e; }
-.as-k { display: inline-block; min-width: 30px; padding: 0 3px; border: 1px solid; border-radius: 0; font: 10px/14px var(--mono); text-align: center; }
-.as-k.as-acc { color: #5fd23a; } .as-k.as-tma { color: #7f95ff; } .as-k.as-ctr { color: #ff6b6b; } .as-k.as-fis { color: #35c4b0; }
-.as-k.as-cta { color: #c9b26b; } .as-k.as-atz { color: #e08ad6; } .as-k.as-nb, .as-k.as-oth { color: #aab4bd; }
+.as-scale { border-collapse: collapse; font: 12px/1.3 var(--mono); }
+.as-scale td { padding: 0 6px 0 0; }
+.as-scale .sc-a td { padding: 1px 0; color: var(--yellow); }
+.as-scale .sc-b td.sc-id { padding: 1px 10px 1px 8px; border-left: 3px solid #5a5a5a; color: #fff; white-space: nowrap; }
+.as-scale .sc-b td.sc-n { padding: 1px 6px 1px 0; color: #c9d1c9; }
+/* 0.14.0: częstotliwość stanowiska między nazwą a kontrolerem, jak w panelu Positions z obrazka właściciela projektu */
+.as-scale .sc-b td.sc-f { padding: 1px 10px 1px 0; color: var(--green-text); white-space: nowrap; }
+.as-scale .sc-b.none td.sc-id { color: var(--muted); }
+.as-scale .sc-b.at td { background: #16301a; }
+/* dymek jest ciemny także na jasnym podkładzie: SYM w nim żółty jak na ciemnym (.map.light .pos-sim to ciemny żółty) */
+.map.light .as-scale .pos-sim { color: var(--yellow); border-color: var(--yellow); }
 /* podpowiedź pod liczbą przestrzeni (TMA / CTR poza wybranym poziomem) */
 .sector-info .as-note { color: var(--yellow); }
 
@@ -197,7 +204,7 @@
 .as-card .flbox input { width: 58px; }
 .map.light .pos-sim, .map.light .atcb.sim { color: #7a6100; border-color: #7a6100; }
 
-/* --- ostre krawędzie jak w systemach PAŻP (0.12.5, Marek): przyciski, pola, karty, plakietki, etykiety, dymki
+/* --- ostre krawędzie jak w systemach PAŻP (0.12.5, właściciel projektu): przyciski, pola, karty, plakietki, etykiety, dymki
    i przełączniki bez zaokrągleń (reguły z style.css i leaflet.css nadpisane tylko w MAP); koło zostaje kołem
    tylko tam, gdzie to kropka */
 .mapwrap .btn, .mapwrap .field, .mapwrap select, .mapwrap textarea, .mapwrap .ms-card, .mapwrap .ms-card h4, .mapwrap .seg,

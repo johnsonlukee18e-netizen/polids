@@ -88,7 +88,8 @@ def test_docs_moved_to_other():
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     # 0.12.3: LOA z panelu RADIO otwiera się w COORDINATION › DOKUMENTY (OTHER › DOCS pokazuje pozostałe dokumenty)
     assert 'navigate("coordination", "docs/" + doc.dataset.coord)' in radio and 'navigate("docs"' not in radio
-    assert 'navigate("other"' not in radio
+    # 0.14.0 (właściciel projektu): jedyne przejście z RADIO do OTHER to przycisk FMP (OTHER › FMP), nie dokumenty
+    assert radio.count('navigate("other"') == 1 and 'navigate("other", fmpTarget(' in radio
 
 
 def _code(src):
@@ -334,7 +335,9 @@ def test_shell_in_english():
         bad = [line.strip() for line in src.splitlines() if POLISH.search(line) and "console." not in line]
         assert not bad, f"{name}: {bad}"
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
-    assert "PREPARE SESSION → AERODROME" in home and "<h3>Position</h3>" in home
+    # 0.14.0 (issue #28): przycisk SELF CHECK-IN (krok 2 HOME, dawne AERODROME › OVERVIEW) zamiast PREPARE SESSION
+    assert '"SELF CHECK-IN"' in home and "\\u2190 CHANGE POSITION" in (FRONTEND / "js" / "overview.js").read_text("utf-8")
+    assert "PREPARE SESSION" not in home and "<h3>Position</h3>" in home
 
 
 def test_sharp_edges():

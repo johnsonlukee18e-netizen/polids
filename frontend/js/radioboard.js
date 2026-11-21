@@ -16,7 +16,21 @@ export const LAYERS = [
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
 export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
-// Stałe przekroje podglądów (0.13.2, Marek: "Dla LOW przygotuj widok na FL330", bez suwaka wysokości – widoki
+// 0.14.0 (właściciel projektu: "Zrób mały przycisk na stronie radio z tytułem FMP który przenosi do zakładki OTHER/FMP"): przycisk
+// FMP w wolnej komórce kolumny przycisków (grid.fmp z /api/radio/board), wygląd jak przyciski warstw, ale bez
+// włączania. Cel: OTHER › FMP z konfiguracją zalogowanych teraz (fmp.code z tablicy), gdy jest w tabeli konfiguracji,
+// inaczej z ostatnio wybraną w FMP (saved: lsGet(FMP_LS), ten sam klucz co fmp.js), bez obu samo "#other/fmp"
+export const FMP_LS = "fmp.config";
+export const FMP_TIP = "OTHER \u203a FMP: sector configurations and capacity";
+const cfgCode = (v) => { const t = String(v ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
+export function fmpTarget(fmp, saved = "") {
+  const c = cfgCode(fmp?.code) || cfgCode(saved);
+  return c ? `fmp/${c}` : "fmp";
+}
+// dymek przycisku: stały opis, a gdy zalogowani pasują do konfiguracji z tabeli – która to ("2N: ALL + NFIR")
+export const fmpTip = (fmp) => (cfgCode(fmp?.code)
+  ? `${FMP_TIP}\nConfiguration now: ${cfgCode(fmp.code)}${fmp.label ? `: ${String(fmp.label).split("+").join(" + ")}` : ""}` : FMP_TIP);
+// Stałe przekroje podglądów (0.13.2, właściciel projektu: "Dla LOW przygotuj widok na FL330", bez suwaka wysokości – widoki
 // uniwersalne): LOW na FL330 (kształty pasma FL295–FL335, bez wycięć TMA), MID na FL350, HIGH na FL400
 export const LEVEL_FT = { LOW: 33000, MID: 35000, HIGH: 40000 };
 
@@ -150,7 +164,7 @@ function distSeg(px, py, [x0, y0, x1, y1]) {
   const t = l2 ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / l2)) : 0;
   return Math.hypot(px - x0 - t * dx, py - y0 - t * dy);
 }
-// Plakietki (0.13.2, Marek: "Usuń wszystkie leader line"): jedna odmiana jak kafelek, w środku swojego obszaru, bez
+// Plakietki (0.13.2, właściciel projektu: "Usuń wszystkie leader line"): jedna odmiana jak kafelek, w środku swojego obszaru, bez
 // linii do punktu – przy tłoku tylko lekko odsunięta: krawędź plakietki najwyżej `max` px od jej punktu (w tłoku
 // × STRETCH). Parametry do placeLabels (wspólne dla strony i testu), kind acc / app / twr / fis: APP w środku
 // obsługiwanych części TMA; TWR obok swojego CTR, gdy CTR jest mniejszy niż plakietka (obrys CTR pod plakietką kosztuje:
@@ -278,12 +292,12 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
 // UNICOM: FIR sąsiada bez nikogo online w sektorach przy granicy (linia pod nazwą FIR-u)
 export const ADVISORY_FQ = "122.800";
 
-// --- stos okienek FIR-u sąsiada (0.13.1, issue #25: stary styl strony, podział okienek wg szkicu Marka z
+// --- stos okienek FIR-u sąsiada (0.13.1, issue #25: stary styl strony, podział okienek wg szkicu właściciela projektu z
 // data/seed/radio_layout.json). Siatka CSS z kolumn i wierszy szkicu, w których stoją okienka (f.cols, f.rows
 // z /api/radio/board; bez nich – z okienek): kolumna stosu = kolumna szkicu, na przemian rząd liczb (wysokości między
 // kafelkami, k = 0..m) i rząd kafelków (m = liczba wierszy). Kolumny i wiersze tylko ze szkicu i z okienek bez łączenia
 // (połączone rozłożone na members z komórkami), więc stos nigdy nie zmienia rozmiaru.
-// 0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (radioboard.py
+// 0.13.5 (właściciel projektu: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (radioboard.py
 // _merged: komórka najwyższego członka, granice od najwyższej górnej do najniższej dolnej), jak EYVL na zdjęciu PANDORY
 // (660 / 133.305 / 95); komórki pozostałych członków zostają puste. Każdy kafelek ma więc jedną komórkę, a liczby przy
 // nim to jego własne granice.
@@ -355,7 +369,7 @@ export function stackGrid(f) {
   return { ncols: cols.length, nrows: 2 * m + 1, cols: cols.map(() => "t"), rows: lv.flatMap((l, k) => (k < m ? [`l${l}`, "t"] : [`l${l}`])),
     tiles: cur.placed.map((t) => ({ b: t.b, gc: `${t.c0 + 1} / ${t.c1 + 2}`, gr: `${2 * t.r0 + 2} / ${2 * t.r1 + 3}` })), marks };
 }
-// --- siatka strony wg szkicu (0.13.2, issue #27, Marek: "Zrób stronę dokładnie jak na szkicu"): 13 kolumn szkicu
+// --- siatka strony wg szkicu (0.13.2, issue #27, właściciel projektu: "Zrób stronę dokładnie jak na szkicu"): 13 kolumn szkicu
 // (grid.tracks z /api/radio/board: box = kafelek stałej szerokości, btn = przyciski warstw i MID, name = same kody
 // FIR-ów z prawej, map = podglądy LOW i HIGH dzielące resztę szerokości) i wiersze szkicu od grid.top + 1 (rząd
 // u góry: wskaźniki i ATIS-y, poza siatką). Każdy wiersz szkicu r to dwa tory: rząd liczb nad nim (levelTrack, tor
@@ -388,7 +402,7 @@ export function pageGrid(grid, firs) {
   return { top, cols: kinds.map((k) => COL_TRACK[k] || COL_TRACK.map),
     rows: Array.from({ length: len }, (_, j) => (j % 2 ? ROW_TRACK.t : ROW_TRACK[`l${Math.min(2, lvl(j))}`])), stacks };
 }
-// Nazwa plakietki stanowiska ACC (0.13.2, Marek): jeden sektor tej warstwy – litera i warstwa ("B LOW"), kilka – skrót
+// Nazwa plakietki stanowiska ACC (0.13.2, właściciel projektu): jeden sektor tej warstwy – litera i warstwa ("B LOW"), kilka – skrót
 // stanowiska (acc_short z /api/radio/board: "ALL", "DBT", "TM"), bez skrótu – nazwa stanowiska (dn)
 export function accPlateName(g, key, short, dn = (cs) => cs) {
   const ss = Array.isArray(g?.sectors) ? g.sectors : [];
@@ -401,7 +415,7 @@ export const limText = (b) => `${Math.round(Number(b?.upper) || 0)}-${Math.round
 const flOf = (n) => `FL${String(Math.round(n)).padStart(3, "0")}`;
 export const limTip = (b) => `${Number(b?.lower) > 0 ? flOf(Number(b.lower)) : "GND"}\u2013${Number(b?.upper) >= 999 ? "UNL" : flOf(Number(b?.upper) || 0)}`;
 
-// --- dymek przy kursorze (0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość (radio.css), na prawo
+// --- dymek przy kursorze (0.13.0, właściciel projektu: okno ściśnięte przy prawej krawędzi): stała szerokość (radio.css), na prawo
 // od kursora, a gdy podszedłby bliżej niż TIP_GAP px do prawej krawędzi okna – na lewo od niego; pod kursorem, przy
 // dolnej krawędzi nad nim; nigdy bliżej brzegu okna niż TIP_GAP. cx, cy = kursor, w, h = rozmiar dymku (szerokość
 // stała, więc mierzona przed ustawieniem miejsca jest ta sama), vw, vh = okno. Wynik {left, top, flipX, flipY} (px)

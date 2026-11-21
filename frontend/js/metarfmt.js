@@ -1,4 +1,4 @@
-// METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): grupy w kolorach, zjawiska z opisem
+// METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie właściciela projektu): grupy w kolorach, zjawiska z opisem
 // [EN / PL] tuż za grupą, przełącznik COLOURED / MONO. Czyste funkcje (bez DOM), testy w Node: test_metar_fmt_js.py.
 // Kod tylko w ASCII: polskie litery opisów jako \u escape (zasada projektu; polskie litery tylko w komentarzach).
 // Klasy części grupy: mt-key (zielony: dzień, kierunek wiatru, zjawisko, RMK, pas RVR, CB/TCU), mt-val (jasnozielony:
@@ -10,6 +10,11 @@ import { esc, splitTaf } from "./api.js";
 // wybór COLOURED / MONO zapamiętany w przeglądarce, wspólny dla METAR PL/MIL/INTL i TAF PL/INTL
 export const MODE_KEY = "meteo.wx.mode";
 export const wxMode = (v) => (v === "mono" ? "mono" : "coloured");
+// 0.14.0 (issue #28): "w METAR i TAF dodaj opcję wyłączenia dekodowania depeszy": DECODED / RAW obok COLOURED / MONO,
+// tak samo zapamiętany w przeglądarce i wspólny dla pięciu list; domyślnie DECODED (opis zjawisk [EN / PL] jak dotąd),
+// RAW = sam komunikat (wxTable z decode: false); wartość spoza listy (pusta pamięć) daje DECODED
+export const DECODE_KEY = "meteo.wx.decode";
+export const wxDecode = (v) => (v === "raw" ? "raw" : "decoded");
 
 // zjawiska: en / pl małymi literami (wielkie litery i kapitaliki robi CSS), g = rodzaj (m, f, n, p = mnogi),
 // ins = narzędnik po "z"/"ze" (opad dołączony do pierwszego: "deszcz ze śniegiem", "burza z gradem"), pcp = opad

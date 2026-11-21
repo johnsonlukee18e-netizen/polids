@@ -54,41 +54,28 @@
 .mapside .vf-bar i.ok { background: #3fb950; } .mapside .vf-bar i.near { background: #ffb020; }
 .mapside .vf-bar i.over { background: #f0453a; } .mapside .vf-bar i.nolim { background: #56606a; }
 
-/* --- wykres TV (lewy dolny róg mapy) */
-.leaflet-control.viff-chart { width: 560px; margin-bottom: 24px; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 0; box-shadow: none;
-  color: var(--text); font: 12px var(--ui); }
-.viff-chart .vf-title { display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 8px; background: var(--panel-2); border-bottom: 1px solid var(--line); }
+/* --- wykres TV (lewy dolny róg mapy). 0.14.0 (issue #28): wykresy ENTRY i OCC jak w OTHER › FMP (klasy .fmc-* z fmp.css),
+   panel nie wyższy niż mapa (max-height z map.js), reszta przewija się w panelu */
+.leaflet-control.viff-chart { width: 560px; margin-bottom: 24px; padding: 0; overflow: auto; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 0; box-shadow: none; color: var(--text); font: 12px var(--ui); }
+.viff-chart .vf-title { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 8px;
+  background: var(--panel-2); border-bottom: 1px solid var(--line); }
 .viff-chart .vf-kind { font: 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
-.viff-chart .vf-title b { font: 13px var(--mono); color: #ffd400; }
+.viff-chart .vf-id { font: 13px var(--mono); color: #ffd400; }
 .viff-chart .vf-desc { color: var(--text); }
+.viff-chart .vf-note { font-size: 11px; }
 .viff-chart .vf-body { padding: 4px 8px 6px; }
 .viff-chart .vf-meta { display: flex; flex-wrap: wrap; gap: 1px 14px; font-size: 11px; color: var(--muted); }
-.viff-chart .vf-meta b { font: 11px var(--mono); color: var(--text); }
-.viff-chart .vf-svg { width: 100%; height: auto; display: block; margin-top: 2px; }
-.viff-chart .vf-svg rect.vf-ok { fill: #3fb950; } .viff-chart .vf-svg rect.vf-near { fill: #ffb020; }
-.viff-chart .vf-svg rect.vf-over { fill: #f0453a; } .viff-chart .vf-svg rect.vf-nolim { fill: #4a7bd0; }
-.viff-chart .vf-svg .vf-occ { stroke-width: 1.5; }
-.viff-chart .vf-svg .vf-occ.vf-ok { fill: rgba(63,185,80,.35); stroke: #3fb950; } .viff-chart .vf-svg .vf-occ.vf-near { fill: rgba(255,176,32,.35); stroke: #ffb020; }
-.viff-chart .vf-svg .vf-occ.vf-over { fill: rgba(240,69,58,.4); stroke: #f0453a; } .viff-chart .vf-svg .vf-occ.vf-nolim { fill: rgba(74,123,208,.35); stroke: #4a7bd0; }
-.viff-chart .vf-svg .vf-cap { stroke: #ff5cc8; stroke-width: 1.6; stroke-dasharray: 5 3; }
-.viff-chart .vf-svg text { text-anchor: middle; }
-.viff-chart .vf-svg .vf-ax.end { text-anchor: end; }
-.viff-chart .vf-svg .vf-capt { fill: #ff5cc8; text-anchor: start; }
-.viff-chart .vf-svg text { font: 10px var(--mono); fill: var(--muted); }
-.viff-chart .vf-svg .vf-val { fill: var(--text); }
-.viff-chart .vf-svg .vf-sub { font: 9px var(--ui); letter-spacing: .6px; text-transform: uppercase; fill: var(--muted); }
-.viff-chart .vf-svg .vf-grid { stroke: #1f251f; }
-.viff-chart .vf-svg .vf-base { stroke: var(--line); }
-.viff-chart .vf-svg .vf-capt { font: 10px var(--mono); }
-.viff-chart .vf-legend i.vf-ok { background: #3fb950; } .viff-chart .vf-legend i.vf-near { background: #ffb020; }
-.viff-chart .vf-legend i.vf-over { background: #f0453a; }
-.viff-chart .vf-legend i.vf-capl { width: 14px; height: 0; border-top: 2px dashed #ff5cc8; }
-.viff-chart .vf-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: center; margin: 2px 0 4px; font-size: 11px; color: var(--text); }
-.viff-chart .vf-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 0; vertical-align: -1px; }
-.viff-chart .vf-legend .vf-stat { color: var(--muted); }
+.viff-chart .vf-meta .vf-reg { color: #ff5a4a; }
+.viff-chart .vf-wait, .viff-chart .vf-err { margin: 6px 0 4px; font-size: 12px; }
+.viff-chart .fmc-empty { margin: 4px 0 0; font-size: 12px; }
+.viff-chart .fmc-title { margin: 6px 0 0; font-size: 13px; }
+.viff-chart .fmc-svg { margin-top: 2px; }
+.viff-chart .fmc-legend { margin-top: 4px; }
+.viff-chart .vf-stat { margin: 2px 0 4px; font-size: 11px; color: var(--text); }
 .viff-chart .vf-fhead { margin: 4px 0 2px; font: 10px var(--ui); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
 .viff-chart .vf-fhead span { color: var(--muted); font-weight: 400; }
-.viff-chart .vf-tblwrap { max-height: 156px; overflow: auto; border: 1px solid var(--line); }
+.viff-chart .vf-tblwrap { max-height: 132px; overflow: auto; border: 1px solid var(--line); }
 .viff-chart .vf-empty { padding: 3px 0; font-size: 11px; color: var(--muted); }
 
 /* --- tabele wyników w stylu NM (lista lotów wykresu, wejścia w sektory) */

@@ -159,7 +159,7 @@ def test_saved_brightness_before_first_paint(tmp_path):
     res = json.loads(r.stdout)
     for v, got, want in res["out"]:
         assert got == want, v
-    # zakres -2..+2 (Marek 28.10.2026): -3, +3, -4, +4 (zapisane przy dawnym zakresie -4..+4) = bez filtra
+    # zakres -2..+2 (właściciel projektu 28.10.2026): -3, +3, -4, +4 (zapisane przy dawnym zakresie -4..+4) = bez filtra
     assert [x[1] for x in res["out"]][:9] == ["brightness(0.76)", "brightness(0.88)", "", "brightness(1.12)",
                                              "brightness(1.24)", "", "", "", ""]
     assert res["blocked"] == ""
@@ -196,7 +196,8 @@ out.empty = tb.takeReload(s);
 tb.markReload("#meteo", broken);
 tb.markReload("#meteo", null);
 out.broken = [tb.takeReload(broken), tb.takeReload(null)];
-out.target = ["#aerodrome/EPWA/dman", "#home", "#home/x", "", null, "#", "#meteo", "#other/checklist/a"].map(tb.reloadTarget);
+out.target = ["#aerodrome/EPWA/dman", "#home", "#home/x", "", null, "#", "#meteo", "#other/checklist/a", "#home/checkin",
+  "#home/CHECKIN"].map(tb.reloadTarget);
 // pasek z atrapą DOM: zapisana jasność 1, kliknięcia, granice zakresu, Reload
 store.set(tb.BRIGHT_KEY, "1");
 const mk = (act) => ({ dataset: { act }, disabled: null, title: "", closest() { return this; } });
@@ -273,7 +274,7 @@ def js(tmp_path_factory):
 
 
 def test_brightness_values(js):
-    # zapisana wartość tylko jako liczba całkowita -2..2 (Marek 28.10.2026; inaczej 0 = bez filtra, także -4..+4
+    # zapisana wartość tylko jako liczba całkowita -2..2 (właściciel projektu 28.10.2026; inaczej 0 = bez filtra, także -4..+4
     # z dawnego zakresu); krok 12 %, 76-124 %
     assert js["of"] == [2, -2, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0]
     assert js["clamp"] == [-2, -2, -1, 0, 1, 2, 2, 0]
@@ -286,8 +287,10 @@ def test_reload_marker(js):
     assert js["take"] == ["#aerodrome/EPWA/dman", None]
     assert js["empty"] == "#home"
     assert js["broken"] == [None, None]
+    # 0.14.0 (issue #28): krok 2 HOME (SELF CHECK-IN) wraca po Reload jak każdy inny ekran, inny #home/x to krok 1
     assert js["target"] == [{"tab": "aerodrome", "arg": "EPWA/dman"}, None, None, None, None, None,
-                            {"tab": "meteo", "arg": ""}, {"tab": "other", "arg": "checklist/a"}]
+                            {"tab": "meteo", "arg": ""}, {"tab": "other", "arg": "checklist/a"},
+                            {"tab": "home", "arg": "checkin"}, {"tab": "home", "arg": "checkin"}]
 
 
 def test_topbar_buttons_clamp_and_storage(js):

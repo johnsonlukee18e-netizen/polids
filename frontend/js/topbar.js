@@ -3,7 +3,7 @@
 // Reload: wczytuje całą stronę od nowa (po aktualizacji serwera nowa wersja aplikacji; zainstalowane okno PWA nie ma
 // przycisku przeglądarki) i wraca do tego samego ekranu. Adres ekranu czeka w sessionStorage tej karty na jedno
 // uruchomienie (takeReload w app.js, po otwarciu HOME); każde inne uruchomienie (F5, nowe okno) otwiera HOME jak dotąd.
-// Brighter / Darker: jasność całego ekranu, krok 12 % od -2 do +2 (76-124 %, Marek 28.10.2026), zapamiętana w tej
+// Brighter / Darker: jasność całego ekranu, krok 12 % od -2 do +2 (76-124 %, właściciel projektu 28.10.2026), zapamiętana w tej
 // przeglądarce (localStorage); na granicy zakresu przycisk jest wyłączony, a dymek podaje bieżącą jasność. Filtr CSS na <html>, nigdy
 // na main ani #views: filtr na przodku robi z niego blok zawierający dla position: fixed, więc dymki RADIO (.rb-tip)
 // i pasek offline przesuwałyby się o szerokość menu i wysokość paska (pomiar w mapie rundy 16); <html> tego nie robi.
@@ -41,11 +41,14 @@ export function takeReload(store = session()) {
   try { hash = store?.getItem(RELOAD_KEY) ?? null; store?.removeItem(RELOAD_KEY); } catch { /* zablokowane */ }
   return hash;
 }
-// ekran do przywrócenia po Reload: {tab, arg} z zapisanego adresu; HOME albo pusty adres = nic (HOME już otwarty)
+// ekran do przywrócenia po Reload: {tab, arg} z zapisanego adresu; HOME albo pusty adres = nic (HOME już otwarty).
+// 0.14.0 (issue #28): krok 2 HOME (#home/checkin, SELF CHECK-IN) to osobny ekran, więc wraca jak każdy inny (krok po
+// kroku 1, ← wraca do powitania); inny #home/x to krok 1, czyli nic
 export function reloadTarget(hash) {
   if (!hash) return null;
   const { tab, arg } = parseHash(hash);
-  return tab && tab !== "home" ? { tab, arg } : null;
+  if (tab === "home") return arg.toLowerCase() === "checkin" ? { tab, arg: "checkin" } : null;
+  return tab ? { tab, arg } : null;
 }
 
 // bar: header#topbar; root: element z filtrem (<html>); here/reload/store/win: do testów w Node.

@@ -154,10 +154,12 @@ def test_tv_chart_not_opened_by_itself():
     load = code.split("const loadViff = async () => {")[1].split("\n  };")[0]
     assert "viffSel" not in load and "loadRatio" not in load and ".active)?.tvs" not in load
     assert "loadRatio" not in code
-    # okno pokazane tylko dla wybranego TV przy włączonym FMP
+    # okno pokazane tylko dla wybranego TV przy włączonym FMP; 0.14.0 (issue #28): wykres z /api/viff/sectors/<TV>
+    # (viffChart), więc okno także bez wiersza listy (wczytuje się albo pokazuje błąd)
     render = code.split("const renderChart = () => {")[1].split("\n  };")[0]
-    assert "const tv = (viffData?.sectors || []).find((t) => t.id === viffSel);" in render
-    assert 'const show = !!tv && $(".viff").checked;' in render
+    assert "const tv = (viffData?.sectors || []).find((t) => t.id === viffSel) || null;" in render
+    assert "const c = viffChart?.id === viffSel ? viffChart : null;" in render
+    assert 'const show = !!viffSel && (!!tv || !!c || !!viffChartErr) && $(".viff").checked;' in render
     assert 'chartEl.style.display = show ? "" : "none";' in render
     # wybór z listy, ze scenariusza i z panelu lotu, zamknięcie ✕ zapisuje pusty wybór
     assert '$(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));' in code

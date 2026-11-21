@@ -80,7 +80,7 @@ def test_parse_atis():
 
 
 def test_parse_atis_approach_runway():
-    # vATIS EPWA 12.10.2026 (zgłoszenie Marka): pas do lądowania tylko w zdaniu o podejściu
+    # vATIS EPWA 12.10.2026 (zgłoszenie właściciela projektu): pas do lądowania tylko w zdaniu o podejściu
     rw = ["11", "29", "15", "33"]
     lines = ["THIS IS WARSAW INFORMATION GOLF . TIME 1530 .", "EXPECT UNIFORM ARRIVALS FOR RNP ZULU APPROACH RUNWAY 33 .",
              "DEPARTURES RUNWAY 29 .", "TRANSITION LEVEL 8 0 .", "FOR ATC CLEARANCE CONTACT TOWER ON 118.305 .",

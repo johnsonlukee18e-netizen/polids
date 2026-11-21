@@ -128,7 +128,7 @@ def test_radio_online_matches_vacs_positions(client):
 
 
 def test_online_only_on_position_frequency(client, monkeypatch):
-    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo. wyswietlaj tylko kontrolerow po
+    """0.13.6 (właściciel projektu: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo. wyswietlaj tylko kontrolerow po
     czestotliwosciach aktywnych poprawnych dla sektorow, nie po nazwach"): /api/radio/online, /api/vatsim/online
     i /api/vatsim/atc (MAP) pokazują tylko połączenia na częstotliwości stanowiska z danych – znak nie wystarcza."""
     feed = {"general": {}, "pilots": [], "controllers": [

@@ -1,4 +1,5 @@
-"""AERODROME › OVERVIEW: poziom przejściowy, przypisanie lotnisk do stanowisk, ECFMP/vIFF i jedno zapytanie /api/overview.
+"""HOME › SELF CHECK-IN (do 0.13.6 AERODROME › OVERVIEW, od 0.14.0 krok 2 HOME): poziom przejściowy, przypisanie
+lotnisk do stanowisk, ECFMP/vIFF i jedno zapytanie /api/overview.
 
 Wszystkie źródła zewnętrzne (METAR/TAF, VATSIM, NOTAM, ECFMP, vIFF) są podstawione, żeby testy działały bez sieci."""
 
@@ -23,7 +24,7 @@ NOW = datetime(2026, 10, 8, 15, 30, tzinfo=timezone.utc)
 # --- poziom przejściowy -----------------------------------------------------------------------------------------
 
 def test_tl_from_qnh_table():
-    """Zasada (Marek, 08.10.2026): 995 hPa i mniej na którymkolwiek lotnisku → FL090, inaczej FL080. Nic więcej."""
+    """Zasada (właściciel projektu, 08.10.2026): 995 hPa i mniej na którymkolwiek lotnisku → FL090, inaczej FL080. Nic więcej."""
     assert tl.from_qnh(1013)["fl"] == 80 and tl.from_qnh(996)["fl"] == 80 and tl.from_qnh(995.5)["fl"] == 80
     assert tl.from_qnh(995)["fl"] == 90 and tl.from_qnh(994)["fl"] == 90
     # także przy skrajnie niskim ciśnieniu zostaje FL090 (bez podnoszenia poziomu)
@@ -259,7 +260,7 @@ def client(monkeypatch_module):
 def test_positions_grupy_i_lotniska(client):
     data = client.get("/api/overview/positions").json()
     groups = {g["kind"]: {p["callsign"]: p for p in g["positions"]} for g in data["groups"]}
-    # przykład Marka: EPWA APP obejmuje EPWA, EPMO, EPLL i EPRA (z kolejności przejmowania w pliku .ese)
+    # przykład właściciela projektu: EPWA APP obejmuje EPWA, EPMO, EPLL i EPRA (z kolejności przejmowania w pliku .ese)
     assert groups["APP"]["EPWA_APP"]["airports"] == ["EPLL", "EPMO", "EPRA", "EPWA"]
     assert groups["APP"]["EPKK_APP"]["airports"] == ["EPKK", "EPKT", "EPRZ"]
     assert groups["APP"]["EPGD_APP"]["airports"] == ["EPBY", "EPGD"]
@@ -490,7 +491,7 @@ def test_overview_mine_moj_cid(client, monkeypatch):
 
 
 def test_overview_tylko_na_czestotliwosci(client, monkeypatch):
-    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): chip ATC, ATIS (litera i pas)
+    """0.13.6 (właściciel projektu: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): chip ATC, ATIS (litera i pas)
     i covered_by tylko z połączeń na częstotliwości stanowiska z danych; sam znak nie wystarcza."""
     from backend.app.routers import aerodromes
     feed = {**FEED, "controllers": [

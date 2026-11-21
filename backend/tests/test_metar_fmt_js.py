@@ -1,5 +1,6 @@
-"""METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): kolory grup, opis zjawisk [EN / PL],
-COLOURED / MONO. Czyste funkcje z frontend/js/metarfmt.js uruchamiane w Node, pasek i arkusz sprawdzane w tekście."""
+"""METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie właściciela projektu): kolory grup, opis zjawisk [EN / PL],
+COLOURED / MONO; 0.14.0 (issue #28): DECODED / RAW (opis zjawisk można wyłączyć). Czyste funkcje
+z frontend/js/metarfmt.js uruchamiane w Node, pasek i arkusz sprawdzane w tekście."""
 import json
 import re
 import shutil
@@ -48,6 +49,11 @@ console.log(JSON.stringify({
   escaped: m.wxBody("metar", "EPWA 121030Z <img src=x>", "EPWA"),
   table: m.wxTable("metar", [{ icao: "EPBY", raw: input.photo[0] }]).startsWith('<table class="mt-tab"><tbody><tr><td class="mt-st">EPBY</td>'),
   mode: [m.wxMode("mono"), m.wxMode("coloured"), m.wxMode("colour"), m.wxMode("x"), m.wxMode(null), m.MODE_KEY],
+  // 0.14.0 (issue #28): DECODED / RAW
+  decode: [m.wxDecode("raw"), m.wxDecode("decoded"), m.wxDecode("RAW"), m.wxDecode("x"), m.wxDecode(null), m.DECODE_KEY],
+  rawTable: m.wxTable("metar", [{ icao: "EPGD", raw: input.photo[1] }, { icao: "EPZG", raw: null }], { decode: false }),
+  decTable: m.wxTable("metar", [{ icao: "EPGD", raw: input.photo[1] }, { icao: "EPZG", raw: null }], { decode: true }),
+  tafRaw: m.wxBody("taf", "TAF EPKK 121100Z 1212/1312 24008KT CAVOK TEMPO 1300/1306 0800 FG", "EPKK", { decode: false }),
 }));
 """
 
@@ -166,6 +172,27 @@ def test_mode_key(js):
     assert js["mode"] == ["mono", "coloured", "coloured", "coloured", "coloured", "meteo.wx.mode"]
 
 
+def test_decode_key(js):
+    """0.14.0 (issue #28): DECODED / RAW. Domyślnie DECODED (opis zjawisk jak dotąd); RAW tylko po wyborze (wartość spoza
+    listy, np. pusta pamięć, daje DECODED); osobny klucz w przeglądarce obok meteo.wx.mode."""
+    assert js["decode"] == ["raw", "decoded", "decoded", "decoded", "decoded", "meteo.wx.decode"]
+
+
+def test_raw_table_without_decoding(js):
+    """RAW: ta sama tabela i te same kolory grup, tylko bez opisu [EN / PL]; NIL bez zmian. DECODED: opis jak dotąd."""
+    raw, dec = js["rawTable"], js["decTable"]
+    assert "mt-dec" not in raw and "[light rain / lekki deszcz]" not in raw
+    assert '<span class="mt-g"><span class="mt-key">-RA</span></span>' in raw
+    assert '<span class="mt-key">210</span>V<span class="mt-key">280</span>' in raw
+    assert '<td class="mt-st">EPZG</td><td class="mt-tx"><div class="mt-ln"><span class="mt-nil">NIL</span></div>' in raw
+    assert '<span class="mt-key">-RA</span><span class="mt-dec">[light rain / lekki deszcz]</span>' in dec
+    # bez opisu tabela różni się tylko opisem
+    assert re.sub(r'<span class="mt-dec">[^<]*</span>', "", dec) == raw
+    # TAF: linie zmian jak w DECODED, mgła bez opisu
+    assert js["tafRaw"].count('<div class="mt-ln mt-cont">') == 1 and "mt-dec" not in js["tafRaw"]
+    assert '<span class="mt-g"><span class="mt-key">FG</span></span>' in js["tafRaw"]
+
+
 def test_ascii_code():
     """W kodzie tylko ASCII (polskie litery opisów jako \\u017c itd.), poza komentarzami w osobnych linijkach."""
     src = SRC.read_text("utf-8")
@@ -179,6 +206,8 @@ def test_css_look():
     css = re.sub(r"/\*.*?\*/", "", CSS_SRC.read_text("utf-8"), flags=re.S)
     assert not re.search(r"font-weight:\s*(?:bold|[6-9]00)|font:\s*(?:bold|[6-9]00)\b", css)
     assert "text-shadow" not in css and "glow" not in css
+    # 0.14.0 (issue #28): dwa przełączniki (COLOURED / MONO i DECODED / RAW) oddzielone kreską
+    assert ".mt-mode + .mt-mode { margin-left: 2px; padding-left: 12px; border-left: 1px solid var(--line); }" in css
     assert all(v.strip() == "0" for v in re.findall(r"border-radius:\s*([^;}]+)", css))
     assert ".mt-tab .mt-dec { font-size: .8em; font-variant: small-caps; text-transform: capitalize; }" in css
     assert ".mtr.mono .mt-tab span { color: inherit; }" in css
@@ -204,14 +233,20 @@ def test_toolbar_switch_first():
     body = METEO[METEO.index("function wxList("):METEO.index("// --- RADAR")]
     bar = body[body.index('<div class="toolbar mtr-bar">'):body.index('<div class="mtr-list">')]
     order = [bar.index(x) for x in ('data-mode="coloured"', ">COLOURED</button>", 'data-mode="mono"', ">MONO</button>",
-                                    "${field}", "refresh every 2 min", 'class="hint upd"')]
+                                    'class="mt-mode mt-decsw"', 'data-decode="decoded"', ">DECODED</button>",
+                                    'data-decode="raw"', ">RAW</button>", "${field}", "refresh every 2 min",
+                                    'class="hint upd"')]
     assert order == sorted(order)
     field = body[body.index("const field = "):body.index("pane.append(")]
     assert field.index('class="ids"') < field.index(">Show</button>") and 'fixed ? ""' in field
     assert "setMode(wxMode(lsGet(MODE_KEY)))" in body and "lsSet(MODE_KEY, b.dataset.mode)" in body
     assert 'wrap.classList.toggle("mono", m === "mono")' in body
-    assert '$(".mtr-list").innerHTML = wxTable(kind, rows, { decode: true })' in body
-    assert 'import { MODE_KEY, wxMode, wxTable } from "../metarfmt.js";' in METEO
+    # 0.14.0 (issue #28): DECODED / RAW we wspólnym kluczu meteo.wx.decode, lista rysowana z wyborem opisu
+    assert "let decode = wxDecode(lsGet(DECODE_KEY)), rows = null;" in body and "lsSet(DECODE_KEY, b.dataset.decode)" in body
+    assert '$(".mtr-list").innerHTML = wxTable(kind, rows, { decode: decode === "decoded" })' in body
+    assert "decode: true" not in body
+    assert 'wrap.querySelectorAll(".mt-mode button[data-mode]")' in body
+    assert 'import { DECODE_KEY, MODE_KEY, wxDecode, wxMode, wxTable } from "../metarfmt.js";' in METEO
     # AERODROME, OVERVIEW, AWOS i karta lotniska zagranicznego zostają przy dawnym colorize()/wxLines()
     assert "export function colorize(raw)" in METEO and "export function wxLines(kind, raw)" in METEO
 

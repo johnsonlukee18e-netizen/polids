@@ -1,4 +1,4 @@
-// RADIO: jedna strona jak w PANDORZE. 0.13.2 (issue #27, Marek: szkic strony) – cała strona w siatce szkicu
+// RADIO: jedna strona jak w PANDORZE. 0.13.2 (issue #27, właściciel projektu: szkic strony) – cała strona w siatce szkicu
 // (data/seed/radio_layout.json, GET /api/radio/board: grid, firs, indicators, berlin): u góry jeden rząd – małe
 // wskaźniki konfiguracji ACC GAT, APP GD, APP WA, APP KK, APP PO (żółta nazwa nad szarym polem), na prawo od nich
 // ATIS-y polskich lotnisk (przycisk ATIS chowa tylko ich treść, nic się nie przesuwa); pod nim siatka 13 kolumn
@@ -8,7 +8,7 @@
 // LOW MID HIGH / APP / TWR / TWR/A / FIS i stan danych, podglądy LOW (kolumny D–G), HIGH (I–K) i mały MID (na dole
 // kolumny H), legenda w lewym dolnym rogu. Kafelek to sama częstotliwość (gdy ktoś go obsługuje) i ID w prawym
 // górnym rogu, zawsze tego samego rozmiaru.
-// Podglądy (0.13.2, Marek: "mapy całe czarne"): czarne tło, tylko cienkie jasne granice FIR-ów i granica FIR EPWW, bez
+// Podglądy (0.13.2, właściciel projektu: "mapy całe czarne"): czarne tło, tylko cienkie jasne granice FIR-ów i granica FIR EPWW, bez
 // sektorów sąsiadów, TMA i CTR; stałe przekroje LOW FL330, MID FL350, HIGH FL400 (bez suwaka wysokości). Sektory ACC
 // EPWW warstwy podglądu: bez nikogo – szare pole bez granic i bez plakietki; obsadzone – czarne, z granatową granicą
 // wokół całego obszaru stanowiska (wycinki tego samego stanowiska jako jeden obszar, dissolve.js) i plakietką jak
@@ -23,13 +23,15 @@
 // danych sektorów). Panel z wyciągiem z LOA EPWW z FIR-em sąsiada
 // (GET /api/radio/loa), z przyciskiem do dokumentu w COORDINATION › DOKUMENTY i PDF-em w nowej karcie. Kliknięcie
 // kodu FIR-u sąsiada (np. EDWW) otwiera ten panel.
+// 0.14.0 (właściciel projektu): mały przycisk FMP w wolnej komórce kolumny przycisków (grid.fmp, nad ATIS): OTHER › FMP z konfiguracją
+// sektorów zalogowanych teraz (fmp.code z /api/radio/board), gdy jest w tabeli, inaczej z ostatnio wybraną w FMP.
 import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
 import { MIN_HOLE, SLIVER, dissolve, pointIn, ringStats } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
-import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf, bboxOrDefault,
-  cellArea, controllersOn, coverGrid, flText, labelOpts, limText, limTip, loaPlace, pageGrid, parseArg, pathAll, pathOf,
-  placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
+import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, FMP_LS, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf,
+  bboxOrDefault, cellArea, controllersOn, coverGrid, flText, fmpTarget, fmpTip, labelOpts, limText, limTip, loaPlace,
+  pageGrid, parseArg, pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
 
 const LS_LAYERS = "radio.layers";
 const REFRESH_MS = 30000;
@@ -92,7 +94,7 @@ export function inEpww(key, u, border) {
   return clipped(`in|${key}`, (pc) => pc.intersection(polysOf(u.geometry), polysOf(border))) || u;
 }
 
-// Sektory ACC podglądu wg obsługującego (runda 12, Marek): wycinki na wysokości podglądu (accs, sliceAt) z tym samym
+// Sektory ACC podglądu wg obsługującego (runda 12, właściciel projektu): wycinki na wysokości podglądu (accs, sliceAt) z tym samym
 // stanowiskiem z kolejności przejmowania warstwy (sectors z /api/radio/board: owner) → jeden obszar (dissolve.js,
 // w pamięci wg klucza: wersja danych, stanowisko, wycinki) i jeden punkt plakietki poza dziurami; wycinki bez nikogo
 // pomijamy (freeArea). Błąd sumy: geom null, rysujemy same wycinki bez granic. border: granica FIR EPWW – obszar tylko
@@ -131,7 +133,7 @@ function greyParts(pc, mp, sl) {
     }
   });
 }
-// Sektory ACC bez nikogo na warstwie podglądu (0.13.2, Marek): szare pole bez granic i bez plakietki – wycinki, których
+// Sektory ACC bez nikogo na warstwie podglądu (0.13.2, właściciel projektu): szare pole bez granic i bez plakietki – wycinki, których
 // sektor tej warstwy nie ma obsługującego, jako jeden obszar (bez granic między nimi). Wynik {geom, shapes} albo null
 // (wszystko obsadzone); geom null po błędzie sumy – wtedy same wycinki (shapes), też bez granic.
 // Z granicą FIR EPWW (border; 0.13.2, przegląd): szare jest wnętrze granicy bez obszarów obsadzonych – dokładnie do
@@ -205,7 +207,7 @@ export function loaHtml(fir, title, f, radio, { msg = "", loading = false } = {}
   </div>`;
 }
 
-// --- dymki (runda 15, Marek): przestrzeń, stanowisko i kto ją teraz obsługuje – bez kolejności przejmowania i bez
+// --- dymki (runda 15, właściciel projektu): przestrzeń, stanowisko i kto ją teraz obsługuje – bez kolejności przejmowania i bez
 // dopisków, skąd jest wartość. x: {who(cs), pos(cs), net} – zalogowany i opis stanowiska z tablicy, false = brak danych
 // o zalogowanych
 export const nowText = (owners, x) => (owners.length ? owners.map((o) => `Now: ${x.who(o) || o}`).join("\n")
@@ -312,7 +314,7 @@ export function pageHtml(pg, grid, bd, x) {
     + (ber ? berlinHtml(bd?.berlin, x, { label: cellArea(ber, pg.top), box: cellArea(ber.box, pg.top) }) : "");
 }
 
-// --- plakietki podglądów (0.13.2, Marek: "plakietki wyglądają jak kafelki"): jasne pole, częstotliwość, małe ID
+// --- plakietki podglądów (0.13.2, właściciel projektu: "plakietki wyglądają jak kafelki"): jasne pole, częstotliwość, małe ID
 // w prawym górnym rogu, rozmiar kafelka (radio.css); TWR/A – żółta litera ATIS obok ID; sam ATIS (wieża offline,
 // TWR/A) – ciemne pole z jasnofioletową częstotliwością ATIS. Szczegóły zawsze w dymku. p: {kind: acc | app | twr | fis,
 // k (granica na podglądzie z tym samym data-k: podświetlenie), id, fq, state: on | off, atis?, code?, icao?, rt}
@@ -429,7 +431,7 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
 export const linesSvg = (lines, P) => `<g class="rb-own">${arr(lines).map((l) => `<path class="${l.kind}${l.geom ? "" : " fb"}" data-k="${esc(l.k)}"`
   + ` d="${l.geom ? (l.kind === "acc" ? pathAll(l.geom, P) : pathOf(l.geom, P)) : arr(l.shapes).map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>`;
 
-// Czerwone tło (0.13.0, Marek): przestrzeń z ograniczeniem przepływu albo z zajętością ponad 80 % dopuszczalnej –
+// Czerwone tło (0.13.0, właściciel projektu): przestrzeń z ograniczeniem przepływu albo z zajętością ponad 80 % dopuszczalnej –
 // sektor ACC na podglądzie swojej warstwy (wycinki jego litery na wysokości podglądu: slices = sliceAt) i TMA na LOW
 // (kształty z kluczem TMA: tmaGeo), także bez nikogo. Kształty jednej przestrzeni sumowane (dissolve.js, w pamięci wg
 // wersji danych i wycinków): jedna czerwona granica wokół całej TMA, bez granic jej wycinków; błąd sumy – same
@@ -594,23 +596,27 @@ export default {
         const wraps = !!a && !e.classList.contains("down") && a.getBoundingClientRect().top >= c.getBoundingClientRect().bottom - 2;
         if (wraps || spills(e)) e.classList.add("nn");
       });
-      renderButtonCells(grid.buttons, top);
+      renderButtonCells(grid.buttons, top, grid.fmp);
       MAPS.forEach((m) => place(maps[m.key].el, grid.maps?.[m.layer] ? cellArea(grid.maps[m.layer], top) : null));
       // stan danych z rzędami liczb nad i pod swoją komórką (krótka linia nie zmienia wysokości strony)
       place($(".rb-status"), grid.status ? cellArea(grid.status, top, { above: 1, below: 1 }) : null);
       place($(".rb-legend"), grid.legend ? cellArea(grid.legend, top) : null);
     }
-    // przyciski: komórki tworzone raz na układ (fokus i najechanie zostają przy odświeżaniu), potem tylko stan
-    function renderButtonCells(buttons, top) {
-      const rows = buttonRows(buttons), key = JSON.stringify([buttons?.col, rows.map((r) => [r.row, r.layers.map((l) => l.id)]), top]);
+    // przyciski: komórki tworzone raz na układ (fokus i najechanie zostają przy odświeżaniu), potem tylko stan;
+    // 0.14.0: przycisk FMP (fmp: komórka z grid.fmp) – bez aria-pressed, bo niczego nie włącza
+    function renderButtonCells(buttons, top, fmp) {
+      const rows = buttonRows(buttons);
+      const key = JSON.stringify([buttons?.col, rows.map((r) => [r.row, r.layers.map((l) => l.id)]), top, fmp?.col, fmp?.row]);
       if (key === btnKey) return;
       btnKey = key;
       const col = Number(buttons?.col) || 1;
+      const go = fmp ? cellArea(fmp, top) : null;
       $(".rb-btns").innerHTML = rows.map((r) => {
         const a = cellArea({ col, row: r.row }, top);
         return `<div class="rb-bt" style="grid-column: ${a.gc}; grid-row: ${a.gr}">${r.layers.map((l) => `<button type="button" data-ly="${l.id}"`
           + ` data-rt="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>`;
-      }).join("");
+      }).join("") + (go ? `<div class="rb-bt rb-go" style="grid-column: ${go.gc}; grid-row: ${go.gr}">`
+        + `<button type="button" data-go="fmp" data-rt="${esc(fmpTip(d?.fmp))}">FMP</button></div>` : "");
       renderButtons();
     }
 
@@ -672,6 +678,8 @@ export default {
         b.classList.toggle("on", layers.has(b.dataset.ly));
         b.setAttribute("aria-pressed", String(layers.has(b.dataset.ly)));
       });
+      // FMP: w dymku konfiguracja zalogowanych teraz (zmienia się z odświeżeniem tablicy)
+      el.querySelectorAll(".rb-btns button[data-go]").forEach((b) => { b.dataset.rt = fmpTip(d?.fmp); });
     }
     // stan danych: sieć, brak granicy FIR-u, błąd strony i brak danych o ograniczeniach przepływu (wtedy legenda czerwonego
     // tła przygaszona: brak czerwieni nie znaczy „bez ograniczeń”); całość także w dymku (wąska kolumna)
@@ -765,6 +773,8 @@ export default {
     };
     // przyciski warstw: kliknięcie łapiemy na kontenerze
     $(".rb-btns").addEventListener("click", (e) => {
+      // FMP: OTHER › FMP (krok do cofnięcia), z konfiguracją zalogowanych albo ostatnio wybraną
+      if (e.target.closest("button[data-go]")) return navigate("other", fmpTarget(d?.fmp, lsGet(FMP_LS)));
       const b = e.target.closest("button[data-ly]");
       if (!b) return;
       const s = new Set(layers);

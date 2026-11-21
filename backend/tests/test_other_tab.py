@@ -163,6 +163,13 @@ step("fmp-pick2", () => last("fmp").opts.onPick("EP-WATMA"));
 step("fmp-away", () => { sub.click("holding"); sub.click("fmp"); });
 step("fmp-other", () => { sub.click("position"); view.activate("fmp/EP-GDTMA"); });
 step("fmp-menu2", () => view.activate(undefined));
+// 0.14.0 (właściciel projektu): konfiguracja sektorów w adresie (#other/fmp/2N, #other/fmp/2N/EP-BH), wybór na stronie (onPick),
+// poprawka adresu (nieznana konfiguracja: replace) i powrót z innej podzakładki z ostatnią konfiguracją
+step("fmp-cfg", () => view.activate("fmp/2n"));
+step("fmp-cfg-tv", () => view.activate("fmp/2N/ep-bh"));
+step("fmp-cfg-pick", () => last("fmp").opts.onPick("3E/EP-BH"));
+step("fmp-cfg-fix", () => last("fmp").opts.onPick("EP-BH", true));
+step("fmp-cfg-away", () => { last("fmp").opts.onPick("5X"); sub.click("holding"); sub.click("fmp"); });
 step("fp-return", () => sub.click("flight-plan"));
 step("regcause", () => view.activate("regcause"));
 step("vfr", () => view.activate("vfr-minima"));
@@ -192,7 +199,14 @@ for (const old of ["light-gun", "ia", "meteo", "nato-weather"]) {
   step("old-" + old, () => { sub.click("4p"); view.activate(old); });
 }
 step("old-meteo-sub", () => { sub.click("regcause"); view.activate("meteo/metar"); });
-console.log(JSON.stringify({ html, initial, steps, future: globalThis.__future }));
+// 0.14.0: konfiguracja z pamięci przeglądarki (savedCfg) na początek nowego OTHER: FMP z menu podzakładek otwiera się z nią
+globalThis.__savedCfg = "2N";
+other.mount({}, { config: { links: {} } });
+log.length = 0;
+globalThis.__sub.click("fmp");
+const saved = { log: [...log], start: last("fmp").opts.start };
+globalThis.__savedCfg = "";
+console.log(JSON.stringify({ html, initial, steps, saved, future: globalThis.__future }));
 """
 
 API_STUB = r"""
@@ -268,12 +282,16 @@ def js(tmp_path_factory):
     (stubs / "docs.mjs").write_text(DOCS_STUB, "utf-8")
     for mod, (fn, kind) in PAGES.items():
         (stubs / f"{mod}.mjs").write_text(PAGE_STUB % {"fn": fn, "kind": kind}, "utf-8")
-    # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js, a id sektora FMP prawdziwą funkcją z fmp.js
-    for mod, fn in (("flightplan", "cleanCallsign"), ("fmp", "cleanTv")):
+    # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js, a id sektora FMP i konfigurację (0.14.0) prawdziwymi
+    # funkcjami z fmp.js; konfiguracja z pamięci przeglądarki z atrapy (globalThis.__savedCfg)
+    for mod, fn in (("flightplan", "cleanCallsign"), ("fmp", "cleanTv"), ("fmp", "cleanCfg"), ("fmp", "parseFmpArg"),
+                    ("fmp", "fmpArg")):
         src = (FRONTEND / "js" / f"{mod}.js").read_text("utf-8")
         clean = next(line for line in src.splitlines() if line.startswith(f"export const {fn} = "))
         with open(stubs / f"{mod}.mjs", "a", encoding="utf-8") as f:
             f.write(clean + "\n")
+    with open(stubs / "fmp.mjs", "a", encoding="utf-8") as f:
+        f.write('export const savedCfg = () => globalThis.__savedCfg || "";\n')
     src = (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     for mod in ("api", "checklist", "docs", *PAGES):
         assert f'"../{mod}.js"' in src, mod
@@ -450,6 +468,21 @@ def test_other_flight_plan_and_fmp_addresses(js):
     assert oth["log"][-1] == ["remember", "other", "fmp/EP-GDTMA", False]
     menu2 = _step(js, "fmp-menu2")
     assert menu2["fmp"][2]["calls"] == [["activate", "<menu>"]] and menu2["log"] == [["remember", "other", "fmp/EP-GDTMA", False]]
+    # 0.14.0 (właściciel projektu): "#other/fmp/2n" przy otwartym FMP: konfiguracja (wielkimi literami) do otwartej strony
+    cfg = _step(js, "fmp-cfg")
+    assert len(cfg["fmp"]) == 3 and cfg["fmp"][2]["calls"][-1] == ["activate", "2N"]
+    assert cfg["log"] == [["remember", "other", "fmp/2N", False]]
+    tv = _step(js, "fmp-cfg-tv")
+    assert tv["fmp"][2]["calls"][-1] == ["activate", "2N/EP-BH"] and tv["log"] == [["remember", "other", "fmp/2N/EP-BH", False]]
+    # wybór konfiguracji albo sektora na stronie = krok historii; poprawka (nieznany kod) podmienia adres
+    assert _step(js, "fmp-cfg-pick")["log"] == [["remember", "other", "fmp/3E/EP-BH", False]]
+    assert _step(js, "fmp-cfg-fix")["log"] == [["remember", "other", "fmp/EP-BH", True]]
+    away = _step(js, "fmp-cfg-away")
+    assert len(away["fmp"]) == 4 and away["fmp"][3]["start"] == "5X"
+    assert away["log"] == [["remember", "other", "fmp/5X", False], ["remember", "other", "holding", False],
+                           ["remember", "other", "fmp/5X", False]]
+    # nowy OTHER: konfiguracja z pamięci przeglądarki od początku (adres i strona)
+    assert js["saved"] == {"log": [["remember", "other", "fmp/2N", False]], "start": "2N"}
     # powrót do FLIGHT PLAN: FMP zniszczone, ostatni znak
     ret = _step(js, "fp-return")
     assert ret["fmp"][0]["dead"] is True and ret["fp"][-1]["start"] == "LOT1"

@@ -3,6 +3,9 @@ import { api, debounce, esc, h, letterMenu, touchKeyboard } from "../api.js";
 const CATEGORY = { CARGO: "CARGO", MIL: "MILITARY" };
 // najwięcej wierszy na raz (ALL to ~7000 znaków wywoławczych): pełna lista = obcięta, z podpowiedzią jak w AIRCRAFT
 const LIMIT = 1000;
+// 0.14.0 (issue #28): "Nazwa operatora oraz kraj pochodzenia powinny być w tej samej czcionce i w tym samym rozmiarze"
+// co kod ICAO i callsign: kolumny operatora (op) i kraju (ctry) jak ICAO (białe, style.css table.callsigns), callsign
+// zostaje żółty, kolumna Info bez zmian
 
 export default {
   mount(root) {
@@ -31,7 +34,7 @@ export default {
         pane.querySelector(".count").textContent = `${rows.length} ${rows.length === 1 ? "result" : "results"}`
           + (rows.length === LIMIT ? ` (first ${LIMIT} shown – pick a letter or type a code)` : "");
         body.innerHTML = rows.map((r) => `<tr><td class="icao">${esc(r.icao)}</td><td class="tel">${esc(r.telephony || "–")}</td>
-          <td class="minor">${esc(r.name)}</td><td class="minor">${esc(r.country)}</td>
+          <td class="op">${esc(r.name)}</td><td class="ctry">${esc(r.country)}</td>
           <td>${r.category ? `<span class="tag ${r.category.toLowerCase()}">${CATEGORY[r.category] || esc(r.category)}</span>` : ""}</td></tr>`).join("");
       } catch (e) {
         body.innerHTML = `<tr><td colspan="5" class="error">${esc(e.message)}</td></tr>`;

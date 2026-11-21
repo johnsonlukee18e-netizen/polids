@@ -1,4 +1,4 @@
-// Pozycje w MAP (runda 12, Marek): drzewo FIR → ACC / FIS / lotniska → stanowiska z włączaniem pojedynczych stanowisk.
+// Pozycje w MAP (runda 12, właściciel projektu): drzewo FIR → ACC / FIS / lotniska → stanowiska z włączaniem pojedynczych stanowisk.
 // Zestaw aktywny = zalogowani w sieci z nadpisaniami (sessionStorage): true = symulacja logowania (stanowisko offline
 // rysujemy tak, jakby ktoś na nim był), false = ukryj zalogowanego. Z zestawu aktywnego korzysta sektoryzacja
 // (obsada wg kontrolerów online), plakietki lotnisk i FIR-ów. Funkcje czyste (testy w Node), widok w tabs/map.js.

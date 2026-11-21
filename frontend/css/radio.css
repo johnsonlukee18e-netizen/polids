@@ -1,11 +1,11 @@
-/* RADIO (runda 10): jedna strona jak w PANDORZE. 0.13.2 (issue #27, Marek: szkic strony): u góry jeden rząd – małe
+/* RADIO (runda 10): jedna strona jak w PANDORZE. 0.13.2 (issue #27, właściciel projektu: szkic strony): u góry jeden rząd – małe
    wskaźniki konfiguracji, na prawo od nich ATIS-y; pod nim siatka szkicu (13 kolumn, wiersze szkicu po dwa tory: rząd
    liczb i kafelek – radioboard.js pageGrid): kody i kafelki FIR-ów sąsiadów, BERLIN, przyciski warstw w kolumnie H,
    podglądy LOW, HIGH i mały MID, stan danych, legenda. Kafelki stałego rozmiaru, wysokości między kafelkami jak na
    zdjęciu PANDORY; rzędy liczb rozciągają się, gdy okno jest wyższe niż strona.
    Czarne tło, czcionka bezszeryfowa zwykłej grubości (bez pogrubień: znaczenie niesie kolor); bez poświaty i cieni pod
    tekstem, kąty proste (0.12.5: ostre krawędzie jak w PAŻP). Układ nie zależy od czcionki o stałej szerokości.
-   Podglądy (0.13.2, Marek: "mapy całe czarne"): czarne, cienkie jasne granice FIR-ów i granica FIR EPWW; sektor ACC
+   Podglądy (0.13.2, właściciel projektu: "mapy całe czarne"): czarne, cienkie jasne granice FIR-ów i granica FIR EPWW; sektor ACC
    EPWW bez nikogo szary (bez granic), obszar stanowiska online z granatową granicą (--rb-navy) i plakietką jak kafelek.
    Przyciski i kafelki jak na zdjęciach PANDORY: jasne prostokąty, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
    --rb-f: rozmiar częstotliwości (mniejszy na 1366×768, większy na 1920×1080); od niego kafelki (--rb-tw × --rb-th:
@@ -24,7 +24,7 @@
   --rb-hw: clamp(200px, 15vw, 330px); --rb-nw: calc(var(--rb-f) * 4.6);
   flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px;
   padding: 3px 6px 6px; overflow: hidden; background: #000; font-family: var(--sans); font-weight: 400; }
-/* bez pogrubień w całej zakładce (Marek, 0.13.0): także w plakietkach i panelu LOA */
+/* bez pogrubień w całej zakładce (właściciel projektu, 0.13.0): także w plakietkach i panelu LOA */
 .rb b, .rb strong, .rb h4, .rb th { font-weight: 400; }
 
 /* --- rząd u góry (0.13.1): wskaźniki konfiguracji (dużo mniejsze niż w 0.13.0: pole ok. 60 × 20 px z małą żółtą
@@ -159,7 +159,7 @@
    wokół całego obszaru, bez granic między jego częściami; pod plakietką pod kursorem jaśniejsza */
 .rb-own path { stroke: var(--rb-navy); stroke-width: 2; fill-rule: evenodd; }
 .rb-own path.hl { stroke: var(--rb-navy-hi); stroke-width: 2.5; }
-/* czerwone tło (0.13.0, Marek): sektor ACC albo TMA z ograniczeniem przepływu teraz lub zajętością ponad 80 %
+/* czerwone tło (0.13.0, właściciel projektu): sektor ACC albo TMA z ograniczeniem przepływu teraz lub zajętością ponad 80 %
    dopuszczalnej – pełne wypełnienie z jasnoczerwoną granicą, pod granicami stanowisk i plakietkami; w dymku powód */
 .rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
 .rb-flow path.fb { stroke: none; fill-rule: nonzero; }
@@ -226,7 +226,7 @@
 .rb-loa li { margin: 0 0 3px; }
 .rb-loa li::marker { color: var(--green-text); }
 
-/* --- dymek (jeden, przy kursorze; 0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
+/* --- dymek (jeden, przy kursorze; 0.13.0, właściciel projektu: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
    maleje przy krawędzi okna (radio.js tipPos odwraca go na drugą stronę kursora, 12 px od brzegu), wysokość z treści,
    najwyżej okno bez dwóch odstępów (tipPos dosuwa go wtedy do krawędzi, nic nie wychodzi poza okno) */
 .rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px);
@@ -234,7 +234,7 @@
   background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
   white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
 
-/* --- dymek (jeden, przy kursorze; 0.13.0, Marek: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
+/* --- dymek (jeden, przy kursorze; 0.13.0, właściciel projektu: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
    maleje przy krawędzi okna (radio.js tipPos odwraca go na drugą stronę kursora, 12 px od brzegu), wysokość z treści,
    najwyżej okno bez dwóch odstępów (tipPos dosuwa go wtedy do krawędzi, nic nie wychodzi poza okno) */
 .rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px);

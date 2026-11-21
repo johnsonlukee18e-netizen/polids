@@ -150,12 +150,12 @@ main { flex: 1; min-width: 0; position: relative; }
 .menu nav, .submenu { overflow-x: hidden; scrollbar-width: none; }
 .menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }
 /* podmenu dłuższe niż menu (więcej niż --menu-rows = 21 rzędów, czyli elementów kolumny flex; litery mają po dwa
-   w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby każdy widoczny
-   rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu (w paddingu byłoby
-   widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do ostatniego, który mieści się
-   nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też całe rzędy. Przewijanie
-   (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap, margines przycisku nad
-   rzędem). 22 = --menu-rows + 1 */
+   w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, NEXT AIRAC, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby
+   każdy widoczny rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu
+   (w paddingu byłoby widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do
+   ostatniego, który mieści się nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też
+   całe rzędy. Przewijanie (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap,
+   margines przycisku nad rzędem). 22 = --menu-rows + 1 */
 .submenu:not(.letters):has(> :nth-child(22)) {
   max-height: calc(var(--menu-rows) * (var(--btn-h) + 2 * var(--btn-m))); margin-block: var(--col-pad); padding-block: 0;
   scroll-snap-type: y mandatory; }
@@ -270,10 +270,9 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 /* imię i nazwisko dłuższe niż cały panel zawija się w sobie, nie wychodzi za krawędź */
 .radio-row .who { color: var(--green-hi); font-size: 12px; overflow-wrap: anywhere; }
 .radio-row .booked-txt { color: #ffb020; font-size: 12px; white-space: nowrap; }
-/* częstotliwości z AIP bez stanowiska w .ese: uwaga i godziny pracy za nazwą; długie godziny (np. EPOK)
-   zawijają się w panelu zamiast wychodzić za krawędź */
-.radio-row .hrs, .radio-row .fq-note { color: var(--muted); font: 11px var(--mono); min-width: 0; overflow-wrap: anywhere; }
-.radio-row .fq-note { color: var(--text); }
+/* częstotliwości z AIP bez stanowiska w .ese: uwaga za nazwą, długa zawija się w panelu zamiast wychodzić za krawędź
+   (0.14.0, issue #28: bez godzin pracy z AIP) */
+.radio-row .fq-note { color: var(--text); font: 11px var(--mono); min-width: 0; overflow-wrap: anywhere; }
 
 /* dymek po najechaniu (data-tip): kto jest zalogowany / zarezerwował */
 [data-tip] { cursor: help; }
@@ -563,10 +562,18 @@ dl.props dd { margin: 0; font-family: var(--mono); }
 .cs-pane { display: flex; flex-direction: column; gap: 8px; }
 .cs-pane > .toolbar { margin-bottom: 0; }
 .cs-list { flex: 1; min-height: 0; overflow: auto; }
-/* CALLSIGN: kod ICAO i callsign najważniejsze, operator i kraj mniejsze */
+/* CALLSIGN: kod ICAO, callsign, operator i kraj jedną czcionką i jednym rozmiarem; 0.14.0 (issue #28): operator i kraj
+   jak ICAO (białe, dawniej 12 px i szare), callsign zostaje żółty, Info (CARGO / MILITARY) bez zmian. Długa nazwa
+   łamie się między słowami w swojej komórce; słowo dłuższe niż kolumna (w bazie do 30 liter, np.
+   VERKEHRSFLIEGERSCHULE,FREIBURG) także w środku (anywhere), ale kolumna nie węższa niż min-width, więc tabela mieści
+   się w panelu od ok. 690 px szerokości jak dawniej (Chrome: 692 px bez przewijania w bok). Komórki wiersza wyrównane
+   do pierwszej linii tekstu (baseline): kod i callsign na wysokości początku nazwy */
+table.callsigns td { vertical-align: baseline; }
 table.callsigns td.icao { font: 20px var(--mono); color: #fff; width: 90px; }
 table.callsigns td.tel { font: 20px var(--mono); color: var(--yellow); }
-table.callsigns td.minor { font-size: 12px; color: var(--muted); }
+table.callsigns td.op, table.callsigns td.ctry { font: 20px var(--mono); color: #fff; overflow-wrap: anywhere; }
+table.callsigns td.op { min-width: 9em; }
+table.callsigns td.ctry { min-width: 6em; }
 .tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }
 .tag.cargo { color: #ffb020; border-color: #ffb020; }
 .tag.mil { color: #7fd0ff; border-color: #7fd0ff; }
@@ -640,29 +647,14 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .vf-bar { height: 8px; background: #1b2229; border-radius: 0; overflow: hidden; }
 .vf-bar i { display: block; height: 100%; }
 .vf-num { text-align: right; color: var(--muted); }
-.vf-bar i.ok, .vf-legend i.vf-ok { background: #3fb950; } .vf-bar i.near, .vf-legend i.vf-near { background: #ffb020; }
-.vf-bar i.over, .vf-legend i.vf-over { background: #f0453a; } .vf-bar i.nolim { background: #56606a; }
+.vf-bar i.ok { background: #3fb950; } .vf-bar i.near { background: #ffb020; }
+.vf-bar i.over { background: #f0453a; } .vf-bar i.nolim { background: #56606a; }
 .viff-chart { width: 560px; background: rgba(9,12,15,.94); border: 1px solid #2c3640; border-radius: 0; padding: 8px 10px; color: var(--text);
   font-size: 12px; }
 .vf-head { display: flex; gap: 8px; align-items: baseline; }
 .vf-head b { font: 16px var(--mono); color: #ffd400; }
 .vf-head .hint { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vf-close { padding: 0 8px; }
-.vf-svg { width: 100%; height: auto; display: block; margin-top: 4px; }
-.vf-svg rect.vf-ok { fill: #3fb950; } .vf-svg rect.vf-near { fill: #ffb020; } .vf-svg rect.vf-over { fill: #f0453a; } .vf-svg rect.vf-nolim { fill: #4a7bd0; }
-.vf-svg .vf-occ { stroke-width: 1.5; } .vf-svg .vf-occ.vf-ok { fill: rgba(63,185,80,.35); stroke: #3fb950; }
-.vf-svg .vf-occ.vf-near { fill: rgba(255,176,32,.35); stroke: #ffb020; } .vf-svg .vf-occ.vf-over { fill: rgba(240,69,58,.4); stroke: #f0453a; }
-.vf-svg .vf-occ.vf-nolim { fill: rgba(74,123,208,.35); stroke: #4a7bd0; }
-.vf-svg .vf-cap { stroke: #ff5cc8; stroke-width: 1.6; stroke-dasharray: 5 3; }
-.vf-svg .vf-capt { fill: #ff5cc8; font: 11px var(--mono); } .vf-svg .vf-capt.mid { text-anchor: middle; font-weight: 400; }
-.vf-svg .vf-grid { stroke: #232c35; }
-.vf-svg text { fill: #aab4bd; font: 11px var(--mono); text-anchor: middle; }
-.vf-svg .vf-ax.end { text-anchor: end; } .vf-svg .vf-val { fill: #fff; }
-.vf-svg .vf-sub { fill: #8fa3b5; font: 10px var(--mono); letter-spacing: .5px; text-transform: uppercase; }
-.vf-svg .vf-win { fill: #cfd8e0; font-size: 10px; }
-.vf-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 2px 0 4px; font-size: 11px; }
-.vf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 0; margin-right: 4px; vertical-align: -1px; }
-.vf-legend i.vf-capl { height: 0; width: 14px; border-top: 2px dashed #ff5cc8; border-radius: 0; }
 .vf-flights { display: flex; flex-wrap: wrap; gap: 2px 10px; max-height: 54px; overflow: auto; font-size: 11px; color: #dfe8ff; }
 .vf-flights .vf-gnd { color: #8c969e; }
 

@@ -1,8 +1,8 @@
-"""Zdjęcia typów w AIRCRAFT (services/photos.py), 0.13.3: Marek "czemu w zakladce aircrafs np BCS3 ma zdjecie
+"""Zdjęcia typów w AIRCRAFT (services/photos.py), 0.13.3: właściciel projektu "czemu w zakladce aircrafs np BCS3 ma zdjecie
 A321 neo?". Wyszukiwarka Wikipedii dawała dla "AIRBUS A-220-300" artykuł o innym Airbusie, a aplikacja brała pierwszy
 wynik i zapisywała go na stałe. Teraz: artykuł z TITLES (A220, CRJ, MD-80), hasło Airbusa bez łącznika, wybór
 artykułu o tym modelu (numer w tytule albo przekierowaniu, nazwa typu z producentem), odrzucanie tytułów z innym
-numerem i ponowne sprawdzenie złych zdjęć zapisanych wcześniej (bez ruszania własnych). 0.13.4 (Marek po wdrożeniu:
+numerem i ponowne sprawdzenie złych zdjęć zapisanych wcześniej (bez ruszania własnych). 0.13.4 (właściciel projektu po wdrożeniu:
 BCS3 "dalej pokazuje Airbusa"): adres grafiki z dowolnego serwera Wikimedia (thumb.wikimedia.org), rozszerzenie
 z samej ścieżki adresu, zdjęcie z artykułu o innym modelu nigdy nie jest pokazywane (bez zastępstwa idzie do replaced/,
 a typ zostaje bez zdjęcia), miniatury 960 px, log podmian i ukryć. Wikipedia nie jest dostępna z tego środowiska, więc
@@ -499,7 +499,7 @@ def test_recheck_any_wikimedia_host(monkeypatch, photo_dir):
     assert photos._wikimedia("https://UPLOAD.wikimedia.org/x.jpg") and photos._wikimedia("https://thumb.wikimedia.org/x")
 
 
-# BCS3.json z polids.pl (Marek, zrzut z 10.11.2026 po wdrożeniu 0.13.3): adres na thumb.wikimedia.org z "?utm_..."
+# BCS3.json z polids.pl (właściciel projektu, zrzut z 10.11.2026 po wdrożeniu 0.13.3): adres na thumb.wikimedia.org z "?utm_..."
 BCS3_ON_SERVER = {
     "credit": "Wikipedia: Airbus A321neo",
     "page": "https://en.wikipedia.org/wiki/Airbus_A321neo",

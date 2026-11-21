@@ -131,7 +131,8 @@ def test_runway_in_use_wording_like_overview():
 
 
 def test_frequency_hours_and_notes_without_aip_tags():
-    """AERODROME › INFO: godziny i uwagi częstotliwości bez odnośników do rozdziałów AIP (czasy i warunki zostają);
+    """Godziny i uwagi częstotliwości bez odnośników do rozdziałów AIP (czasy i warunki zostają; od 0.14.0, issue #28,
+    AERODROME › INFO godzin nie pokazuje, ale zostają w bazie i w API: test_aerolist.py);
     SCHEMA_VERSION 11 przebudowuje starą bazę, bo częstotliwości wczytuje się tylko do pustej tabeli."""
     with (settings.seed_dir / "frequencies.csv").open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))

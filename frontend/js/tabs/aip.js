@@ -42,14 +42,43 @@ export const AD_VFR = [["EPBA", "ALEKSANDROWICE k/Bielska-Bia\u0142ej"], ["EPBC"
 
 // Trzy zakładki, trzy pakiety eAIP (0.13.1): link w /api/config, pakiet w GET /api/docs/charts/<api>/<ICAO>, część AIP
 // ze stroną lotniska (AD 2 w IFR, AD 4 w MIL i VFR), sekcja z mapami, zakres sekcji opisu, lista lotnisk, dymek "eAIP"
+// 0.14.0 (issue #28): name = nazwa pakietu w dymku i komunikacie przycisku NEXT AIRAC
 export const AIP = {
   adciv: { link: "aip_ifr", api: "ifr", part: 2, charts: "2.24", text: "2.1\u2013AD 2.25", list: AD2,
-    whole: "The whole eAIP IFR (table of contents)" },
+    whole: "The whole eAIP IFR (table of contents)", name: "eAIP IFR" },
   admil: { link: "aip_mil", api: "mil", part: 4, charts: "4.24", text: "4.1\u2013AD 4.25", list: AD_MIL,
-    whole: "The whole eAIP MIL (table of contents)" },
+    whole: "The whole eAIP MIL (table of contents)", name: "eAIP MIL" },
   advfr: { link: "aip_vfr", api: "vfr", part: 4, charts: "4.13", text: "4.1\u2013AD 4.13", list: AD_VFR,
-    whole: "The whole eAIP VFR (table of contents)" },
+    whole: "The whole eAIP VFR (table of contents)", name: "eAIP VFR" },
 };
+
+// 0.14.0 (issue #28): "dodaj opcję przy eAIP (next airac), gdzie będzie link do AIP na kolejny airac". Przycisk
+// NEXT AIRAC tuż pod "eAIP": cała przeglądarka index-v2.html poprawki następnego cyklu, tak jak "eAIP" dla bieżącej.
+// Adres i cykl z /api/config: links.<link>_next (backend: eaip.next_links; "" = PAŻP poprawki jeszcze nie opublikował)
+// i airac_next (ident, effective). Bez adresu komunikat z numerem cyklu i datą wejścia zamiast strony błędu.
+// Adres zakładki "#adciv/next" (wielkość liter dowolna).
+export const NEXT = "next";
+// "2026-11-26" -> "26.11.2026" (jak stopka HOME, home.js airacText); zły napis -> ""
+const dmy = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+};
+export const isNextArg = (arg) => String(arg ?? "").trim().toLowerCase() === NEXT;
+// adres eAIP następnego cyklu dla pakietu albo "" (nie opublikowany albo brak danych z /api/config)
+export const nextUrl = (config, pkg) => {
+  const u = config?.links?.[`${pkg.link}_next`];
+  return typeof u === "string" ? u.trim() : "";
+};
+// "AIRAC 2612, effective 26.11.2026"; bez danych cyklu (np. /api/config niedostępny) ""
+export const nextCycle = (a) => (a?.ident ? `AIRAC ${a.ident}` + (dmy(a.effective) ? `, effective ${dmy(a.effective)}` : "") : "");
+// dymek przycisku: "eAIP IFR for the next AIRAC cycle: AIRAC 2612, effective 26.11.2026"
+export const nextTip = (pkg, a) => `${pkg.name} for the next AIRAC cycle` + (nextCycle(a) ? `: ${nextCycle(a)}` : "");
+// komunikat, gdy poprawki nie ma: "eAIP VFR for AIRAC 2612 (effective 26.11.2026) has not been published yet."
+export function nextMissing(pkg, a) {
+  if (!a?.ident) return `${pkg.name} for the next AIRAC cycle is not available.`;
+  const from = dmy(a.effective);
+  return `${pkg.name} for AIRAC ${a.ident}${from ? ` (effective ${from})` : ""} has not been published yet.`;
+}
 
 // Strona AD 2 lotniska (AD 2.1–2.25, mapy w AD 2.24) z tej samej poprawki co skonfigurowany index-v2.html:
 // ".../AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html" → ".../AIRAC%20AMDT%2010-26_2026_10_01/eAIP/AD%202%20EPWA%201-en-GB.html".
@@ -195,7 +224,8 @@ export const topRow = (row, top, rows) => {
   return top;
 };
 
-// AD CIV / AD MIL / AD VFR: podmenu jak w PANDORZE: "eAIP" (cała przeglądarka index-v2.html pakietu) i przycisk dla
+// AD CIV / AD MIL / AD VFR: podmenu jak w PANDORZE: "eAIP" (cała przeglądarka index-v2.html pakietu), od 0.14.0
+// (issue #28) pod nim NEXT AIRAC (to samo dla następnego cyklu, "#adciv/next"), i przycisk dla
 // każdego lotniska z listy, który otwiera listę map lotniska z PDF-em obok (AD CIV od 0.12.5, issue #18; AD MIL i AD VFR
 // od 0.13.1, issue #25, wcześniej tylko cała przeglądarka). Adres "#adciv/EPWA" (pierwsza mapa) albo "#admil/EPKS/12-5",
 // "#advfr" = cała przeglądarka; kliknięcie lotniska albo mapy to krok do cofnięcia (←). AD VFR ma 69 lotnisk: podmenu
@@ -209,6 +239,34 @@ function aipTab(tab) {
       let charts = null, want = "";   // want: mapa z adresu dla lotniska, kt\u00f3rego lista dopiero powstanie
       const argOf = (id) => (id === EAIP ? "" : id);
       const page = (url) => (pane) => { charts = null; iframeWithFallback(pane, url, NOTE); embedBar(pane); };
+      // 0.14.0 (issue #28): NEXT AIRAC: eAIP następnego cyklu jak "eAIP" albo komunikat, gdy nie opublikowany.
+      // Przegląd: przy komunikacie jeszcze raz /api/config (serwer sprawdza brakującą poprawkę co godzinę), bo
+      // ctx.config jest z chwili otwarcia aplikacji: poprawka opublikowana w międzyczasie otwiera się bez Reload. Nowe
+      // adresy NEXT AIRAC trzech pakietów i cykl zostają w ctx.config (bieżący eAIP bez zmian, jak dotąd do Reload);
+      // podzakładka zamknięta przed odpowiedzią (dead) niczego już nie rysuje
+      const nextTitle = () => nextTip(pkg, ctx.config?.airac_next);
+      const nextPage = (pane) => {
+        let dead = false;
+        const draw = () => {
+          const url = nextUrl(ctx.config, pkg);
+          pane.innerHTML = "";
+          if (url) { page(url)(pane); return true; }
+          charts = null;
+          pane.append(h(`<div class="card aip-next"><p>${esc(nextMissing(pkg, ctx.config?.airac_next))}</p></div>`));
+          return false;
+        };
+        if (draw()) return null;
+        api("/api/config").then((cfg) => {
+          if (!cfg?.links || !ctx.config) return;
+          ctx.config.links ??= {};
+          for (const p of Object.values(AIP)) ctx.config.links[`${p.link}_next`] = cfg.links[`${p.link}_next`] ?? "";
+          if (cfg.airac_next) ctx.config.airac_next = cfg.airac_next;
+          const b = sub.nav.querySelector(`button[data-id="${NEXT}"]`);
+          if (b) b.title = nextTitle();
+          if (!dead) draw();
+        }).catch(() => {});
+        return { destroy() { dead = true; } };
+      };
       const chartsPage = (icao) => (pane) => {
         pane.classList.add("chl-pane");
         charts = mountCharts(pane, { icao, name: names[icao], base, chart: want, pkg,
@@ -218,11 +276,13 @@ function aipTab(tab) {
       };
       const sub = subtabs(root, [
         { id: EAIP, label: "eAIP", fill: true, render: page(base) },
+        { id: NEXT, label: "NEXT AIRAC", fill: true, render: nextPage },
         { sep: true },
         ...pkg.list.map(([icao]) => ({ id: icao, label: icao, fill: true, render: chartsPage(icao) })),
       ], { arg: argOf });
       sub.nav.querySelectorAll("button[data-id]").forEach((b) => {
-        b.title = b.dataset.id === EAIP ? pkg.whole : `${names[b.dataset.id]} \u2013 charts`;
+        const id = b.dataset.id;
+        b.title = id === EAIP ? pkg.whole : id === NEXT ? nextTitle() : `${names[id]} \u2013 charts`;
       });
       // wybrany przycisk widoczny w przewijanym podmenu (AD VFR: lotnisko z dołu listy z adresu albo po ←); przy
       // pierwszym (eAIP) podmenu wraca na samą górę, razem z odstępem nad przyciskiem. Przewinięcie o całe rzędy
@@ -232,7 +292,8 @@ function aipTab(tab) {
       const reveal = () => {
         const nav = sub.nav, b = nav.querySelector("button.active"), first = nav.querySelector("button");
         if (!b) return;
-        if (b === first) { nav.scrollTop = 0; return; }
+        // 0.14.0 (issue #28): NEXT AIRAC (drugi rząd) też na samej górze, razem z "eAIP" nad nim
+        if (b === first || b.dataset.id === NEXT) { nav.scrollTop = 0; return; }
         if (nav.scrollHeight <= nav.clientHeight) return;
         const box = (el) => el.getBoundingClientRect(), bs = getComputedStyle(b), ns = getComputedStyle(nav);
         const pitch = box(b).height + parseFloat(bs.marginTop) + parseFloat(bs.marginBottom);
@@ -241,11 +302,12 @@ function aipTab(tab) {
         nav.scrollTop = topRow(row, Math.round(nav.scrollTop / pitch), rows) * pitch;
       };
       return {
-        // arg undefined (przycisk menu): zostaje otwarta strona; "" = cały eAIP; "EPWA" = mapy EPWA; "EPWA/2-1" = mapa
+        // arg undefined (przycisk menu): zostaje otwarta strona; "" = cały eAIP; "EPWA" = mapy EPWA; "EPWA/2-1" = mapa;
+        // 0.14.0 (issue #28): "next" = NEXT AIRAC
         activate(arg) {
           if (arg !== undefined) {
             const a = aipArg(pkg.list, arg);
-            const id = a.icao || EAIP;
+            const id = a.icao || (isNextArg(arg) ? NEXT : EAIP);
             if (sub.current() !== id) { want = a.chart; sub.show(id); } else if (charts && a.chart !== charts.current()) charts.pick(a.chart);
           }
           reveal();

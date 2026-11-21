@@ -66,7 +66,7 @@ NO_FREQ = "199.998"
 def active_frequency(c: dict) -> str:
     """Aktywna częstotliwość połączenia (pierwsze 7 znaków, np. 127.025); pusta przy 199.998 i bez częstotliwości.
 
-    0.13.6 (Marek): kontroler na 199.998 to tak, jakby go nie było."""
+    0.13.6 (właściciel projektu): kontroler na 199.998 to tak, jakby go nie było."""
     f = str(c.get("frequency") or "").strip()[:7]
     return "" if not f or f == NO_FREQ else f
 
@@ -100,7 +100,7 @@ def _hit(cands: list[tuple[int, object]], c: dict) -> str:
 def on_frequency(conns: list[dict], positions: list) -> list[dict]:
     """Połączenia (kontrolerzy i ATIS) na częstotliwości któregoś stanowiska z danych (jak w match_positions).
 
-    0.13.6 (Marek: "wyświetlaj tylko kontrolerów po częstotliwościach aktywnych poprawnych dla sektorów, nie po
+    0.13.6 (właściciel projektu: "wyświetlaj tylko kontrolerów po częstotliwościach aktywnych poprawnych dla sektorów, nie po
     nazwach"): pozostałych – na 199.998, na częstotliwości spoza danych albo cudzej – aplikacja nie pokazuje nigdzie,
     jakby ich nie było. positions: obiekty z callsign, prefix i frequency (AtcPosition, Station). Lista innego kształtu
     (null, napis z zepsutego feedu) to brak połączeń."""
@@ -113,10 +113,10 @@ def on_frequency(conns: list[dict], positions: list) -> list[dict]:
 def match_positions(controllers: list[dict], positions: list, prefer: Collection[str] = ()) -> dict[str, dict]:
     """Dopasowanie zalogowanych kontrolerów do stanowisk z pliku .ese (klucz: callsign stanowiska).
 
-    0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): najpierw aktywna
+    0.13.5 (właściciel projektu: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): najpierw aktywna
     częstotliwość, jak w EuroScope – stanowisko o tym samym prefiksie, typie (końcówce) i częstotliwości; przy kilku
     takich to o znaku kontrolera, inaczej pierwsze z listy. EPWW_DBF_CTR na 127.025 obsługuje więc DBT, nie DBF.
-    0.13.6 (Marek: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
+    0.13.6 (właściciel projektu: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
     częstotliwościach aktywnych poprawnych dla sektorów, nie po nazwach"): sam znak nic nie daje – kontroler na 199.998
     albo na częstotliwości żadnego stanowiska nie obsługuje niczego. Dwóch kontrolerów na jednym stanowisku (uczeń
     i instruktor): wygrywa dopasowany po częstotliwości i znaku, potem po samej częstotliwości (w kolejności danych).
@@ -213,7 +213,7 @@ def frequency_position(controllers: list[dict], positions: list) -> dict[str, st
 
 def online_firs(controllers: list[dict], by_position: dict[str, str] | None = None) -> dict[str, list[dict]]:
     """Które granice FIR (id z VATSpy) mają zalogowanego kontrolera CTR/FSS. Najdłuższy pasujący prefiks wygrywa.
-    by_position (frequency_position): znak → stanowisko z częstotliwości; 0.13.6 (Marek: "nie po nazwach"): granica
+    by_position (frequency_position): znak → stanowisko z częstotliwości; 0.13.6 (właściciel projektu: "nie po nazwach"): granica
     wg stanowiska, nie znaku – EPWW_N_CTR na 133.475 (częstotliwość C) to EPWW-C, nie EPWW-N. Stanowisko bez granicy
     w VATSpy (EKCH_FW_CTR z vacs-data, prefiks EKDK): granica wg znaku zalogowanego (jest na poprawnej częstotliwości)."""
     data = fir_boundaries()

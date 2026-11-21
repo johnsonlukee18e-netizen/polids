@@ -1,6 +1,6 @@
 """data/seed/sectors.geojson: generator z plików .ese, import przy starcie i zgodność z plikami .ese w repozytorium.
 
-Marek: "data/seed/sectors.geojson tutaj trzeba będzie przerzucić sektory najlepiej i potem niech z tego bierze dane"."""
+Właściciel projektu: "data/seed/sectors.geojson tutaj trzeba będzie przerzucić sektory najlepiej i potem niech z tego bierze dane"."""
 import json
 import os
 

@@ -402,7 +402,7 @@ async def overview(db: Session, position: str | None = None, now: datetime | Non
     # QNH liczymy ze wszystkich kontrolowanych lotnisk (zasada TL dotyczy całego FIR-u), nawet przy filtrze
     (metars, tafs, wx_errors), feed, notams, flow, monitor = await asyncio.gather(
         _weather(AERODROMES), _feed(), _notams(shown, now), _flow(shown, now), _monitor(shown, now))
-    # 0.13.6 (Marek: "nie po nazwach"): kontrolerzy i ATIS tylko na częstotliwości stanowiska z danych; na 199.998
+    # 0.13.6 (właściciel projektu: "nie po nazwach"): kontrolerzy i ATIS tylko na częstotliwości stanowiska z danych; na 199.998
     # i poza danymi – jakby ich nie było (chip ATC i ATIS, pas z ATIS, zajęte stanowiska)
     known = known_stations(db)
     net = feed["feed"]

@@ -1,4 +1,4 @@
-// Granice tylko tam, gdzie zmienia się obsługujący (runda 12, Marek): wycinki sektorów obsługiwane przez to samo
+// Granice tylko tam, gdzie zmienia się obsługujący (runda 12, właściciel projektu): wycinki sektorów obsługiwane przez to samo
 // stanowisko łączymy w jeden wielokąt (MAP: obsada wg kontrolerów online, RADIO: podglądy LOW/MID/HIGH).
 // Suma wielokątów: polygon-clipping 0.15.7 (MIT, frontend/vendor/polygon-clipping, ładowany znacznikiem <script>
 // przed app.js jako globalThis.polygonClipping). Wynik w pamięci wg klucza (stanowisko + zestaw wycinków), więc

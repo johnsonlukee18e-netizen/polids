@@ -55,7 +55,7 @@ console.log(JSON.stringify({
   mil: aip.AD_MIL,
   vfr: aip.AD_VFR,
   pkgs: Object.fromEntries(Object.entries(aip.AIP).map(([k, p]) => [k, { link: p.link, api: p.api, part: p.part,
-    charts: p.charts, text: p.text, n: p.list.length, whole: p.whole }])),
+    charts: p.charts, text: p.text, n: p.list.length, whole: p.whole, name: p.name }])),
   lists: [aip.AIP.adciv.list === aip.AD2, aip.AIP.admil.list === aip.AD_MIL, aip.AIP.advfr.list === aip.AD_VFR],
   vfrPage: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2011-26_2026_10_29/index-v2.html", "EPBC", 4),
   milPage: aip.aeroPageUrl("https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2011-26_2026_10_29", "EPKS", 4),
@@ -65,6 +65,20 @@ console.log(JSON.stringify({
   // pierwszy widoczny rząd: [rząd przycisku, pierwszy widoczny teraz, ile rzędów widać]
   topRows: [[5, 0, 10], [9, 0, 10], [10, 0, 10], [12, 0, 10], [3, 5, 10], [5, 5, 10], [70, 0, 28], [0, 3, 28], [2, 40, 28],
     [45, 40, 1], [45, 40, 0], [-1, 2, 10]].map(([r, t, n]) => aip.topRow(r, t, n)),
+  // 0.14.0 (issue #28): NEXT AIRAC
+  next: aip.NEXT,
+  nextArgs: ["next", "NEXT", " Next ", "next/2-1", "", undefined, "EPWA", "nextx"].map(aip.isNextArg),
+  nextUrls: [
+    [{ links: { aip_ifr_next: " https://x.test/n/index-v2.html " } }, "adciv"], [{ links: { aip_ifr_next: "" } }, "adciv"],
+    [{ links: { aip_ifr_next: "https://x.test/n/index-v2.html" } }, "admil"], [{ links: {} }, "advfr"], [{}, "adciv"],
+    [undefined, "adciv"], [{ links: { aip_vfr_next: 5 } }, "advfr"], [{ links: { aip_vfr_next: "https://x.test/v" } }, "advfr"],
+  ].map(([c, k]) => aip.nextUrl(c, aip.AIP[k])),
+  nextCycles: [{ ident: "2612", effective: "2026-11-26", next: "2026-12-24" }, { ident: "2701", effective: "x" }, {}, undefined]
+    .map(aip.nextCycle),
+  nextTips: [[{ ident: "2612", effective: "2026-11-26" }, "adciv"], [undefined, "admil"], [{ ident: "2701", effective: "2027-01-21" }, "advfr"]]
+    .map(([a, k]) => aip.nextTip(aip.AIP[k], a)),
+  nextMissing: [[{ ident: "2612", effective: "2026-11-26" }, "advfr"], [{ ident: "2612" }, "admil"], [undefined, "adciv"], [{}, "adciv"]]
+    .map(([a, k]) => aip.nextMissing(aip.AIP[k], a)),
 }));
 """
 
@@ -174,7 +188,7 @@ def test_tabs_wiring():
 
 def test_packages(js):
     """0.13.1: tabela AIP: link w /api/config, pakiet w adresie listy map, część AIP, sekcja map, lista lotnisk."""
-    assert js["pkgs"] == {
+    assert {k: {f: v for f, v in p.items() if f != "name"} for k, p in js["pkgs"].items()} == {
         "adciv": {"link": "aip_ifr", "api": "ifr", "part": 2, "charts": "2.24", "text": "2.1–AD 2.25", "n": 15,
                   "whole": "The whole eAIP IFR (table of contents)"},
         "admil": {"link": "aip_mil", "api": "mil", "part": 4, "charts": "4.24", "text": "4.1–AD 4.25", "n": 15,
@@ -183,6 +197,7 @@ def test_packages(js):
                   "whole": "The whole eAIP VFR (table of contents)"},
     }
     assert js["lists"] == [True, True, True]
+    assert [js["pkgs"][k]["name"] for k in ("adciv", "admil", "advfr")] == ["eAIP IFR", "eAIP MIL", "eAIP VFR"]
     mil, vfr = dict(js["mil"]), dict(js["vfr"])
     assert list(mil) == sorted(mil) and list(vfr) == sorted(vfr) and len(mil) == 15 and len(vfr) == 69
     assert mil["EPKS"] == "POZNAŃ/Krzesiny" and mil["EPLY"] == "ŁĘCZYCA" and vfr["EPBC"] == "WARSZAWA - BABICE"
@@ -306,9 +321,11 @@ RESP["/api/docs/charts/mil/EPKS"] = { icao: "EPKS", page: "https://x.test/mil/eA
   error: null, charts: [chart("mil", "EPKS", "2-1", "ADC"), chart("mil", "EPKS", "12-5", "IAC")] };
 RESP["/api/docs/charts/mil/EPZZ"] = { icao: "EPZZ", page: "", error: null, charts: [chart("mil", "EPZZ", "2-1", "ADC")] };
 RESP["/api/docs/charts/vfr/EPZZ"] = { icao: "EPZZ", page: "", error: null, charts: [chart("vfr", "EPZZ", "3-1", "VFR")] };
+// 0.14.0 (issue #28): eAIP następnego cyklu: IFR i VFR opublikowane, MIL jeszcze nie ("")
 const links = { aip_ifr: "https://x.test/ifr/index-v2.html", aip_mil: "https://x.test/mil/index-v2.html",
-  aip_vfr: "https://x.test/vfr/index-v2.html" };
-const ctx = { config: { links } };
+  aip_vfr: "https://x.test/vfr/index-v2.html", aip_ifr_next: "https://x.test/ifr-next/index-v2.html", aip_mil_next: "",
+  aip_vfr_next: "https://x.test/vfr-next/index-v2.html" };
+const ctx = { config: { links, airac_next: { ident: "2612", effective: "2026-11-26", next: "2026-12-24" } } };
 const el = (root) => root.pane.el;
 const out = {};
 
@@ -316,8 +333,8 @@ const out = {};
 const mil = {};
 const tm = aip.admil.mount(mil, ctx);
 out.milStart = { pages: [...log.pages], ids: mil.nav.buttons.map((b) => b.dataset.id), seps: mil.nav.seps,
-  titles: [mil.nav.buttons[0].title, mil.nav.buttons.find((b) => b.dataset.id === "EPKS").title],
-  args: ["eaip", "EPKS"].map(mil.arg) };
+  titles: [mil.nav.buttons[0].title, mil.nav.buttons.find((b) => b.dataset.id === "EPKS").title, mil.nav.buttons[1].title],
+  args: ["eaip", "EPKS", "next"].map(mil.arg) };
 reset();
 tm.activate("epks/12-5");
 await tick();
@@ -341,6 +358,15 @@ tm.activate("EPDE");
 await tick();
 out.milError = { api: [...log.api], list: el(mil).querySelector(".chl-list").innerHTML,
   viewer: el(mil).querySelector(".viewer").attrs.src };
+// 0.14.0 (issue #28): NEXT AIRAC w AD MIL: poprawka nie opublikowana, komunikat zamiast strony; drugi raz bez zmiany
+reset();
+tm.activate(" NEXT ");
+tm.activate("next");
+out.milNext = { pages: [...log.pages], api: [...log.api], remember: [...log.remember], html: el(mil).html,
+  active: mil.nav.querySelector("button.active").dataset.id, classes: mil.pane.classes };
+reset();
+tm.activate("");
+out.milNextBack = { pages: [...log.pages], remember: [...log.remember] };
 
 // AD VFR: 69 lotnisk, lotnisko z dołu listy przewijane do widoku o całe rzędy
 reset();
@@ -354,6 +380,13 @@ await tick();
 out.vfrEpzw = { api: [...log.api], remember: [...log.remember], scrolled: [...log.scrolled], html: el(vfr).html };
 // z dołu w górę (EPBC: rząd nad widokiem), rząd w widoku (EPKI), w dół (EPPZ), przycisk menu (bez arg), cały eAIP
 out.vfrSeq = ["EPBC", "EPKI", "EPPZ", undefined, ""].map((a) => { reset(); tv.activate(a); return [...log.scrolled]; });
+// 0.14.0 (issue #28): NEXT AIRAC w AD VFR (opublikowany): przeglądarka eAIP następnego cyklu, podmenu na samej górze
+reset();
+tv.activate("EPZW");
+reset();
+tv.activate("next");
+out.vfrNext = { pages: [...log.pages], remember: [...log.remember], scrolled: [...log.scrolled],
+  title: vfr.nav.buttons[1].title };
 
 // AD CIV bez zmian w zachowaniu: lista z IFR, AD 2 TEXT
 reset();
@@ -362,6 +395,10 @@ const tc = aip.adciv.mount(civ, ctx);
 out.civStart = { pages: [...log.pages], n: civ.nav.buttons.length };
 tc.activate("EPWA/2-1");
 out.civEpwa = { api: [...log.api], remember: [...log.remember], html: el(civ).html };
+reset();
+tc.activate("next");
+out.civNext = { pages: [...log.pages], remember: [...log.remember], ids: civ.nav.buttons.slice(0, 3).map((b) => b.dataset.id),
+  title: civ.nav.buttons[1].title };
 
 // pamięć list map: klucz pakiet/ICAO
 reset();
@@ -373,6 +410,36 @@ aip.mountCharts(b, { icao: "EPZZ", name: "x", base: links.aip_vfr, pkg: aip.AIP.
 await tick();
 aip.mountCharts(c, { icao: "EPZZ", name: "x", base: links.aip_mil, pkg: aip.AIP.admil });
 out.cache = { api: [...log.api], viewers: [a, b, c].map((x) => x.el.querySelector(".viewer").attrs.src) };
+
+// przegląd 0.14.0 (issue #28): komunikat NEXT AIRAC pyta /api/config jeszcze raz; poprawka opublikowana od otwarcia
+// aplikacji otwiera się bez Reload, nowe adresy i cykl zostają w ctx.config
+const cfg0 = () => ({ config: { links: { aip_mil: "https://x.test/mil/index-v2.html", aip_mil_next: "", aip_vfr_next: "" },
+  airac_next: { ident: "2612", effective: "2026-11-26" } } });
+RESP["/api/config"] = { links: { aip_mil: "https://x.test/mil-other/index-v2.html", aip_mil_next: "https://x.test/mil-next/index-v2.html",
+  aip_ifr_next: "https://x.test/ifr-next/index-v2.html" }, airac_next: { ident: "2613", effective: "2026-12-24" } };
+const ctxR = cfg0(), rm = {};
+const tr = aip.admil.mount(rm, ctxR);
+reset();
+tr.activate("next");
+const cardBefore = el(rm).html;
+await tick(); await tick();
+out.refresh = { cardBefore, api: [...log.api], pages: [...log.pages], links: ctxR.config.links, airac: ctxR.config.airac_next };
+// podzakładka zamknięta przed odpowiedzią: bez rysowania
+const ctxD = cfg0(), dm = {};
+const td = aip.admil.mount(dm, ctxD);
+reset();
+td.activate("next");
+td.activate("EPKS");
+await tick(); await tick();
+out.refreshDead = { pages: [...log.pages], active: dm.nav.querySelector("button.active").dataset.id, next: ctxD.config.links.aip_mil_next };
+// odpowiedź bez linków (np. błąd): komunikat zostaje, ctx.config bez zmian
+RESP["/api/config"] = { detail: "x" };
+const ctxE = cfg0(), em = {};
+const te = aip.admil.mount(em, ctxE);
+reset();
+te.activate("next");
+await tick(); await tick();
+out.refreshNone = { pages: [...log.pages], html: el(em).html, config: ctxE.config };
 console.log(JSON.stringify(out));
 """
 
@@ -397,9 +464,11 @@ def test_admil_tab(tabs):
     start = tabs["milStart"]
     # start: cały eAIP MIL, potem odstęp i 15 lotnisk wojskowych w kolejności AD 1.3; dymki z nazwą lotniska
     assert start["pages"] == ["https://x.test/mil/index-v2.html"] and start["seps"] == 1
-    assert start["ids"][:3] == ["eaip", "EPCE", "EPDA"] and len(start["ids"]) == 16 and start["ids"][-1] == "EPTM"
-    assert start["titles"] == ["The whole eAIP MIL (table of contents)", "POZNAŃ/Krzesiny – charts"]
-    assert start["args"] == ["", "EPKS"]
+    # 0.14.0 (issue #28): NEXT AIRAC tuż pod eAIP, przed odstępem; dymek z cyklem i datą wejścia
+    assert start["ids"][:3] == ["eaip", "next", "EPCE"] and len(start["ids"]) == 17 and start["ids"][-1] == "EPTM"
+    assert start["titles"] == ["The whole eAIP MIL (table of contents)", "POZNAŃ/Krzesiny – charts",
+                               "eAIP MIL for the next AIRAC cycle: AIRAC 2612, effective 26.11.2026"]
+    assert start["args"] == ["", "EPKS", "next"]
     # "#admil/EPKS/12-5": lista z /api/docs/charts/mil/EPKS, mapa 12-5 w podglądzie, krok historii zakładki admil
     e = tabs["milEpks"]
     assert e["api"] == ["/api/docs/charts/mil/EPKS"] and e["remember"] == [["admil", "EPKS/12-5"]]
@@ -427,23 +496,25 @@ def test_admil_tab(tabs):
 def test_advfr_tab(tabs):
     start = tabs["vfrStart"]
     ids = start.pop("ids")
-    assert start == {"pages": ["https://x.test/vfr/index-v2.html"], "n": 70, "last": "EPZW"}
-    row = {icao: ids.index(icao) + 1 for icao in ids[1:]}   # rząd 0: eAIP, rząd 1: odstęp
-    assert (row["EPBA"], row["EPZW"]) == (2, 70)
+    assert start == {"pages": ["https://x.test/vfr/index-v2.html"], "n": 71, "last": "EPZW"}
+    # rząd 0: eAIP, rząd 1: NEXT AIRAC (0.14.0, issue #28), rząd 2: odstęp
+    assert ids[:2] == ["eaip", "next"]
+    row = {icao: ids.index(icao) + 1 for icao in ids[2:]}
+    assert (row["EPBA"], row["EPZW"]) == (3, 71)
     e = tabs["vfrEpzw"]
     # ostatnie z 69 lotnisk VFR: przewinięcie o całe rzędy (atrapa: 21 rzędów w widoku, rząd co 31 px), EPZW w ostatnim
     # widocznym rzędzie; lista z /api/docs/charts/vfr/EPZW
     assert e["api"] == ["/api/docs/charts/vfr/EPZW"] and e["remember"] == [["advfr", "EPZW"]]
-    assert e["scrolled"] == [(70 - 21 + 1) * 31]
+    assert e["scrolled"] == [(71 - 21 + 1) * 31]
     # EPBC nad widokiem: na górze; EPKI w widoku (rzędy 3-23): bez zmiany; EPPZ pod widokiem: na dole; przycisk menu
     # (bez arg): bez zmiany; cały eAIP: na samą górę
-    assert row["EPBC"] == 3 and 3 <= row["EPKI"] <= 23 < row["EPPZ"]
-    assert tabs["vfrSeq"] == [[3 * 31], [3 * 31], [(row["EPPZ"] - 20) * 31], [(row["EPPZ"] - 20) * 31], [0]]
+    assert row["EPBC"] == 4 and 4 <= row["EPKI"] <= 24 < row["EPPZ"]
+    assert tabs["vfrSeq"] == [[4 * 31], [4 * 31], [(row["EPPZ"] - 20) * 31], [(row["EPPZ"] - 20) * 31], [0]]
     assert ">AD 4 TEXT ↗</a>" in e["html"] and "(AD 4.1–AD 4.13)" in e["html"] and "ZAWISZYN" in e["html"]
 
 
 def test_adciv_tab_unchanged(tabs):
-    assert tabs["civStart"] == {"pages": ["https://x.test/ifr/index-v2.html"], "n": 16}
+    assert tabs["civStart"] == {"pages": ["https://x.test/ifr/index-v2.html"], "n": 17}
     e = tabs["civEpwa"]
     assert e["api"] == ["/api/docs/charts/ifr/EPWA"] and e["remember"] == [["adciv", "EPWA/2-1"]]
     assert ">AD 2 TEXT ↗</a>" in e["html"] and "(AD 2.1–AD 2.25)" in e["html"]
@@ -455,3 +526,80 @@ def test_chart_cache_per_package(tabs):
     assert tabs["cache"] == {"api": ["/api/docs/charts/mil/EPZZ", "/api/docs/charts/vfr/EPZZ"],
                              "viewers": ["https://x.test/mil/AD_4_EPZZ_2-1.pdf", "https://x.test/vfr/AD_4_EPZZ_3-1.pdf",
                                          "https://x.test/mil/AD_4_EPZZ_2-1.pdf"]}
+
+
+# --- 0.14.0 (issue #28): "dodaj opcję przy eAIP (next airac), gdzie będzie link do AIP na kolejny airac"
+def test_next_pure(js):
+    """Adres "#adciv/next" (wielkość liter dowolna, bez mapy), adres eAIP następnego cyklu z /api/config
+    (links.<link>_next; "" albo brak = nie opublikowany), dymek z cyklem i datą wejścia, komunikat bez strony."""
+    assert js["next"] == "next"
+    assert js["nextArgs"] == [True, True, True, False, False, False, False, False]
+    assert js["nextUrls"] == ["https://x.test/n/index-v2.html", "", "", "", "", "", "", "https://x.test/v"]
+    assert js["nextCycles"] == ["AIRAC 2612, effective 26.11.2026", "AIRAC 2701", "", ""]
+    assert js["nextTips"] == ["eAIP IFR for the next AIRAC cycle: AIRAC 2612, effective 26.11.2026",
+                              "eAIP MIL for the next AIRAC cycle",
+                              "eAIP VFR for the next AIRAC cycle: AIRAC 2701, effective 21.01.2027"]
+    assert js["nextMissing"] == ["eAIP VFR for AIRAC 2612 (effective 26.11.2026) has not been published yet.",
+                                 "eAIP MIL for AIRAC 2612 has not been published yet.",
+                                 "eAIP IFR for the next AIRAC cycle is not available.",
+                                 "eAIP IFR for the next AIRAC cycle is not available."]
+
+
+def test_next_not_published_shows_message(tabs):
+    """AD MIL bez poprawki następnego cyklu: komunikat (karta) zamiast strony błędu PAŻP, bez ramki i bez listy map;
+    krok historii "next"; powrót do "eAIP" otwiera bieżącą poprawkę."""
+    n = tabs["milNext"]
+    # przegląd: komunikat pyta /api/config jeszcze raz (jedno zapytanie; drugie activate tej samej podzakładki bez zmian)
+    assert n["pages"] == [] and n["api"] == ["/api/config"] and n["active"] == "next" and n["classes"] == []
+    assert n["html"] == ('<div class="card aip-next"><p>eAIP MIL for AIRAC 2612 (effective 26.11.2026) has not been '
+                         'published yet.</p></div>')
+    assert n["remember"] == [["admil", "next"], ["admil", "next"]]
+    assert tabs["milNextBack"] == {"pages": ["https://x.test/mil/index-v2.html"], "remember": [["admil", ""]]}
+
+
+def test_next_published_opens_eaip(tabs):
+    """Opublikowana poprawka: cała przeglądarka index-v2.html następnego cyklu tak jak "eAIP" (iframeWithFallback);
+    w długim podmenu AD VFR NEXT AIRAC przewija podmenu na samą górę (eAIP nad nim widoczny)."""
+    v = tabs["vfrNext"]
+    assert v["pages"] == ["https://x.test/vfr-next/index-v2.html"] and v["remember"] == [["advfr", "next"]]
+    assert v["scrolled"] == [0]
+    assert v["title"] == "eAIP VFR for the next AIRAC cycle: AIRAC 2612, effective 26.11.2026"
+    c = tabs["civNext"]
+    assert c["pages"] == ["https://x.test/ifr-next/index-v2.html"] and c["remember"] == [["adciv", "next"]]
+    assert c["ids"] == ["eaip", "next", "EPBY"]
+
+
+def test_next_wiring():
+    """Przycisk w fabryce aipTab tuż po "eAIP", ta sama strona co "eAIP" (page) albo karta z komunikatem; adres
+    "next" w activate; CSS karty bez zaokrągleń, pogrubień i cieni; bez reklamowych nazw klas."""
+    assert ('{ id: EAIP, label: "eAIP", fill: true, render: page(base) },\n'
+            '        { id: NEXT, label: "NEXT AIRAC", fill: true, render: nextPage },\n        { sep: true },') in AIP
+    assert "if (url) { page(url)(pane); return true; }" in AIP
+    assert "const id = a.icao || (isNextArg(arg) ? NEXT : EAIP);" in AIP
+    assert "if (b === first || b.dataset.id === NEXT) { nav.scrollTop = 0; return; }" in AIP
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "coordination.css").read_text("utf-8"), flags=re.S)
+    rules = [line for line in css.splitlines() if ".aip-next" in line]
+    assert rules == [".aip-next { margin: 12px 16px; max-width: 760px; }", ".aip-next p { margin: 0; line-height: 1.45; }"]
+    assert not re.search(r"class=\"[^\"]*\b(ad-|ads|advert|banner|sponsor|promo)", AIP)
+
+
+def test_next_message_refreshes_config(tabs):
+    """Przegląd 0.14.0: ctx.config jest z chwili otwarcia aplikacji, więc komunikat "has not been published yet" pyta
+    /api/config jeszcze raz. Poprawka opublikowana w międzyczasie: od razu przeglądarka eAIP następnego cyklu (bez
+    Reload); adresy NEXT AIRAC trzech pakietów i cykl zapisane w ctx.config, bieżący eAIP bez zmian."""
+    r = tabs["refresh"]
+    assert r["cardBefore"] == ('<div class="card aip-next"><p>eAIP MIL for AIRAC 2612 (effective 26.11.2026) has not been '
+                               'published yet.</p></div>')
+    assert r["api"] == ["/api/config"] and r["pages"] == ["https://x.test/mil-next/index-v2.html"]
+    assert r["links"] == {"aip_mil": "https://x.test/mil/index-v2.html", "aip_mil_next": "https://x.test/mil-next/index-v2.html",
+                          "aip_vfr_next": "", "aip_ifr_next": "https://x.test/ifr-next/index-v2.html"}
+    assert r["airac"] == {"ident": "2613", "effective": "2026-12-24"}
+    # podzakładka zamknięta przed odpowiedzią: nic nie rysuje na cudzej stronie, adres i tak zapamiętany
+    d = tabs["refreshDead"]
+    assert d["pages"] == [] and d["active"] == "EPKS" and d["next"] == "https://x.test/mil-next/index-v2.html"
+    # odpowiedź bez linków: komunikat zostaje, konfiguracja bez zmian
+    e = tabs["refreshNone"]
+    assert e["pages"] == [] and "has not been published yet." in e["html"]
+    assert e["config"] == {"links": {"aip_mil": "https://x.test/mil/index-v2.html", "aip_mil_next": "", "aip_vfr_next": ""},
+                           "airac_next": {"ident": "2612", "effective": "2026-11-26"}}
+    assert '.catch(() => {});' in AIP[AIP.index("const nextPage = "):AIP.index("const chartsPage = ")]

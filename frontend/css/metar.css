@@ -1,8 +1,9 @@
-/* METEO › METAR PL / MIL / INTL i TAF PL / INTL jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): tabela stacja |
+/* METEO › METAR PL / MIL / INTL i TAF PL / INTL jak strona METAR w PANDORZE (0.13.1, zdjęcie właściciela projektu): tabela stacja |
    treść, wiersze na przemian czarne i ciemnoszare, treść zawija się pod początkiem komunikatu (nie pod stacją).
    Kolory grup (metarfmt.js): zielony = dzień, kierunek wiatru, zjawisko, RMK; jasnozielony = wartości; ciemnozielony =
    ilość chmur; niebieski = trend; biały = stacja, jednostki, temperatura, Q, reszta po RMK, opis zjawiska [EN / PL]
-   kapitalikami. MONO: wszystko jednym kolorem. Bez pogrubień, bez poświaty, ostre krawędzie. */
+   kapitalikami. MONO: wszystko jednym kolorem. RAW (0.14.0, issue #28): bez opisu zjawisk. Bez pogrubień, bez poświaty,
+   ostre krawędzie. */
 .mtr { --mt-key: #35ad35; --mt-val: #a3e4ad; --mt-cov: #24802a; --mt-trend: #7f9df2; --mt-alt: #2b2b2b; }
 .mtr-bar .ids { flex: 1 1 420px; min-width: 220px; max-width: 760px; }
 /* 0.13.2 (issue #27): METAR PL i TAF PL bez pola stacji i Show (zawsze wszystkie lotniska IFR); pasek ma wysokość pola
@@ -14,6 +15,9 @@
   color: var(--bad); cursor: pointer; }
 .mt-mode button.on { color: var(--green-hi); cursor: default; }
 .mt-mode button:not(.on):hover { color: #ff6a5a; }
+/* 0.14.0 (issue #28): DECODED / RAW (opis zjawisk albo sam komunikat) obok COLOURED / MONO, oddzielone cienką kreską,
+   żeby było widać dwa przełączniki, a nie cztery przyciski w jednym rzędzie */
+.mt-mode + .mt-mode { margin-left: 2px; padding-left: 12px; border-left: 1px solid var(--line); }
 table.mt-tab { border-collapse: collapse; width: 100%; font: 18px/1.45 var(--mono); color: #fff; }
 table.mt-tab td { padding: 1px 8px; vertical-align: top; background: #000; }
 table.mt-tab tr:nth-child(even) td { background: var(--mt-alt); }

@@ -79,7 +79,7 @@ def js(tmp_path_factory):
 
 def test_p21_lines_like_reference(js):
     # DOM004 z P21: poniżej TL (FL080) "A" i setki stóp ze strzałką wznoszenia; typ + kategoria turbulencji, cel.
-    # 0.12.6 (Marek): trzy linijki, bez "h  s  r" i RFL
+    # 0.12.6 (właściciel projektu): trzy linijki, bez "h  s  r" i RFL
     assert js["dom"] == ["DOM004   248", "A 53↑", "DC10H EPWA"]
     # TRA005: FL trzema cyframi, lot poziomy bez strzałki, tranzyt z punktem wyjścia z FIR-u zamiast celu
     assert js["tra"] == ["TRA005   431", "270", "B737M MIXAT"]
@@ -100,7 +100,7 @@ def _text(html):
 
 
 def test_aircraft_marker_without_label(js):
-    """0.12.6 (Marek): samolot na mapie bez stałej etykiety: sama sylwetka obrócona wg kursu; klasa relacji i wyboru
+    """0.12.6 (właściciel projektu): samolot na mapie bez stałej etykiety: sama sylwetka obrócona wg kursu; klasa relacji i wyboru
     na ikonie, etykieta tylko w okienku po najechaniu (dymek Leafleta w MAP)."""
     for m in (js["marker"], js["markerPlain"]):
         html = m["icon"]["html"]

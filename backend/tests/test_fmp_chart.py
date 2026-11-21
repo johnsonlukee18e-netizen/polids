@@ -192,7 +192,7 @@ def test_sector_series_matches_direct_count():
         assert c["peak"] == peak and c["peak_at"] == viff._abs_hhmm(now.hour * 60 + now.minute + peak_from_now), now
 
 
-def _fake(calls, fail=(), days=None, load=None, exc=UpstreamError):
+def _fake(calls, fail=(), days=None, exc=UpstreamError):
     days = days or {"2026-10-05": DAY}
 
     async def get(path, params=None, ttl=None):
@@ -201,8 +201,8 @@ def _fake(calls, fail=(), days=None, load=None, exc=UpstreamError):
         if path == "/etfms/scenarios":
             return []
         if path == "/etfms/airspaces":
-            if "fromNow" in params:   # sectors(): bieżąca doba od teraz
-                return load or {}
+            # 0.14.0 (issue #28): sectors() bierze te same całodobowe dane co wykres (bez "fromNow"), w cache razem
+            assert set(params) == {"filter", "date"} and ttl == 60, params
             calls.append(params["date"])
             if params["date"] in fail:
                 raise exc("timeout")
@@ -217,16 +217,19 @@ def test_sector_chart_service():
         calls = []
         viff._get = _fake(calls)
         c = run(viff.sector_chart("ep-bh", NOW))
-        assert calls == ["2026-10-05"] and c["id"] == "EP-BH" and c["label"] == "sector B upper" and c["prefix"] == "EP"
+        # dzisiejsza doba dla wiersza tabeli (sectors()) i dla wykresu: to samo zapytanie (w aplikacji z cache)
+        assert calls == ["2026-10-05", "2026-10-05"] and c["id"] == "EP-BH" and c["label"] == "sector B upper" and c["prefix"] == "EP"
         # aktywność, przepustowość i regulacje jak wiersz tabeli FMP (sectors())
         row = next(s for s in run(viff.sectors("EP", NOW))["sectors"] if s["id"] == "EP-BH")
         for k in ("active", "entries_cap", "occupancy_cap", "restricted", "regulated", "scenarios", "volumes"):
             assert c[k] == row[k], k
         assert c["active"] is True and (c["entries_cap"], c["occupancy_cap"]) == (45, 14)
         assert [e["count"] for e in c["entries"]][:5] == [2, 1, 2, 1, 3] and len(c["occupancy"]) == 301
-        # doby potrzebne dla okna: 00:10 wczoraj i dziś, 19:10 dziś, 20:10 i 21:10 dziś i jutro
-        for when, dates in ((at(0, 10, 6), ["2026-10-05", "2026-10-06"]), (at(19), ["2026-10-05"]),
-                            (at(20), ["2026-10-05", "2026-10-06"]), (at(21), ["2026-10-05", "2026-10-06"])):
+        # doby potrzebne dla okna (po dzisiejszej dla sectors()): 00:10 wczoraj i dziś, 19:10 dziś, 20:10 i 21:10 dziś
+        # i jutro
+        for when, dates in ((at(0, 10, 6), ["2026-10-06", "2026-10-05", "2026-10-06"]), (at(19), ["2026-10-05"] * 2),
+                            (at(20), ["2026-10-05", "2026-10-05", "2026-10-06"]),
+                            (at(21), ["2026-10-05", "2026-10-05", "2026-10-06"])):
             calls.clear()
             assert run(viff.sector_chart("EP-BH", when)) is not None and calls == dates, when
         # nieznany TV
@@ -242,7 +245,7 @@ def test_sector_chart_service():
                 viff._get = _fake(calls, fail=("2026-10-06",), exc=exc)
                 c = run(viff.sector_chart("EP-BH", at(h)))
                 assert c is not None and c["start"] == f"{h - 1}00", (exc, h)
-                assert calls == (["2026-10-06"] if h == 23 else []) + ["2026-10-05", "2026-10-06"], (exc, h)
+                assert calls == ["2026-10-05"] + (["2026-10-06"] if h == 23 else []) + ["2026-10-05", "2026-10-06"], (exc, h)
         # błąd dzisiejszej doby: UpstreamError (router: 502)
         viff._get = _fake(calls, fail=("2026-10-05",))
         with pytest.raises(UpstreamError):
@@ -258,11 +261,11 @@ def test_sectors_tomorrow_optional():
     viff_get = viff._get
     try:
         calls = []
-        viff._get = _fake(calls, days={"2026-10-06": nxt}, load=load)
+        viff._get = _fake(calls, days={"2026-10-05": load, "2026-10-06": nxt})
         row = next(s for s in run(viff.sectors("EP", at(23)))["sectors"] if s["id"] == "EP-BH")
-        assert calls == ["2026-10-06"] and [h["entries"] for h in row["hours"]] == [4, 7]
+        assert calls == ["2026-10-05", "2026-10-06"] and [h["entries"] for h in row["hours"]] == [4, 7]
         for exc in (UpstreamError, ValueError):
-            viff._get = _fake(calls, fail=("2026-10-06",), days={"2026-10-06": nxt}, load=load, exc=exc)
+            viff._get = _fake(calls, fail=("2026-10-06",), days={"2026-10-05": load, "2026-10-06": nxt}, exc=exc)
             d = run(viff.sectors("EP", at(23)))
             row = next(s for s in d["sectors"] if s["id"] == "EP-BH")
             assert {s["id"] for s in d["sectors"]} == {"EP-BH", "EP-DM"} and [h["entries"] for h in row["hours"]] == [4], exc
@@ -270,7 +273,7 @@ def test_sectors_tomorrow_optional():
         # przed 23Z jutrzejsza doba nie jest potrzebna
         calls.clear()
         run(viff.sectors("EP", at(22)))
-        assert calls == []
+        assert calls == ["2026-10-05"]
     finally:
         viff._get = viff_get
 
@@ -322,6 +325,8 @@ def test_sector_endpoints_at_23z_without_tomorrow(client, monkeypatch):
 # --- frontend w Node
 
 NODE_SCRIPT = r"""
+// airspace.js (importowany przez fmp.js) rozszerza klasę Leafleta przy wczytaniu; w przeglądarce L jest globalny
+globalThis.L = { CircleMarker: { extend: (o) => o } };
 const fmp = await import(process.argv[2]);
 const series = JSON.parse((await import("node:fs")).readFileSync(process.argv[3], "utf-8"));
 const zeros = (n) => Array.from({ length: n }, () => 0);
@@ -364,6 +369,8 @@ export const ONLINE_EVENT = "polids:online";
 export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const h = () => makeEl();
 export const api = (url) => new Promise((res, rej) => globalThis.__pending.push({ url, res, rej }));
+export const lsGet = (k) => (globalThis.__ls ||= {})[k] ?? null;
+export const lsSet = (k, v) => { (globalThis.__ls ||= {})[k] = String(v); };
 """
 
 MOUNT_SCRIPT = r"""
@@ -389,6 +396,9 @@ const root = pane.root, box = root.querySelector(".fmp-scroll"), side = root.que
 const main = root.querySelector(".fmp-main");
 const urls = () => globalThis.__pending.map((p) => p.url);
 const take = (url) => { const i = globalThis.__pending.findIndex((p) => p.url === url); return globalThis.__pending.splice(i, 1)[0]; };
+// 0.14.0: konfiguracje sektorów (pasek CONFIGURATION) – tu bez żadnej wybranej, tabela jak dotąd
+const cd = { ver: "v1", layers: {}, geo: { border: [], acc: [] }, configs: [],
+  current: { ok: true, error: null, positions: [], names: [], code: null } };
 const sel = () => box.rows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.tv);
 const head = () => (/class="fmc-code[^"]*" title="([^"]+)"/.exec(side.innerHTML) || [])[1] || null;
 const clickRow = (id) => box.on.click.forEach((f) => f({ target: { closest: (s) => (s === "tr[data-tv]" ? { dataset: { tv: id } } : null) } }));
@@ -396,6 +406,7 @@ const clickClose = () => side.on.click.forEach((f) => f({ target: { closest: (s)
 const o = {};
 // adres z sektorem: tabela i wykres od razu, panel "Loading" z kodem sektora, wiersz zaznaczony i przewinięty do widoku
 o.start = [urls(), side.innerHTML.includes("Loading") && head(), main.classList.contains("open")];
+take("/api/radio/configs?geo=1").res(cd);
 take("/api/viff/sectors").res(sectors);
 await tick();
 o.table = [sel(), [...globalThis.__scrolled], box.innerHTML.includes('class="on sel" data-tv="EP-DM"')];
@@ -424,6 +435,7 @@ o.addr = [[...picks], sel(), head(), [...globalThis.__scrolled]];
 // odświeżenie co 60 s: tabela i wykres; błąd wykresu zostawia wykres z komunikatem
 timers[0]();
 o.refreshUrls = urls();
+take("/api/radio/configs?have=v1").res(cd);
 take("/api/viff/sectors").res(sectors);
 take("/api/viff/sectors/EP-DM").rej(Object.assign(new Error("Flow data unavailable"), { status: 502 }));
 await tick();
@@ -433,6 +445,7 @@ clickClose();
 o.close = [[...picks], sel(), side.innerHTML.includes("Click a sector")];
 timers[0]();
 o.idleUrls = urls();
+take("/api/radio/configs?have=v1").res(cd);
 take("/api/viff/sectors").res(sectors);
 await tick();
 // zły sektor z adresu = nic nie wybrane (bez zapytania); nieznany: komunikat w panelu z ✕
@@ -445,6 +458,8 @@ o.unknown = [head(), side.innerHTML.includes("No flow data for sector EP-XX"), s
 // ONLINE_EVENT: od razu tabela i wykres; destroy(): bez timera i nasłuchu, spóźnione dane nic nie rysują
 listeners["polids:online"].forEach((f) => f());
 o.online = urls();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
 const before = side.innerHTML;
 page.destroy();
 take("/api/viff/sectors/EP-XX").res(chart("EP-XX"));
@@ -452,6 +467,20 @@ await tick();
 o.destroyed = [cleared, (listeners["polids:online"] || []).length, side.innerHTML === before];
 console.log(JSON.stringify(o));
 """
+
+
+def _mjs(src):
+    """Moduł z frontend/js z importami "./x.js" zamienionymi na "./x.mjs" (pliki obok w katalogu testu)."""
+    return re.sub(r'"\./([a-z]+)\.js"', r'"./\1.mjs"', src)
+
+
+def _page_modules(d):
+    """Atrapa api.js (API_STUB), prawdziwe viffchart.js, dissolve.js, radioboard.js i fmp.js; z airspace.js tylko kolor
+    stanowiska (prawdziwy moduł przy wczytaniu pyta serwer o kolejność przejmowania i potrzebuje Leafleta)."""
+    (d / "api.mjs").write_text(API_STUB, "utf-8")
+    (d / "airspace.mjs").write_text('export const colorFor = (k) => (k === "EPWW_ALL_CTR" ? "#4fcc92" : "#40f5ec");\n', "utf-8")
+    for name in ("viffchart", "dissolve", "radioboard", "fmp"):
+        (d / f"{name}.mjs").write_text(_mjs((JS / f"{name}.js").read_text("utf-8")), "utf-8")
 
 
 def _node():
@@ -466,9 +495,9 @@ def js(tmp_path_factory):
     node = _node()
     d = tmp_path_factory.mktemp("fmpchart")
     (d / "api.mjs").write_text((JS / "api.js").read_text("utf-8"), "utf-8")
-    for name in ("viffchart", "fmp"):
-        src = (JS / f"{name}.js").read_text("utf-8")
-        (d / f"{name}.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"').replace('"./viffchart.js"', '"./viffchart.mjs"'), "utf-8")
+    # 0.14.0: fmp.js importuje też airspace.js (kolory stanowisk), dissolve.js i radioboard.js (podglądy konfiguracji)
+    for name in ("viffchart", "fmp", "airspace", "dissolve", "radioboard"):
+        (d / f"{name}.mjs").write_text(_mjs((JS / f"{name}.js").read_text("utf-8")), "utf-8")
     # szereg z backendu (sector_series) jako dane wykresu: ten sam kontrakt co GET /api/viff/sectors/{tv}
     c = viff.sector_series("EP-BH", {0: DAY}, NOW, ROW)
     c.update({"label": "sector B upper", "active": True, "restricted": False})
@@ -553,15 +582,13 @@ def test_clean_tv(js):
 
 def test_fmp_page_behaviour(tmp_path):
     node = _node()
-    (tmp_path / "api.mjs").write_text(API_STUB, "utf-8")
-    (tmp_path / "viffchart.mjs").write_text((JS / "viffchart.js").read_text("utf-8").replace('"./api.js"', '"./api.mjs"'), "utf-8")
-    src = (JS / "fmp.js").read_text("utf-8")
-    (tmp_path / "fmp.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"').replace('"./viffchart.js"', '"./viffchart.mjs"'), "utf-8")
+    _page_modules(tmp_path)
     (tmp_path / "run.mjs").write_text(MOUNT_SCRIPT, "utf-8")
     r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "fmp.mjs").as_uri()], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     o = json.loads(r.stdout)
-    assert o["start"] == [["/api/viff/sectors", "/api/viff/sectors/EP-DM"], "EP-DM", True]
+    # 0.14.0: z tabelą także konfiguracje sektorów (pierwszy raz z geometrią podglądów)
+    assert o["start"] == [["/api/viff/sectors", "/api/radio/configs?geo=1", "/api/viff/sectors/EP-DM"], "EP-DM", True]
     assert o["table"] == [["EP-DM"], ["EP-DM"], True]
     assert o["chart"] == ["EP-DM", True, 0]
     picks, sel, urls, same, head, loading = o["click"]
@@ -572,11 +599,113 @@ def test_fmp_page_behaviour(tmp_path):
     # przewinięcia do wiersza: tabela z adresu, pierwszy wykres każdego nowego wyboru (EP-DM, EP-WATMA; spóźniony EP-BH
     # nic nie rysuje), wybór z adresu i jego wykres; scrollIntoView({block: "nearest"}) przy widocznym wierszu nic nie robi
     assert o["addr"] == [["EP-BH", "EP-WATMA", ""], ["EP-DM"], "EP-DM", ["EP-DM", "EP-DM", "EP-WATMA", "EP-DM", "EP-DM"]]
-    assert o["refreshUrls"] == ["/api/viff/sectors", "/api/viff/sectors/EP-DM"]
+    assert o["refreshUrls"] == ["/api/viff/sectors", "/api/radio/configs?have=v1", "/api/viff/sectors/EP-DM"]
     assert o["refreshErr"] == ["EP-DM", True, True]
     assert o["close"] == [["EP-BH", "EP-WATMA", "", ""], [], True]
-    assert o["idleUrls"] == ["/api/viff/sectors"]
+    assert o["idleUrls"] == ["/api/viff/sectors", "/api/radio/configs?have=v1"]
     assert o["bad"] == []
     assert o["unknown"] == ["EP-XX", True, True, ["EP-BH", "EP-WATMA", "", ""]]
-    assert o["online"] == ["/api/viff/sectors", "/api/viff/sectors/EP-XX"]
+    assert o["online"] == ["/api/viff/sectors", "/api/radio/configs?have=v1", "/api/viff/sectors/EP-XX"]
     assert o["destroyed"] == [[1], 0, True]
+
+
+# 0.14.0 (właściciel projektu: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane konfiguracje"): pasek CONFIGURATION na atrapie DOM
+CFG_SCRIPT = r"""
+globalThis.__pending = [];
+globalThis.__scrolled = [];
+globalThis.__ls = {};
+const timers = [], listeners = {};
+globalThis.setInterval = (f) => { timers.push(f); return timers.length; };
+globalThis.clearInterval = () => {};
+globalThis.window = { addEventListener(t, f) { (listeners[t] ||= []).push(f); }, removeEventListener() {} };
+const fmp = await import(process.argv[2]);
+const tick = () => new Promise((r) => setImmediate(r));
+const tv = (id, o) => ({ id, hours: [], occupancy: [], peak_60: 0, entries_cap: 40, occupancy_cap: 14, restrictions: [], ...o });
+const sectors = { prefix: "EP", now: "1310", sectors: [tv("EP-BH", { active: true }), tv("EP-JL", { active: true }), tv("EP-WATMA")] };
+const pos = (name, callsign, ...letters) => ({ name, callsign, short: name, frequency: "125.450",
+  sectors: { LOW: letters, MID: letters, HIGH: letters } });
+const none = { LOW: [], MID: [], HIGH: [] };
+const cd = { ver: "v1", layers: {}, geo: { border: [], acc: [] },
+  current: { ok: true, error: null, positions: ["EPWW_ALL_CTR", "EPWW_N_CTR"], names: ["ALL", "NFIR"], code: "2N" },
+  configs: [{ code: "1X", label: "ALL", size: 1, positions: [pos("ALL", "EPWW_ALL_CTR", "B", "J")], free: none },
+    { code: "2N", label: "ALL+NFIR", size: 2, positions: [pos("ALL", "EPWW_ALL_CTR", "J"), pos("NFIR", "EPWW_N_CTR", "B")], free: none }] };
+const picks = [];
+const pane = { append(x) { this.root = x; } };
+const page = fmp.mountFmp(pane, { start: "2n/ep-bh", onPick: (a, fix) => picks.push([a, !!fix]) });
+const root = pane.root, box = root.querySelector(".fmp-scroll"), bar = root.querySelector(".fmp-cfg");
+const panel = root.querySelector(".fmp-cp");
+const urls = () => { const u = globalThis.__pending.map((p) => p.url); globalThis.__pending.length = 0; return u; };
+const sel = () => box.rows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.tv);
+const groups = () => [...box.innerHTML.matchAll(/<tr class="fmp-grp[^"]*"><td colspan="3"[^>]*>(?:<i[^>]*><\/i>)?([A-Z ]+)/g)].map((m) => m[1]);
+const clickCfg = (code) => bar.on.click.forEach((f) => f({ target: { closest: (s) => (s === "button[data-cfg]" ? { dataset: { cfg: code } } : null) } }));
+const o = {};
+// adres z konfiguracją i sektorem: konfiguracja zapamiętana od razu; pasek "Loading", panel ukryty do odpowiedzi
+const pending = [...globalThis.__pending];
+o.start = [urls(), globalThis.__ls["fmp.config"], panel.hidden, bar.innerHTML.includes("Loading")];
+pending.find((p) => p.url === "/api/viff/sectors").res(sectors);
+await tick();
+o.plain = [box.innerHTML.includes('<table class="fmp-table">'), groups(), sel()];
+pending.find((p) => p.url === "/api/radio/configs?geo=1").res(cd);
+await tick();
+// po konfiguracjach: panel 2N, tabela w grupach stanowisk, przycisk 2N wybrany i z NOW, sektor dalej zaznaczony
+o.loaded = [panel.hidden, panel.innerHTML.includes('<span class="fmp-cp-code">2N</span>'), groups(),
+  box.innerHTML.includes('<table class="fmp-table grouped">'), bar.innerHTML.includes('class="fmp-cb on now" data-cfg="2N"'), sel(), picks.length];
+// drugi klik w wybraną konfigurację: bez konfiguracji (krok historii z samym sektorem), tabela jak dotąd, bez zapytań;
+// przegląd 0.14.0: fokus z klawiatury na przycisku 2N wraca na nowy przycisk 2N (pasek rysowany od nowa)
+const focused = [], btn2N = { dataset: { cfg: "2N" } };
+bar.contains = (x) => x === btn2N;
+bar.kids['button[data-cfg="2N"]'] = { focus: (opt) => focused.push(opt) };
+globalThis.document = { activeElement: btn2N };
+clickCfg("2N");
+globalThis.document = { activeElement: null };
+o.off = [[...picks], panel.hidden, groups(), globalThis.__ls["fmp.config"], sel(), urls()];
+o.focus = focused;
+// klik w inną: krok historii z konfiguracją i sektorem, grupy tej konfiguracji; wybrany wiersz przewinięty do widoku
+// w tabeli, a cały obszar FMP zostaje, gdzie był (przegląd 0.14.0: w niskim oknie przewija się cały obszar)
+root.scrollTop = 5;
+const push = globalThis.__scrolled.push.bind(globalThis.__scrolled);
+globalThis.__scrolled.push = (x) => { root.scrollTop = 99; return push(x); };
+clickCfg("1X");
+o.on = [[...picks].slice(1), panel.hidden, groups(), globalThis.__ls["fmp.config"], sel()];
+o.keep = [root.scrollTop, globalThis.__scrolled.includes("EP-BH")];
+// adres (Wstecz / Dalej): konfiguracja i sektor bez onPick
+page.activate("2N/EP-JL");
+o.addr = [picks.length, groups(), sel(), urls(), globalThis.__ls["fmp.config"]];
+// kod spoza tabeli w adresie: bez konfiguracji, adres poprawiony (fix) już z nowym sektorem
+page.activate("9Z/EP-BH");
+o.unknown = [[...picks].slice(2), panel.hidden, groups(), sel(), globalThis.__ls["fmp.config"], urls()];
+// sam sektor (adres do 0.13.6): bez konfiguracji
+page.activate("2N");
+page.activate("EP-JL");
+o.tvOnly = [groups(), sel(), picks.length, urls()];
+// odświeżenie: konfiguracje bez geometrii (have=v1); błąd zostawia pasek z komunikatem
+timers[0]();
+const again = [...globalThis.__pending];
+o.refresh = urls();
+again.find((p) => p.url === "/api/radio/configs?have=v1").rej(new Error("Server down"));
+await tick();
+o.refreshErr = [bar.innerHTML.includes("Not refreshed: Server down"), bar.innerHTML.includes('data-cfg="5X"') || bar.innerHTML.includes('data-cfg="1X"')];
+console.log(JSON.stringify(o));
+"""
+
+
+def test_fmp_page_configurations(tmp_path):
+    node = _node()
+    _page_modules(tmp_path)
+    (tmp_path / "run.mjs").write_text(CFG_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "fmp.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    assert o["start"] == [["/api/viff/sectors", "/api/radio/configs?geo=1", "/api/viff/sectors/EP-BH"], "2N", True, True]
+    # tabela przed konfiguracjami jak dotąd, potem w grupach (bez nowego zapytania o tabelę)
+    assert o["plain"] == [True, [], ["EP-BH"]]
+    assert o["loaded"] == [False, True, ["ALL", "NFIR", "OTHER"], True, True, ["EP-BH"], 0]
+    assert o["off"] == [[["EP-BH", False]], True, [], "", ["EP-BH"], []]
+    assert o["on"] == [[["1X/EP-BH", False]], False, ["ALL", "OTHER"], "1X", ["EP-BH"]]
+    # przegląd 0.14.0: fokus zostaje na przycisku konfiguracji; obszar FMP nie odjeżdża przy wyborze konfiguracji
+    assert o["focus"] == [{"preventScroll": True}] and o["keep"] == [5, True]
+    assert o["addr"] == [2, ["ALL", "NFIR", "OTHER"], ["EP-JL"], ["/api/viff/sectors/EP-JL"], "2N"]
+    assert o["unknown"] == [[["EP-BH", True]], True, [], ["EP-BH"], "", ["/api/viff/sectors/EP-BH"]]
+    assert o["tvOnly"] == [[], ["EP-JL"], 3, ["/api/viff/sectors/EP-JL"]]
+    assert o["refresh"] == ["/api/viff/sectors", "/api/radio/configs?have=v1", "/api/viff/sectors/EP-JL"]
+    assert o["refreshErr"] == [True, True]

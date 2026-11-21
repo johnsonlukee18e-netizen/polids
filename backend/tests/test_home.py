@@ -1,5 +1,8 @@
 """HOME (0.12.3, issue #13): rating zalogowanego kontrolera, jego połączenie i rezerwacje w VATSIM (/api/vatsim/me),
-wybór stanowiska wspólny z AERODROME › OVERVIEW, przycisk przejścia tam przed sesją, wersja i AIRAC na dole."""
+wybór stanowiska wspólny z check-inem, wersja i AIRAC na dole.
+0.14.0 (issue #28): dawne AERODROME › OVERVIEW to krok 2 HOME (SELF CHECK-IN, #home/checkin): najpierw powitanie
+i wybór stanowiska, potem przyciskiem SELF CHECK-IN strona check-inu dla tego stanowiska (wieża: strona INFO lotniska
+w AERODROME), z przyciskiem powrotu do kroku 1."""
 import json
 import os
 import re
@@ -114,7 +117,7 @@ def test_vatsim_me_logged_in(client, monkeypatch):
 
 
 def test_vatsim_me_active_frequency(client, monkeypatch):
-    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): połączenie na 199.998 albo na
+    """0.13.6 (właściciel projektu: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): połączenie na 199.998 albo na
     częstotliwości, której nie ma stanowisko z danych, nie ma stanowiska i ma active: false (HOME pisze je osobno)."""
     _login(client, monkeypatch)
     me = int(CID)
@@ -231,7 +234,18 @@ const isFilter = (cs) => ["EPWW_DBT_CTR", "EPWA_APP", "EPKK_APP"].includes(cs);
 const privateSync = ov.syncPosition({ seen: "EPKK_APP", position: "EPKK_APP", loaded: true }, api.choiceGet("test.blocked"), isFilter);
 blocked = false;
 
+// 0.14.0 (issue #28): overview.js przez import() z ponowną próbą (retryImport): dwa błędy (serwer nie odpowiada), potem
+// moduł; numery prób (nowy adres przy każdej), ta sama obietnica w trakcie wczytywania i po wczytaniu
+const tries = [];
+let fails = 2;
+const imp = home.retryImport((n) => { tries.push(n); return fails-- > 0 ? Promise.reject(new Error("offline")) : Promise.resolve({ n }); });
+const pending = imp() === imp();
+const retry = [];
+for (let i = 0; i < 4; i++) retry.push(await imp().then((m) => m.n, (e) => e.message));
+const retryOut = { pending, retry, tries, kept: imp() === imp() };
+
 console.log(JSON.stringify({
+  retryOut,
   posKey: api.POS_KEY,
   choice,
   privateSync,
@@ -303,6 +317,11 @@ console.log(JSON.stringify({
     { list, stored: "EPWA_APP", online: [on("EPWA_TWR", { frequency: "118.000" })] },
   ].map(home.initialPosition),
   target: [null, list[0], list[2]].map(home.sessionTarget),
+  // 0.14.0 (issue #28): krok HOME tylko wg adresu (undefined = przycisk "?" w menu, logo, nieznany adres: krok 1);
+  // drugi element (krok na ekranie) nie może niczego zmienić
+  steps: [[undefined, ""], [undefined, "checkin"], ["", "checkin"], ["checkin", ""], ["CHECKIN", ""], ["x", "checkin"],
+          ["0", ""], [null, "checkin"]].map(([a, cur]) => home.stepOf(a, cur)),
+  checkinKey: home.CHECKIN,
   hello: home.greeting({ user: { cid: "1234567", name: "Jan Kowalski", rating: 4 } }),
 }));
 """
@@ -350,7 +369,7 @@ def test_times_and_lines(js):
                             "ATIS EPWA_ATIS (120.455) since 10:12Z · information K",
                             "You are connected to VATSIM as an observer (EPKK_OBS) since 10:12Z",
                             "You are connected to VATSIM as EPWA_APP",
-                            # 0.13.6 (Marek: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
+                            # 0.13.6 (właściciel projektu: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
                             "You are connected to VATSIM as EPWW_ALL_CTR (199.998) since 10:12Z, not on a position frequency",
                             "You are connected to VATSIM as EPWW_X_CTR (118.000) since 10:12Z, not on a position frequency",
                             # ATIS poza częstotliwością stanowiska: bez litery (nie nadaje jako ATIS lotniska)
@@ -392,9 +411,70 @@ def test_initial_position(js):
 
 
 def test_session_target(js):
-    assert js["target"] == [{"arg": "0", "label": "PREPARE SESSION → AERODROME OVERVIEW"},
-                            {"arg": "0", "label": "PREPARE SESSION → AERODROME OVERVIEW"},
-                            {"arg": "EPWA", "label": "PREPARE SESSION → AERODROME EPWA"}]
+    """0.14.0 (issue #28): ACC, APP i cały FIR do kroku 2 HOME (SELF CHECK-IN), wieża od razu do strony INFO lotniska."""
+    assert js["target"] == [{"tab": "home", "arg": "checkin", "label": "SELF CHECK-IN"},
+                            {"tab": "home", "arg": "checkin", "label": "SELF CHECK-IN"},
+                            {"tab": "aerodrome", "arg": "EPWA", "label": "SELF CHECK-IN → AERODROME EPWA"}]
+
+
+def test_home_steps(js):
+    """Krok HOME tylko z adresu: #home/checkin (dowolna wielkość liter) = krok 2, każdy inny adres krok 1. Przegląd
+    0.14.0: także bez arg, czyli przycisk "?" w menu, logo (href="#home") i nieznany adres (#foo) – zawsze najpierw
+    powitanie i wybór pozycji, niezależnie od kroku na ekranie."""
+    assert js["checkinKey"] == "checkin"
+    assert js["steps"] == ["", "", "", "checkin", "checkin", "", "", ""]
+
+
+def test_retry_import(js):
+    """0.14.0 (issue #28): nieudany import() przeglądarka zapamiętuje pod jego adresem (TRY AGAIN i powrót serwera nic by
+    nie dały aż do przeładowania strony), więc każda ponowna próba ma swój numer (?retry=n); w trakcie wczytywania
+    i po wczytaniu ta sama obietnica, bez nowego pobierania."""
+    assert js["retryOut"] == {"pending": True, "retry": ["offline", "offline", 2, 2], "tries": [0, 1, 2], "kept": True}
+
+
+def test_home_two_steps_in_one_tab():
+    """Krok 1 (powitanie i wybór stanowiska) i krok 2 (SELF CHECK-IN z overview.js) w jednej zakładce; check-in
+    wczytywany dopiero przy pierwszym otwarciu (HOME statycznie importuje tylko api.js); powrót do kroku 1 i wieża
+    w check-inie to kroki do cofnięcia; adres zakładki zgłoszony z activate()."""
+    home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
+    assert '<div class="home-checkin" hidden></div>' in home and '<div class="home-main">' in home
+    # overview.js pobierany już przy montowaniu HOME, ponowna próba po błędzie pod nowym adresem (retryImport)
+    assert 'const ovImport = retryImport((n) => import(n ? `../overview.js?retry=${n}` : "../overview.js"));' in home
+    assert "ovImport().catch(() => {});" in home and "ovLoading = ovImport().then(({ mountOverview }) => {" in home
+    assert 'onGoto: (code) => navigate("aerodrome", code),' in home and 'onBack: () => navigate("home", ""),' in home
+    assert "showStep(stepOf(arg));\n        remember(\"home\", step);" in home
+    assert 'pane.classList.toggle("ci-mode", ci);' in home
+    # odświeżanie VATSIM co minutę tylko w kroku 1; check-in po powrocie serwera, gdy się nie wczytał
+    assert 'if (user && step === "" && root.classList.contains("active") && !document.hidden)' in home
+    assert "if (step === CHECKIN && !ov) openCheckin();" in home
+    # stopka z wersją i AIRAC pod oboma krokami (poza .home-main)
+    i_main, i_ci, i_foot = home.index('<div class="home-main">'), home.index('<div class="home-checkin"'), home.index('<footer class="home-foot">')
+    assert i_main < i_ci < i_foot
+    overview = (FRONTEND / "js" / "overview.js").read_text("utf-8")
+    assert "export function mountOverview(el, { onGoto, onBack } = {}) {" in overview
+    assert '${onBack ? `<button type="button" class="gbtn ov-back"' in overview and "\\u2190 CHANGE POSITION" in overview
+    assert '$(".ov-back")?.addEventListener("click", () => onBack());' in overview
+    # żaden odnośnik w aplikacji nie prowadzi już do dawnego AERODROME › OVERVIEW (#aerodrome/0)
+    # (w kodzie, bez komentarzy: te opisują dawny adres)
+    for path in (FRONTEND / "js").rglob("*.js"):
+        src = "\n".join(re.split(r"\s//\s", ln)[0] for ln in path.read_text("utf-8").splitlines()
+                        if not ln.lstrip().startswith("//"))
+        assert not re.search(r"""navigate\(\s*["']aerodrome["']\s*,\s*["']0["']|#aerodrome/0\b|open\(\s*["']aerodrome["']\s*,\s*["']0["']""",
+                             src), path.name
+    assert "mountOverview" not in (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
+
+
+def test_home_css_steps():
+    """Krok 2 na całym panelu (siatka bez wyśrodkowania), [hidden] chowa krok (display: flex go przykrywał); w niskim
+    albo wąskim oknie wiersz rośnie z treścią (stopka pod check-inem); ostre krawędzie, bez cieni i pogrubień."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "home.css").read_text("utf-8"), flags=re.S)
+    assert ".home-pane > [hidden] { display: none; }" in css
+    assert ".home-pane.ci-mode { grid-template-rows: minmax(0, 1fr) auto; justify-items: stretch;" in css
+    assert re.search(r"@media \(max-width: 1240px\), \(max-height: 640px\) \{\s*\.home-pane\.ci-mode \{ grid-template-rows: auto auto; \}", css)
+    assert not re.search(r"border-radius:\s*[1-9]|box-shadow|text-shadow|glow|font-weight:\s*(bold|[6-9]00)", css)
+    ov = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "overview.css").read_text("utf-8"), flags=re.S)
+    assert ".aero-pane.ov-mode" not in ov and ".ov-bar .gbtn.ov-back { width: auto; margin: 0;" in ov
+    assert ".ov table.data th, .ov table.data td { text-align: center; }" in ov
 
 
 def test_home_choice_sequences(js):
@@ -454,9 +534,9 @@ def test_home_shares_position_with_overview(js):
     assert "syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed)" in overview
     assert "position = listPosition(seen, listed);" in overview and 'let position = "";' in overview
     assert "choiceSet(POS_KEY, position);" in overview
-    aerodrome = (FRONTEND / "js" / "tabs" / "aerodrome.js").read_text("utf-8")
-    assert 'if (mode === "ov" && ov) { ov.sync(); return; }' in aerodrome
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
+    # 0.14.0 (issue #28): check-in w kroku 2 HOME; już otwarty dostaje przy ponownym pokazaniu wybór z kroku 1 (sync)
+    assert "if (ov) { ov.sync(); return; }" in home
     assert "homeChoice(choice, { net, shared: choiceGet(POS_KEY), list })" in home
     assert re.search(r'^import \{[^}]*\bPOS_KEY\b[^}]*\} from "\.\./api\.js";$', home, re.M)
     # COORDINATION: stanowisko domyślne z tego samego wyboru okna (zachowanie: test_coord_tab_js.py)
@@ -465,9 +545,9 @@ def test_home_shares_position_with_overview(js):
     for src in (overview, home, coordination, agreements):
         assert "lsGet(POS_KEY)" not in src and "lsSet(POS_KEY" not in src
         assert "const POS_KEY" not in src
-    # przycisk: OVERVIEW (0) albo strona lotniska wieży, zapis dopiero z wczytaną listą (inaczej pusty wybór kasowałby
-    # zapisany); HOME importuje tylko api.js (test powłoki wczytuje go w Node)
-    assert re.search(r'if \(listLoaded\) save\(\);\s*navigate\("aerodrome", sessionTarget\(current\(\)\)\.arg\);', home)
+    # przycisk: check-in (krok 2) albo strona lotniska wieży, zapis dopiero z wczytaną listą (inaczej pusty wybór
+    # kasowałby zapisany); HOME importuje statycznie tylko api.js (test powłoki wczytuje go w Node)
+    assert re.search(r'if \(listLoaded\) save\(\);\s*const t = sessionTarget\(current\(\)\);\s*navigate\(t\.tab, t\.arg\);', home)
     assert re.findall(r'^import .* from "([^"]+)";$', home, re.M) == ["../api.js"]
     # stopka: sama wersja i AIRAC
     assert "[ctx.config?.version, airacText(ctx.config?.airac)]" in home

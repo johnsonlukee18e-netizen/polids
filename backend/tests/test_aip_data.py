@@ -127,7 +127,7 @@ def test_config_now():
     assert config_now(runway_config("EPWR"), NIGHT) == {"arr": "11", "dep": "29"}
     assert config_now(runway_config("EPWR"), DAY) == {"arr": "29", "dep": "29"}
     assert config_now(runway_config("EPGD"), DAY) == {"arr": None, "dep": "29"}
-    # EPWA: AD 2.21 pkt 1 (tekst AIP od Marka), H24 doloty 33, odloty 29
+    # EPWA: AD 2.21 pkt 1 (tekst AIP od właściciela projektu), H24 doloty 33, odloty 29
     assert config_now(runway_config("EPWA"), DAY) == config_now(runway_config("EPWA"), NIGHT) == {"arr": "33", "dep": "29"}
     assert "verified" not in runway_config("EPWA") and runway_config("EPWA")["source"].startswith("AIP AD 2.21")
     assert config_now(runway_config("EPKK"), DAY) == {"arr": None, "dep": None}
@@ -146,7 +146,7 @@ def test_lvp_thresholds_per_aerodrome():
     assert cfg["EPKK"]["lvp"]["ceiling_ft"] == ["<=", 200] and "prep" not in cfg["EPKK"]
     assert cfg["EPWR"]["cancel"]["rvr_m"] == [">", 600]
     assert all(cfg[i]["scope"] == "DEP" and "vis_m" in cfg[i]["lvp"] for i in ("EPKS", "EPMB", "EPMI", "EPPW", "EPSN"))
-    # EPWA i EPPO z tekstu AD 2.22 od Marka: EPWA bez fazy przygotowania, odwołanie RVR > 550 m (ściśle)
+    # EPWA i EPPO z tekstu AD 2.22 od właściciela projektu: EPWA bez fazy przygotowania, odwołanie RVR > 550 m (ściśle)
     assert not any(cfg[i].get("verified") is False for i in civil)
     assert cfg["EPWA"]["lvp"] == {"rvr_m": ["<", 550], "ceiling_ft": ["<", 200], "logic": "or"} and "prep" not in cfg["EPWA"]
     assert cfg["EPWA"]["cancel"] == {"rvr_m": [">", 550], "ceiling_ft": [">=", 200], "logic": "and"}

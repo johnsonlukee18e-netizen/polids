@@ -29,16 +29,16 @@ export function scnCond(s, { html = false } = {}) {
   if (s.anypositions?.length) out.push(`when online: ${b(s.anypositions, " or ")}`);
   if (s.nopositions?.length) out.push(`and offline: ${b(s.nopositions, ", ")}`);
   if (s.booked) out.push("bookings count too");
-  if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`time ${v(`${s.start}–${s.end}`)}`);
-  (s.times || []).forEach((t) => out.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}–${t.to}`)}`));
-  return out.join(" · ") || "no conditions";
+  if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`time ${v(`${s.start}\u2013${s.end}`)}`);
+  (s.times || []).forEach((t) => out.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}\u2013${t.to}`)}`));
+  return out.join(" \u00b7 ") || "no conditions";
 }
 
 // Dymek wiersza scenariusza vIFF po angielsku, z danych scenariusza: id, traffic volumes (z opisem jak tvLabel)
 // i warunki. Opisu scenariusza z vIFF (s.description, wolny tekst po polsku) nie pokazujemy.
 export function scnTip(s) {
   const tvs = (s.tvs || []).map((t) => `${t.id} (${tvLabel(t.id)})`);
-  return `Scenario ${s.id}: ${tvs.length ? `traffic volumes ${tvs.join(", ")}` : "no traffic volumes"} · ${scnCond(s)}`;
+  return `Scenario ${s.id}: ${tvs.length ? `traffic volumes ${tvs.join(", ")}` : "no traffic volumes"} \u00b7 ${scnCond(s)}`;
 }
 
 // aktywny = status 1 w vIFF albo członek aktywnego scenariusza (backend liczy to w polu active)
@@ -59,15 +59,15 @@ export function loadRatio(tv) {
 
 // wiersz TV z paskiem obciążenia; tv = null, gdy vIFF nie podał danych sektora
 export function listRow(tv, selected, id = tv?.id) {
-  if (!tv) return `<button class="vf-row" data-tv="${esc(id)}" title="${esc(tvLabel(id))}"><b>${esc(id)}</b><span class="vf-bar"></span><span class="vf-num">–</span></button>`;
+  if (!tv) return `<button class="vf-row" data-tv="${esc(id)}" title="${esc(tvLabel(id))}"><b>${esc(id)}</b><span class="vf-bar"></span><span class="vf-num">\u2013</span></button>`;
   const r = loadRatio(tv);
   const cls = r > 1 ? "over" : r >= 0.9 ? "near" : r > 0 ? "ok" : "nolim";
   // liczba przy pasku: godzina (bieżąca albo następna) z większym obciążeniem wejść
   const h0 = [...tv.hours].sort((a, b) => (b.entries_cap ? b.entries / b.entries_cap : 0) - (a.entries_cap ? a.entries / a.entries_cap : 0))[0];
-  const tip = `${tv.id} · ${tvLabel(tv.id)}${h0 ? ` · ${h0.hour}Z: ${h0.entries ?? "–"} entries / ${h0.entries_cap ?? "no limit"}` : ""} · peak ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} in sector`;
+  const tip = `${tv.id} \u00b7 ${tvLabel(tv.id)}${h0 ? ` \u00b7 ${h0.hour}Z: ${h0.entries ?? "\u2013"} entries / ${h0.entries_cap ?? "no limit"}` : ""} \u00b7 peak ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} in sector`;
   return `<button class="vf-row ${tv.id === selected ? "on" : ""}" data-tv="${esc(tv.id)}" title="${esc(tip)}">
     <b>${esc(tv.id)}</b><span class="vf-bar"><i class="${cls}" style="width:${Math.min(100, Math.round(r * 100))}%"></i></span>
-    <span class="vf-num">${h0 ? `${h0.entries ?? "–"}/${h0.entries_cap ?? "∞"}` : "–"}</span></button>`;
+    <span class="vf-num">${h0 ? `${h0.entries ?? "\u2013"}/${h0.entries_cap ?? "\u221e"}` : "\u2013"}</span></button>`;
 }
 
 // Stan lotu jak w liście lotów NM (te same kody i kolory co tabela odlotów w AERODROME)
@@ -76,76 +76,85 @@ export function stateChip(v, states) {
   if (!v) return "";
   const label = v.state === "SU" && v.suspension ? "SU " + v.suspension.replace(/^FLS-?/, "") : v.state;
   const tip = [states?.[v.state] || v.state, v.atfcm_status && `ATFCM: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`]
-    .filter(Boolean).join(" · ");
+    .filter(Boolean).join(" \u00b7 ");
   return `<span class="fs fs-${STATE_CLASS[v.state] || "fi"}" title="${esc(tip)}">${esc(label)}</span>${v.ready ? ` <span class="fs fs-rea" title="REA: ready to depart before the slot">REA</span>` : ""}`;
 }
 // kolory opóźnienia CTOT jak w liście lotów NM: < 15 min niebieski, < 30 żółty, < 45 pomarańczowy, ≥ 45 czerwony
 export const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 
-const clock = (now, m) => {
-  const t = (parseInt(now.slice(0, 2), 10) * 60 + parseInt(now.slice(2), 10) + m) % 1440;
-  return String(Math.floor(t / 60)).padStart(2, "0") + String(t % 60).padStart(2, "0");
-};
-
-// Wykres: po lewej wejścia na godzinę (vIFF: bieżąca i następna pełna godzina) z linią przepustowości,
-// po prawej liczba samolotów w sektorze minuta po minucie od teraz do +60 min z linią przepustowości chwilowej.
-// Pod wykresem lista lotów jak tabela wyników NM; pilot(cs) → {departure, arrival, aircraft} z VATSIM albo nic,
+// 0.14.0 (issue #28, "widać jedynie linię limitu górnego, a nie aktualną przepustowość"): wykres TV na MAP z tych
+// samych danych i tym samym rysunkiem co OTHER › FMP. c = odpowiedź GET /api/viff/sectors/<TV> (wejścia w 60 min co
+// 20 min i samoloty w sektorze minuta po minucie, od pełnej godziny przed teraz do +5 h, z przepustowością
+// i regulacjami), opts.svg = {entry, occ}: entrySvg i occSvg z fmp.js (podane z map.js, bo fmp.js importuje ten moduł).
+// Do 0.13.6 słupki i zajętość szły z koszyków godzinowych listy sektorów; koszyk, którego godzina nie była dosłownie
+// napisem "HH", nie trafiał w żadną godzinę, więc zostawała sama linia przepustowości z definicji TV.
+// tv = wiersz TV z /api/viff/sectors (obszary, scenariusze, loty w sektorze w ciągu godziny) albo null; c = null:
+// wykres jeszcze się wczytuje albo (err) się nie wczytał; note = błąd odświeżenia przy ostatnim wykresie.
+// Pod wykresem lista lotów jak tabela wyników NM; pilot(cs) = {departure, arrival, aircraft} albo nic,
 // sel = znak lotu otwartego w szczegółach (wiersz podświetlony).
-export function chartHtml(tv, now, pilot = () => null, sel = null) {
-  const W = 540, H = 150, top = 16, bottom = 22, plotH = H - top - bottom;
-  // --- wejścia / h
-  const hours = tv.hours.length ? tv.hours : [];
-  const eMax = Math.max(4, tv.entries_cap || 0, ...hours.map((h) => h.entries || 0)) * 1.1;
-  const ey = (v) => top + plotH - (v / eMax) * plotH;
-  const bars = hours.map((h, i) => {
-    const x = 34 + i * 62, y = ey(h.entries || 0);
-    return `<rect x="${x}" y="${y}" width="40" height="${top + plotH - y}" class="vf-${loadClass(h.entries, h.entries_cap)}"/>
-      <text x="${x + 20}" y="${y - 3}" class="vf-val">${h.entries ?? "–"}</text>
-      <text x="${x + 20}" y="${H - 6}" class="vf-ax">${esc(h.hour)}Z${i === 0 ? " now" : ""}</text>`;
-  }).join("");
-  const eCap = tv.entries_cap ? `<line x1="26" x2="162" y1="${ey(tv.entries_cap)}" y2="${ey(tv.entries_cap)}" class="vf-cap"/>
-    <text x="164" y="${ey(tv.entries_cap) + 4}" class="vf-capt">${tv.entries_cap}</text>` : "";
-  // --- zajętość minuta po minucie
-  const occ = tv.occupancy || [];
-  const oMax = Math.max(3, tv.occupancy_cap || 0, ...occ) * 1.1;
-  const x0 = 214, x1 = W - 34, ox = (m) => x0 + (m / 60) * (x1 - x0), oy = (v) => top + plotH - (v / oMax) * plotH;
-  let path = `M${ox(0)},${oy(0)}`;
-  occ.forEach((v, m) => { path += `L${ox(m)},${oy(v)}L${ox(m + 1 > 60 ? 60 : m + 1)},${oy(v)}`; });
-  path += `L${ox(60)},${oy(0)}Z`;
-  const oCls = loadClass(tv.peak_60, tv.occupancy_cap);
-  const ticks = [0, 20, 40, 60].map((m) => `<line x1="${ox(m)}" x2="${ox(m)}" y1="${top}" y2="${top + plotH}" class="vf-grid"/>
-    <text x="${ox(m)}" y="${H - 6}" class="vf-ax">${clock(now, m)}</text>`).join("");
-  const oCap = tv.occupancy_cap ? `<line x1="${x0}" x2="${x1}" y1="${oy(tv.occupancy_cap)}" y2="${oy(tv.occupancy_cap)}" class="vf-cap"/>
-    <text x="${x1 + 3}" y="${oy(tv.occupancy_cap) + 4}" class="vf-capt">${tv.occupancy_cap}</text>` : "";
-  const yTicks = (max, y, x) => [0, Math.round(max / 2), Math.floor(max)].map((v) => `<text x="${x}" y="${y(v) + 4}" class="vf-ax end">${v}</text>`).join("");
-  const svg = `<svg viewBox="0 0 ${W} ${H}" class="vf-svg">
-    <line x1="26" x2="170" y1="${top + plotH}" y2="${top + plotH}" class="vf-base"/><line x1="${x0}" x2="${x1}" y1="${top + plotH}" y2="${top + plotH}" class="vf-base"/>
-    <text x="96" y="${top - 5}" class="vf-sub">Entries / h${tv.entries_cap ? "" : " (no limit)"}</text>
-    ${yTicks(eMax / 1.1, ey, 24)}${bars}${eCap}
-    <text x="${(x0 + x1) / 2}" y="${top - 5}" class="vf-sub">Occupancy: aircraft in sector (now → +60 min)</text>
-    ${ticks}${yTicks(oMax / 1.1, oy, x0 - 6)}<path d="${path}" class="vf-occ vf-${oCls}"/>${oCap}
-  </svg>`;
-  const rows = (tv.flights || []).map((f) => {
+const DASH_ = "\u2013", DOT_ = " \u00b7 ";
+const regsOf = (c) => [...new Set([...(c.entries_reg || []).map((r) => `entries ${r.value} ${r.start}${DASH_}${r.end}`),
+  ...(c.occupancy_reg || []).map((r) => `occupancy ${r.value} ${r.start}${DASH_}${r.end}`)])];
+const pair = (n, cap) => `${n}${cap === null ? "" : `/${cap}`}`;
+// teraz: wejścia w 60 min od początku słupka z bieżącą minutą i samoloty w sektorze w tej minucie, wobec przepustowości
+// (niższej z deklarowanej i regulowanej, jak kolory słupków)
+export function chartNow(c) {
+  const at = num(c?.now_at);
+  if (!c || at === null) return null;
+  const bar = [...(c.entries || [])].reverse().find((e) => e.from <= at) || null;
+  const occ = num((c.occupancy || [])[at]);
+  const regAt = (c.occupancy_reg || []).filter((s) => s.from <= at && at < s.to).map((s) => s.value);
+  return {
+    entries: bar ? num(bar.count) ?? 0 : null, entriesCap: bar ? capOf(num(bar.cap), num(bar.reg)) : null, entriesFrom: bar?.time || null,
+    occupancy: occ, occupancyCap: capOf(num(c.occupancy_cap), regAt.length ? Math.min(...regAt) : null),
+  };
+}
+
+export function chartHtml(tv, c, { pilot = () => null, sel = null, svg = null, err = "", note = "" } = {}) {
+  const id = c?.id || tv?.id || "";
+  const active = c ? !!c.active : !!(tv?.active ?? tv?.status === 1);
+  const ec = num(c ? c.entries_cap : tv?.entries_cap), oc = num(c ? c.occupancy_cap : tv?.occupancy_cap);
+  const vols = tv?.volumes || c?.volumes || [], scns = tv?.scenarios || c?.scenarios || [];
+  const regs = c ? regsOf(c) : [];
+  const head = `<div class="vf-title"><span class="vf-kind" title="TV (traffic volume): sector or area with a set capacity">TV sector</span>`
+    + `<span class="vf-id">${esc(id)}</span><span class="vf-desc">${esc(tvLabel(id))}</span>`
+    + `<span class="vs-chip${active ? " on" : ""}">${active ? "ACTIVE" : "inactive"}</span>`
+    + (note ? `<span class="vf-note error">${esc(note)}</span>` : "")
+    + `<button class="vf-close" title="Close chart">\u2715</button></div>`;
+  const meta = `<div class="vf-meta">${vols.length ? `<span title="airspace volumes">${esc(vols.join(", "))}</span>` : ""}`
+    + `${scns.length ? `<span>scenario: ${esc(scns.join(", "))}</span>` : ""}`
+    + `<span>capacity: ${ec === null ? "no entry limit" : `${ec} entries/h`}${DOT_}${oc === null ? "no occupancy limit" : `${oc} at once`}</span>`
+    + `${regs.length ? `<span class="vf-reg">regulated: ${esc(regs.join(", "))}</span>` : ""}</div>`;
+  let charts;
+  if (!c || !svg) charts = err ? `<p class="error vf-err">${esc(err)}</p>` : `<p class="hint vf-wait">Loading\u2026</p>`;
+  else {
+    const n = chartNow(c);
+    const stat = [`${esc(c.now)}Z`,
+      n && n.entries !== null ? `entries ${pair(n.entries, n.entriesCap)} from ${esc(n.entriesFrom)}Z` : "",
+      n && n.occupancy !== null ? `in sector ${pair(n.occupancy, n.occupancyCap)}` : "",
+      num(c.peak) ? `peak ${c.peak} at ${esc(c.peak_at)}Z` : ""].filter(Boolean).join(DOT_);
+    // przegląd 0.14.0 (issue #28): bez ruchu w oknie wykresu same linie przepustowości wyglądały jak dawny błąd, więc
+    // zdanie jak w OTHER › FMP (fmpChartHtml)
+    const quiet = !(c.occupancy || []).some((v) => v > 0) && !(c.entries || []).some((e) => e.count > 0);
+    charts = (quiet ? `<p class="hint fmc-empty">No traffic in this period.</p>` : "")
+      + `<div class="fmc-chart"><div class="fmc-title">ENTRY <span>entries in ${esc(c.span)} min, every ${esc(c.step)} min</span></div>${svg.entry(c)}</div>`
+      + `<div class="fmc-chart"><div class="fmc-title">OCC <span>aircraft in the sector, per minute</span></div>${svg.occ(c)}</div>`
+      + `<div class="fmc-legend"><span><i class="fmc-ok"></i>below 90 %</span><span><i class="fmc-near"></i>90${DASH_}100 %</span>`
+      + `<span><i class="fmc-over"></i>over capacity</span><span><i class="fmc-nolim"></i>no limit</span>`
+      + `<span><i class="fmc-capl"></i>capacity</span><span><i class="fmc-regl"></i>regulated</span></div>`
+      + `<div class="vf-stat">${stat}</div>`;
+  }
+  const flights = tv?.flights || [];
+  const rows = flights.map((f) => {
     const p = pilot(f.callsign);
-    return `<tr data-cs="${esc(f.callsign)}" class="${f.airborne ? "" : "gnd"}${f.callsign === sel ? " on" : ""}" title="${f.airborne ? "airborne" : "still on ground / planned"} · click: flight details">
-      <td class="cs">${esc(f.callsign)}</td><td>${esc(p?.departure || "–")}</td><td>${esc(p?.arrival || "–")}</td><td>${esc(p?.aircraft || "–")}</td>
+    return `<tr data-cs="${esc(f.callsign)}" class="${f.airborne ? "" : "gnd"}${f.callsign === sel ? " on" : ""}" title="${f.airborne ? "airborne" : "still on ground / planned"}${DOT_}click: flight details">
+      <td class="cs">${esc(f.callsign)}</td><td>${esc(p?.departure || DASH_)}</td><td>${esc(p?.arrival || DASH_)}</td><td>${esc(p?.aircraft || DASH_)}</td>
       <td class="t">${esc(f.entry)}</td><td class="t">${esc(f.exit)}</td></tr>`;
   }).join("");
-  const active = tv.active ?? tv.status === 1;
-  return `<div class="vf-title"><span class="vf-kind" title="TV (traffic volume): sector or area with a set capacity">TV sector</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
-      ${active ? `<span class="vs-chip on">ACTIVE</span>` : `<span class="vs-chip">inactive</span>`}
-      <button class="vf-close" title="Close chart">✕</button></div>
-    <div class="vf-body">
-    <div class="vf-meta">${tv.volumes.length ? `<span title="airspace volumes">${esc(tv.volumes.join(", "))}</span>` : ""}
-      ${tv.scenarios?.length ? `<span>scenario: ${esc(tv.scenarios.join(", "))}</span>` : ""}
-      <span>capacity: <b>${tv.entries_cap ?? "∞"}</b> entries/h · <b>${tv.occupancy_cap ?? "∞"}</b> at once</span></div>
-    ${svg}
-    <div class="vf-legend"><span><i class="vf-ok"></i>&lt; 90 %</span><span><i class="vf-near"></i>90–100 %</span><span><i class="vf-over"></i>&gt; capacity</span>
-      <span><i class="vf-capl"></i>capacity</span><span class="vf-stat">${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · peak ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} ·
-      entries per 20 min: ${(tv.windows || []).map((w) => w.entries).join(" · ") || "–"}</span></div>
-    <div class="vf-fhead">Flights in sector within the hour <span>(${(tv.flights || []).length})</span></div>
+  return `${head}<div class="vf-body">${meta}${charts}
+    <div class="vf-fhead">Flights in sector within the hour <span>(${flights.length})</span></div>
     ${rows ? `<div class="vf-tblwrap"><table class="vf-tbl"><thead><tr><th>Callsign</th><th>ADEP</th><th>ADES</th><th>Type</th><th>Entry</th><th>Exit</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>` : `<div class="vf-empty">no flights within the hour</div>`}
+      <tbody>${rows}</tbody></table></div>` : `<div class="vf-empty">${tv ? "no flights within the hour" : "no flight list"}</div>`}
     </div>`;
 }
 

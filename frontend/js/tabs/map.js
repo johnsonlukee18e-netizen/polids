@@ -1,9 +1,11 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, atisHtml, esc, h, hhmm, lsGet, lsSet, vatsimAtc, vatsimOnline } from "../api.js";
 import { chartHtml, delayClass, listRow, scnCond, scnTip, stateChip, tvGroup, tvLabel } from "../viffchart.js";
+import { entrySvg, occSvg } from "../fmp.js";
 import { AC_LABEL_GAP, FACILITIES, PLANE_PATH, POSITION_COLORS, SymbolMarker, acLabelSpot, aircraftMarker, airportBadge, altLabel, atcPanes, atcRows, atcTooltip, climbRates,
   colorFor, controllerRows, drawFirs, fl, loadFirs, loadVacs, p21Html, sliceOwner, symbolFor, symbolHalf, symbolSvg } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
 import { labelPoint, nudge, settledRect } from "../coverage.js";
+import { altScale, altScaleHtml, ctrBadges } from "../mapatc.js";
 import { dissolve, mainParts, pointIn } from "../dissolve.js";
 import { displayName, loadDisplayNames } from "../posname.js";
 import { activeAtc, activeOnline, buildTree, countOf, firsOf, matchItem, toggle } from "../postree.js";
@@ -48,12 +50,9 @@ const AIR = [
 ];
 const AIR_TAG = { acc: "ACC", tma: "TMA", cta: "CTA", ctr: "CTR", oth: "FIS/ATZ", nb: "neighbours" };
 const PICK_OF = Object.fromEntries(AIR.flatMap((a) => a.kinds.map((k) => [k, a.id])));
-// kolejność w dymku (z góry): ACC, TMA, CTR, CTA, FIS, ATZ, sąsiedzi
-const KIND_ORDER = ["acc", "tma", "ctr", "cta", "fis", "atz", "oth", "nb"];
-const KIND_TAG = { acc: "ACC", tma: "TMA", ctr: "CTR", fis: "FIS", cta: "CTA", atz: "ATZ", oth: "OTHER", nb: "FIR" };
 const OTH_HEAD = { fis: "FIS", atz: "ATZ / TRA", oth: "other" };
 // przestrzenie z kolejnością przejmowania z chains.js (APP/TWR z .ese, potem ACC): z niej obsługujący (ownerOf);
-// samej kolejności nie pokazujemy (0.12.6, Marek: bez hierarchii w opisie przestrzeni)
+// samej kolejności nie pokazujemy (0.12.6, właściciel projektu: bez hierarchii w opisie przestrzeni)
 const CHAIN_KINDS = ["tma", "cta", "ctr"];
 const LEVELS = [15, 50, 100, 200, 300, 370];
 // Przełączniki widoczności spoza warstw przestrzeni (0.13.1, issue #25: wszystkie ustawienia wyświetlania w sekcji
@@ -240,7 +239,7 @@ function mainMap(ctx) {
   let base = null;
   let theme = THEME.dark;
   const layers = {
-    firs: L.layerGroup().addTo(map), air: L.layerGroup().addTo(map), airways: L.layerGroup(), airLbl: L.layerGroup().addTo(map),
+    firs: L.layerGroup().addTo(map), firCtr: L.layerGroup().addTo(map), air: L.layerGroup().addTo(map), airways: L.layerGroup(), airLbl: L.layerGroup().addTo(map),
     ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
     traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map), viff: L.layerGroup().addTo(map),
   };
@@ -258,7 +257,7 @@ function mainMap(ctx) {
   });
   paintLegend();
 
-  // Sekcje panelu zwijane kliknięciem w nagłówek. 0.13.1 (issue #25, Marek): wszystkie domyślnie zwinięte; zapisane są
+  // Sekcje panelu zwijane kliknięciem w nagłówek. 0.13.1 (issue #25, właściciel projektu): wszystkie domyślnie zwinięte; zapisane są
   // tylko rozwinięte (map.open). Dawny map.sections (Ruch, Przestrzeń, Trasa… rozwinięte domyślnie) pomijamy, żeby
   // po aktualizacji panel u każdego startował zwinięty
   const open = new Set(store.get("map.open", []).filter((k) => typeof k === "string"));
@@ -310,7 +309,7 @@ function mainMap(ctx) {
   $(".ms-hide").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.add("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
   $(".ms-show").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.remove("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
 
-  // Punkt jako symbol EuroScope z nazwą obok. Symbole mniejsze niż do 0.12.4 (Marek, 0.12.5: nie zasłaniają mapy):
+  // Punkt jako symbol EuroScope z nazwą obok. Symbole mniejsze niż do 0.12.4 (właściciel projektu, 0.12.5: nie zasłaniają mapy):
   // skala 1 = jednostki SYMBOLS w pikselach; nazwa tuż za prawym brzegiem symbolu
   const pointMarker = (p, { color, label = true, scale = 1, weight = 1.3, permanent = true, cls = "lbl", popup = true, tooltip = true } = {}) => {
     const sym = symbolFor(p.kind);
@@ -474,8 +473,6 @@ function mainMap(ctx) {
   };
   // stanowisko z kolejności przejmowania → zalogowany kontroler (klucze online to znaki z pliku .ese; ACC też przez ese_id)
   const onlOf = (cs, { byId, onl, vacs }) => onl[cs] || onl[byId[vacs?.acc_positions?.[cs]?.ese_id]?.callsign] || null;
-  // częstotliwość stanowiska z kolejności: z pliku .ese, dla ACC z tabeli kolejności przejmowania
-  const freqOf = (cs) => net.posBy[cs]?.frequency || net.vacs?.acc_positions?.[cs]?.frequency || "";
 
   // Właściciel jednego wycinka. Wynik: {c: obsługujący (w TMA / CTA / CTR tylko APP, TWR…: etykieta), top: ACC top-down,
   // key: znak do koloru, who: znak obsługującego z kolejności (kolor TMA / CTA / CTR), ch: kolejność z chains.js (TMA, CTA,
@@ -541,6 +538,8 @@ function mainMap(ctx) {
   // geom: obszar etykiety (suma wycinków stanowiska albo wycinek), w którym może się przesunąć.
   // c: kontroler online obsługujący przestrzeń: po najechaniu na etykietę jego dane zamiast listy przestrzeni (hoverAt)
   let lblCtl = [];
+  // kolor obszaru kontrolera (znak → kolor z drawOwned): ta sama kreska w podziałce dymka
+  const ownColor = new Map();
   const lbl = (at, html, shift = 0, c = null, geom = null) => L.marker(at, { interactive: false, pane: "asLbl", shift, geom,
     icon: L.divIcon({ className: "maplabel", iconSize: null, html: `<div${c ? ` class="ctl" data-ctl="${lblCtl.push(c) - 1}"` : ""}>${html}</div>` }) })
     .addTo(layers.airLbl);
@@ -564,7 +563,7 @@ function mainMap(ctx) {
       const c = map.containerPointToLayerPoint([(r.left + r.right) / 2 - mb.left, (r.top + r.bottom) / 2 - mb.top]);
       return boxes[boxes.push({ x: c.x, y: c.y, w: r.width, h: r.height, k }) - 1];
     };
-    [layers.atc, layers.firs].forEach((lg) => lg.eachLayer((m) => { const h = m.getElement?.(); rect(h?.querySelector(".atcb"), 1, h); }));
+    [layers.atc, layers.firs, layers.firCtr].forEach((lg) => lg.eachLayer((m) => { const h = m.getElement?.(); rect(h?.querySelector(".atcb"), 1, h); }));
     // nazwy punktów trasy (wybrany lot i trasa wpisana ręcznie: stałe dymki nad asLbl)
     [layers.flight, layers.route].forEach((lg) => lg.eachLayer((m) => rect(m.getTooltip?.()?.getElement(), 1)));
     // nazwa lotniska (stały dymek nad asLbl) razem z symbolem lotniska z jej lewej strony (kanwa pod asLbl); wyłączone
@@ -647,7 +646,7 @@ function mainMap(ctx) {
     hideTip();
     vis = [];
     lblCtl = [];
-    if (!slices) { renderInfo(level()); return; }
+    if (!slices) { drawCtr(); renderInfo(level()); return; }
     const lv = level(), all = lv === null;
     net.useOnline = $(".online").checked && !!net.act;
     const onl = net.useOnline ? net.act.positions : null;
@@ -660,6 +659,8 @@ function mainMap(ctx) {
     shown.forEach((f) => vis.push({ f, pr: f.properties, own: ownerOf(f.properties, ctxo) }));
     if (net.useOnline) drawOwned(all);
     else drawSlices(all);
+    // plakietki CTR bez kontrolerów, których obszar ma już etykietę (lblCtl)
+    drawCtr();
     declutter();
     renderInfo(lv);
     pane.querySelectorAll(".pk:not([hidden])").forEach((el) => renderPicker(el.dataset.air));
@@ -704,7 +705,7 @@ function mainMap(ctx) {
     });
   }
 
-  // Obsada wg kontrolerów online (runda 12, Marek): widoczne wycinki tego samego obsługującego (APP / TWR w TMA, CTA i CTR,
+  // Obsada wg kontrolerów online (runda 12, właściciel projektu): widoczne wycinki tego samego obsługującego (APP / TWR w TMA, CTA i CTR,
   // ACC także top-down, sąsiad, FIS) jako jeden obszar w kolorze stanowiska z jedną etykietą: granica tylko tam, gdzie
   // zmienia się obsługujący. Wycinków bez nikogo nie rysujemy. Grupa = kontroler (znak z sieci; ten sam kontroler pod
   // znakiem sąsiada z alias_of też), kolor wg stanowiska z kolejności przejmowania (stałe kolory ACC EPWW).
@@ -726,12 +727,14 @@ function mainMap(ctx) {
   // wycinków, bez konturów między nimi. Od największego obszaru: mniejsze (CTR wieży w TMA) na wierzchu.
   function drawOwned(all) {
     const f = all ? 0.6 : 1;  // wszystkie poziomy: nakładające się obszary słabiej
+    ownColor.clear();
     const groups = ownedGroups().map((g) => {
       const d = dissolve(`${g.c.callsign}|${[...g.gi].sort((a, b) => a - b).join(",")}`, g.vs.map((v) => v.f.geometry));
       return { ...g, d, color: colorFor(g.keys.find((k) => POSITION_COLORS[k]) || g.keys[0] || g.c.callsign),
         size: d ? d.area : g.vs.reduce((a, v) => a + area(v.f.bb), 0) };
     }).sort((a, b) => b.size - a.size);
     groups.forEach((g) => {
+      ownColor.set(g.c.callsign, g.color);
       // stanowisko symulowane (sekcja Pozycje): kontur przerywany i "SYM" w etykiecie
       const st = { color: g.color, weight: 1.5, opacity: 1, fillColor: g.color, fillOpacity: 0.16 * f, ...(g.c.sim ? { dashArray: "6 4" } : {}) };
       if (g.d) L.geoJSON(g.d.geometry, { interactive: false, style: st }).addTo(layers.air);
@@ -767,53 +770,45 @@ function mainMap(ctx) {
     }
     tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   };
-  const whoHtml = (v) => {
-    const { c, top, ch } = v.own, pr = v.pr;
+  // 0.14.0 (issue #28, właściciel projektu: "bardzo długie, niepotrzebne objaśnienia; wystarczy prosta podziałka wysokości z id
+  // kontrolera, imieniem i nazwiskiem oraz wysokościami granicznymi"): dymek przestrzeni to podziałka wysokości
+  // w punkcie kursora (altScale, altScaleHtml z mapatc.js) zamiast wierszy z rodzajem, nazwą, ID, zakresem,
+  // częstotliwością i "since": granice pionowe od góry, między nimi stanowisko (nazwa jak w etykietach na mapie)
+  // z imieniem i nazwiskiem kontrolera, "–" bez obsady; kreska w kolorze obszaru stanowiska. Cała kolumna przestrzeni
+  // w tym punkcie (wszystkie poziomy, włączone warstwy i wybór z list), pasmo z rysowanym poziomem wyróżnione.
+  // Obsada wyłączona (podział pełny): stanowisko z kolejności przejmowania, bez nazwiska i bez koloru.
+  // częstotliwość stanowiska z danych (pełny podział bez sieci: nikt nie jest zalogowany)
+  const freqOf = (cs) => net.posBy[cs]?.frequency || net.vacs?.acc_positions?.[cs]?.frequency || "";
+  const whoOf = (pr, own) => {
     if (!net.useOnline) {
-      const cs = ch?.chain[0] || pr.callsign;
-      return cs ? `<span class="muted">${esc(displayName(cs))} ${esc((ch ? freqOf(cs) : "") || pr.frequency || "")} (full split)</span>` : "";
+      const cs = own.ch?.chain[0] || pr.callsign;
+      return cs ? [{ key: cs, id: displayName(cs), freq: (own.ch ? freqOf(cs) : "") || pr.frequency || "", name: "" }] : [];
     }
-    // kto i od kiedy online (pełne dane kontrolera: najechanie na etykietę stanowiska albo plakietkę lotniska)
-    const nm = (x) => `<span class="muted">${esc(x.name || "")}${x.logon_time ? ` · since ${hhmm(x.logon_time)}` : ""}</span>`;
-    if (c) return `<span class="fq">${esc(c.frequency)}</span> <b>${esc(displayName(c.callsign))}</b> ${nm(c)}`;
-    if (top) return `<span class="muted">top-down:</span> <span class="fq">${esc(top.frequency)}</span> <b>${esc(displayName(top.callsign))}</b> ${nm(top)}`;
-    return `<span class="muted">unstaffed</span>`;
+    const c = own.c || own.top;
+    return c ? [{ key: c.callsign, id: displayName(c.callsign), freq: c.frequency || "", name: c.name || "", sim: !!c.sim,
+      color: ownColor.get(c.callsign) || colorFor(own.key || own.who || c.callsign) }] : [];
   };
-  // Wiersz przestrzeni: nazwa, ID, zakres pionowy, częstotliwość i kto ją teraz obsługuje (od kiedy). Bez kolejności
-  // przejmowania pod wierszem TMA / CTA / CTR (0.12.6, Marek: bez hierarchii, jak w RADIO).
-  const hoverHtml = (hits, lv) => {
-    // TMA / CTA / CTR: wycinki tej samej przestrzeni z tym samym obsługującym (np. konfiguracje pasów EPWA_DIR11_A, DIR15_A…)
-    // w jednym wierszu z łącznym zakresem pionowym; reszta: sąsiednie pasma tego samego wycinka z tym samym obsługującym.
-    // Sortowanie także wg obsługującego: wycinki innego stanowiska (np. EPWA_APP_S_D między EPWA_DIR11_D i DIR11_A) nie rozbijają wiersza.
-    const rows = [], nk = (pr) => (CHAIN_KINDS.includes(pr.kind) ? `${pr.kind}:${pr.key}` : pr.kind + ":" + pr.name);
-    hits.map((v) => ({ ...v, w: whoHtml(v) }))
-      .sort((a, b) => KIND_ORDER.indexOf(a.pr.kind) - KIND_ORDER.indexOf(b.pr.kind) || nk(a.pr).localeCompare(nk(b.pr)) || a.w.localeCompare(b.w)
-        || a.pr.lower_ft - b.pr.lower_ft)
-      .forEach((v) => {
-        const w = v.w, last = rows[rows.length - 1];
-        if (last && nk(last.pr) === nk(v.pr) && last.w === w && v.pr.lower_ft <= last.hi) {
-          last.hi = Math.max(last.hi, v.pr.upper_ft);
-          if (!last.names.includes(v.pr.name)) last.names.push(v.pr.name);
-          return;
-        }
-        rows.push({ pr: v.pr, own: v.own, w, lo: v.pr.lower_ft, hi: v.pr.upper_ft, names: [v.pr.name] });
-      });
-    // jak przekrój pionowy: od najwyższej przestrzeni do najniższej
-    rows.sort((a, b) => b.hi - a.hi || b.lo - a.lo || KIND_ORDER.indexOf(a.pr.kind) - KIND_ORDER.indexOf(b.pr.kind));
-    const names = (r) => esc(r.names.length > 2 ? `${r.names[0]} +${r.names.length - 1}` : r.names.join(", "));
-    const nm = (r) => (r.pr.kind === "nb" ? `<b>${esc(r.pr.label)}</b>` : `<b>${esc(r.pr.group_label)}</b> <span class="muted">${names(r)}</span>`);
-    return `<div class="atc-tip-h"><b>${lv === null ? "all levels" : fl(lv)}</b> ${plural(rows.length, "airspace", "airspaces")} here</div>
-      <table>${rows.map((r) => `<tr><td><span class="as-k as-${r.pr.kind}">${KIND_TAG[r.pr.kind]}</span></td><td>${nm(r)}</td>
-        <td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>`).join("")}</table>`;
+  const hoverHtml = (x, y, lv) => {
+    const col = (slices?.features || []).filter((f) => {
+      const pr = f.properties;
+      return air[pr.pick] && (!pick[pr.pick] || pick[pr.pick].has(pr.key))
+        && x >= f.bb[0] && x <= f.bb[2] && y >= f.bb[1] && y <= f.bb[3] && inGeom(x, y, f.geometry);
+    });
+    return altScaleHtml(altScale(col.map((f) => ({ lo: f.properties.lower_ft, hi: f.properties.upper_ft, size: area(f.bb),
+      who: whoOf(f.properties, ownerOf(f.properties, net.ctxo)) }))), { lv, alt: altLabel });
   };
   // Dymek etykiety stanowiska: kontroler (znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy, opis) i ATIS
   // lotniska z prefiksu znaku (ESGG_GND → ATIS ESGG), każda linijka ATIS osobno
+  // 0.14.0 (issue #28): także inni zalogowani na tej samej częstotliwości (uczeń i instruktor), którzy do 0.13.6 mieli
+  // osobną plakietkę CTR obok etykiety
   const ctlCard = (c) => {
     const icao = String(c.callsign || "").split("_")[0];
     const ap = atcData.airports.find((a) => a.icao === icao);
     const atis = (ap?.facilities?.ATIS || []).filter((a) => a.callsign !== c.callsign);
+    const same = (net.act?.controllers || []).filter((x) => x.callsign && x.callsign !== c.callsign && x.frequency
+      && x.frequency === c.frequency && !/_ATIS$/.test(x.callsign));
     return atcTooltip(displayName(c.callsign), ap ? ads.find((a) => a.icao === icao)?.city || ap.name : "",
-      controllerRows(c, { info: true }) + atcRows(atis, "ATIS", "A"));
+      controllerRows(c, { info: true }) + same.map((x) => controllerRows(x)).join("") + atcRows(atis, "ATIS", "A"));
   };
   const hoverAt = () => {
     raf = 0;
@@ -825,9 +820,11 @@ function mainMap(ctx) {
     if (!e || !vis.length || e.buttons || e.target.closest?.(".leaflet-marker-icon, .leaflet-tooltip, .leaflet-control, .leaflet-popup")
       || mapEl.querySelector("canvas.leaflet-interactive")) { hideTip(); return; }
     const ll = map.mouseEventToLatLng(e), x = ll.lng, y = ll.lat;
-    const hits = vis.filter((v) => x >= v.f.bb[0] && x <= v.f.bb[2] && y >= v.f.bb[1] && y <= v.f.bb[3] && inGeom(x, y, v.f.geometry));
-    if (!hits.length) { hideTip(); return; }
-    showTip(map.mouseEventToContainerPoint(e), hoverHtml(hits, level()));
+    // dymek tylko nad rysowaną przestrzenią; treść: cała kolumna w tym punkcie
+    const hit = vis.some((v) => x >= v.f.bb[0] && x <= v.f.bb[2] && y >= v.f.bb[1] && y <= v.f.bb[3] && inGeom(x, y, v.f.geometry));
+    const html = hit ? hoverHtml(x, y, level()) : "";
+    if (!html) { hideTip(); return; }
+    showTip(map.mouseEventToContainerPoint(e), html);
   };
   mapEl.addEventListener("mousemove", (e) => { lastEv = e; if (!raf) raf = requestAnimationFrame(hoverAt); });
   mapEl.addEventListener("mouseleave", () => { lastEv = null; hideTip(); });
@@ -963,7 +960,7 @@ function mainMap(ctx) {
     return `${tags} ${where}: choose ${at.length ? (at.length > 1 ? `${at[0]}–${at[at.length - 1]}` : at[0]) + " or " : ""}“all levels”`;
   };
   // opis pod przełącznikami: liczba wycinków, kto jest online (bez opisu kolejności przejmowania i skąd ona jest:
-  // Marek, 0.12.5 i 0.12.6)
+  // Właściciel projektu, 0.12.5 i 0.12.6)
   function renderInfo(lv) {
     const el = $(".sector-info");
     if (sliceErr) { el.innerHTML = `<span class="error">Sectors unavailable: ${esc(sliceErr)}</span>`; return; }
@@ -1010,13 +1007,22 @@ function mainMap(ctx) {
   // podświetlenie obsady FIR-ów (VATSpy) tylko w FIR EPWW; FIR-y sąsiednie jako same kontury (ich sektory: warstwa sąsiadów).
   // Obsada z zestawu aktywnego: stanowisko ukryte w sekcji Pozycje znika też z plakietki CTR, symulowane ACC ją dostaje
   // (przerywana ramka, gdy w FIR-ze są same symulacje).
+  // 0.14.0 (issue #28): kontury i nazwy FIR-ów tu, plakietki CTR FIR-u EPWW osobno (drawCtr, po etykietach obszarów)
   const drawFirLayer = () => {
     layers.firs.clearLayers();
-    const epwwOnline = Object.fromEntries(Object.entries(net.act?.firs || {}).filter(([id]) => id.startsWith("EPWW")));
-    if (net.firs && $(".firs").checked) drawFirs(layers.firs, net.firs, epwwOnline, { panes });
+    if (net.firs && $(".firs").checked) drawFirs(layers.firs, net.firs, {}, { panes });
+  };
+  // Plakietka CTR EPWW tylko dla kontrolera bez etykiety obszaru na mapie (ctrBadges z mapatc.js): do 0.13.6 kontroler
+  // ACC miał etykietę "EPWW S 123.625" i tuż obok plakietkę "CTR EPWW-S" (podwójna tabliczka)
+  const drawCtr = () => {
+    layers.firCtr.clearLayers();
+    if (!net.firs || !$(".firs").checked) return;
+    const on = ctrBadges(net.act?.firs, lblCtl);
+    const feats = net.firs.features.filter((f) => on[f.properties.id]);
+    if (feats.length) drawFirs(layers.firCtr, { features: feats }, on, { panes });
   };
 
-  // --- Pozycje (runda 12, Marek): drzewo FIR → ACC / FIS / lotniska → stanowiska z polem wyboru. Zaznaczone = zestaw
+  // --- Pozycje (runda 12, właściciel projektu): drzewo FIR → ACC / FIS / lotniska → stanowiska z polem wyboru. Zaznaczone = zestaw
   // aktywny: domyślnie zalogowani (zielona nazwa), kliknięcie symuluje logowanie stanowiska offline (SYM, kontur
   // przerywany) albo ukrywa zalogowanego. Z zestawu aktywnego korzystają sektoryzacja (obsada wg kontrolerów online),
   // plakietki lotnisk i plakietka CTR FIR-u. Wybór, rozwinięte gałęzie i wyszukiwanie do końca sesji przeglądarki (sessionStorage).
@@ -1135,8 +1141,12 @@ function mainMap(ctx) {
   // --- vIFF: ruch vs przepustowość sektorów (traffic volumes) na godzinę naprzód.
   // W panelu najpierw scenariusze (aktywne na górze) z ich TV, pod nimi lista wszystkich TV; wykres wybranego TV
   // z listą lotów w lewym dolnym rogu mapy, obrys TV na mapie.
+  // 0.14.0 (issue #28): wykres z GET /api/viff/sectors/<TV> i rysunkami ENTRY / OCC z OTHER › FMP (entrySvg, occSvg);
+  // lista lotów nadal z /api/viff/sectors. viffChart = ostatni wykres (c.id = TV), viffChartErr = błąd bez wykresu,
+  // viffNote = błąd odświeżenia przy ostatnim wykresie; spóźniona odpowiedź dla poprzedniego wyboru nic nie rysuje (chartSeq)
   let viffData = null;
   let viffSel = store.get("map.viff.sel", null);
+  let viffChart = null, viffChartErr = "", viffNote = "", chartSeq = 0;
   let pilots = [], pilotIdx = new Map();
   let chartSel = null;  // lot, do którego tabela wykresu była już przewinięta
   const chart = L.control({ position: "bottomleft" });
@@ -1156,10 +1166,15 @@ function mainMap(ctx) {
   let tmaP = null;
   const tmaLines = () => (tmaP ||= api("/api/nav/airspace?kind=tma").catch(() => { tmaP = null; return null; }));
   // obrys: litera sektora EPWW (EPWW-BH → sektory EPWWB na wszystkich poziomach) albo TMA lotniska (EPWA-TMA)
+  // przegląd 0.14.0 (issue #28): obrys rysuje drawViff i po wczytaniu wykresu loadChart; gdy oba czekają na wycinki
+  // (pierwsze wczytanie), rysuje tylko ostatnie wywołanie (areaSeq), bez podwójnego obrysu
+  let areaSeq = 0;
   const drawTvArea = async (tv) => {
+    const my = ++areaSeq;
     layers.viff.clearLayers();
     if (!tv) return;
     const [secs, tma] = await Promise.all([loadSlices().catch(() => null), tmaLines()]);
+    if (my !== areaSeq) return;
     const feats = [];
     tv.volumes.forEach((v) => {
       const [area, part = ""] = v.split("-");
@@ -1181,11 +1196,15 @@ function mainMap(ctx) {
       <div class="vs-cond">${scnCond(s, { html: true })}</div>
       ${s.tvs.map((t) => listRow(byId[t.id], viffSel, t.id)).join("")}</div>`;
   const renderChart = () => {
-    const tv = (viffData?.sectors || []).find((t) => t.id === viffSel);
-    const show = !!tv && $(".viff").checked;
+    const tv = (viffData?.sectors || []).find((t) => t.id === viffSel) || null;
+    const c = viffChart?.id === viffSel ? viffChart : null;
+    const show = !!viffSel && (!!tv || !!c || !!viffChartErr) && $(".viff").checked;
     const keep = chartEl.querySelector(".vf-tblwrap")?.scrollTop || 0;
+    const top = chartEl.scrollTop;
     chartEl.style.display = show ? "" : "none";
-    chartEl.innerHTML = show ? chartHtml(tv, viffData.now, (cs) => pilotIdx.get(cs), selected) : "";
+    chartEl.innerHTML = show ? chartHtml(tv, c, { pilot: (cs) => pilotIdx.get(cs), sel: selected, svg: { entry: entrySvg, occ: occSvg },
+      err: c ? "" : viffChartErr, note: c ? viffNote : "" }) : "";
+    chartEl.scrollTop = top;
     const w = chartEl.querySelector(".vf-tblwrap");
     if (w) w.scrollTop = keep;
     // nowo wybrany lot spoza widocznej części tabeli: przewiń do jego wiersza
@@ -1193,7 +1212,23 @@ function mainMap(ctx) {
     if (r && (r.offsetTop < w.scrollTop + 20 || r.offsetTop + r.offsetHeight > w.scrollTop + w.clientHeight)) w.scrollTop = r.offsetTop - w.clientHeight / 2;
     if (show) chartSel = selected;
     fitFd();
-    return show ? tv : null;
+    return show ? tv || (c ? { id: c.id, volumes: c.volumes || [] } : null) : null;
+  };
+  // wykres wybranego TV; błąd odświeżenia zostawia ostatni wykres z komunikatem w nagłówku
+  const loadChart = async () => {
+    const my = ++chartSeq, id = viffSel;
+    if (!id || !$(".viff").checked) { viffChart = null; viffChartErr = viffNote = ""; return; }
+    if (viffChart?.id !== id) { viffChart = null; viffChartErr = viffNote = ""; }
+    try {
+      const c = await api(`/api/viff/sectors/${encodeURIComponent(id)}`);
+      if (my !== chartSeq) return;
+      viffChart = c; viffChartErr = viffNote = "";
+    } catch (e) {
+      if (my !== chartSeq) return;
+      if (viffChart?.id === id) viffNote = `Not refreshed: ${e.message}`;
+      else viffChartErr = e.message;
+    }
+    if (viffSel === id) drawTvArea(renderChart());
   };
   const drawViff = () => {
     const list = viffData?.sectors || [], scns = viffData?.scenarios || [];
@@ -1215,11 +1250,14 @@ function mainMap(ctx) {
   const selectTv = (id) => {
     viffSel = id;
     store.set("map.viff.sel", id);
+    // komunikaty dotyczyły poprzedniego wyboru
+    viffChartErr = viffNote = "";
     drawViff();
+    loadChart();
   };
   const loadViff = async () => {
     $(".vf-card").classList.toggle("off", !$(".viff").checked);  // wyłączony vIFF: bez scenariuszy i listy TV
-    if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
+    if (!$(".viff").checked) { chartEl.style.display = "none"; drawTvArea(null); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
     try {
       // 0.13.1 (issue #25): bez zapisanego wyboru żaden TV nie jest wybierany sam, więc okno wykresu zostaje zamknięte;
       // wykres otwiera dopiero wybór TV przez użytkownika (zapisany w map.viff.sel i przywracany przy następnym wejściu)
@@ -1230,6 +1268,7 @@ function mainMap(ctx) {
       $(".viff-info").innerHTML = `<span class="error">${esc(e.message)}</span>`;
     }
     drawViff();
+    loadChart();
   };
   $(".viff").addEventListener("change", loadViff);
   $(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));
@@ -1334,7 +1373,14 @@ function mainMap(ctx) {
   const chartH = () => (chartEl.style.display === "none" ? 0 : chartEl.offsetHeight);
   // na wąskiej mapie panel lotu (prawy górny róg) kończy się nad wykresem TV (lewy dolny róg), żeby się nie nakładały
   const fitFd = () => {
-    const { x: w, y: hgt } = map.getSize(), ch = chartH();
+    const { x: w, y: hgt } = map.getSize();
+    // 0.14.0 (issue #28): wykres TV (dwa wykresy jak w OTHER › FMP i lista lotów) nie wyżej niż mapa bez przycisków
+    // zoomu u góry; reszta przewija się w panelu
+    chartEl.style.maxHeight = Math.max(180, hgt - 110) + "px";
+    // przegląd 0.14.0 (issue #28): na wąskiej mapie (okno telefonu) panel nie szerszy niż mapa (560 px wychodziło
+    // za prawą krawędź i było ucięte); wykresy SVG zwężają się razem z panelem
+    chartEl.style.maxWidth = Math.max(240, w - 20) + "px";
+    const ch = chartH();
     const clash = ch && w < chartEl.offsetWidth + 420 + 40;
     fdEl.style.maxHeight = Math.max(200, hgt - 20 - (clash ? ch + 34 : 0)) + "px";
     relabel();  // wykres TV albo panel lotu pokazany, ukryty albo innej wielkości
@@ -1469,7 +1515,7 @@ function mainMap(ctx) {
     $(".traffic-info").textContent = `${plural(ep.length, "aircraft", "aircraft")} in EP traffic (departures ${n.dep}, arrivals ${n.arr}, `
       + `transits through EPWW ${n.trn}) · ${trafficAt}. Hover an aircraft: label; click: flight details and route.`;
   };
-  // Etykieta samolotu (0.12.6, Marek): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
+  // Etykieta samolotu (0.12.6, właściciel projektu): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
   // w nieprzezroczystym okienku po najechaniu na samolot, u wybranego lotu cały czas. Własna warstwa nad plakietkami
   // lotnisk i etykietami stanowisk (pod kartami lotnisk, atcTip = 700); okienko w granicach mapy i obok nakładek
   // Leafleta (panel lotu, wykres TV, przyciski; acLabelSpot), przy otwarciu, po każdym przerysowaniu ruchu (moveend)
