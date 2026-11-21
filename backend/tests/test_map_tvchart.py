@@ -128,9 +128,12 @@ def js(tmp_path_factory):
         viff._get = get
     d = tmp_path_factory.mktemp("tvchart")
     (d / "api.mjs").write_text((JS / "api.js").read_text("utf-8"), "utf-8")
-    for name in ("viffchart", "fmp"):
+    # 0.14.0: fmp.js importuje też airspace.js (kolory stanowisk; przy wczytaniu rozszerza klasę Leafleta, więc tu
+    # tylko colorFor), dissolve.js i radioboard.js (podglądy konfiguracji)
+    (d / "airspace.mjs").write_text('export const colorFor = () => "#40f5ec";\n', "utf-8")
+    for name in ("viffchart", "fmp", "dissolve", "radioboard"):
         src = (JS / f"{name}.js").read_text("utf-8")
-        (d / f"{name}.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"').replace('"./viffchart.js"', '"./viffchart.mjs"'), "utf-8")
+        (d / f"{name}.mjs").write_text(re.sub(r'"\./([a-z]+)\.js"', r'"./\1.mjs"', src), "utf-8")
     (d / "data.json").write_text(json.dumps({"tv": tv, "c": c}), "utf-8")
     (d / "run.mjs").write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(d / "run.mjs"), (d / "viffchart.mjs").as_uri(), (d / "fmp.mjs").as_uri(), str(d / "data.json")],
