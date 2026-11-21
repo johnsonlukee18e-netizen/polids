@@ -18,8 +18,10 @@ tego cyklu, sprawdzenie ponownie w tle. Pierwsze sprawdzenie startuje razem z se
 katalogu dla cyklu po bieżącym (next_airac, package_url): PAŻP publikuje poprawkę z wyprzedzeniem, ale nie zawsze
 (cykl bez poprawki, jeszcze nieopublikowana). Katalog sprawdzamy tak samo (folder_exists, pamięć na cykl, jedno
 sprawdzenie naraz, /api/config czeka najwyżej CONFIG_WAIT): jest → adres; brak (4xx) → "" (przycisk NEXT AIRAC pokazuje
-wtedy komunikat z numerem cyklu i datą wejścia), ponowne sprawdzenie po TTL_NEXT_MISSING; nie wiadomo (sieć, 5xx,
-ponad CONFIG_WAIT) → wyliczony adres, jak przy bieżącym cyklu, a gdy wcześniejsze sprawdzenie dało wynik, ten wynik.
+wtedy komunikat z numerem cyklu i datą wejścia), ponowne sprawdzenie po TTL_NEXT_MISSING (zapytanie, które je zaczyna,
+czeka na nie najwyżej CONFIG_WAIT, więc poprawka opublikowana w tym czasie jest od razu w odpowiedzi); nie wiadomo
+(sieć, 5xx, ponad CONFIG_WAIT) → wyliczony adres, jak przy bieżącym cyklu, a gdy wcześniejsze sprawdzenie dało wynik,
+ten wynik.
 Bez wstecznego szukania i bez adresu z .env (ten dotyczy bieżącej poprawki)."""
 
 import asyncio
@@ -200,25 +202,32 @@ def warm() -> None:
 async def _cached(airac: dict, links, nxt: bool = False) -> dict[str, str]:
     """Wynik z pamięci albo sprawdzenie u PAŻP (wspólne dla bieżącego i następnego cyklu). Bez wyniku dla tego cyklu
     czeka na sprawdzenie najwyżej CONFIG_WAIT, potem wyliczony adres (sprawdzenie trwa dalej w tle); wynik po terminie
-    ważności: od razu on, a nowe sprawdzenie w tle."""
+    ważności: od razu on, a nowe sprawdzenie w tle.
+    Przegląd 0.14.0: wyjątek to brak poprawki następnego cyklu ("") po terminie. Ponowne sprawdzenie startuje dopiero
+    z zapytaniem, a na spokojnym serwerze to zwykle odświeżenie karty NEXT AIRAC, które bez czekania dostałoby stary
+    komunikat "not published" mimo opublikowanej poprawki. Dlatego czeka jak bez wyniku (najwyżej CONFIG_WAIT), a gdy
+    sprawdzenie nie zdąży, dalej "" (nie wyliczony adres strony, której może nie być)."""
     out: dict[str, str] = {}
     now = time.monotonic()
     waiting: dict[str, asyncio.Task] = {}
+    stale: dict[str, str] = {}   # link -> stary wynik po terminie, gdy na sprawdzenie czekamy mimo niego
     for link in links:
         hit = _resolved.get(_key(link, airac, nxt))
         if hit and hit[0] > now:
             out[link] = hit[1]
             continue
         task = _start(link, airac, nxt)
-        if hit:
+        if hit and not (nxt and hit[1] == ""):
             out[link] = hit[1]
         else:
+            if hit:
+                stale[link] = hit[1]
             waiting[link] = task
     if waiting:
         await asyncio.wait(waiting.values(), timeout=CONFIG_WAIT)   # bez anulowania: zadania kończą się w tle
         for link, task in waiting.items():
             ok = task.done() and not task.cancelled() and task.exception() is None
-            out[link] = task.result() if ok else package_url(link, airac)
+            out[link] = task.result() if ok else stale.get(link, package_url(link, airac))
     return out
 
 

@@ -104,8 +104,9 @@ def test_next_links_cached_for_cycle(pansa):
 
 
 def test_missing_next_checked_again_later(pansa):
-    """Brak katalogu trzymany TTL_NEXT_MISSING (godzina), potem od razu stary wynik i sprawdzenie w tle; gdy PAŻP
-    w tym czasie opublikował poprawkę, następne zapytanie ma adres."""
+    """Brak katalogu trzymany TTL_NEXT_MISSING (godzina), potem ponowne sprawdzenie. Przegląd 0.14.0: zapytanie, które
+    je zaczyna (na spokojnym serwerze zwykle odświeżenie karty NEXT AIRAC), czeka na nie (najwyżej CONFIG_WAIT) zamiast
+    dostać od razu stary brak, więc poprawka opublikowana w tym czasie otwiera się od razu."""
     assert eaip.TTL_NEXT_MISSING == 3600
     assert nxt()["aip_vfr"] == ""
     pansa["on"].add("eaipvfr/AIRAC AMDT VFR 12-26_2026_11_26")
@@ -114,13 +115,37 @@ def test_missing_next_checked_again_later(pansa):
         key = ("aip_vfr" + eaip.NEXT, "2612")
         assert eaip._resolved[key][1] == ""
         eaip._resolved[key] = (time.monotonic() - 1, "")   # termin minął
-        stale = await eaip.next_links(DAY)
-        await asyncio.gather(*list(eaip._inflight.values()))
-        return stale, await eaip.next_links(DAY)
+        first = await eaip.next_links(DAY)
+        return first, await eaip.next_links(DAY)
 
-    stale, fresh = asyncio.run(run())
-    assert stale["aip_vfr"] == "" and strip(fresh) == NEXT_12
+    first, again = asyncio.run(run())
+    assert strip(first) == NEXT_12 and strip(again) == NEXT_12
     assert len(pansa["seen"]) == 4
+
+
+def test_missing_next_recheck_slow_pansa(pansa, monkeypatch):
+    """Przegląd 0.14.0: PAŻP wolniejszy niż CONFIG_WAIT przy ponownym sprawdzeniu braku: odpowiedź po CONFIG_WAIT
+    dalej z "" (komunikat), nie z wyliczonym adresem strony, której może nie być; sprawdzenie kończy się w tle
+    i następne zapytanie ma adres opublikowanej w tym czasie poprawki. Znany adres (IFR) po terminie dalej od razu."""
+    assert nxt()["aip_vfr"] == ""
+    monkeypatch.setattr(eaip, "CONFIG_WAIT", 0.3)
+    pansa["on"].add("eaipvfr/AIRAC AMDT VFR 12-26_2026_11_26")
+    pansa["delay"] = 0.8
+
+    async def run():
+        for link in ("aip_vfr", "aip_ifr"):
+            key = (link + eaip.NEXT, "2612")
+            eaip._resolved[key] = (time.monotonic() - 1, eaip._resolved[key][1])   # termin minął
+        t = time.monotonic()
+        first = await eaip.next_links(DAY)
+        took = time.monotonic() - t
+        await asyncio.gather(*list(eaip._inflight.values()))
+        return took, first, await eaip.next_links(DAY)
+
+    took, first, after = asyncio.run(run())
+    assert 0.3 <= took < 0.6, took
+    assert first["aip_vfr"] == "" and strip(first)["aip_ifr"] == NEXT_12["aip_ifr"]
+    assert strip(after) == NEXT_12
 
 
 @pytest.mark.parametrize("status", ["down", 500, 503, 429])
@@ -155,7 +180,8 @@ def test_unknown_recheck_keeps_last_result(pansa, status):
     pansa["status"] = None
     pansa["on"].add("eaipvfr/AIRAC AMDT VFR 12-26_2026_11_26")
     stale, after = asyncio.run(recheck())
-    assert stale["aip_vfr"] == "" and strip(after) == NEXT_12
+    # zapytanie, które zaczyna ponowne sprawdzenie znanego braku, czeka na nie (test_missing_next_checked_again_later)
+    assert strip(stale) == NEXT_12 and strip(after) == NEXT_12
 
 
 def test_redirect_elsewhere_counts_as_missing(pansa, monkeypatch):
@@ -202,9 +228,10 @@ def test_config_has_next_cycle_and_links(pansa):
 
 def test_config_waits_at_most_config_wait(pansa, monkeypatch):
     """PAŻP wolniejszy niż limit: bieżące i następne sprawdzenia równolegle, /api/config po CONFIG_WAIT (nie 2 x) z
-    wyliczonymi adresami; sprawdzenie kończy się w tle, następne /api/config od razu z wynikiem."""
-    monkeypatch.setattr(eaip, "CONFIG_WAIT", 0.3)
-    pansa["delay"] = 0.8
+    wyliczonymi adresami; sprawdzenie kończy się w tle, następne /api/config od razu z wynikiem. Przegląd 0.14.0: granica
+    poniżej 2 x CONFIG_WAIT (0.8 s z 0.5 s), więc czekanie na bieżący i następny cykl po kolei (1.0 s) nie przechodzi."""
+    monkeypatch.setattr(eaip, "CONFIG_WAIT", 0.5)
+    pansa["delay"] = 1.2
 
     async def run():
         t = time.monotonic()
@@ -216,7 +243,7 @@ def test_config_waits_at_most_config_wait(pansa, monkeypatch):
         return took, first, second, time.monotonic() - t
 
     took, first, second, took2 = asyncio.run(run())
-    assert took < 0.3 + 0.4, took
+    assert 0.5 <= took < 0.8, took
     assert strip({k: first[f"{k}_next"] for k in eaip.PACKAGES}) == NEXT_12
     assert strip({k: second[f"{k}_next"] for k in eaip.PACKAGES}) == {"aip_ifr": NEXT_12["aip_ifr"], "aip_vfr": "",
                                                                       "aip_mil": NEXT_12["aip_mil"]}

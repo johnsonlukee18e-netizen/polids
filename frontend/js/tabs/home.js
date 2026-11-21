@@ -19,9 +19,10 @@ const REFRESH_MS = 60000;
 
 // 0.14.0 (issue #28): krok 2 w adresie (#home/checkin); "" = krok 1
 export const CHECKIN = "checkin";
-// krok wg arg z adresu: undefined = przycisk "?" w menu (krok zostaje, jak stan każdej zakładki), "checkin" = krok 2,
-// każdy inny adres (#home, stary albo nieznany #home/x) = krok 1
-export const stepOf = (arg, cur = "") => (arg === undefined ? cur : String(arg).toLowerCase() === CHECKIN ? CHECKIN : "");
+// krok tylko wg adresu: "checkin" (dowolna wielkość liter) = krok 2, wszystko inne = krok 1: #home, stary albo nieznany
+// #home/x, a także undefined, czyli przycisk "?" w menu, logo (href="#home") i nieznany adres (#foo). Przegląd 0.14.0:
+// "?" zawsze otwiera najpierw powitanie i wybór pozycji (issue #28), nie ostatni krok jak stan innych zakładek
+export const stepOf = (arg) => (String(arg ?? "").toLowerCase() === CHECKIN ? CHECKIN : "");
 
 export function greeting(me) {
   const u = me?.user;
@@ -335,11 +336,11 @@ export default {
       if (step === CHECKIN && !ov) openCheckin();
     });
     return {
-      // arg: undefined = przycisk "?" w menu (krok zostaje), "" = krok 1, "checkin" = krok 2 (stepOf); start aplikacji
-      // to zawsze krok 1 (pierwsze open("home") bez arg na świeżo zamontowanej zakładce).
+      // arg: "checkin" = krok 2, wszystko inne = krok 1 (stepOf), także undefined: start aplikacji, przycisk "?" w menu
+      // i logo zawsze otwierają krok 1; check-in zostaje zamontowany, więc SELF CHECK-IN wraca do niego z filtrem.
       // Każde pokazanie HOME: stanowisko zmienione w międzyczasie w check-inie i świeży stan VATSIM (najwyżej co 30 s)
       activate(arg) {
-        showStep(stepOf(arg, step));
+        showStep(stepOf(arg));
         remember("home", step);
         ready = ready.then(() => {
           if (!listLoaded) return loadAll();

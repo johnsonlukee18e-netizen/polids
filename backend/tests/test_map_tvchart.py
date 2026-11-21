@@ -211,3 +211,7 @@ def test_map_chart_wiring():
     css = (JS.parent / "css" / "viff.css").read_text("utf-8")
     assert ".leaflet-control.viff-chart { width: 560px; margin-bottom: 24px; padding: 0; overflow: auto;" in css
     assert ".vf-svg" not in css and ".vf-legend" not in css
+    # przegląd 0.14.0: także bez ogólnych kopii tych reguł w style.css (wykres to fmc-* z fmp.js); pasek listy TV zostaje
+    style = (JS.parent / "css" / "style.css").read_text("utf-8")
+    assert ".vf-svg" not in style and ".vf-legend" not in style
+    assert ".vf-bar i.ok { background: #3fb950; }" in style and ".vf-bar i.nolim { background: #56606a; }" in style

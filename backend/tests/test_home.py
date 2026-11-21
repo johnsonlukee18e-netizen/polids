@@ -317,7 +317,8 @@ console.log(JSON.stringify({
     { list, stored: "EPWA_APP", online: [on("EPWA_TWR", { frequency: "118.000" })] },
   ].map(home.initialPosition),
   target: [null, list[0], list[2]].map(home.sessionTarget),
-  // 0.14.0 (issue #28): krok HOME wg adresu (undefined = przycisk "?" w menu: krok bez zmian)
+  // 0.14.0 (issue #28): krok HOME tylko wg adresu (undefined = przycisk "?" w menu, logo, nieznany adres: krok 1);
+  // drugi element (krok na ekranie) nie może niczego zmienić
   steps: [[undefined, ""], [undefined, "checkin"], ["", "checkin"], ["checkin", ""], ["CHECKIN", ""], ["x", "checkin"],
           ["0", ""], [null, "checkin"]].map(([a, cur]) => home.stepOf(a, cur)),
   checkinKey: home.CHECKIN,
@@ -417,9 +418,11 @@ def test_session_target(js):
 
 
 def test_home_steps(js):
-    """Krok HOME z adresu: #home/checkin = krok 2, każdy inny adres krok 1, przycisk "?" w menu (bez arg) zostawia krok."""
+    """Krok HOME tylko z adresu: #home/checkin (dowolna wielkość liter) = krok 2, każdy inny adres krok 1. Przegląd
+    0.14.0: także bez arg, czyli przycisk "?" w menu, logo (href="#home") i nieznany adres (#foo) – zawsze najpierw
+    powitanie i wybór pozycji, niezależnie od kroku na ekranie."""
     assert js["checkinKey"] == "checkin"
-    assert js["steps"] == ["", "checkin", "", "checkin", "checkin", "", "", ""]
+    assert js["steps"] == ["", "", "", "checkin", "checkin", "", "", ""]
 
 
 def test_retry_import(js):
@@ -439,7 +442,7 @@ def test_home_two_steps_in_one_tab():
     assert 'const ovImport = retryImport((n) => import(n ? `../overview.js?retry=${n}` : "../overview.js"));' in home
     assert "ovImport().catch(() => {});" in home and "ovLoading = ovImport().then(({ mountOverview }) => {" in home
     assert 'onGoto: (code) => navigate("aerodrome", code),' in home and 'onBack: () => navigate("home", ""),' in home
-    assert "showStep(stepOf(arg, step));\n        remember(\"home\", step);" in home
+    assert "showStep(stepOf(arg));\n        remember(\"home\", step);" in home
     assert 'pane.classList.toggle("ci-mode", ci);' in home
     # odświeżanie VATSIM co minutę tylko w kroku 1; check-in po powrocie serwera, gdy się nie wczytał
     assert 'if (user && step === "" && root.classList.contains("active") && !document.hidden)' in home
