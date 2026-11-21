@@ -1,8 +1,9 @@
-// AERODROME: listy lotnisk FIR-ów (podzakładki EPWW … UKLV) i karta lotniska zagranicznego.
+// AERODROME: listy lotnisk FIR-ów (podzakładki EPWW … UKLV), wyszukiwarka wszystkich lotnisk (podzakładka "()")
+// i karta lotniska zagranicznego.
 // Lista jak w PANDORZE: u góry wyszukiwarka z klawiatury z przyciskami WYŚWIETL i WYCZYŚĆ, niżej wiersze
 // "ICAO NAZWA" w jednej kolumnie, w pasach, przewijane w swoim okienku. Backend: GET /api/aerodromes/fir/{klucz}
 // (services/aerolist.py) i GET /api/aerodromes/{icao}/card (METAR, TAF, stanowiska ze stanem VATSIM).
-import { api, atisHtml, debounce, esc, hhmm, textWidth, vatsimAtc } from "./api.js";
+import { api, atisHtml, debounce, esc, hhmm, ONLINE_EVENT, textWidth, touchKeyboard, vatsimAtc } from "./api.js";
 import { colorize, wxLines } from "./tabs/meteo.js";
 
 export const FIR_KEYS = ["EPWW", "ESAA", "ED", "ET", "LKAA", "LZBB", "UMKK", "EYVL", "UMMV", "UKLV"];
@@ -76,7 +77,8 @@ export function firOf(icao) {
   return null;
 }
 
-// Adres zakładki (#aerodrome/arg): "0" = OVERVIEW (dawne "OVERVIEW" też), "fir/ED" = lista lotnisk FIR-u,
+// Adres zakładki (#aerodrome/arg): "0" = "()", od 0.14.0 (issue #28) wyszukiwarka wszystkich lotnisk (do 0.13.6
+// OVERVIEW, które przeszło do HOME jako SELF CHECK-IN; dawne "OVERVIEW" też daje "0"), "fir/ED" = lista lotnisk FIR-u,
 // "EPWA" / "EDDB" = lotnisko (PRZEGLĄD albo karta), "EPWA/awos", "EPWA/ruch" = widok lotniska z bazy.
 // Zwraca postać kanoniczną albo null (nie rozpoznano).
 export function aeroArg(arg) {
@@ -302,6 +304,210 @@ Enter = SHOW (exact ICAO, otherwise the highlighted match: the main aerodrome of
       ro.disconnect();
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", atcDue);
+    },
+  };
+}
+
+// --- 0.14.0 (issue #28): "()" – wyszukiwarka wszystkich lotnisk -------------------------------------------------
+// "zostaw () jako stronę do wyszukiwania lotniska, wraz z klawiaturą": jedno pole dla wszystkich lotnisk, które zna
+// aplikacja (polskie z bazy, /api/aerodromes, i listy FIR-ów z podzakładek EPWW … UKLV), po kodzie ICAO albo nazwie,
+// wyniki listą jak lista FIR-u; kliknięcie (albo Enter przy jednym trafieniu) otwiera lotnisko jak kliknięcie na liście
+// FIR-u. Pod listą klawiatura dotykowa (touchKeyboard z api.js, jak w CALLSIGN i AIRCRAFT), tutaj domyślnie otwarta.
+
+// Lotniska do wyszukiwania (czysta funkcja, testy w Node): db = /api/aerodromes [{icao, name, city, kind}], lists =
+// {klucz FIR-u: /api/aerodromes/fir/{klucz}}. Każde ICAO raz, w kolejności podzakładek (EPWW pierwsze, więc przy równym
+// dopasowaniu polskie przed zagranicznymi), z listy FIR-u (nazwa, MIL, rank, inne nazwy) uzupełnionej nazwą i miastem
+// z bazy; lotnisko z bazy, którego nie ma na żadnej liście, zaraz po liście EPWW. it.i = kolejność do remisów.
+export function aeroIndex(db = [], lists = {}) {
+  const out = [], seen = new Set();
+  lists ||= {};
+  const base = new Map((Array.isArray(db) ? db : []).filter((a) => a?.icao).map((a) => [a.icao, a]));
+  const add = (icao, name, kind, rank, fir, alias) => {
+    if (!icao || seen.has(icao)) return;
+    seen.add(icao);
+    out.push({ i: out.length, icao, name: name || "", kind: kind || null, rank, fir, keys: searchKeys(name, alias) });
+  };
+  // FIR_KEYS zaczyna się od EPWW
+  for (const k of FIR_KEYS) {
+    for (const a of Array.isArray(lists[k]) ? lists[k] : []) {
+      if (!a?.icao) continue;
+      const d = base.get(a.icao);
+      add(a.icao, a.name || d?.name, a.kind, a.rank ?? 2, k, [...(a.alias || []), d?.name, d?.city].filter(Boolean));
+    }
+    if (k !== "EPWW") continue;
+    for (const d of base.values()) {
+      add(d.icao, d.name, /^mil/i.test(d.kind || "") ? "MIL" : null, 1, firOf(d.icao) || "EPWW", [d.city].filter(Boolean));
+    }
+  }
+  return out;
+}
+
+// Wszystkie lotniska pasujące do wpisanego tekstu, od najlepszego (kolejność jak bestMatch: ICAO dokładny, ICAO od
+// początku, nazwa od początku, słowo w nazwie, dowolne miejsce; w grupach nazw ważniejsze lotnisko, potem kolejność
+// podzakładek). Pusty tekst: nic.
+export function findAeros(items, query) {
+  const forms = queryForms(query);
+  if (!forms.length) return [];
+  const cmp = (a, b) => { for (let j = 0; j < a.length; j++) if (a[j] !== b[j]) return a[j] - b[j]; return 0; };
+  return items.map((it, n) => {
+    const t = matchTier(it, forms);
+    const g = Math.floor(t);
+    return { it, t, k: [g, g >= 2 ? it.rank ?? 2 : 0, t, it.i ?? n] };
+  }).filter((x) => x.t !== Infinity).sort((a, b) => cmp(a.k, b.k)).map((x) => x.it);
+}
+
+// Enter (albo SHOW): wybrany strzałkami wiersz; ICAO wpisany dokładnie; jedyne trafienie; bez trafień kod w postaci ICAO
+// (karta powie, jeśli takiego lotniska nie ma). Kilka trafień bez wyboru: null (strona zaznacza wtedy pierwsze).
+export function enterTarget(found, query, sel = null) {
+  if (sel && found.some((it) => it.icao === sel)) return sel;
+  const q = fold(query).replace(/\s+/g, "");
+  if (found.some((it) => it.icao === q)) return q;
+  if (found.length === 1) return found[0].icao;
+  return !found.length && isIcao(q) ? q : null;
+}
+
+// ile wierszy wyników naraz (dalej "N of M": trzeba wpisać więcej)
+export const FIND_LIMIT = 100;
+// wybór klawiatury tej strony (osobno od AIRCRAFT i CALLSIGN): "1" otwarta, "0" zamknięta, nic = otwarta
+export const FIND_KBD_KEY = "aerodrome.keyboard";
+
+// Strona "()". state: {q, sel, scroll} (zapamiętane w aerodrome.js, ← wraca z tym samym tekstem); onOpen(icao) otwiera
+// lotnisko (krok w historii), onChange(state) po zmianie tekstu albo wyboru. Zwraca {focus(), save(), destroy()}.
+export function mountAeroSearch(el, state, { onOpen, onChange }) {
+  el.innerHTML = `<div class="alist aero-find">
+    <div class="alist-bar">
+      <input class="alist-q" type="text" autocomplete="off" spellcheck="false" maxlength="40"
+        placeholder="ICAO or aerodrome name" aria-label="Search all aerodromes" value="${esc(state.q || "")}">
+      <button class="alist-btn alist-go" type="button">SHOW</button>
+      <button class="alist-btn alist-clear" type="button">CLEAR</button>
+      <button class="alist-btn aero-find-kbd" type="button" title="Show or hide the touch keyboard">KEYBOARD</button>
+      <span class="alist-title">All aerodromes</span>
+      <span class="alist-n hint"></span>
+      <span style="flex:1"></span>
+      <span class="alist-legend hint" title="Poland and the neighbouring FIRs, by ICAO code or name.
+Enter = SHOW (the selected aerodrome, the exact ICAO code or the only match; with more matches the first is selected), \u2191 \u2193 = select, Esc = CLEAR.">\u2191\u2193 Enter Esc</span>
+    </div>
+    <div class="alist-box"><div class="alist-msg hint">Loading the aerodrome lists\u2026</div><div class="alist-rows"></div></div>
+  </div>`;
+  const $ = (s) => el.querySelector(s);
+  const input = $(".alist-q"), box = $(".alist-box"), rows = $(".alist-rows"), msg = $(".alist-msg");
+  const kbd = touchKeyboard(input, $(".aero-find-kbd"), { key: FIND_KBD_KEY, open: true });
+  $(".aero-find").append(kbd.el);
+  // items: wszystkie lotniska (aeroIndex); found: pasujące do tekstu; shown: wiersze na ekranie (najwyżej FIND_LIMIT);
+  // sel: ICAO wybranego wiersza; failed: listy FIR-ów, które się nie wczytały, partial: nie wczytało się coś (także baza
+  // lotnisk polskich), więc po powrocie serwera ponowna próba
+  let items = [], found = [], shown = [], sel = state.sel || null, loaded = false, failed = [], partial = false, destroyed = false;
+
+  const row = (icao) => rows.querySelector(`.alist-row[data-icao="${CSS.escape(icao)}"]`);
+  const select = (icao, reveal = true) => {
+    rows.querySelector(".alist-row.sel")?.classList.remove("sel");
+    sel = icao || null;
+    const r = sel && row(sel);
+    if (!r) return;
+    r.classList.add("sel");
+    if (!reveal || !box.clientHeight) return;
+    const top = r.offsetTop, hh = r.offsetHeight;
+    if (top - hh < box.scrollTop) box.scrollTop = top - hh;
+    else if (top + 2 * hh > box.scrollTop + box.clientHeight) box.scrollTop = top + 2 * hh - box.clientHeight;
+  };
+
+  const render = () => {
+    if (!loaded) return;
+    const q = input.value.trim();
+    found = findAeros(items, q);
+    shown = found.slice(0, FIND_LIMIT);
+    rows.innerHTML = shown.map((a, n) => `<div class="alist-row${n % 2 ? " odd" : ""}" data-icao="${esc(a.icao)}" title="${esc(a.icao)} ${esc(a.name)}${a.kind ? " \u00b7 " + esc(a.kind) : ""} \u00b7 ${esc(FIR_LABELS[a.fir] || a.fir)}">
+      <b>${esc(a.icao)}</b><span class="alist-nm">${esc(a.name || "\u2013")}</span>${a.kind ? `<i class="alist-kind">${esc(a.kind)}</i>` : ""}<span class="aero-find-fir">${esc(a.fir)}</span></div>`).join("");
+    const nm = rows.querySelector(".alist-nm");
+    if (nm) rows.style.setProperty("--nmw", `${Math.max(textWidth(["00000000"], nm), textWidth(shown.map((a) => a.name || "\u2013"), nm)) + 2}px`);
+    const part = failed.length ? ` Not loaded now: ${failed.join(", ")}.` : "";
+    $(".alist-n").textContent = !q ? `${items.length} ${adWord(items.length)}`
+      : found.length > shown.length ? `${shown.length} of ${found.length}` : `${found.length} found`;
+    msg.hidden = Boolean(q && found.length && !part);
+    const ic = fold(q).replace(/\s+/g, "");
+    msg.innerHTML = !q ? `Type an ICAO code or a name: aerodromes of Poland and the neighbouring FIRs.${esc(part)}`
+      : !found.length ? `No aerodrome matching \u201c${esc(q)}\u201d.${isIcao(ic) ? ` Enter or SHOW opens <b>${esc(ic)}</b>.` : ""}${esc(part)}`
+        : esc(part.trim());
+    if (sel && !shown.some((a) => a.icao === sel)) sel = null;
+    select(sel, false);
+  };
+
+  const open = () => {
+    const t = enterTarget(found, input.value, sel);
+    if (t) { onOpen(t); return; }
+    // kilka trafień: pierwsze zaznaczone, następny Enter je otwiera
+    if (shown.length) { select(shown[0].icao); changed(); }
+    input.focus();
+  };
+  const clear = () => {
+    input.value = "";
+    sel = null;
+    render();
+    box.scrollTop = 0;
+    input.focus();
+    changed();
+  };
+  const save = () => ({ q: input.value, sel, scroll: box.scrollTop });
+  const changed = debounce(() => { if (!destroyed) onChange?.(save()); }, 400);
+
+  input.addEventListener("input", () => { sel = null; render(); box.scrollTop = 0; changed(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); open(); return; }
+    if (e.key === "Escape") { e.preventDefault(); clear(); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const j = stepSel(shown.findIndex((a) => a.icao === sel), shown.length, e.key === "ArrowDown" ? 1 : -1);
+    if (j < 0) return;
+    select(shown[j].icao);
+    changed();
+  });
+  $(".alist-go").addEventListener("click", open);
+  $(".alist-clear").addEventListener("click", clear);
+  rows.addEventListener("click", (e) => {
+    const icao = e.target.closest(".alist-row")?.dataset.icao;
+    if (icao) { select(icao, false); onOpen(icao); }
+  });
+  // pisanie poza polem (po kliknięciu w listę albo w tytuł) trafia do wyszukiwarki, jak na liście FIR-u
+  const onKey = (e) => {
+    if (destroyed || !el.isConnected || !input.offsetParent || e.target === input) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, button, [contenteditable]")) return;
+    input.focus();
+  };
+  document.addEventListener("keydown", onKey);
+
+  // polskie lotniska z bazy i wszystkie listy FIR-ów (listy raz na sesję, ten sam cache co podzakładki); lista, która
+  // się nie wczytała, nie blokuje pozostałych
+  const load = () => Promise.allSettled([api("/api/aerodromes"), ...FIR_KEYS.map((k) => firList(k))]).then(([db, ...ls]) => {
+    if (destroyed) return;
+    const lists = {};
+    failed = [];
+    FIR_KEYS.forEach((k, n) => { if (ls[n].status === "fulfilled") lists[k] = ls[n].value; else failed.push(k); });
+    partial = failed.length > 0 || db.status !== "fulfilled";
+    items = aeroIndex(db.status === "fulfilled" ? db.value : [], lists);
+    if (!items.length) {
+      const err = [db, ...ls].find((r) => r.status === "rejected");
+      msg.hidden = false;
+      msg.innerHTML = `<span class="error">${esc(err?.reason?.message || "No aerodromes")}</span>`;
+      return;
+    }
+    loaded = true;
+    const back = state.scroll;
+    render();
+    if (back && box.clientHeight) box.scrollTop = back;
+    else if (sel) select(sel);
+  });
+  const online = () => { if (!destroyed && (!loaded || partial)) load(); };
+  window.addEventListener(ONLINE_EVENT, online);
+  load();
+
+  return {
+    focus: () => { kbd.sync(); input.focus(); input.select(); },
+    save,
+    destroy: () => {
+      destroyed = true;
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener(ONLINE_EVENT, online);
     },
   };
 }

@@ -1,8 +1,8 @@
-/* AERODROME › OVERVIEW: cały FIR EPWW na jednym ekranie (1600x900, użyteczne na 1366x768).
-   Styl jak reszta treści – panele NM UI z paskiem tytułu, gęste tabele, płaskie przyciski, bez poświaty.
-   Każdy panel przewija się w sobie; strona nie przewija się w ogóle. */
+/* HOME › SELF CHECK-IN (0.14.0, issue #28: dawne AERODROME › OVERVIEW, krok 2 HOME): cały FIR EPWW na jednym ekranie
+   (1600x900, użyteczne na 1366x768). Styl jak reszta treści – panele NM UI z paskiem tytułu, gęste tabele, płaskie
+   przyciski, bez poświaty. Każdy panel przewija się w sobie; strona nie przewija się w ogóle. Panel HOME w tym kroku:
+   home.css (.home-pane.ci-mode). */
 
-.aero-pane.ov-mode > .toolbar .aero-view { display: none; }   /* INFO/AWOS/TRAFFIC dotyczą jednego lotniska */
 .ov { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* pasek zawsze w jednej linii (inaczej "N hidden" przy MINE przesuwał całą siatkę przy 1366 px): skraca się opis
    stanowiska (wielokropek), reszta ma stałą szerokość */
@@ -23,6 +23,9 @@
 .ov-bar .ov-pos-note { flex: 0 1 auto; min-width: 0; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-bar .ov-net { flex: 0 1 auto; min-width: 0; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-bar .ov-upd { white-space: nowrap; }
+/* 0.14.0 (issue #28): powrót do kroku 1 HOME (wybór stanowiska), zielony przycisk PANDORY w wysokości pola */
+.ov-bar .gbtn.ov-back { width: auto; margin: 0; padding: 3px 12px; font-size: 12px; line-height: 18px; }
+.ov-bar .gbtn.ov-back:hover { background: linear-gradient(#52bd3c, #36992a); }
 
 .ov-grid { flex: 1; min-height: 0; display: grid; gap: 8px;
   grid-template-columns: 272px minmax(400px, 1.4fr) minmax(300px, 1fr); }
@@ -50,6 +53,8 @@
 .ov-note.warn { color: #e8e2c8; border-left-color: var(--warn); }
 .ov-err { margin-bottom: 4px; font-size: 12px; }
 .ov .ov-src { margin-top: 6px; padding-top: 4px; border-top: 1px solid #161b16; font-size: 11px; line-height: 1.35; }
+/* zawartość tabel wyśrodkowana, jak w AERODROME (do 0.13.6 dawała to reguła .aero-pane w style.css) */
+.ov table.data th, .ov table.data td { text-align: center; }
 .ov table.data.ov-tab { font-size: 12px; }
 .ov table.data.ov-tab th, .ov table.data.ov-tab td { padding: 2px 6px; }
 .ov table.data.ov-tab td.num { font-size: 12px; }
@@ -136,9 +141,8 @@
 .ov-chk-body .chk-section { margin: 5px 0 2px; }
 .ov-chk-body .chk-note { width: 96px; }
 
-/* niskie albo wąskie okno (1366x768 i mniej): panele w naturalnej wysokości, ekran przewija się jak w PRZEGLĄDZIE */
+/* niskie albo wąskie okno (1366x768 i mniej): panele w naturalnej wysokości, przewija się cały panel HOME (home.css) */
 @media (max-width: 1240px), (max-height: 640px) {
-  .aero-pane.ov-mode { overflow: auto; }
   .ov-grid { grid-template-columns: 272px minmax(0, 1.4fr); }
   .ov-col > .card.grow, .ov-col > .card.part { flex: none; max-height: none; }
   .ov-col .scroll { max-height: 300px; }

@@ -196,7 +196,8 @@ out.empty = tb.takeReload(s);
 tb.markReload("#meteo", broken);
 tb.markReload("#meteo", null);
 out.broken = [tb.takeReload(broken), tb.takeReload(null)];
-out.target = ["#aerodrome/EPWA/dman", "#home", "#home/x", "", null, "#", "#meteo", "#other/checklist/a"].map(tb.reloadTarget);
+out.target = ["#aerodrome/EPWA/dman", "#home", "#home/x", "", null, "#", "#meteo", "#other/checklist/a", "#home/checkin",
+  "#home/CHECKIN"].map(tb.reloadTarget);
 // pasek z atrapą DOM: zapisana jasność 1, kliknięcia, granice zakresu, Reload
 store.set(tb.BRIGHT_KEY, "1");
 const mk = (act) => ({ dataset: { act }, disabled: null, title: "", closest() { return this; } });
@@ -286,8 +287,10 @@ def test_reload_marker(js):
     assert js["take"] == ["#aerodrome/EPWA/dman", None]
     assert js["empty"] == "#home"
     assert js["broken"] == [None, None]
+    # 0.14.0 (issue #28): krok 2 HOME (SELF CHECK-IN) wraca po Reload jak każdy inny ekran, inny #home/x to krok 1
     assert js["target"] == [{"tab": "aerodrome", "arg": "EPWA/dman"}, None, None, None, None, None,
-                            {"tab": "meteo", "arg": ""}, {"tab": "other", "arg": "checklist/a"}]
+                            {"tab": "meteo", "arg": ""}, {"tab": "other", "arg": "checklist/a"},
+                            {"tab": "home", "arg": "checkin"}, {"tab": "home", "arg": "checkin"}]
 
 
 def test_topbar_buttons_clamp_and_storage(js):

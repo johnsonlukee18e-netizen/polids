@@ -1,11 +1,10 @@
 import { api, atisHtml, esc, fmt, h, hhmm, lvpState, lvpTip, positionTip, remember, stash, stashed, textWidth, vatsimBookings, vatsimOnline, lsGet, lsSet, ONLINE_EVENT } from "../api.js";
 import { colorize, wxLines } from "./meteo.js";
 import { windVec, hwTxt, xwTxt, kt, validTxt, pointTip } from "../wind.js";
-import { FIR_KEYS, FIR_LABELS, aeroArg, firOf, mountAeroCard, mountFirList, obsInfo, splitArg } from "../aerolist.js";
+import { FIR_KEYS, FIR_LABELS, aeroArg, firOf, mountAeroCard, mountAeroSearch, mountFirList, obsInfo, splitArg } from "../aerolist.js";
 import { mountAwos } from "../awos.js";
 import { notamState } from "../notamstate.js";
 import { mountDman } from "../dman.js";
-import { mountOverview } from "../overview.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 const byType = (a, b) => TYPE_ORDER.indexOf(a.callsign.split("_").pop()) - TYPE_ORDER.indexOf(b.callsign.split("_").pop()) || a.callsign.localeCompare(b.callsign);
@@ -22,16 +21,16 @@ function lvpBox(lvp) {
 }
 
 // Częstotliwości z AIP (data/seed/frequencies.csv) bez stanowiska w pliku .ese (wszystkie, gdy .ese nie zna stanowisk
-// lotniska, np. EPLK; EPRA: MIL GND 119.155, APP 128.680): służba, znak, MHz, uwaga, godziny. Uwaga i godziny częstotliwości
-// stanowiska z .ese (np. EPRA 118.430: TWR cywilna i wojskowa) są w dymku jego wiersza (renderFreqs). Bez źródła danych.
+// lotniska, np. EPLK; EPRA: MIL GND 119.155, APP 128.680): służba, znak, MHz, uwaga. Uwaga częstotliwości stanowiska
+// z .ese (np. EPRA 118.430: TWR cywilna i wojskowa) jest w dymku jego wiersza (renderFreqs). Bez źródła danych.
+// 0.14.0 (issue #28): "usuń informacje o godzinach otwarcia pozycji, bo to godziny z reala, a nie na VATSIM": bez godzin
+// pracy z AIP (dawne .hrs, objaśnienie "hours UTC winter (summer in brackets)" i "hours: …" w dymku); pole hours
+// zostaje w bazie i w API (/api/aerodromes/{icao}), tylko go nie pokazujemy.
 function aipFreqs(list) {
   if (!list?.length) return "";
-  // objaśnienie godzin tylko przy godzinach z czasem (samo H24, NOTAM, PPR albo brak godzin: bez niego)
-  const hrs = list.some((x) => /\d{4}/.test(x.hours || "")) ? "hours UTC winter (summer in brackets)" : "";
-  return list.map((x) => `<div class="radio-row aip-freq" data-tip="${esc([x.description, x.note, x.hours && `hours: ${x.hours}`].filter(Boolean).join("\n"))}">
+  return list.map((x) => `<div class="radio-row aip-freq" data-tip="${esc([x.description, x.note].filter(Boolean).join("\n"))}">
       <span class="freq">${esc(x.mhz)}</span><span class="pos-txt"><span class="cs">${esc(x.kind)}</span><span class="nm">${esc(x.description || "")}</span>
-      ${x.note ? `<span class="fq-note">${esc(x.note)}</span>` : ""}${x.hours ? `<span class="hrs">${esc(x.hours)}</span>` : ""}</span></div>`).join("")
-    + (hrs ? `<p class="hint">${hrs}</p>` : "");
+      ${x.note ? `<span class="fq-note">${esc(x.note)}</span>` : ""}</span></div>`).join("");
 }
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
@@ -254,12 +253,14 @@ function value(label, v, extra = "") {
 
 export default {
   mount(root, ctx) {
-    // Podmenu jak w PANDORZE: () = OVERVIEW całego FIR EPWW (overview.js), dalej listy lotnisk FIR-ów (aerolist.js):
-    // lotnisko polskie z bazy otwiera INFO / AWOS / TRAFFIC (dawniej PRZEGLĄD / AWOS / RUCH), pozostałe kartę z METAR,
-    // TAF i stanowiskami.
+    // Podmenu jak w PANDORZE: () = wyszukiwarka wszystkich lotnisk z klawiaturą dotykową (aerolist.js), dalej listy
+    // lotnisk FIR-ów (aerolist.js): lotnisko polskie z bazy otwiera INFO / AWOS / TRAFFIC (dawniej PRZEGLĄD / AWOS / RUCH),
+    // pozostałe kartę z METAR, TAF i stanowiskami.
     // 0.13.2 (issue #27): przycisk OVERVIEW ma napis "()" zamiast "0"; identyfikator zostaje "0" (data-fir, adres
     // #aerodrome/0, zapisany ostatni ekran aerodrome.last), więc stare odnośniki i ustawienia działają dalej.
-    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="OVERVIEW: whole FIR EPWW">()</button>
+    // 0.14.0 (issue #28): OVERVIEW przeszło do HOME (krok 2, SELF CHECK-IN, #home/checkin); "zostaw () jako stronę do
+    // wyszukiwania lotniska, wraz z klawiaturą": "()" (dalej "0" w adresie i w zapisanym ekranie) to wyszukiwarka.
+    const sub = h(`<nav class="submenu aero-firs"><button data-fir="0" title="Search all aerodromes">()</button>
       ${FIR_KEYS.map((k) => `<button data-fir="${k}" title="${esc(FIR_LABELS[k])}">${k}</button>`).join("")}</nav>`);
     root.append(sub);
     const pane = h(`<div class="pane aero-pane">
@@ -276,16 +277,18 @@ export default {
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
     // lotnisko pełnej strony; ustawienie serwera default_aerodrome tylko wypełnia nim pole ICAO, zanim użytkownik coś
-    // wybierze (pierwsze otwarcie AERODROME to zawsze () = OVERVIEW, potem ostatni ekran: initial() niżej)
+    // wybierze (pierwsze otwarcie AERODROME to zawsze () = wyszukiwarka, potem ostatni ekran: initial() niżej)
     let icao = lsGet("aerodrome.icao") || ctx.config.default_aerodrome || "EPWA";
     let timer = null;
     // widok: PRZEGLĄD (siatka poniżej), AWOS (awos.js) albo RUCH (paski EFES, dman.js); w adresie: #aerodrome/EPWA,
     // #aerodrome/EPWA/awos, #aerodrome/EPWA/ruch (krok do cofnięcia). AWOS i RUCH mają własne zegary sprzątane
     // przy zmianie widoku.
     let view = "overview", awos = null, strips = null;
-    // tryb ekranu: "ov" (() = OVERVIEW, w adresie "0"), "list" (lista FIR-u), "page" (lotnisko z bazy:
-    // PRZEGLĄD/AWOS/RUCH), "card" (karta)
-    let mode = null, state = null, ov = null, list = null, listKey = null, card = null, cardIcao = null;
+    // tryb ekranu: "find" (() = wyszukiwarka wszystkich lotnisk, w adresie "0"; 0.14.0, do 0.13.6 "ov" = OVERVIEW),
+    // "list" (lista FIR-u), "page" (lotnisko z bazy: PRZEGLĄD/AWOS/RUCH), "card" (karta)
+    let mode = null, state = null, find = null, list = null, listKey = null, card = null, cardIcao = null;
+    // tekst, wybór i przewinięcie wyszukiwarki "()" (powrót bez wpisu historii, np. przyciskiem "()")
+    let findState = {};
     // filtr, wybrany wiersz i przewinięcie listy: każdy wpis historii z listą ma swoje (stash w api.js, ← i Wstecz wracają
     // do listy z jej filtrem, także gdy tę samą listę otwarto później z innym); listState: ostatni stan każdej listy
     // (powrót bez wpisu historii, np. odnośnik do listy z karty)
@@ -343,7 +346,7 @@ export default {
         const ps = info.atc_positions.filter((p) => !(/information/i.test(p.name) && /_(APP|CTR)$/.test(p.callsign))).sort(byType);
         const extra = Object.keys(bookings).filter((cs) => cs.startsWith(icao + "_") && !ps.some((p) => p.callsign === cs));
         // nazwa stacji najwyżej tak szeroka jak najdłuższa w panelu: imiona i godziny rezerwacji w jednej kolumnie tuż za nią
-        // AIP do stanowisk z .ese po MHz (kanał 8,33 kHz: 122.755 w AIP = 122.750 w .ese): uwaga i godziny w dymku,
+        // AIP do stanowisk z .ese po MHz (kanał 8,33 kHz: 122.755 w AIP = 122.750 w .ese): uwaga w dymku (0.14.0: bez godzin),
         // częstotliwości AIP bez stanowiska w .ese (np. EPRA MIL GND 119.155, APP 128.680) pod listą
         const near = (a, b) => Math.abs(+a - +b) < 0.006;
         const aipOf = (p) => info.frequencies.filter((x) => near(x.mhz, p.frequency));
@@ -352,7 +355,7 @@ export default {
         el.innerHTML = ((ps.map((p) => {
           const on = online[p.callsign], books = bookings[p.callsign] || [];
           const cls = on ? "on" : books.length ? "booked" : "";
-          const tip = [positionTip(on, books), ...aipOf(p).map((x) => [x.kind, x.note, x.hours && `hours: ${x.hours}`].filter(Boolean).join(" · "))]
+          const tip = [positionTip(on, books), ...aipOf(p).map((x) => [x.kind, x.note].filter(Boolean).join(" \u00b7 "))]
             .filter(Boolean).join("\n");
           // pos-txt: znak, nazwa stacji i kto (imię i nazwisko albo rezerwacja); przy braku miejsca kto schodzi pod znak (style.css)
           return `<div class="radio-row ${cls}" ${tip ? `data-tip="${esc(tip)}"` : ""}><span class="freq ${cls}">${esc(p.frequency)}</span>
@@ -453,7 +456,7 @@ export default {
         if (apwDue()) loadApw();   // błąd statusu nie blokuje karty wiatru
         return;
       }
-      // w międzyczasie przełączono na AWOS, RUCH, inne lotnisko, listę albo OVERVIEW
+      // w międzyczasie przełączono na AWOS, RUCH, inne lotnisko, listę albo wyszukiwarkę
       if (view !== "overview" || mode !== "page" || code !== icao) return;
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
@@ -500,15 +503,15 @@ export default {
     const markSub = (key) => sub.querySelectorAll("button[data-fir]").forEach((b) => b.classList.toggle("active", b.dataset.fir === key));
     const setMode = (m) => {
       mode = m;
-      pane.classList.toggle("ov-mode", m === "ov");
+      pane.classList.toggle("find-mode", m === "find");
       pane.classList.toggle("list-mode", m === "list");
       pane.classList.toggle("card-mode", m === "card");
     };
-    // sprząta bieżący ekran (zegary PRZEGLĄDU, AWOS, RUCH, OVERVIEW, listy i karty); stan listy zostaje w listState
+    // sprząta bieżący ekran (zegary PRZEGLĄDU, AWOS, RUCH, wyszukiwarki, listy i karty); stan listy zostaje w listState,
+    // wyszukiwarki w findState
     const leave = () => {
       if (list) { listState[listKey] = list.save(); list.destroy(); list = null; }
-      ov?.destroy();
-      ov = null;
+      if (find) { findState = find.save(); find.destroy(); find = null; }
       card?.destroy();
       card = null;
       clearInterval(timer);
@@ -519,18 +522,21 @@ export default {
       strips = null;
     };
 
-    // () (adres "0"): cały FIR EPWW (overview.js) w miejscu siatki lotniska
-    const showOverview = () => {
+    // () (adres "0"): 0.14.0 (issue #28) wyszukiwarka wszystkich lotnisk (aerolist.js) w miejscu siatki lotniska; tekst
+    // z wpisu historii (←, Wstecz) albo ostatni (przycisk "()"). Lotnisko z wyników otwiera się jak z listy FIR-u.
+    const showFind = () => {
       markSub("0");
-      // już otwarty: zostaje ze swoim filtrem i zaznaczeniami checklisty, chyba że w HOME wybrano inne stanowisko
-      if (mode === "ov" && ov) { ov.sync(); return; }
+      if (mode === "find" && find) { find.focus(); return; }
       leave();
-      setMode("ov");
-      $(".title").textContent = "OVERVIEW · FIR EPWW";
-      $(".upd").textContent = "";
+      const saved = stashed("aerodrome");
+      setMode("find");
+      $(".title").textContent = $(".upd").textContent = "";
       $(".content").innerHTML = "";
-      // wieża wybrana w filtrze: zawsze PRZEGLĄD lotniska, także gdy ostatnio był otwarty AWOS albo RUCH
-      ov = mountOverview($(".content"), { onGoto: (code) => goto(code) });
+      find = mountAeroSearch($(".content"), saved?.key === "0" ? saved : findState, {
+        onOpen: (code) => goto(code),
+        onChange: (st) => { findState = st; if (mode === "find") stash("aerodrome", { key: "0", ...st }); },
+      });
+      find.focus();
     };
 
     // lista lotnisk FIR-u (aerolist.js); fresh = kliknięta podzakładka: lista od nowa, bez filtra
@@ -617,7 +623,7 @@ export default {
       timer = setInterval(load, 60000);
     };
 
-    // Ostatni ekran ("0" = OVERVIEW albo lotnisko z widokiem) na następne uruchomienie: zapisany dopiero, gdy wiadomo, że lotnisko
+    // Ostatni ekran ("0" = wyszukiwarka albo lotnisko z widokiem) na następne uruchomienie: zapisany dopiero, gdy wiadomo, że lotnisko
     // istnieje (w bazie albo karta się wczytała), więc literówka (ZZZZ) nie zostaje ekranem startowym.
     const saveLast = (cardOk = false) => {
       if (!state || state.startsWith("fir/")) return;
@@ -628,7 +634,7 @@ export default {
     };
     // ekran wg arg (postać z aeroArg); zwraca adres tego, co naprawdę pokazano (karta nie ma widoków AWOS i RUCH)
     const show = (a, opts = {}) => {
-      if (a === "0") showOverview();
+      if (a === "0") showFind();
       else if (a.startsWith("fir/")) showList(a.slice(4), opts);
       else {
         const { code, view: v } = splitArg(a);
@@ -650,10 +656,12 @@ export default {
         return;
       }
       if (mode === "list" && list) stash("aerodrome", { key: listKey, ...list.save() });   // stan listy w jej wpisie, przed krokiem dalej
+      if (mode === "find" && find) stash("aerodrome", { key: "0", ...find.save() });
       a = show(a, opts);
       remember("aerodrome", a);
     };
-    // pierwsze otwarcie z menu: ostatni ekran albo "0" = OVERVIEW (także z kluczy zapisanych przez wersje do 0.12: lotnisko i widok)
+    // pierwsze otwarcie z menu: ostatni ekran albo "0" = wyszukiwarka (także z kluczy zapisanych przez wersje do 0.12:
+    // lotnisko i widok; dawne "aerodrome.ov" = OVERVIEW też daje "0")
     const initial = () => {
       const last = aeroArg(lsGet("aerodrome.last"));
       if (last && !last.startsWith("fir/")) return last;
@@ -695,7 +703,8 @@ export default {
 
     // arg: undefined = przycisk AERODROME w menu (ekran zostaje), napis = adres (←, Wstecz, odnośnik z innej zakładki).
     // AWOS tego lotniska zostaje (wybrany pas, nakładka, wykrywanie nowej litery ATIS); RUCH tego lotniska zostaje
-    // (zaznaczony pasek, przewinięcie zatok) i tylko wznawia odświeżanie co 30 s; lista dostaje kursor w wyszukiwarce.
+    // (zaznaczony pasek, przewinięcie zatok) i tylko wznawia odświeżanie co 30 s; lista i wyszukiwarka "()" dostają
+    // kursor w polu wyszukiwania.
     return { activate: (arg) => {
       let a = (arg ? aeroArg(arg) : null) || (arg ? "0" : state || initial());
       const rv = a && splitArg(a).view;
@@ -707,6 +716,7 @@ export default {
       }
       else if (a === state && mode === "page" && awos) { /* AWOS bez zmian */ }
       else if (a === state && mode === "list" && list) list.focus();
+      else if (a === state && mode === "find" && find) find.focus();
       else a = show(a);
       remember("aerodrome", a);
     } };
