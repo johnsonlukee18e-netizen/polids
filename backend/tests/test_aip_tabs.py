@@ -410,6 +410,36 @@ aip.mountCharts(b, { icao: "EPZZ", name: "x", base: links.aip_vfr, pkg: aip.AIP.
 await tick();
 aip.mountCharts(c, { icao: "EPZZ", name: "x", base: links.aip_mil, pkg: aip.AIP.admil });
 out.cache = { api: [...log.api], viewers: [a, b, c].map((x) => x.el.querySelector(".viewer").attrs.src) };
+
+// przegląd 0.14.0 (issue #28): komunikat NEXT AIRAC pyta /api/config jeszcze raz; poprawka opublikowana od otwarcia
+// aplikacji otwiera się bez Reload, nowe adresy i cykl zostają w ctx.config
+const cfg0 = () => ({ config: { links: { aip_mil: "https://x.test/mil/index-v2.html", aip_mil_next: "", aip_vfr_next: "" },
+  airac_next: { ident: "2612", effective: "2026-11-26" } } });
+RESP["/api/config"] = { links: { aip_mil: "https://x.test/mil-other/index-v2.html", aip_mil_next: "https://x.test/mil-next/index-v2.html",
+  aip_ifr_next: "https://x.test/ifr-next/index-v2.html" }, airac_next: { ident: "2613", effective: "2026-12-24" } };
+const ctxR = cfg0(), rm = {};
+const tr = aip.admil.mount(rm, ctxR);
+reset();
+tr.activate("next");
+const cardBefore = el(rm).html;
+await tick(); await tick();
+out.refresh = { cardBefore, api: [...log.api], pages: [...log.pages], links: ctxR.config.links, airac: ctxR.config.airac_next };
+// podzakładka zamknięta przed odpowiedzią: bez rysowania
+const ctxD = cfg0(), dm = {};
+const td = aip.admil.mount(dm, ctxD);
+reset();
+td.activate("next");
+td.activate("EPKS");
+await tick(); await tick();
+out.refreshDead = { pages: [...log.pages], active: dm.nav.querySelector("button.active").dataset.id, next: ctxD.config.links.aip_mil_next };
+// odpowiedź bez linków (np. błąd): komunikat zostaje, ctx.config bez zmian
+RESP["/api/config"] = { detail: "x" };
+const ctxE = cfg0(), em = {};
+const te = aip.admil.mount(em, ctxE);
+reset();
+te.activate("next");
+await tick(); await tick();
+out.refreshNone = { pages: [...log.pages], html: el(em).html, config: ctxE.config };
 console.log(JSON.stringify(out));
 """
 
@@ -519,7 +549,8 @@ def test_next_not_published_shows_message(tabs):
     """AD MIL bez poprawki następnego cyklu: komunikat (karta) zamiast strony błędu PAŻP, bez ramki i bez listy map;
     krok historii "next"; powrót do "eAIP" otwiera bieżącą poprawkę."""
     n = tabs["milNext"]
-    assert n["pages"] == [] and n["api"] == [] and n["active"] == "next" and n["classes"] == []
+    # przegląd: komunikat pyta /api/config jeszcze raz (jedno zapytanie; drugie activate tej samej podzakładki bez zmian)
+    assert n["pages"] == [] and n["api"] == ["/api/config"] and n["active"] == "next" and n["classes"] == []
     assert n["html"] == ('<div class="card aip-next"><p>eAIP MIL for AIRAC 2612 (effective 26.11.2026) has not been '
                          'published yet.</p></div>')
     assert n["remember"] == [["admil", "next"], ["admil", "next"]]
@@ -543,10 +574,32 @@ def test_next_wiring():
     "next" w activate; CSS karty bez zaokrągleń, pogrubień i cieni; bez reklamowych nazw klas."""
     assert ('{ id: EAIP, label: "eAIP", fill: true, render: page(base) },\n'
             '        { id: NEXT, label: "NEXT AIRAC", fill: true, render: nextPage },\n        { sep: true },') in AIP
-    assert "if (url) { page(url)(pane); return; }" in AIP
+    assert "if (url) { page(url)(pane); return true; }" in AIP
     assert "const id = a.icao || (isNextArg(arg) ? NEXT : EAIP);" in AIP
     assert "if (b === first || b.dataset.id === NEXT) { nav.scrollTop = 0; return; }" in AIP
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "coordination.css").read_text("utf-8"), flags=re.S)
     rules = [line for line in css.splitlines() if ".aip-next" in line]
     assert rules == [".aip-next { margin: 12px 16px; max-width: 760px; }", ".aip-next p { margin: 0; line-height: 1.45; }"]
     assert not re.search(r"class=\"[^\"]*\b(ad-|ads|advert|banner|sponsor|promo)", AIP)
+
+
+def test_next_message_refreshes_config(tabs):
+    """Przegląd 0.14.0: ctx.config jest z chwili otwarcia aplikacji, więc komunikat "has not been published yet" pyta
+    /api/config jeszcze raz. Poprawka opublikowana w międzyczasie: od razu przeglądarka eAIP następnego cyklu (bez
+    Reload); adresy NEXT AIRAC trzech pakietów i cykl zapisane w ctx.config, bieżący eAIP bez zmian."""
+    r = tabs["refresh"]
+    assert r["cardBefore"] == ('<div class="card aip-next"><p>eAIP MIL for AIRAC 2612 (effective 26.11.2026) has not been '
+                               'published yet.</p></div>')
+    assert r["api"] == ["/api/config"] and r["pages"] == ["https://x.test/mil-next/index-v2.html"]
+    assert r["links"] == {"aip_mil": "https://x.test/mil/index-v2.html", "aip_mil_next": "https://x.test/mil-next/index-v2.html",
+                          "aip_vfr_next": "", "aip_ifr_next": "https://x.test/ifr-next/index-v2.html"}
+    assert r["airac"] == {"ident": "2613", "effective": "2026-12-24"}
+    # podzakładka zamknięta przed odpowiedzią: nic nie rysuje na cudzej stronie, adres i tak zapamiętany
+    d = tabs["refreshDead"]
+    assert d["pages"] == [] and d["active"] == "EPKS" and d["next"] == "https://x.test/mil-next/index-v2.html"
+    # odpowiedź bez linków: komunikat zostaje, konfiguracja bez zmian
+    e = tabs["refreshNone"]
+    assert e["pages"] == [] and "has not been published yet." in e["html"]
+    assert e["config"] == {"links": {"aip_mil": "https://x.test/mil/index-v2.html", "aip_mil_next": "", "aip_vfr_next": ""},
+                           "airac_next": {"ident": "2612", "effective": "2026-11-26"}}
+    assert '.catch(() => {});' in AIP[AIP.index("const nextPage = "):AIP.index("const chartsPage = ")]

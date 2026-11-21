@@ -151,11 +151,11 @@ main { flex: 1; min-width: 0; position: relative; }
 .menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }
 /* podmenu dłuższe niż menu (więcej niż --menu-rows = 21 rzędów, czyli elementów kolumny flex; litery mają po dwa
    w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, NEXT AIRAC, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby
-   każdy widoczny rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu (w paddingu byłoby
-   widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do ostatniego, który mieści się
-   nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też całe rzędy. Przewijanie
-   (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap, margines przycisku nad
-   rzędem). 22 = --menu-rows + 1 */
+   każdy widoczny rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu
+   (w paddingu byłoby widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do
+   ostatniego, który mieści się nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też
+   całe rzędy. Przewijanie (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap,
+   margines przycisku nad rzędem). 22 = --menu-rows + 1 */
 .submenu:not(.letters):has(> :nth-child(22)) {
   max-height: calc(var(--menu-rows) * (var(--btn-h) + 2 * var(--btn-m))); margin-block: var(--col-pad); padding-block: 0;
   scroll-snap-type: y mandatory; }

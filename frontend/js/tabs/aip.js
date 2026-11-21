@@ -239,12 +239,33 @@ function aipTab(tab) {
       let charts = null, want = "";   // want: mapa z adresu dla lotniska, kt\u00f3rego lista dopiero powstanie
       const argOf = (id) => (id === EAIP ? "" : id);
       const page = (url) => (pane) => { charts = null; iframeWithFallback(pane, url, NOTE); embedBar(pane); };
-      // 0.14.0 (issue #28): NEXT AIRAC: eAIP następnego cyklu jak "eAIP" albo komunikat, gdy nie opublikowany
+      // 0.14.0 (issue #28): NEXT AIRAC: eAIP następnego cyklu jak "eAIP" albo komunikat, gdy nie opublikowany.
+      // Przegląd: przy komunikacie jeszcze raz /api/config (serwer sprawdza brakującą poprawkę co godzinę), bo
+      // ctx.config jest z chwili otwarcia aplikacji: poprawka opublikowana w międzyczasie otwiera się bez Reload. Nowe
+      // adresy NEXT AIRAC trzech pakietów i cykl zostają w ctx.config (bieżący eAIP bez zmian, jak dotąd do Reload);
+      // podzakładka zamknięta przed odpowiedzią (dead) niczego już nie rysuje
+      const nextTitle = () => nextTip(pkg, ctx.config?.airac_next);
       const nextPage = (pane) => {
-        const url = nextUrl(ctx.config, pkg);
-        if (url) { page(url)(pane); return; }
-        charts = null;
-        pane.append(h(`<div class="card aip-next"><p>${esc(nextMissing(pkg, ctx.config?.airac_next))}</p></div>`));
+        let dead = false;
+        const draw = () => {
+          const url = nextUrl(ctx.config, pkg);
+          pane.innerHTML = "";
+          if (url) { page(url)(pane); return true; }
+          charts = null;
+          pane.append(h(`<div class="card aip-next"><p>${esc(nextMissing(pkg, ctx.config?.airac_next))}</p></div>`));
+          return false;
+        };
+        if (draw()) return null;
+        api("/api/config").then((cfg) => {
+          if (!cfg?.links || !ctx.config) return;
+          ctx.config.links ??= {};
+          for (const p of Object.values(AIP)) ctx.config.links[`${p.link}_next`] = cfg.links[`${p.link}_next`] ?? "";
+          if (cfg.airac_next) ctx.config.airac_next = cfg.airac_next;
+          const b = sub.nav.querySelector(`button[data-id="${NEXT}"]`);
+          if (b) b.title = nextTitle();
+          if (!dead) draw();
+        }).catch(() => {});
+        return { destroy() { dead = true; } };
       };
       const chartsPage = (icao) => (pane) => {
         pane.classList.add("chl-pane");
@@ -261,7 +282,7 @@ function aipTab(tab) {
       ], { arg: argOf });
       sub.nav.querySelectorAll("button[data-id]").forEach((b) => {
         const id = b.dataset.id;
-        b.title = id === EAIP ? pkg.whole : id === NEXT ? nextTip(pkg, ctx.config?.airac_next) : `${names[id]} \u2013 charts`;
+        b.title = id === EAIP ? pkg.whole : id === NEXT ? nextTitle() : `${names[id]} \u2013 charts`;
       });
       // wybrany przycisk widoczny w przewijanym podmenu (AD VFR: lotnisko z dołu listy z adresu albo po ←); przy
       // pierwszym (eAIP) podmenu wraca na samą górę, razem z odstępem nad przyciskiem. Przewinięcie o całe rzędy

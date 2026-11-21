@@ -19,8 +19,8 @@ katalogu dla cyklu po bieżącym (next_airac, package_url): PAŻP publikuje popr
 (cykl bez poprawki, jeszcze nieopublikowana). Katalog sprawdzamy tak samo (folder_exists, pamięć na cykl, jedno
 sprawdzenie naraz, /api/config czeka najwyżej CONFIG_WAIT): jest → adres; brak (4xx) → "" (przycisk NEXT AIRAC pokazuje
 wtedy komunikat z numerem cyklu i datą wejścia), ponowne sprawdzenie po TTL_NEXT_MISSING; nie wiadomo (sieć, 5xx,
-ponad CONFIG_WAIT) → wyliczony adres, jak przy bieżącym cyklu. Bez wstecznego szukania i bez adresu z .env (ten
-dotyczy bieżącej poprawki)."""
+ponad CONFIG_WAIT) → wyliczony adres, jak przy bieżącym cyklu, a gdy wcześniejsze sprawdzenie dało wynik, ten wynik.
+Bez wstecznego szukania i bez adresu z .env (ten dotyczy bieżącej poprawki)."""
 
 import asyncio
 import logging
@@ -148,7 +148,10 @@ async def _resolve_next(client: httpx.AsyncClient, link: str, airac: dict) -> tu
     url = package_url(link, airac)
     ok = await folder_exists(client, url)
     if ok is None:
-        return url, TTL_UNKNOWN
+        # 0.14.0 (issue #28, przegląd): chwilowy błąd PAŻP (sieć, 5xx, 429) przy ponownym sprawdzeniu nie zamienia
+        # znanego braku ("") na wyliczony adres strony, której nie ma (strona błędu zamiast komunikatu): zostaje ostatni
+        # wynik, wyliczony adres tylko bez wcześniejszego; ponownie po TTL_UNKNOWN
+        return _resolved.get(_key(link, airac, True), (0.0, url))[1], TTL_UNKNOWN
     return (url, TTL_FOUND) if ok else ("", TTL_NEXT_MISSING)
 
 
@@ -164,7 +167,7 @@ async def _refresh(link: str, airac: dict, nxt: bool = False) -> str:
         async with _client() as client:
             url, ttl = await (_resolve_next if nxt else _resolve)(client, link, airac)
     except Exception:   # nieprzewidziany błąd: jak brak połączenia, bez wyjątku w zadaniu, którego nikt nie odbierze
-        log.exception("eAIP %s: sprawdzenie katalogu nie powiodło się", link)
+        log.exception("eAIP %s: sprawdzenie katalogu nie powiodło się", key[0])
         url, ttl = _resolved.get(key, (0.0, package_url(link, airac)))[1], TTL_UNKNOWN
     _resolved[key] = (time.monotonic() + ttl, url)
     return url

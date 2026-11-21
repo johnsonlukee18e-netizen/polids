@@ -131,6 +131,33 @@ def test_unknown_keeps_computed_url(pansa, status):
     assert nxt() == NEXT_12
 
 
+@pytest.mark.parametrize("status", ["down", 503, 429])
+def test_unknown_recheck_keeps_last_result(pansa, status):
+    """Przegląd 0.14.0: ponowne sprawdzenie po TTL_NEXT_MISSING trafia na chwilowy błąd PAŻP: zostaje znany brak ("",
+    komunikat), a nie wyliczony adres strony, której nie ma; kolejna próba po TTL_UNKNOWN, a gdy PAŻP wróci
+    z opublikowaną poprawką, jest adres."""
+    assert nxt()["aip_vfr"] == ""
+    key = ("aip_vfr" + eaip.NEXT, "2612")
+
+    async def recheck():
+        eaip._resolved[key] = (time.monotonic() - 1, eaip._resolved[key][1])   # termin minął
+        stale = await eaip.next_links(DAY)
+        await asyncio.gather(*list(eaip._inflight.values()))
+        return stale, await eaip.next_links(DAY)
+
+    pansa["status"] = status
+    stale, after = asyncio.run(recheck())
+    assert stale["aip_vfr"] == "" and after["aip_vfr"] == ""
+    until, url = eaip._resolved[key]
+    assert url == "" and until - time.monotonic() <= eaip.TTL_UNKNOWN
+    # znany adres (IFR, katalog jest) też nie znika przy błędzie
+    assert strip(after)["aip_ifr"] == NEXT_12["aip_ifr"]
+    pansa["status"] = None
+    pansa["on"].add("eaipvfr/AIRAC AMDT VFR 12-26_2026_11_26")
+    stale, after = asyncio.run(recheck())
+    assert stale["aip_vfr"] == "" and strip(after) == NEXT_12
+
+
 def test_redirect_elsewhere_counts_as_missing(pansa, monkeypatch):
     """Przekierowanie brakującego katalogu na inną stronę (200) to też brak."""
     def handler(request):
