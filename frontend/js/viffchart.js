@@ -18,11 +18,15 @@ export function tvLabel(id) {
   return "sector combination";
 }
 
+// koniec okna czasu: godzina, a przy oknie o długości doby lub dłuższym (przegląd 0.14.2, to_date) data i godzina
+const winEnd = (t) => (t.to_date ? `${t.to_date} ${t.to}` : String(t.to));
+
 // Warunki aktywacji scenariusza vIFF (vIFF sam decyduje, czy jest aktywny; pokazujemy tylko warunki). html: wartości
 // w <b> i escapowane (wiersz scenariusza w MAP), bez html sam tekst (dymek, escapowany przy wstawianiu).
 // 0.14.2 (issue #35): times = false bez okien czasu (lista scenariuszy w OTHER › FMP ma na nie osobną kolumnę TIME,
 // scnTimeText); bez warunków stanowisk wtedy "no position conditions". To samo okno podane dwa razy (start/end i times)
-// tylko raz.
+// tylko raz. Przegląd 0.14.2: okno o długości doby lub dłuższe (activationPeriods z to_date) z datą końca przed godziną
+// końca ("2026-11-21 time 1900–2026-11-23 2100").
 export function scnCond(s, { html = false, times = true } = {}) {
   const e = html ? esc : (t) => String(t);
   const v = (t) => (html ? `<b>${esc(t)}</b>` : String(t));
@@ -34,25 +38,31 @@ export function scnCond(s, { html = false, times = true } = {}) {
   if (s.booked) out.push("bookings count too");
   const when = [];
   if (times && s.start && s.end && !(s.start === "0000" && s.end === "2359")) when.push(`time ${v(`${s.start}\u2013${s.end}`)}`);
-  if (times) (s.times || []).forEach((t) => when.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}\u2013${t.to}`)}`));
+  if (times) (s.times || []).forEach((t) => when.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}\u2013${winEnd(t)}`)}`));
   out.push(...new Set(when));
   return out.join(" \u00b7 ") || (times ? "no conditions" : "no position conditions");
 }
 
 // 0.14.2 (issue #35): okna czasu scenariusza w jednej linii ("0600–1200, 2026-10-18 1800–2000"): start/end
-// (poza 0000-2359) i wpisy times (z times, oneTimes i activationPeriods) bez powtórek; bez okna "H24"
+// (poza 0000-2359) i wpisy times (z times, oneTimes i activationPeriods) bez powtórek; bez okna "H24". Przegląd
+// 0.14.2: okno z datą końca (to_date) "2026-11-21 1900–2026-11-23 2100"
 export function scnTimeText(s) {
   const out = [];
   if (s?.start && s?.end && !(s.start === "0000" && s.end === "2359")) out.push(`${s.start}\u2013${s.end}`);
-  (s?.times || []).forEach((t) => { if (t?.from && t?.to) out.push(`${t.date ? `${t.date} ` : ""}${t.from}\u2013${t.to}`); });
+  (s?.times || []).forEach((t) => { if (t?.from && t?.to) out.push(`${t.date ? `${t.date} ` : ""}${t.from}\u2013${winEnd(t)}`); });
   return [...new Set(out)].join(", ") || "H24";
 }
 
+// przegląd 0.14.2: scenariusz włączony w vIFF (enabled), który teraz nie obowiązuje (active = isActive z vIFF)
+export const scnEnabledIdle = (s) => !!(s?.enabled && !s?.active);
+
 // Dymek wiersza scenariusza vIFF po angielsku, z danych scenariusza: id, traffic volumes (z opisem jak tvLabel)
-// i warunki. Opisu scenariusza z vIFF (s.description, wolny tekst po polsku) nie pokazujemy.
+// i warunki. Opisu scenariusza z vIFF (s.description, wolny tekst po polsku) nie pokazujemy. Przegląd 0.14.2:
+// scenariusz włączony, ale nieobowiązujący teraz ma przy id "(enabled, not active now)" (OTHER › FMP i MAP)
 export function scnTip(s) {
   const tvs = (s.tvs || []).map((t) => `${t.id} (${tvLabel(t.id)})`);
-  return `Scenario ${s.id}: ${tvs.length ? `traffic volumes ${tvs.join(", ")}` : "no traffic volumes"} \u00b7 ${scnCond(s)}`;
+  return `Scenario ${s.id}${scnEnabledIdle(s) ? " (enabled, not active now)" : ""}: `
+    + `${tvs.length ? `traffic volumes ${tvs.join(", ")}` : "no traffic volumes"} \u00b7 ${scnCond(s)}`;
 }
 
 // aktywny = status 1 w vIFF albo członek aktywnego scenariusza (backend liczy to w polu active)

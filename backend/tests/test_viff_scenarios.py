@@ -2,7 +2,10 @@
 i nieaktywnych"): backend widoku SCENARIOS w OTHER › FMP. Okna activationPeriods (żywe dane z 21.11.2026: daty ISO)
 w times scenariusza, scenarios_ok w /api/viff/sectors (brak listy ≠ pusta lista) i straż: aplikacja tylko czyta
 z vIFF (GET). Podgląd scenariusza liczy przeglądarka; endpoint podglądu vIFF jest POST i zmienia stan sieci, więc
-ani kod, ani zapytania nie mogą go użyć."""
+ani kod, ani zapytania nie mogą go użyć.
+
+Przegląd 0.14.2: active = isActive z vIFF (scenariusz obowiązuje teraz), enabled = pole active (włączony); okres
+activationPeriods o długości doby lub dłuższy z datą końca (to_date)."""
 import ast
 import asyncio
 import json
@@ -51,11 +54,33 @@ def test_activation_periods_in_times():
                           {"start": "2026-11-21", "end": "2026-11-22"}, {"start": "x"}, "x", None]) == [
         {"from": "2300", "to": "0100", "date": "2026-11-21"}, {"from": "0600", "to": "0900", "date": None}]
     assert viff._periods(None) == [] and viff._periods({"start": "0600"}) == []
+    # przegląd 0.14.2: okres o długości doby lub dłuższy z datą końca (26 h też, nie tylko różnica dat > 1 dzień); krótszy
+    # (także przez północ) bez to_date, jak wyżej
+    assert viff._periods([{"start": "2026-11-21T19:00:00Z", "end": "2026-11-23T21:00:00Z"},
+                          {"start": "2026-11-21T19:00:00.000Z", "end": "2026-11-22T21:00:00.000Z"},
+                          {"start": "2026-11-21T19:00:00Z", "end": "2026-11-22T19:00:00Z"},
+                          {"start": "2026-11-21T19:00:00Z", "end": "2026-11-22T18:59:00Z"}]) == [
+        {"from": "1900", "to": "2100", "date": "2026-11-21", "to_date": "2026-11-23"},
+        {"from": "1900", "to": "2100", "date": "2026-11-21", "to_date": "2026-11-22"},
+        {"from": "1900", "to": "1900", "date": "2026-11-21", "to_date": "2026-11-22"},
+        {"from": "1900", "to": "1859", "date": "2026-11-21"}]
     # times, oneTimes i activationPeriods razem
     both = viff.scenario({"id": "EP-X", "times": [[1, [], "1600", "2200"]], "oneTimes": [["2026-11-22", "0600", "0700"]],
                           "activationPeriods": [{"start": "2026-11-21T19:00:00.000Z", "end": "2026-11-21T21:00:00.000Z"}]})
     assert [(t["from"], t["to"], t["date"]) for t in both["times"]] == [
         ("1600", "2200", None), ("0600", "0700", "2026-11-22"), ("1900", "2100", "2026-11-21")]
+
+
+def test_active_is_in_effect_flag():
+    """Przegląd 0.14.2: żywy EP-KKTMA (active=true, isActive=false, okno 19:00–21:00Z jeszcze przed sobą) nie jest
+    aktywny teraz, tylko włączony; active z pola active wyłącznie w rekordzie bez klucza isActive; isLive pomijamy."""
+    kk = viff.scenario(LIVE[1])
+    assert kk["active"] is False and kk["enabled"] is True
+    assert [(viff.scenario(x)["active"], viff.scenario(x)["enabled"]) for x in (LIVE[0], LIVE[2])] == [(False, False)] * 2
+    flags = [{"active": True}, {"active": False}, {"active": False, "isActive": True}, {"active": True, "isActive": True},
+             {"isActive": True}, {"active": True, "isActive": None}, {"active": False, "isActive": False, "isLive": True}, {}]
+    assert [(viff.scenario({"id": "X", **f})["active"], viff.scenario({"id": "X", **f})["enabled"]) for f in flags] == [
+        (True, True), (False, False), (True, False), (True, True), (True, False), (False, True), (False, False), (False, False)]
 
 
 def _recording_client(monkeypatch, calls, scenarios=LIVE):
@@ -83,8 +108,10 @@ def test_scenarios_read_with_get_only(monkeypatch):
         d = asyncio.run(viff.sectors("EP", NOW))
     finally:
         http_cache.clear_cache()
-    assert [s["id"] for s in scns] == ["EP-KKTMA", "EP-1X", "EP-WATMA"]  # aktywne na początku
-    assert d["scenarios_ok"] is True and [s["id"] for s in d["scenarios"]] == ["EP-KKTMA", "EP-1X", "EP-WATMA"]
+    # aktywne na początku; przegląd 0.14.2: żaden nie obowiązuje teraz (EP-KKTMA tylko włączony), więc po id
+    assert [s["id"] for s in scns] == ["EP-1X", "EP-KKTMA", "EP-WATMA"]
+    assert d["scenarios_ok"] is True and [s["id"] for s in d["scenarios"]] == ["EP-1X", "EP-KKTMA", "EP-WATMA"]
+    assert [(s["active"], s["enabled"]) for s in d["scenarios"]] == [(False, False), (False, True), (False, False)]
     assert calls and {m for m, _, _ in calls} == {"GET"}
     assert ("GET", "/etfms/scenarios", {"filter": "EP", "active": "false"}) in calls
     assert not any("preview" in p.lower() or p.lower() in ("/etfms/fetchscenarios", "/etfms/addscenario") for _, p, _ in calls)
@@ -92,7 +119,28 @@ def test_scenarios_read_with_get_only(monkeypatch):
     by = {s["id"]: s for s in d["sectors"]}
     assert {"EP-ALLFIR", "EP-KKTMA", "EP-KKTMAD", "EP-WATMA", "EP-WATMAD"} <= set(by)
     assert by["EP-KKTMA"]["scenarios"] == ["EP-KKTMA"] and by["EP-KKTMA"]["occupancy_cap"] == 17
+    # przegląd 0.14.2: TV samego włączonego scenariusza nie jest aktywny (tabela SECTORS w OTHER › FMP, MAP)
+    assert by["EP-KKTMA"]["active"] is False and by["EP-KKTMAD"]["active"] is False
     json.dumps(d)
+
+
+def test_sector_active_follows_scenario_in_effect(monkeypatch):
+    """Przegląd 0.14.2: TV jest aktywny przez scenariusz tylko, gdy scenariusz obowiązuje teraz (isActive), bez względu
+    na pole active (włączony); aktywne TV i scenariusze na początku."""
+    calls = []
+    now = [{**LIVE[1], "isActive": True}, {**LIVE[2], "active": True}, LIVE[0]]
+    _recording_client(monkeypatch, calls, scenarios=now)
+    http_cache.clear_cache()
+    try:
+        d = asyncio.run(viff.sectors("EP", NOW))
+    finally:
+        http_cache.clear_cache()
+    by = {s["id"]: s for s in d["sectors"]}
+    assert [(s["id"], s["active"], s["enabled"]) for s in d["scenarios"]] == [
+        ("EP-KKTMA", True, True), ("EP-1X", False, False), ("EP-WATMA", False, True)]
+    assert by["EP-KKTMA"]["active"] and by["EP-KKTMAD"]["active"]
+    assert not by["EP-WATMA"]["active"] and not by["EP-WATMAD"]["active"] and not by["EP-ALLFIR"]["active"]
+    assert [s["id"] for s in d["sectors"]][:2] == ["EP-KKTMA", "EP-KKTMAD"]
 
 
 def test_scenarios_unavailable_flag(monkeypatch):

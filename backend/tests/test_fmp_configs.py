@@ -326,13 +326,24 @@ o.target = [rb.fmpTarget({ code: "2N" }, "3E"), rb.fmpTarget({ code: null }, "3e
   rb.fmpTarget(undefined, undefined)];
 o.fmpTip = [rb.fmpTip({ code: "2N", label: "ALL+NFIR" }), rb.fmpTip({ code: null, label: null }), rb.fmpTip(undefined)];
 // --- 0.14.2 (issue #35): widok SCENARIOS
-o.cleanScn = ["ep_dbfg", " EP-ALLFIR ", "x y", "", null, "A".repeat(41), "EP/1", "_X", "EP-<X>"].map(fmp.cleanScn);
+o.cleanScn = ["ep_dbfg", " EP-ALLFIR ", "x y", "", null, "A".repeat(41), "EP/1", "_X", "EP-<X>",
+  // przegląd 0.14.2: wolny tekst vIFF do 64 znaków bez "/" i znaków sterujących
+  "ep-kk.tma", " EP WAA1 ", "A".repeat(64), "A".repeat(65), "EP\tX", "EP\u0001X", "EP\u007fX", "/EP", "   "].map(fmp.cleanScn);
 o.parseScn = ["scenarios", "SCENARIOS/ep_nfir", "2n/scenarios/EP_NFIR/ep-bh", "scenarios//EP-BH", "scenarios/EP-WATMA",
-  "2N/scenarios", "scenarios/x y/EP-BH", "9z/scenarios/EP_ALL", "scenarios/EP_ALL/x y", "EP-BH/scenarios"].map(fmp.parseFmpArg);
+  "2N/scenarios", "scenarios/x y/EP-BH", "9z/scenarios/EP_ALL", "scenarios/EP_ALL/x y", "EP-BH/scenarios",
+  "scenarios/ep-kk.tma/ep-kktma", "2N/scenarios/EP WAA1"].map(fmp.parseFmpArg);
 o.argScn = [["", "", "scenarios", ""], ["2n", "", "scenarios", "ep_nfir"], ["2N", "ep-bh", "scenarios", "EP_NFIR"],
-  ["", "EP-BH", "scenarios", ""], ["", "EP-BH", "", "EP_NFIR"], ["xx", "", "scenarios", "x y"]].map((a) => fmp.fmpArg(...a));
+  ["", "EP-BH", "scenarios", ""], ["", "EP-BH", "", "EP_NFIR"], ["xx", "", "scenarios", "x y"], ["", "", "scenarios", "EP/1"]].map((a) => fmp.fmpArg(...a));
 o.roundTrip = ["scenarios", "scenarios/EP_NFIR", "scenarios/EP_NFIR/EP-BH", "2N/scenarios/EP_NFIR/EP-BH", "2N/scenarios",
-  "2N/EP-BH", "EP-BH", "2N", ""].map((a) => { const p = fmp.parseFmpArg(a); return fmp.fmpArg(p.cfg, p.tv, p.view, p.scn); });
+  "2N/EP-BH", "EP-BH", "2N", "", "scenarios/EP-KK.TMA/EP-KKTMA", "2N/scenarios/EP WAA1"].map((a) => { const p = fmp.parseFmpArg(a); return fmp.fmpArg(p.cfg, p.tv, p.view, p.scn); });
+// przegląd 0.14.2: id spoza dawnego wzorca w liście da się kliknąć (data-scn = id wielkimi literami)
+o.listOdd = fmp.scnListHtml({ prefix: "EP", scenarios_ok: true, scenarios: [
+  { id: "EP-KK.TMA", active: true, tvs: [], positions: [], anypositions: [], nopositions: [], times: [] },
+  { id: "ep waa1", active: false, tvs: [], positions: [], anypositions: [], nopositions: [], times: [] },
+  { id: "EP/1", active: false, tvs: [], positions: [], anypositions: [], nopositions: [], times: [] }] }, "EP-KK.TMA");
+// przegląd 0.14.2: komórka TIME: kawałki bez zawijania, przerwy tylko między słowami i po półpauzie przed datą końca
+o.timeHtml = ["H24", "2026-11-21 1900\u20132100", "0600\u20131200, 2026-10-18 1800\u20132000", "2026-11-21 1900\u20132026-11-23 2100", "<x>", ""]
+  .map(fmp.timeHtml);
 const scn = data.scn, S = Object.fromEntries(scn.scenarios.map((x) => [x.id, x]));
 o.match = [["EP_DBFG", "2G"], ["EP_DBFG", "2N"], ["EP-ALLFIR", "1X"], ["EP-ALLFIR", "2N"], ["EP-ALLFIR", "2D"],
   ["EP-KKTMA", "2N"], ["EP-NONE", "2N"], ["EP-ANY", "1X"], ["EP-ANY", "2N"]].map(([id, c]) => fmp.scnMatch(S[id], by[c]));
@@ -393,15 +404,16 @@ def _stv(tid, active, entries, cap, occ, ocap, reg=None):
 
 
 def _scn(sid, active, tvs, **kw):
-    base = {"id": sid, "active": active, "tvs": [{"id": t, "occupancy_cap": o, "entries_cap": e} for t, o, e in tvs],
+    base = {"id": sid, "active": active, "enabled": active, "tvs": [{"id": t, "occupancy_cap": o, "entries_cap": e} for t, o, e in tvs],
             "positions": [], "anypositions": [], "nopositions": [], "start": "0000", "end": "2359", "times": [],
             "description": "", "booked": False}
     return {**base, **kw}
 
 
 # 0.14.2 (issue #35): odpowiedź /api/viff/sectors ze scenariuszami jak u vIFF (EP-ALLFIR, EP-KKTMA z żywych danych
-# 21.11.2026: wzorzec EPWW_D*_CTR, okno z activationPeriods); EP-DM zadeklarowany 40/14, w scenariuszu 44/15; EP-DH
-# z regulacją wejść 30; EP-BM bez wiersza (scenariusz zna TV, którego lista nie ma)
+# 21.11.2026: wzorzec EPWW_D*_CTR, okno z activationPeriods; przegląd 0.14.2: EP-KKTMA włączony, ale nieobowiązujący
+# teraz: active=false, enabled=true); EP-DM zadeklarowany 40/14, w scenariuszu 44/15; EP-DH z regulacją wejść 30; EP-BM
+# bez wiersza (scenariusz zna TV, którego lista nie ma)
 SCN = {"prefix": "EP", "now": "1210", "scenarios_ok": True, "sectors": [
     _stv("EP-DH", True, 40, 44, 15, 15, reg=30), _stv("EP-DM", True, 40, 40, 13, 14), _stv("EP-BH", False, 10, 44, 2, 15),
     _stv("EP-ALLFIR", False, 50, 120, 30, 40), _stv("EP-KKTMA", True, 9, None, 3, 17)],
@@ -410,8 +422,8 @@ SCN = {"prefix": "EP", "now": "1210", "scenarios_ok": True, "sectors": [
              nopositions=["EPWW_S_CTR", "EPWW_J_CTR", "EPWW_N_CTR", "EPWW_D*_CTR"], booked=True, description="ALLFIR SOLO"),
         _scn("EP_DBFG", True, [("EP-DH", 15, 44), ("EP-DM", 15, 44), ("EP-BH", 15, 44), ("EP-BM", 15, 44)],
              positions=["EPWW_DBF_CTR"], description="DBFG open"),
-        _scn("EP-KKTMA", True, [("EP-KKTMA", 17, None), ("EP-KKTMAD", 8, None)], anypositions=["EPKK_APP"], start=None, end=None,
-             times=[{"from": "1900", "to": "2100", "date": "2026-11-21"}], booked=True, description="podział FIR"),
+        _scn("EP-KKTMA", False, [("EP-KKTMA", 17, None), ("EP-KKTMAD", 8, None)], anypositions=["EPKK_APP"], start=None, end=None,
+             times=[{"from": "1900", "to": "2100", "date": "2026-11-21"}], booked=True, description="podział FIR", enabled=True),
         _scn("EP-NONE", False, []),
         _scn("EP-ANY", False, [("EP-BH", 15, 44)], anypositions=["EPWW_N_CTR", "EPWW_S_CTR"]),
         _scn("EP-<X>", False, [("EP-<X>", 1, 2)], start="1600", end="2200", times=[{"from": "1600", "to": "2200", "date": None}]),
@@ -587,19 +599,32 @@ def test_fmp_files_conventions():
 # --- 0.14.2 (issue #35): widok SCENARIOS
 
 def test_js_scenario_address(js):
-    assert js["cleanScn"] == ["EP_DBFG", "EP-ALLFIR", "", "", "", "", "", "", ""]
+    # przegląd 0.14.2: id scenariusza to wolny tekst vIFF: każdy napis do 64 znaków bez "/" i znaków sterujących
+    assert js["cleanScn"] == ["EP_DBFG", "EP-ALLFIR", "X Y", "", "", "A" * 41, "", "_X", "EP-<X>",
+                              "EP-KK.TMA", "EP WAA1", "A" * 64, "", "", "", "", "", ""]
     p = [(x["cfg"], x["tv"], x["view"], x["scn"]) for x in js["parseScn"]]
     assert p == [("", "", "scenarios", ""), ("", "", "scenarios", "EP_NFIR"), ("2N", "EP-BH", "scenarios", "EP_NFIR"),
                  ("", "", "scenarios", ""), ("", "", "scenarios", "EP-WATMA"), ("2N", "", "scenarios", ""),
                  # zły scenariusz: bez scenariusza i bez sektora; zły sektor przy scenariuszu: sam scenariusz
-                 ("", "", "scenarios", ""), ("9Z", "", "scenarios", "EP_ALL"), ("", "", "scenarios", "EP_ALL"),
+                 ("", "EP-BH", "scenarios", "X Y"), ("9Z", "", "scenarios", "EP_ALL"), ("", "", "scenarios", "EP_ALL"),
                  # "scenarios" tylko na początku (po konfiguracji); inaczej to (zły) sektor jak dotąd
-                 ("", "", "", "")]
+                 ("", "", "", ""),
+                 # przegląd 0.14.2: id z kropką albo spacją (router koduje adres sam)
+                 ("", "EP-KKTMA", "scenarios", "EP-KK.TMA"), ("2N", "", "scenarios", "EP WAA1")]
     # stare adresy: te same {cfg, tv} co do 0.14.1, bez widoku
     assert all(x["view"] == "" and x["scn"] == "" for x in js["parse"])
-    assert js["argScn"] == ["scenarios", "2N/scenarios/EP_NFIR", "2N/scenarios/EP_NFIR/EP-BH", "scenarios", "EP-BH", "scenarios"]
+    assert js["argScn"] == ["scenarios", "2N/scenarios/EP_NFIR", "2N/scenarios/EP_NFIR/EP-BH", "scenarios", "EP-BH",
+                            "scenarios/X Y", "scenarios"]
     assert js["roundTrip"] == ["scenarios", "scenarios/EP_NFIR", "scenarios/EP_NFIR/EP-BH", "2N/scenarios/EP_NFIR/EP-BH",
-                               "2N/scenarios", "2N/EP-BH", "EP-BH", "2N", ""]
+                               "2N/scenarios", "2N/EP-BH", "EP-BH", "2N", "", "scenarios/EP-KK.TMA/EP-KKTMA", "2N/scenarios/EP WAA1"]
+    # wiersz z takim id ma data-scn do kliknięcia i zaznaczenia (wcześniej data-scn="": wiersz nic nie robił)
+    assert re.findall(r'<tr class="([a-z ]+)" data-scn="([^"]*)">', js["listOdd"]) == [("on sel", "EP-KK.TMA"), ("off", "EP WAA1")]
+    # id, którego adres nie uniesie ("/"): wiersz bez data-scn, nie wygląda na klikalny (CSS), dymek "No preview"
+    rows = re.findall(r'<tr class="([a-z -]+)"( data-scn="[^"]*")?><td class="fmp-sec" title="([^"]*)">([^<]*)</td>', js["listOdd"])
+    assert [r[3] for r in rows] == ["EP-KK.TMA", "EP/1", "ep waa1"] and rows[1] == (
+        "off fmp-scn-nopv", "", "Scenario EP/1: no traffic volumes · no conditions\n"
+        "No preview: this scenario id cannot be used in the page address.", "EP/1")
+    assert js["listOdd"].count("fmp-scn-nopv") == 1 and js["listOdd"].count("No preview") == 1
 
 
 def test_js_scenario_match_with_real_configurations(js):
@@ -619,30 +644,37 @@ def test_js_scenario_match_with_real_configurations(js):
 def test_js_scenario_list(js):
     h = js["list"]
     assert h.startswith('<table class="fmp-table fmp-scn-table">')
+    # przegląd 0.14.2: ACTIVE = obowiązuje teraz; EP-KKTMA (włączony, okno 1900–2100 jeszcze przed nami) w INACTIVE
     assert [m for m in re.findall(r'<tr class="fmp-grp"><td colspan="(\d)"[^>]*>([A-Z]+)<span class="fmp-grp-sub">(\d+)</span>', h)] == [
-        ("4", "ACTIVE", "2"), ("4", "INACTIVE", "4")]
+        ("4", "ACTIVE", "1"), ("4", "INACTIVE", "5")]
     # aktywne na początku, potem po id (jak backend: "-" przed "_"); wybrany wiersz zielony (sel), nieaktywne czarne;
-    # id spoza wzorca adresu (EP-<X>) bez data-scn do kliknięcia
+    # przegląd 0.14.2: id spoza dawnego wzorca adresu (EP-<X>) też z data-scn (escapowanym) do kliknięcia
     assert re.findall(r'<tr class="([a-z ]+)" data-scn="([^"]*)">', h) == [
-        ("on", "EP-KKTMA"), ("on sel", "EP_DBFG"), ("off", ""), ("off", "EP-ALLFIR"), ("off", "EP-ANY"), ("off", "EP-NONE")]
-    # warunki bez okien czasu, okna w TIME (bez powtórek, bez okna H24), kody TV bez "EP-" z przepustowością w dymku
-    assert '<td class="fmp-scn-cond">when online: EPWW_DBF_CTR</td><td class="fmp-scn-time">H24</td>' in h
+        ("on sel", "EP_DBFG"), ("off", "EP-&lt;X&gt;"), ("off", "EP-ALLFIR"), ("off", "EP-ANY"), ("off", "EP-KKTMA"), ("off", "EP-NONE")]
+    # dymek włączonego, ale nieobowiązującego scenariusza
+    assert '<td class="fmp-sec" title="Scenario EP-KKTMA (enabled, not active now): traffic volumes EP-KKTMA (TMA EPKK)' in h
+    assert h.count("(enabled, not active now)") == 1
+    # warunki bez okien czasu, okna w TIME (bez powtórek, bez okna H24; kawałki bez zawijania), kody TV bez "EP-"
+    # z przepustowością w dymku
+    assert '<td class="fmp-scn-cond">when online: EPWW_DBF_CTR</td><td class="fmp-scn-time"><span>H24</span></td>' in h
     assert ('<td class="fmp-scn-tvs" title="EP-DH: 44 entries/h, 15 aircraft at once\nEP-DM: 44 entries/h, 15 aircraft at once\n'
             'EP-BH: 44 entries/h, 15 aircraft at once\nEP-BM: 44 entries/h, 15 aircraft at once">DH DM BH BM</td>') in h
-    assert ('<td class="fmp-scn-cond">when online: EPKK_APP · bookings count too</td><td class="fmp-scn-time">2026-11-21 1900–2100</td>'
+    assert ('<td class="fmp-scn-cond">when online: EPKK_APP · bookings count too</td><td class="fmp-scn-time"><span>2026-11-21</span> '
+            '<span>1900–2100</span></td>'
             '<td class="fmp-scn-tvs" title="EP-KKTMA: no entry limit, 17 aircraft at once\nEP-KKTMAD: no entry limit, 8 aircraft at once">'
             'KKTMA KKTMAD</td>') in h
     assert ('<td class="fmp-scn-cond">when online: EPWW_ALL_CTR · and offline: EPWW_S_CTR, EPWW_J_CTR, EPWW_N_CTR, EPWW_D*_CTR'
             ' · bookings count too</td>') in h
-    assert '<td class="fmp-scn-cond">no position conditions</td><td class="fmp-scn-time">H24</td><td class="fmp-scn-tvs" title="No traffic volumes">–</td>' in h
+    assert ('<td class="fmp-scn-cond">no position conditions</td><td class="fmp-scn-time"><span>H24</span></td>'
+            '<td class="fmp-scn-tvs" title="No traffic volumes">–</td>') in h
     # id escapowane (dymek i komórka), okno podane dwa razy raz
-    assert '>EP-&lt;X&gt;</td>' in h and "<X>" not in h and '<td class="fmp-scn-time">1600–2200</td>' in h
+    assert '>EP-&lt;X&gt;</td>' in h and "<X>" not in h and '<td class="fmp-scn-time"><span>1600–2200</span></td>' in h
     assert '<td class="fmp-sec" title="Scenario EP_DBFG: traffic volumes EP-DH (sector D upper)' in h
     # bez konfiguracji bez kolumny konfiguracji
     assert "fmp-scn-m" not in h and "<th" in h and h.count("<th ") == 4
     g = js["list2N"]
     assert re.findall(r'<td class="fmp-scn-m (\w+)" title="[^"]*">([^<]+)</td>', g) == [
-        ("unknown", "?"), ("no", "no"), ("yes", "yes"), ("no", "no"), ("yes", "yes"), ("yes", "yes")]
+        ("no", "no"), ("yes", "yes"), ("no", "no"), ("yes", "yes"), ("unknown", "?"), ("yes", "yes")]
     assert ('<td class="fmp-scn-m no" title="With 2N (ALL + NFIR): not met (EPWW_DBF_CTR not open). '
             'Time windows and bookings are not checked.">no</td>') in g
     assert '>2N</th>' in g and "Time windows and bookings are not checked." in g.split("</thead>")[0]
@@ -652,7 +684,12 @@ def test_js_scenario_list(js):
     assert js["listNone"] == ['<p class="hint fmp-empty">No scenarios.</p>'] * 2
     na = js["listNoActive"]
     assert '<tr class="fmp-none"><td colspan="4">No scenario is active now</td></tr>' in na and 'data-scn="EP_DBFG"' not in na
-    assert js["scnInfo"] == ["1210Z · 2 of 6 scenarios active (grey rows)", "1210Z · 1 of 1 scenario active (grey rows)", "", ""]
+    assert js["scnInfo"] == ["1210Z · 1 of 6 scenarios active (grey rows)", "1210Z · 1 of 1 scenario active (grey rows)", "", ""]
+    # przegląd 0.14.2: komórka TIME
+    assert js["timeHtml"] == ["<span>H24</span>", "<span>2026-11-21</span> <span>1900–2100</span>",
+                              "<span>0600–1200,</span> <span>2026-10-18</span> <span>1800–2000</span>",
+                              "<span>2026-11-21</span> <span>1900–</span><wbr><span>2026-11-23</span> <span>2100</span>",
+                              "<span>&lt;x&gt;</span>", "<span></span>"]
     for html in (h, g, na):
         # bez opisu scenariusza (wolny tekst), bez pogrubień i bez nazwy źródła
         assert "DBFG open" not in html and "podział" not in html and "SOLO" not in html
@@ -670,7 +707,7 @@ def test_js_scenario_preview(js):
     assert [r[0] for r in js["tvRows"]] == ["EP-DH", "EP-DM", "EP-BH", "EP-BM"]   # kolejność scenariusza
     p = js["preview"]
     assert p.startswith('<div class="fmc fmp-sp"><div class="fmc-head"><span class="fmc-code" title="Scenario EP_DBFG: ')
-    assert ('>EP_DBFG</span><span class="fmc-desc">scenario preview</span><span class="fmc-chip on">ACTIVE</span>'
+    assert ('>EP_DBFG</span><span class="fmc-desc">scenario preview</span><span class="fmc-chip on" title="Active now">ACTIVE</span>'
             '<button type="button" class="fmp-sp-close" title="Close the preview" aria-label="Close the preview">✕</button></div>') in p
     assert '<div class="fmc-meta">when online: EPWW_DBF_CTR</div>' in p and "fmp-sp-cfg" not in p
     assert '<p class="hint fmp-sp-note">Preview only: nothing is activated. Capacities as set in the scenario, traffic now.</p>' in p
@@ -698,9 +735,13 @@ def test_js_scenario_preview(js):
     kk = js["previewKK"]
     # TMA: poza mapami; błąd wykresu w panelu; okno czasu z datą w warunkach; nieaktywny / aktywny wg scenariusza
     assert '<p class="hint fmp-sp-off">Not on the maps: KKTMA, KKTMAD</p>' in kk and '<p class="error fmc-err">No &lt;data&gt;</p>' in kk
+    # przegląd 0.14.2: włączony, ale nieobowiązujący teraz: INACTIVE z dymkiem (znak i kod w nagłówku)
+    assert '<span class="fmc-chip" title="Enabled, not active now">INACTIVE</span>' in kk
+    assert '<span class="fmc-code" title="Scenario EP-KKTMA (enabled, not active now): ' in kk
     assert "when online: EPKK_APP · bookings count too · 2026-11-21 time 1900–2100" in kk and "podział" not in kk
     nn = js["previewNone"]
-    assert '<span class="fmc-chip">INACTIVE</span>' in nn and '<div class="fmp-sp-cfg yes"' in nn
+    assert '<span class="fmc-chip" title="Not active now">INACTIVE</span>' in nn and '<div class="fmp-sp-cfg yes"' in nn
+    assert "enabled" not in nn and "enabled" not in p
     assert '<tr class="fmp-none"><td colspan="4">No traffic volumes</td></tr>' in nn and "fmp-grp" not in nn
     assert js["scnPick"] == '<p class="hint fmp-pick">Click a scenario to preview its traffic volumes and capacities.</p>'
     v0, v1 = js["views"]
@@ -731,3 +772,26 @@ def test_js_scenario_maps_real_geometry(js):
     assert js["scnPvsNone"] == '<p class="hint fmp-pv-none">No sector geometry.</p><p class="hint fmp-sp-off">Not on the maps: WATMA</p>'
     # podgląd konfiguracji (0.14.0) bez zmian
     assert js["pvAfter"] == js["pv"][0]
+
+
+def test_scenario_list_and_preview_css():
+    """Przegląd 0.14.2: lista scenariuszy mieści się w 424 px jak tabela SECTORS (okno 1280 i 1366 px, także z kolumną
+    konfiguracji; sprawdzone w przeglądarce: scrollWidth = clientWidth): węższe odstępy w komórkach listy, TIME zawijany
+    tylko między kawałkami bez zawijania (timeHtml), szerokość TIME tylko preferowana. Nagłówek tabeli podglądu przyklejony
+    do górnej krawędzi panelu (.fmp-side ma 6 px górnego odstępu), w wąskim oknie (przewija się .fmp-main) bez przesunięcia."""
+    import re
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "fmp.css").read_text("utf-8"), flags=re.S)
+    assert "table.fmp-scn-table th, table.fmp-scn-table td { padding-left: 6px; padding-right: 6px; }" in css
+    assert "table.fmp-scn-table td.fmp-scn-time { width: 158px; white-space: normal; font-size: 14px; }" in css
+    assert "table.fmp-scn-table td.fmp-scn-time span { white-space: nowrap; }" in css
+    # scenariusz bez podglądu: bez rączki i bez podświetlenia wiersza
+    assert "table.fmp-scn-table tbody tr.fmp-scn-nopv { cursor: default; }" in css
+    assert "table.fmp-scn-table tr.fmp-scn-nopv.on:hover td { background: #484848; }" in css
+    assert "table.fmp-scn-table tr.fmp-scn-nopv.off:hover td { background: #000; }" in css
+    assert "table.fmp-table tr.on td { background: #484848; }" in css and "table.fmp-table tr.off td { background: #000; }" in css
+    # nagłówki grup i wiersz "brak" zostają z odstępami tabeli (bardziej szczegółowe reguły)
+    assert "table.fmp-table tr.fmp-grp td { padding: 7px 12px 2px;" in css and "table.fmp-table tr.fmp-none td { padding: 2px 12px 2px 28px;" in css
+    side_pad_top = int(re.search(r"\.fmp-side \{[^}]*padding: (\d+)px", css).group(1))
+    assert f"table.fmp-sp-tab th {{ top: -{side_pad_top}px; }}" in css
+    narrow = re.search(r"@container fmp \(max-width: (\d+)px\) \{ table\.fmp-sp-tab th \{ top: 0; \} \}", css)
+    assert narrow and narrow.group(1) == re.search(r"@container fmp \(max-width: (\d+)px\) \{\n", css).group(1)

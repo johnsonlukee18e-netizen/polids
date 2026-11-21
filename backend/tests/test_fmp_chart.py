@@ -908,3 +908,181 @@ def test_fmp_page_scenarios(tmp_path):
     assert o["unavailable"] == ['<p class="error fmp-empty">Scenarios unavailable.</p>', "", "scenarios"]
     assert o["unavailableSide"] == ['<p class="error fmp-pick">Scenarios unavailable.</p>', 12, []]
     assert o["destroyed"] == [[1], 0]
+
+
+# Przegląd 0.14.2: widok SCENARIOS na atrapie DOM – nieudane wczytanie listy bez "Loading" w panelu (bez względu na to,
+# czy konfiguracje przyjdą przed błędem, czy po nim), scenariusz z id spoza dawnego wzorca (kropka) do kliknięcia i w adresie,
+# wykres nowo wybranego traffic volume podglądu przewinięty do widoku panelu (jak scrollIntoView "nearest"; odświeżenie
+# nie przewija, także po błędzie wykresu; wykres z adresu po narysowaniu podglądu), w wąskim oknie obszar tabeli i panelu
+# (.fmp-main)
+SCN_FIX_SCRIPT = r"""
+globalThis.__pending = [];
+globalThis.__scrolled = [];
+globalThis.__ls = {};
+const timers = [], cleared = [], listeners = {};
+globalThis.setInterval = (f) => { timers.push(f); return timers.length; };
+globalThis.clearInterval = (id) => cleared.push(id);
+globalThis.window = { addEventListener(t, f) { (listeners[t] ||= []).push(f); },
+  removeEventListener(t, f) { listeners[t] = (listeners[t] || []).filter((x) => x !== f); } };
+const fmp = await import(process.argv[2]);
+const tick = () => new Promise((r) => setImmediate(r));
+const tv = (id, o) => ({ id, hours: [], occupancy: [], peak_60: 0, entries_cap: 40, occupancy_cap: 14, restrictions: [], ...o });
+const scn = (id, active, tvs, o) => ({ id, active, enabled: active, tvs: tvs.map((t) => ({ id: t, occupancy_cap: 15, entries_cap: 44 })),
+  positions: [], anypositions: [], nopositions: [], start: "0000", end: "2359", times: [], booked: false, description: "opis", ...o });
+const sectors = { prefix: "EP", now: "1310", scenarios_ok: true,
+  sectors: [tv("EP-DH", { active: true }), tv("EP-DM", { active: true }), tv("EP-KKTMA")],
+  scenarios: [scn("EP_DBFG", true, ["EP-DH", "EP-DM"]), scn("EP-KK.TMA", false, ["EP-KKTMA"], { enabled: true })] };
+const chart = (id) => ({ id, label: "x", now: "1310", start: "1200", minutes: 300, now_at: 70, step: 20, span: 60, active: true,
+  restricted: false, entries_cap: 40, occupancy_cap: 14, entries: [{ from: 0, count: 3, cap: 40, reg: null }],
+  occupancy: [1, 2, 3], entries_reg: [], occupancy_reg: [], peak: 3, peak_at: "1312" });
+const cd = { ver: "v1", layers: {}, geo: { border: [], acc: [] }, configs: [],
+  current: { ok: true, error: null, positions: [], names: [], code: null } };
+const picks = [];
+const pane = { append(x) { this.root = x; } };
+const page = fmp.mountFmp(pane, { start: "scenarios/ep_dbfg", onPick: (a, fix) => picks.push([a, !!fix]) });
+const root = pane.root, box = root.querySelector(".fmp-scroll"), side = root.querySelector(".fmp-side"), main = root.querySelector(".fmp-main");
+const urls = () => globalThis.__pending.map((p) => p.url);
+const take = (url) => { const i = globalThis.__pending.findIndex((p) => p.url === url); return globalThis.__pending.splice(i, 1)[0]; };
+const head = () => (/class="fmc-code[^"]*" title="[^"]*">([^<]+)</.exec(side.innerHTML) || [])[1] || null;
+const click = (el, sel, dataset) => el.on.click.forEach((f) => f({ target: { closest: (s) => (s === sel ? { dataset } : null) } }));
+const fail = (m) => Object.assign(new Error(m), { status: 502 });
+const o = {};
+// szybki błąd listy, konfiguracje później (kolejność, w której panel zostawał na "Loading")
+o.start = side.innerHTML;
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+o.failFirst = [box.innerHTML, side.innerHTML];
+take("/api/radio/configs?geo=1").res(cd);
+await tick();
+o.failAfterCfg = side.innerHTML;
+// odświeżenie co 60 s: ten sam błąd, konfiguracje po nim; potem odwrotna kolejność
+timers[0]();
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+take("/api/radio/configs?have=v1").res(cd);
+await tick();
+o.failRefresh = [box.innerHTML, side.innerHTML, urls()];
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+await tick();
+take("/api/viff/sectors").rej(fail("Upstream error"));
+await tick();
+o.failReverse = side.innerHTML;
+// bez wybranego scenariusza: pusto (nie ma czego kliknąć)
+page.activate("scenarios");
+o.failNoSel = [side.innerHTML, picks.length];
+// lista wraca: podgląd scenariusza z adresu
+page.activate("scenarios/EP_DBFG");
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.recovered = [head(), side.innerHTML.includes("Loading"), side.innerHTML.includes("unavailable"), box.innerHTML.includes('data-scn="EP-KK.TMA"')];
+// klik w scenariusz z kropką w id: krok historii z tym id, zaznaczenie, podgląd (włączony, ale nieobowiązujący)
+click(box, "tr[data-scn]", { scn: "EP-KK.TMA" });
+o.oddClick = [picks.at(-1), fmp.parseFmpArg(picks.at(-1)[0]).scn, head(),
+  box.scnRows.filter((r) => r.classList.contains("sel")).map((r) => r.dataset.scn),
+  side.innerHTML.includes('<span class="fmc-chip" title="Enabled, not active now">INACTIVE</span>')];
+page.activate("scenarios/ep-kk.tma");
+o.oddAddr = [head(), picks.length, urls()];
+// klik w traffic volume podglądu: wykres pod tabelą (atrapa: 700 px od góry strony, panel od 100 px, 300 px widoczne)
+page.activate("scenarios/EP_DBFG");
+side.scrollHeight = 1000; side.clientHeight = 300; side.scrollTop = 0;
+side.getBoundingClientRect = () => ({ top: 100 });
+side.kids[".fmp-sp-chart"] = { getBoundingClientRect: () => ({ top: 700 - side.scrollTop, height: 480 }) };
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+o.scrollLoading = [side.scrollTop, urls()];
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+o.scrollLoaded = [side.scrollTop, side.innerHTML.includes("fmc-svg")];
+// odświeżenie tego samego wykresu nie przewija (użytkownik przewinął panel wyżej)
+side.scrollTop = 50;
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+take("/api/viff/sectors/EP-DH").res(chart("EP-DH"));
+await tick();
+o.scrollRefresh = side.scrollTop;
+// wykres już cały widoczny: bez przewijania
+side.scrollTop = 0;
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 150 - side.scrollTop, height: 120 });
+click(side, "tr[data-tv]", { tv: "EP-DM" });
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.scrollVisible = side.scrollTop;
+// niższy od panelu, ale pod jego dolną krawędzią: dolna krawędź do dolnej krawędzi panelu (też z błędem wykresu)
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 300 - side.scrollTop, height: 200 });
+click(side, "tr[data-tv]", { tv: "EP-DH" });
+take("/api/viff/sectors/EP-DH").rej(fail("No flow data"));
+await tick();
+o.scrollBottom = [side.scrollTop, side.innerHTML.includes("No flow data")];
+// odświeżenie co 60 s po błędzie wykresu (ten sam traffic volume, znów "Loading", potem błąd): bez przewijania
+side.scrollTop = 20;
+timers[0]();
+take("/api/radio/configs?have=v1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.errRefreshLoading = [side.scrollTop, side.innerHTML.includes("Loading")];
+take("/api/viff/sectors/EP-DH").rej(fail("No flow data"));
+await tick();
+o.errRefresh = [side.scrollTop, side.innerHTML.includes("No flow data")];
+// wąskie okno: panel pod listą bez własnego przewijania, przewija się .fmp-main
+side.scrollHeight = 500; side.clientHeight = 500; side.scrollTop = 0;
+main.scrollHeight = 1200; main.clientHeight = 400; main.scrollTop = 0;
+main.getBoundingClientRect = () => ({ top: 50 });
+side.kids[".fmp-sp-chart"].getBoundingClientRect = () => ({ top: 900 - main.scrollTop, height: 300 });
+click(side, "tr[data-tv]", { tv: "EP-DM" });
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.narrow = [side.scrollTop, main.scrollTop];
+page.destroy();
+// adres ze scenariuszem i traffic volume (przeładowanie, link): wykres przyszedł przed listą, przewinięty do widoku
+// dopiero po narysowaniu podglądu
+globalThis.__pending = [];
+const pane2 = { append(x) { this.root = x; } };
+const page2 = fmp.mountFmp(pane2, { start: "scenarios/EP_DBFG/EP-DM" });
+const side2 = pane2.root.querySelector(".fmp-side");
+side2.scrollHeight = 1000; side2.clientHeight = 300; side2.getBoundingClientRect = () => ({ top: 100 });
+side2.kids[".fmp-sp-chart"] = { getBoundingClientRect: () => ({ top: 700 - side2.scrollTop, height: 480 }) };
+take("/api/viff/sectors/EP-DM").res(chart("EP-DM"));
+await tick();
+o.addrChartFirst = [side2.scrollTop, side2.innerHTML];
+take("/api/radio/configs?geo=1").res(cd);
+take("/api/viff/sectors").res(sectors);
+await tick();
+o.addrList = [side2.scrollTop, side2.innerHTML.includes("fmc-svg")];
+page2.destroy();
+console.log(JSON.stringify(o));
+"""
+
+
+def test_fmp_page_scenarios_review_fixes(tmp_path):
+    node = _node()
+    _page_modules(tmp_path)
+    (tmp_path / "run.mjs").write_text(SCN_FIX_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "run.mjs"), (tmp_path / "fmp.mjs").as_uri()], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    o = json.loads(r.stdout)
+    unavailable = '<p class="error fmp-pick">Scenarios unavailable.</p>'
+    # przed pierwszą odpowiedzią "Loading"; po błędzie listy już nie (nic nie czeka), także gdy konfiguracje przyjdą później
+    assert o["start"] == '<p class="hint fmp-pick">Loading…</p>'
+    assert o["failFirst"] == ['<p class="error fmp-err">Upstream error</p>', unavailable]
+    assert o["failAfterCfg"] == unavailable and o["failReverse"] == unavailable
+    assert o["failRefresh"] == ['<p class="error fmp-err">Upstream error</p>', unavailable, []]
+    assert o["failNoSel"] == ["", 0]
+    assert o["recovered"] == ["EP_DBFG", False, False, True]
+    # id z kropką: klik = krok historii z tym id (adres go zachowuje), zaznaczony wiersz i podgląd
+    assert o["oddClick"] == [["scenarios/EP-KK.TMA", False], "EP-KK.TMA", "EP-KK.TMA", ["EP-KK.TMA"], True]
+    assert o["oddAddr"] == ["EP-KK.TMA", 1, []]
+    # wykres pod tabelą podglądu: górna krawędź 8 px pod górną krawędzią panelu (wyższy niż panel), od razu z "Loading"
+    assert o["scrollLoading"] == [592, ["/api/viff/sectors/EP-DH"]]
+    assert o["scrollLoaded"] == [592, True]
+    assert o["scrollRefresh"] == 50
+    assert o["scrollVisible"] == 0
+    assert o["scrollBottom"] == [100, True]
+    # odświeżenie po błędzie wykresu nie przewija (panel zostaje tam, gdzie go zostawił użytkownik)
+    assert o["errRefreshLoading"] == [20, True] and o["errRefresh"] == [20, True]
+    # wykres z adresu przed listą: najpierw "Loading" bez przewijania, po liście podgląd z wykresem w widoku panelu
+    assert o["addrChartFirst"] == [0, '<p class="hint fmp-pick">Loading…</p>']
+    assert o["addrList"] == [592, True]
+    assert o["narrow"] == [0, 750]

@@ -179,7 +179,18 @@ table.fmp-table tr.fmp-none td { padding: 2px 12px 2px 28px; background: #000; c
 .fmp-vw { display: inline-flex; gap: 3px; }
 table.fmp-scn-table td.fmp-scn-cond, table.fmp-scn-table td.fmp-scn-tvs { white-space: normal; color: var(--text);
   font: 400 13px/1.3 var(--ui); }
-table.fmp-scn-table td.fmp-scn-time { font-size: 14px; }
+/* przegląd 0.14.2: lista scenariuszy mieści się w 424 px jak tabela SECTORS (okno 1280–1440 px, także z kolumną
+   konfiguracji): węższe odstępy w komórkach (nagłówki grup i wiersz "brak" zostają jak w tabeli), TIME zawijany tylko
+   między słowami (data, okno godzin) i po półpauzie przed datą końca (fmp.js timeHtml: kawałki w <span>), nigdy
+   w środku daty; szerokość TIME jak SCENARIO tylko preferowana: w szerokim oknie okno "2026-11-21 1900–2100" w jednej
+   linii, w wąskim kolumna zwęża się do najdłuższego kawałka */
+table.fmp-scn-table th, table.fmp-scn-table td { padding-left: 6px; padding-right: 6px; }
+table.fmp-scn-table td.fmp-scn-time { width: 158px; white-space: normal; font-size: 14px; }
+table.fmp-scn-table td.fmp-scn-time span { white-space: nowrap; }
+/* przegląd 0.14.2: scenariusz bez podglądu (id, którego adres nie uniesie): wiersz nie wygląda na klikalny */
+table.fmp-scn-table tbody tr.fmp-scn-nopv { cursor: default; }
+table.fmp-scn-table tr.fmp-scn-nopv.on:hover td { background: #484848; }
+table.fmp-scn-table tr.fmp-scn-nopv.off:hover td { background: #000; }
 table.fmp-scn-table td.fmp-scn-m { text-align: center; font-size: 14px; }
 table.fmp-scn-table td.fmp-scn-m.yes, .fmp-sp-cfg.yes { color: var(--green-hi); }
 table.fmp-scn-table td.fmp-scn-m.no, .fmp-sp-cfg.no { color: var(--muted); }
@@ -187,6 +198,11 @@ table.fmp-scn-table td.fmp-scn-m.unknown, .fmp-sp-cfg.unknown { color: var(--yel
 .fmp-sp-cfg { margin: 2px 0 0; font-size: 12px; cursor: help; }
 .fmp-sp-note { margin: 4px 0; font-size: 12px; }
 table.fmp-sp-tab { margin-top: 4px; font-size: 15px; }
+/* przegląd 0.14.2: nagłówek tabeli podglądu przyklejony do górnej krawędzi panelu (.fmp-side ma 6 px górnego odstępu,
+   w którym inaczej widać przewijane wiersze); w wąskim oknie przewija się .fmp-main bez odstępu */
+table.fmp-sp-tab th { top: -6px; }
+@container fmp (max-width: 919px) { table.fmp-sp-tab th { top: 0; } }
+.fmp-sp .fmc-chip[title] { cursor: help; }
 table.fmp-sp-tab td.fmp-sp-now { color: var(--muted); font-size: 13px; }
 .fmp-sp-chart { margin-top: 10px; padding-top: 6px; border-top: 1px solid #3a3a3a; }
 .fmp-sp .fmp-pvs, .fmp-sp .fmp-pv-none { margin-top: 10px; }

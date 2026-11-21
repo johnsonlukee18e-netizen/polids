@@ -2,7 +2,7 @@ import { api, esc, h, lsGet, lsSet, ONLINE_EVENT } from "./api.js";
 import { colorFor } from "./airspace.js";
 import { dissolve, pointIn, ringStats } from "./dissolve.js";
 import { EPWW_BBOX, FMP_LS, LEVEL_FT, bboxOf, bboxOrDefault, flText, pathAll, pathOf, projection, ringsOf, sliceAt } from "./radioboard.js";
-import { capOf, fmpRows, loadClass, scnCond, scnTimeText, scnTip, tvLabel } from "./viffchart.js";
+import { capOf, fmpRows, loadClass, scnCond, scnEnabledIdle, scnTimeText, scnTip, tvLabel } from "./viffchart.js";
 
 // OTHER › FMP (0.13.0, issue #23): sektory (traffic volumes) w tabeli SECTOR | CAPACITY | OCCUPANCY jak FMP PANDORY,
 // z tych samych danych co panel sektorów na MAP (GET /api/viff/sectors, jedno zapytanie zbiorcze z cache).
@@ -44,6 +44,12 @@ import { capOf, fmpRows, loadClass, scnCond, scnTimeText, scnTip, tvLabel } from
 // "#other/fmp/scenarios", "#other/fmp/scenarios/EP_NFIR", "#other/fmp/scenarios/EP_NFIR/EP-BH", z konfiguracją
 // "#other/fmp/2N/scenarios/EP_NFIR"; słowo "scenarios" w adresie, bo id scenariusza bywa też id traffic volume
 // (EP-WATMA). SECTORS po podglądzie zostawia wybrany traffic volume (wykresy z prawdziwą przepustowością).
+// Przegląd 0.14.2: ACTIVE = scenariusz obowiązuje teraz (isActive z vIFF); włączony, ale jeszcze nieobowiązujący
+// (enabled) jest w INACTIVE z dopiskiem "enabled, not active now" w dymku wiersza i podglądu. Kolumna TIME zawija się
+// tylko między datą a godzinami i po półpauzie przed datą końca okna dłuższego niż doba (lista mieści się w 424 px jak
+// tabela SECTORS); id scenariusza to wolny tekst (cleanScn), a wiersz scenariusza, którego id adres nie uniesie, nie
+// wygląda na klikalny i ma dymek "No preview". Klik w traffic volume podglądu przewija panel do jego wykresu (raz,
+// odświeżenie nie przewija); nieudane wczytanie listy nie zostawia w panelu "Loading".
 
 const REFRESH_MS = 60000;
 
@@ -53,9 +59,10 @@ const DASH = "\u2013", DOT = " \u00b7 ";
 export const cleanTv = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z]{2}-[A-Z0-9-]{1,20}$/.test(t) ? t : ""; };
 // 0.14.0 (właściciel projektu): kod konfiguracji sektorów z adresu albo z pamięci: cyfra i litera ("2n" → "2N"); inne napisy = ""
 export const cleanCfg = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
-// 0.14.2 (issue #35): id scenariusza z adresu albo z wiersza listy: wielkie litery ("ep_nfir" → "EP_NFIR"), cyfry, "_"
-// i "-", do 40 znaków; inne napisy = ""
-export const cleanScn = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{0,39}$/.test(t) ? t : ""; };
+// 0.14.2 (issue #35): id scenariusza z adresu albo z wiersza listy wielkimi literami ("ep_nfir" → "EP_NFIR"); przegląd
+// 0.14.2: id scenariusza w vIFF to wolny tekst ("EP-KK.TMA", "EP WAA1"), więc każdy napis do 64 znaków bez "/" (dzieli
+// adres) i bez znaków sterujących; adres koduje i odkodowuje router (hashOf, parseHash); inne napisy = ""
+export const cleanScn = (s) => { const t = String(s ?? "").trim().toUpperCase(); return t.length <= 64 && /^[^\/\u0000-\u001f\u007f]+$/.test(t) ? t : ""; };
 // adres podzakładki → {cfg, tv, view, scn}: "2N", "2N/EP-BH", stare "EP-BH" (sam sektor, bez konfiguracji), 0.14.2:
 // "scenarios", "scenarios/EP_NFIR", "2N/scenarios/EP_NFIR/EP-BH" (view = "scenarios", traffic volume tylko przy
 // scenariuszu); zły kod, sektor albo scenariusz = ""
@@ -438,7 +445,12 @@ export function scnMatch(s, cfg) {
   return { state: "yes", text: `${head}: the position conditions are met` };
 }
 const MATCH_TEXT = { yes: "yes", no: "no", unknown: "?" };
+// przegląd 0.14.2: komórka TIME zawija się tylko między słowami (data, okno godzin) i po półpauzie przed datą końca
+// ("2026-11-20 1900–" / "2026-11-22 2100"), nigdy w środku daty ani okna: każdy kawałek w <span> bez zawijania (CSS)
+export const timeHtml = (t) => String(t ?? "").split(" ")
+  .map((w) => w.split(/(?<=\u2013)(?=\d{4}-)/).map((x) => `<span>${esc(x)}</span>`).join("<wbr>")).join(" ");
 const NOT_CHECKED = "Time windows and bookings are not checked.";
+const NO_PREVIEW = "\nNo preview: this scenario id cannot be used in the page address.";
 
 // lista scenariuszy (lewa strona widoku SCENARIOS): grupy ACTIVE i INACTIVE, wiersz = scenariusz (sel = id wybranego);
 // cfg = wybrana konfiguracja: kolumna z jej kodem (scnMatch). Czysta funkcja (testy w Node)
@@ -452,10 +464,13 @@ export function scnListHtml(data, sel = "", cfg = null) {
     const id = cleanScn(s.id), tvs = (s.tvs || []).filter((t) => t?.id), m = scnMatch(s, cfg);
     const tvTip = tvs.map((t) => `${t.id}: ${capWords(t.entries_cap, "entries/h", "no entry limit")}, `
       + `${capWords(t.occupancy_cap, "aircraft at once", "no occupancy limit")}`).join("\n") || "No traffic volumes";
-    return `<tr class="${s.active ? "on" : "off"}${id && id === sel ? " sel" : ""}" data-scn="${esc(id)}">`
-      + `<td class="fmp-sec" title="${esc(scnTip(s))}">${esc(s.id)}</td>`
+    // przegląd 0.14.2: id, którego adres nie uniesie ("/", znaki sterujące, ponad 64 znaki; cleanScn = ""): wiersz bez
+    // data-scn, bez kursora rączki i podświetlenia (CSS fmp-scn-nopv) i z dymkiem, że podglądu nie ma; inaczej wyglądałby
+    // na klikalny, a klik nic nie robi
+    return `<tr class="${s.active ? "on" : "off"}${id && id === sel ? " sel" : ""}${id ? "" : " fmp-scn-nopv"}"${id ? ` data-scn="${esc(id)}"` : ""}>`
+      + `<td class="fmp-sec" title="${esc(scnTip(s) + (id ? "" : NO_PREVIEW))}">${esc(s.id)}</td>`
       + `<td class="fmp-scn-cond">${esc(scnCond(s, { times: false }))}</td>`
-      + `<td class="fmp-scn-time">${esc(scnTimeText(s))}</td>`
+      + `<td class="fmp-scn-time">${timeHtml(scnTimeText(s))}</td>`
       + `<td class="fmp-scn-tvs" title="${esc(tvTip)}">${esc(tvs.map((t) => code(t.id)).join(" ") || DASH)}</td>`
       + (m ? `<td class="fmp-scn-m ${m.state}" title="${esc(`${m.text}. ${NOT_CHECKED}`)}">${MATCH_TEXT[m.state]}</td>` : "") + "</tr>";
   };
@@ -558,6 +573,9 @@ function spRowHtml(r, sel) {
   return rowHtml(r, sel, `<td class="fmp-sp-now" title="${esc(tip)}">${esc(now)}</td>`);
 }
 
+// dymek znaku ACTIVE / INACTIVE w podglądzie; przegląd 0.14.2: włączony, ale nieobowiązujący teraz osobno
+const chipTip = (s) => (s.active ? "Active now" : scnEnabledIdle(s) ? "Enabled, not active now" : "Not active now");
+
 // SCENARIO PREVIEW (prawa strona widoku SCENARIOS): nagłówek (id, ACTIVE / INACTIVE, ✕), warunki, z konfiguracją
 // linia scnMatch, zdanie, że to tylko podgląd, tabela traffic volumes z przepustowością ze scenariusza (z konfiguracją
 // w grupach stanowisk), pod nią wykresy wybranego TV (sel; chart = odpowiedź /api/viff/sectors/<TV>, note / err jak
@@ -574,7 +592,7 @@ export function scnPreviewHtml(data, s, { cfg = null, geo = null, ver = "", laye
       : fmpWaitHtml(sel, row, err)}</div>`;
   }
   return `<div class="fmc fmp-sp"><div class="fmc-head"><span class="fmc-code" title="${esc(scnTip(s))}">${esc(s.id)}</span>`
-    + `<span class="fmc-desc">scenario preview</span><span class="fmc-chip${s.active ? " on" : ""}">${s.active ? "ACTIVE" : "INACTIVE"}</span>`
+    + `<span class="fmc-desc">scenario preview</span><span class="fmc-chip${s.active ? " on" : ""}" title="${chipTip(s)}">${s.active ? "ACTIVE" : "INACTIVE"}</span>`
     + `<button type="button" class="fmp-sp-close" title="Close the preview" aria-label="Close the preview">\u2715</button></div>`
     + `<div class="fmc-meta">${esc(scnCond(s))}</div>`
     + (m ? `<div class="fmp-sp-cfg ${m.state}" title="${NOT_CHECKED}">${esc(m.text)}</div>` : "")
@@ -613,7 +631,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   // 0.14.2 (issue #35): view = "" (SECTORS) albo "scenarios", scnSel = wybrany scenariusz ("" = żaden; sel = jego
   // traffic volume z wykresami), chartNote / chartErr = błąd odświeżenia / wczytania wykresu w podglądzie, drawnScn =
   // scenariusz, którego podgląd jest w panelu (inny = panel przewinięty na początek)
-  let view = first.view, scnSel = first.scn, chartNote = "", chartErr = "", drawnScn = "";
+  let view = first.view, scnSel = first.scn, chartNote = "", chartErr = "", drawnScn = "", shownTv = "";
   let sel = first.tv, chart = null, chartAt = 0, cseq = 0, reveal = view ? !!scnSel : !!sel;
   // 0.14.0 (właściciel projektu): cfgSel = wybrana konfiguracja ("" = żadna), cd = ostatnia odpowiedź /api/radio/configs (cdErr: błąd
   // ostatniego odświeżenia), geo = geometria podglądów (geoVer: jej wersja), grouped = konfiguracja, wg której jest
@@ -651,6 +669,23 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     if (fix) { mark(); onPick(here(), true); }
   };
   const draw = (html) => { const top = side.scrollTop; side.innerHTML = html; side.scrollTop = top; };
+  // przegląd 0.14.2: nowo wybrany traffic volume podglądu (wykres pod tabelą podglądu) przewinięty do widoku jak
+  // scrollIntoView "nearest": wykres niższy od panelu cały, wyższy od góry (8 px odstępu); tylko panel (szerokie okno)
+  // albo obszar tabeli i panelu (wąskie okno, panel pod listą), bez przewijania całego obszaru FMP; wykres już widoczny
+  // zostaje, gdzie jest (wybrany wiersz też)
+  // shownTv = traffic volume, którego wykres (albo błąd) panel już tak pokazał: odświeżenie co minutę (także po błędzie
+  // wykresu) nie przewija; done = false: tylko "Loading" (wykres jeszcze przewinie się po wczytaniu)
+  const showChart = (done = true) => {
+    if (!view || !sel || shownTv === sel || !scnOf()) return;
+    if (done) shownTv = sel;
+    for (const sc of [side, main]) {
+      const cb = side.querySelector(".fmp-sp-chart")?.getBoundingClientRect?.(), sb = sc.getBoundingClientRect?.();
+      if (!cb || !sb || !(sc.scrollHeight > sc.clientHeight)) continue;
+      const top = cb.top - sb.top - (sc.clientTop || 0) + sc.scrollTop - 8;
+      const want = Math.min(top, top + 8 + cb.height - sc.clientHeight);
+      if (want > sc.scrollTop) sc.scrollTop = want;
+    }
+  };
   // tabela (z grupami wybranej konfiguracji) albo lista scenariuszy; przewinięcie zostaje
   const drawTable = () => {
     if (!data) return;
@@ -676,14 +711,17 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     const s = scnOf();
     if (!s) {
       drawnScn = "";
-      side.innerHTML = scnSel && !data ? `<p class="hint fmp-pick">Loading\u2026</p>`
+      // przegląd 0.14.2: lista się nie wczytała (loadedAt bez data): bez "Loading" (nic już nie czeka; błąd jest
+      // w liście), z wybranym scenariuszem krótki komunikat, bez wyboru pusto (nie ma czego kliknąć)
+      side.innerHTML = !data && loadedAt ? (scnSel ? `<p class="error fmp-pick">Scenarios unavailable.</p>` : "")
+        : scnSel && !data ? `<p class="hint fmp-pick">Loading\u2026</p>`
         : scnSel && data?.scenarios_ok === false ? `<p class="error fmp-pick">Scenarios unavailable.</p>` : scnPickHtml();
       return;
     }
     const html = scnPreviewHtml(data, s, { cfg: cfgOf(), geo, ver: geoVer, layers: cd?.layers || {}, sel,
       chart: chart?.id === sel ? chart : null, note: chartNote, err: chartErr });
     if (drawnScn === scnSel) draw(html);
-    else { side.innerHTML = html; side.scrollTop = 0; }
+    else { side.innerHTML = html; side.scrollTop = 0; shownTv = ""; }
     drawnScn = scnSel;
   };
   // pasek CONFIGURATION i panel wybranej konfiguracji (stanowiska i podglądy); przegląd 0.14.0: fokus z klawiatury
@@ -707,7 +745,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
       data = d; loadedAt = Date.now();
       fixScn();
       drawTable();
-      if (view) drawSide();
+      if (view) { drawSide(); if (chart?.id === sel || chartErr) showChart(); }
       info.textContent = view ? scnInfo(d) : fmpInfo(d);
       msg.textContent = "";
       if (reveal) showRow();
@@ -717,7 +755,8 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
       if (data) msg.textContent = `Not refreshed: ${e.message}`;
       else {
         box.innerHTML = `<p class="error fmp-err">${esc(e.message)}</p>`; info.textContent = "";
-        if (view) side.innerHTML = "";
+        // przegląd 0.14.2: panel wg tej samej reguły co po wczytaniu konfiguracji i wykresu (drawSide), bez "Loading"
+        if (view) drawSide();
       }
     }
   };
@@ -748,7 +787,9 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     const my = ++cseq, id = sel, fresh = chart?.id !== id;
     if (view) {
       if (!id || fresh) { chart = null; chartAt = 0; chartNote = chartErr = ""; drawSide(); }
-      if (!id) return;
+      if (!id) { shownTv = ""; return; }
+      // przegląd 0.14.2: "Loading" pod tabelą podglądu od razu widoczny, po wczytaniu jeszcze raz (wykres jest wyższy)
+      if (fresh) showChart(false);
     } else {
       if (!id) { chart = null; chartAt = 0; side.innerHTML = fmpPickHtml(); return; }
       if (chart?.id !== id) side.innerHTML = fmpWaitHtml(id, rowOf(id));
@@ -757,7 +798,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
       const c = await api(`/api/viff/sectors/${encodeURIComponent(id)}`);
       if (dead || my !== cseq) return;
       chart = c; chartAt = Date.now();
-      if (view) { chartNote = chartErr = ""; drawSide(); return; }
+      if (view) { chartNote = chartErr = ""; drawSide(); showChart(); return; }
       draw(fmpChartHtml(c, rowOf(id)));
       // w wąskim oknie wykresy stoją pod tabelą i ją skracają: nowo wybrany wiersz zostaje widoczny (odświeżenie co
       // minutę nie przewija)
@@ -769,6 +810,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
         if (chart?.id === id) chartNote = `Not refreshed: ${e.message}`;
         else { chart = null; chartErr = e.message; }
         drawSide();
+        showChart();
         return;
       }
       if (chart?.id === id) draw(fmpChartHtml(chart, rowOf(id), `Not refreshed: ${e.message}`));
