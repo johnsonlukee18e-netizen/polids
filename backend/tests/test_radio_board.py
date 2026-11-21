@@ -199,10 +199,12 @@ def test_board_atis(board):
 
 def test_board_atis_from_aip(client, monkeypatch):
     """0.13.6: drugi ATIS z AIP (EPWA ATIS DEP 123.430) i ATIS lotniska bez ATIS w pliku .ese (EPRA 125.230) są na
-    poprawnej częstotliwości: na pasku ATIS jako dodatkowe wiersze z częstotliwością z sieci i z plakietką TWR/A; ten
-    sam znak na 199.998 albo na częstotliwości spoza danych – jakby go nie było."""
-    def feed_with(*atis):
-        return {**FEED, "controllers": [], "atis": [
+    poprawnej częstotliwości: na pasku ATIS jako dodatkowe wiersze z częstotliwością z sieci i w dymku plakietki wieży
+    (0.14.2: plakietki samego ATIS już nie ma – tylko wieża online, EPWA); ten sam znak na 199.998 albo na
+    częstotliwości spoza danych – jakby go nie było."""
+    def feed_with(*atis, ctrls=()):
+        return {**FEED, "controllers": [{"callsign": cs, "frequency": fq, "name": "Twr", "cid": 60 + i}
+                                        for i, (cs, fq) in enumerate(ctrls)], "atis": [
             {"callsign": cs, "frequency": fq, "name": "Atis", "cid": 70 + i, "atis_code": code}
             for i, (cs, fq, code) in enumerate(atis)]}
 
@@ -212,20 +214,20 @@ def test_board_atis_from_aip(client, monkeypatch):
         monkeypatch.setattr(vatsim_api, "get_feed", other)
         return client.get("/api/radio/board").json()
 
-    d = get(feed_with(("EPWA_A_ATIS", "120.455", "K"), ("EPWA_D_ATIS", "123.430", "L"), ("EPRA_ATIS", "125.230", "M")))
+    d = get(feed_with(("EPWA_A_ATIS", "120.455", "K"), ("EPWA_D_ATIS", "123.430", "L"), ("EPRA_ATIS", "125.230", "M"),
+                      ctrls=[("EPWA_TWR", "118.305")]))
     atis = {a["callsign"]: a for a in d["atis"]}
     assert atis["EPWA_ATIS"]["online"] and d["online"]["EPWA_ATIS"]["callsign"] == "EPWA_A_ATIS"
     assert atis["EPWA_D_ATIS"]["extra"] and atis["EPWA_D_ATIS"]["online"] and atis["EPRA_ATIS"]["extra"]
     assert (d["pos"]["EPWA_D_ATIS"]["frequency"], d["online"]["EPWA_D_ATIS"]["atis_code"]) == ("123.430", "L")
     assert (d["pos"]["EPRA_ATIS"]["frequency"], d["online"]["EPRA_ATIS"]["atis_code"]) == ("125.230", "M")
-    twra = {p["icao"]: p["atis"] for p in d["plates"]["twr"]}
-    assert twra["EPWA"] == ["EPWA_ATIS", "EPWA_D_ATIS"] and twra["EPRA"] == ["EPRA_ATIS"]
+    # plakietka tylko wieży online (EPWA) z oboma ATIS-ami w dymku; EPRA (sam ATIS, wieża offline) bez plakietki
+    assert {p["icao"]: p["atis"] for p in d["plates"]["twr"]} == {"EPWA": ["EPWA_ATIS", "EPWA_D_ATIS"]}
     # znak stanowiska z pliku (EPWA_ATIS) na drugiej częstotliwości z AIP: w swoim wierszu, z częstotliwością z sieci
     d = get(feed_with(("EPWA_ATIS", "123.430", "N")))
     row = next(a for a in d["atis"] if a["callsign"] == "EPWA_ATIS")
     assert row["online"] and not row.get("extra") and d["pos"]["EPWA_ATIS"]["frequency"] == "123.430"
-    assert d["online"]["EPWA_ATIS"]["atis_code"] == "N" and {p["icao"]: p["atis"] for p in d["plates"]["twr"]} == {
-        "EPWA": ["EPWA_ATIS"]}
+    assert d["online"]["EPWA_ATIS"]["atis_code"] == "N" and d["plates"]["twr"] == []
     for fq in ("199.998", "121.130"):
         d = get(feed_with(("EPWA_D_ATIS", fq, "L"), ("EPRA_ATIS", fq, "M"), ("EPWA_ATIS", fq, "N")))
         assert not any(a["online"] for a in d["atis"]) and d["plates"]["twr"] == [], fq
@@ -247,8 +249,9 @@ def test_board_neighbour_firs(board):
     assert all(set(s) == {"fir", "title"} for s in rb.STACKS)
     assert all(set(f) == {"fir", "title", "name", "room", "merge", "staffed", "advisory", "online", "boxes"} for f in board["firs"])
     heads = {f["fir"]: (f["name"]["col"], f["name"]["row"], f["name"]["cols"]) for f in board["firs"]}
-    assert heads == {"EDWW": (2, 4, 1), "EDUU": (3, 6, 1), "EDMM": (2, 14, 1), "ESAA": (5, 4, 2), "LKAA": (5, 18, 2),
-                     "UMKK": (10, 4, 1), "LZBB": (10, 18, 1), "EYVL": (13, 3, 1), "UMMV": (13, 9, 1), "UKLV": (13, 15, 1)}
+    # 0.14.2 (issue #35): ESAA i UMKK o wiersz wyżej
+    assert heads == {"EDWW": (2, 4, 1), "EDUU": (3, 6, 1), "EDMM": (2, 14, 1), "ESAA": (5, 3, 2), "LKAA": (5, 18, 2),
+                     "UMKK": (10, 3, 1), "LZBB": (10, 18, 1), "EYVL": (13, 3, 1), "UMMV": (13, 9, 1), "UKLV": (13, 15, 1)}
     lkaa = next(f for f in board["firs"] if f["fir"] == "LKAA")
     assert {(b["col"], b["row"]) for m in lkaa["boxes"] for b in m["members"]} == {(5, 19), (6, 19), (5, 20), (6, 20), (6, 21)}
     assert not any(t in fmp for f in lay["firs"] for b in f["boxes"] for t in b["tiles"])
@@ -282,24 +285,28 @@ def test_board_neighbour_firs(board):
 def test_board_geo(client):
     """0.13.2 (issue #27, właściciel projektu: "mapy całe czarne"): geometria bez sąsiadów (bez sektorów ACC, TMA i CTR sąsiadów –
     granice FIR-ów sąsiadów zostają jako cienkie linie); kształty TMA/CTA, CTR i FIS FIR EPWW do granic stanowisk
-    online (id, nazwa, geometria; TMA z kluczem TMA, CTR z grupą CTR), bez kolejności przejmowania."""
+    online (id, nazwa, geometria; TMA z kluczem TMA, CTR z grupą CTR), bez kolejności przejmowania. 0.14.2 (issue #35):
+    także ATZ lotnisk (z ICAO lotniska) do warstwy TWR/A."""
     d = client.get("/api/radio/board?geo=1").json()
     g = d["geo"]
-    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis"}
+    assert set(g) == {"border", "firs", "acc", "tma", "ctr", "fis", "atz"}
     assert g["border"]["type"] == "MultiPolygon" and g["border"]["coordinates"]
     assert {f["id"] for f in g["firs"]} >= {"EDWW", "EDMM", "LKAA", "LZBB", "UKLV", "UMMV", "EYVL", "UMKK", "ESAA"}
     assert all("-" not in f["id"] and f["id"] != "EPWW" for f in g["firs"])
     letters = {s["letter"] for s in d["sectors"]}
     assert {a["letter"] for a in g["acc"]} == letters
     assert all(a["lo"] < a["hi"] and a["geometry"]["coordinates"] and a["name"].startswith("EPWW") for a in g["acc"])
-    for key, pre, extra in (("tma", "t", {"tma"}), ("ctr", "c", {"ctr"}), ("fis", "f", set())):
+    for key, pre, extra in (("tma", "t", {"tma"}), ("ctr", "c", {"ctr"}), ("fis", "f", set()), ("atz", "z", {"atz"})):
         assert g[key], key
         assert [a["id"] for a in g[key]] == [f"{pre}{i}" for i in range(len(g[key]))], key
         assert all(set(a) == {"id", "name", "geometry"} | extra and a["geometry"]["coordinates"] for a in g[key]), key
     assert {a["tma"] for a in g["tma"]} >= {"TMA Warszawa", "TMA Kraków", "TMA Gdańsk"}
     assert {a["ctr"] for a in g["ctr"]} == {t["id"] for t in d["twr"]}
+    assert {a["atz"] for a in g["atz"]} == {"EPBA", "EPBC", "EPGL", "EPKA", "EPKM", "EPKP", "EPKR", "EPLR", "EPML", "EPNT",
+                                            "EPOD", "EPPL", "EPPT", "EPZR"}
+    assert all(a["name"].startswith(f"{a['atz']}_ATZ") for a in g["atz"])
     # nic z FIR-ów sąsiadów (TMA Ostrawy i Berlina, CTR sąsiadów, sektory sąsiadów: do 0.13.1 w geo.nb)
-    names = [a["name"] for k in ("acc", "tma", "ctr", "fis") for a in g[k]]
+    names = [a["name"] for k in ("acc", "tma", "ctr", "fis", "atz") for a in g[k]]
     assert not any(n.startswith(("LK", "ED", "LZ", "UK", "UM", "EY", "ES")) for n in names)
     assert len(json.dumps(g)) < 400_000  # raz na sesję, ale bez przesady
     # geometria zakodowana raz (część stała) i wklejona do odpowiedzi: poza nią ta sama treść co bez geo=1
@@ -788,7 +795,7 @@ def js(tmp_path_factory):
 
 def test_js_layers_and_address(js):
     assert js["ids"] == ["atis", "low", "mid", "high", "app", "twr", "twra", "fis"]
-    # przyciski środkowej kolumny jak na szkicu: TWR/A = wieże z ATIS lotnisk
+    # przyciski środkowej kolumny jak na szkicu: TWR/A = wieże i ATZ (0.14.2, issue #35)
     assert js["labels"] == ["ATIS", "LOW", "MID", "HIGH", "APP", "TWR", "TWR/A", "FIS"]
     assert js["defaults"] == ["atis", "low", "mid", "high"]
     # 0.13.2 (issue #27): stałe przekroje (LOW FL330, MID FL350, HIGH FL400), bez suwaka i jego pomocników
@@ -997,7 +1004,7 @@ def test_js_stack_size_fixed_all_merges(tmp_path):
 
 LAYOUT_SCRIPT = r"""
 // podgląd LOW (FL330) jak na ekranie 1366×768, 1600×900 i 1920×1080 (0.13.2, issue #27): granice i plakietki
-// stanowisk online zbudowane funkcją strony previewItems (ACC warstwy, APP, TWR, TWR/A, FIS – tylko zalogowani)
+// stanowisk online zbudowane funkcją strony previewItems (ACC warstwy, APP, TWR, TWR/A z ATZ, FIS – tylko zalogowani)
 // i ułożone przez placeLabels z labelOpts, bez linii prowadzących. Plakietka jak kafelek: najmniej rozmiar kafelka
 // (tw × th), szersza tylko przy dłuższym ID; podgląd LOW, tytuł i kafelek zmierzone w przeglądarce (demo,
 // siatka szkicu, #radio/atis,low,mid,high). Sektory ACC: jeden obszar na stanowisko (accGroups, suma wycinków
@@ -1010,17 +1017,18 @@ const { boards, geo } = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 const radio = await import(process.argv[4]);
 const { posName } = await import(process.argv[5]);
 console.warn = () => {};
-// podgląd LOW: W, H, tytuł [x, y, w, h], kafelek tw × th, f = częstotliwość, lf = ID (px)
+// podgląd LOW: W, H, tytuł [x, y, w, h], kafelek tw × th, f = częstotliwość, lf = ID (px); 0.14.2: także okno
+// przeglądarki na monitorze 1920×1080 (1920×950: rozmiar strony zależy też od wysokości okna)
 const SCREENS = {
   1366: { W: 371, H: 350, title: [2, 1, 70, 17], tw: 61.7, th: 22.6, f: 12, lf: 9 },
   1600: { W: 452, H: 417, title: [2, 1, 70, 17], tw: 70.2, th: 29.4, f: 13.8, lf: 9.8 },
   1920: { W: 568, H: 504, title: [2, 1, 70, 17], tw: 80.5, th: 33.3, f: 16, lf: 12 },
+  "1920x950": { W: 578, H: 442, title: [2, 1, 77, 19], tw: 75.3, th: 31.3, f: 14.9, lf: 10.9 },
 };
 const SETS = { twr: ["low", "twr"], apptwr: ["low", "app", "twr"], all: ["low", "app", "twra", "fis"], nolow: ["app", "twr"] };
-// rozmiar plakietki jak w radio.css: najmniej kafelek, szersza przy dłuższym ID (z literą ATIS) albo częstotliwości
+// rozmiar plakietki jak w radio.css: najmniej kafelek, szersza przy dłuższym ID albo częstotliwości
 const tw = (s, px) => [...String(s || "")].length * 0.6 * px;
-const sizeOf = (p, scr) => ({ w: Math.ceil(Math.max(scr.tw, 10 + Math.max(tw(p.id, scr.lf) + (p.code ? 3 + 4 + tw(p.code, scr.lf) : 0), tw(p.fq, scr.f)))),
-  h: scr.th });
+const sizeOf = (p, scr) => ({ w: Math.ceil(Math.max(scr.tw, 10 + Math.max(tw(p.id, scr.lf), tw(p.fq, scr.f)))), h: scr.th });
 const FQ = /^\d{3}\.\d{3}$/;
 function layout(bd, set, scr) {
   const ly = new Set(SETS[set]);
@@ -1042,7 +1050,7 @@ function layout(bd, set, scr) {
   return {
     n: plates.length, order: plates.map((p) => p.kind), app: of("app").map(({ p }) => p.k).sort(), twr: of("twr").map(({ p }) => p.k).sort(),
     acc: of("acc").map(({ p }) => p.id).sort(), fis: of("fis").map(({ p }) => p.k).sort(),
-    atisOnly: of("twr").filter(({ p }) => p.atis).map(({ p }) => [p.k, p.state, FQ.test(p.fq)]),
+    states: [...new Set(plates.map((p) => p.state))],
     lines: lines.map((l) => `${l.kind}:${l.k}`).sort(),
     // plakietka w środku swojej przestrzeni: najwyżej lekko odsunięta; punkt części TMA albo CTR (plates.at)
     gap: Math.round(Math.max(0, ...tw0.map(({ i }) => gap(i)))), gapAll: Math.round(Math.max(0, ...plates.map((_, i) => gap(i)))),
@@ -1051,14 +1059,16 @@ function layout(bd, set, scr) {
     overlaps: rects.flatMap((a, i) => rects.slice(i + 1).map((b, j) => (a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1 ? `${plates[i].k}/${plates[i + 1 + j].k}` : "")))
       .filter(Boolean),
     hits: mv.filter((m) => m.hit).length,
-    // każda plakietka z częstotliwością (tylko zalogowani; sam ATIS – częstotliwość ATIS)
+    // każda plakietka z częstotliwością (tylko zalogowani)
     noFq: plates.filter((p) => !FQ.test(p.fq)).map((p) => p.k),
     html: plates.map(radio.plateHtml),
     // 0.13.2 (przegląd): każdy obrys w granicy FIR EPWW, więc w ramce podglądu (dawniej FIS Gdańsk z EPWW-MIDSEA
     // ok. 40 px nad górną krawędzią LOW); APP, TWR i FIS – sam obrys zewnętrzny (tyle "M", ile części)
     outside: lines.flatMap((l) => (l.geom ? [l.geom] : l.shapes).flatMap((g) => rb.ringsOf(g)).flat().map(P))
       .filter(([px, py]) => px < -0.5 || py < -0.5 || px > W + 0.5 || py > H + 0.5).length,
-    holes: lines.filter((l) => l.kind !== "acc" && l.geom && (radio.linesSvg([l], P).match(/M/g) || []).length !== rb.ringsOf(l.geom).length)
+    // (litery M liczone tylko w ścieżce d: data-k ATZ EPKM i EPML też ma M)
+    holes: lines.filter((l) => l.kind !== "acc" && l.geom
+      && ((radio.linesSvg([l], P).match(/ d="([^"]*)"/)?.[1] || "").match(/M/g) || []).length !== rb.ringsOf(l.geom).length)
       .map((l) => l.k),
   };
 }
@@ -1088,16 +1098,26 @@ FIS_FEED = {**FEED, "controllers": [
 INFO_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Info", "cid": 90 + i} for i, (cs, fq) in enumerate((
         ("EPWW_I_CTR", "128.325"), ("EPWW_IE_CTR", "127.660")))], "atis": []}
+# 0.14.2 (issue #35, właściciel projektu: "TWR/A to jednak TWR + ATZ"): stanowiska AFIS i radio lotnisk z ATZ (tłok na Śląsku:
+# BA, GL, KM, ZR i KA przy CTR Katowice), Babice w CTR Warszawa, Szczecin-Dąbie bez ATZ (sama plakietka) i wieże KT, WA
+ATZ_FEED = {**FEED, "controllers": [
+    {"callsign": cs, "frequency": fq, "name": "Atz", "cid": 100 + i} for i, (cs, fq) in enumerate((
+        ("EPBA_R_TWR", "118.330"), ("EPGL_R_TWR", "118.260"), ("EPKM_R_TWR", "120.080"), ("EPZR_R_TWR", "122.805"),
+        ("EPKA_R_TWR", "118.080"), ("EPML_I_TWR", "119.105"), ("EPBC_I_TWR", "119.180"), ("EPSD_R_TWR", "125.335"),
+        ("EPKT_TWR", "129.255"), ("EPWA_TWR", "118.305"), ("EPWA_APP", "128.805")))], "atis": []}
+ATZ_ICAOS = ["EPBA", "EPBC", "EPGL", "EPKA", "EPKM", "EPML", "EPZR"]
+LOW_SCREENS = ("1366", "1600", "1920", "1920x950")  # klucze SCREENS w LAYOUT_SCRIPT
 
 
 def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     """0.13.0 (właściciel projektu: "jak nikt nie siedzi, nie pokazuj tysiąca plakietek APP i TWR"), 0.13.2 (issue #27): na podglądzie
     LOW granice i plakietki tylko stanowisk online – APP: jedna plakietka na stanowisko APP w środku obsługiwanych części
     TMA (WA APP + WA N + WA S: trzy; dyrektor bez plakietki) i granatowa granica tych części, wieża online: granica CTR
-    i plakietka, TWR/A także sam ATIS (ciemna plakietka z częstotliwością ATIS, bez granicy), FIS online: granica jego
-    obszarów i jedna plakietka; bez nikogo – nic (bez samych ID). Bez linii prowadzących, najwyżej lekko odsunięte.
+    i plakietka, TWR/A (0.14.2, issue #35: TWR + ATZ) także stanowiska AFIS i radio lotnisk online: granica ATZ
+    i plakietka (bez ATZ sama plakietka), bez plakietek samego ATIS; FIS online: granica jego obszarów i jedna
+    plakietka; bez nikogo – nic (bez samych ID). Bez linii prowadzących, najwyżej lekko odsunięte.
     Geometria z /api/radio/board, granice i plakietki funkcjami strony (previewItems, placeLabels, plateHtml) na
-    1366×768, 1600×900 i 1920×1080; bez nakładania się, każda plakietka z częstotliwością."""
+    1366×768, 1600×900, 1920×1080 i 1920×950 (0.14.2); bez nakładania się, każda plakietka z częstotliwością."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -1106,7 +1126,8 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     (d / "package.json").write_text('{"type": "module"}', "utf-8")
     geo = client.get("/api/radio/board?geo=1").json()["geo"]
     boards = {"board": board}
-    for name, feed in (("alt", ALT_FEED), ("split", SPLIT_FEED), ("empty", EMPTY_FEED), ("fis", FIS_FEED), ("info", INFO_FEED)):
+    for name, feed in (("alt", ALT_FEED), ("split", SPLIT_FEED), ("empty", EMPTY_FEED), ("fis", FIS_FEED), ("info", INFO_FEED),
+                       ("atz", ATZ_FEED)):
         async def get(feed=feed):
             return feed
 
@@ -1125,17 +1146,17 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
     res = json.loads(r.stdout)
     if os.environ.get("RB_DUMP"):
         open(os.environ["RB_DUMP"], "w").write(json.dumps(res))
-    assert len(res) == 72
+    assert len(res) == 7 * 4 * len(LOW_SCREENS)
     # nikt online: ani jednej granicy i plakietki (ACC, APP, TWR, TWR/A bez ATIS-ów, FIS: bez samych ID)
     for key in ("empty-twr-1366", "empty-apptwr-1600", "empty-all-1920"):
         assert res[key]["n"] == 0 and res[key]["lines"] == [], key
     # FEED: N online na całym LOW (jedna plakietka "N"), WA APP (przejmuje WA N, WA S, Łódź i Radom – jedna plakietka
-    # i jedna granica), żadnej wieży; na TWR/A sam ATIS EPWA (ciemna plakietka z częstotliwością ATIS, bez granicy CTR)
+    # i jedna granica), żadnej wieży; 0.14.2: na TWR/A bez plakietki samego ATIS EPWA (ATIS w rzędzie u góry)
     b = res["board-apptwr-1366"]
     assert b["app"] == ["EPWA_APP"] and b["twr"] == [] and b["acc"] == ["N"]
     assert b["lines"] == ["acc:EPWW_N_CTR", "app:EPWA_APP"]
     ba = res["board-all-1366"]
-    assert ba["twr"] == ["EPWA"] and ba["atisOnly"] == [["EPWA", "off", True]] and "twr:EPWA" not in ba["lines"]
+    assert ba["twr"] == [] and not any(x.startswith(("twr:", "atz:")) for x in ba["lines"])
     assert ba["fis"] == [] and not any(x.startswith("fis:") for x in ba["lines"])
     # LOW wyłączony: bez granic i plakietek ACC (APP i TWR dalej, gdy ich warstwy są włączone)
     nl = res["board-nolow-1600"]
@@ -1163,8 +1184,17 @@ def test_js_twr_layout(client, board, tmp_path, monkeypatch):
         assert {"fis:EPWW_IE_CTR", "fis:EPWW_I_CTR"} <= set(res[f"info-all-{sn}"]["lines"]), sn
         # plakietka z dopiskiem FIS (znak jak sektor ACC: sama nazwa "I" wyglądałaby jak plakietka ACC)
         assert all('class="rb-id">EPWW I' in h and ' FIS</span>' in h for h in res[f"info-all-{sn}"]["html"]), sn
+    # 0.14.2: TWR/A = TWR + ATZ – wieże z CTR jak na TWR i stanowiska AFIS i radio z granicą ATZ (Szczecin-Dąbie bez
+    # ATZ: sama plakietka); na TWR bez ATZ; APP nad ATZ nie zapala ATZ
+    for sn in LOW_SCREENS:
+        za, zt = res[f"atz-all-{sn}"], res[f"atz-twr-{sn}"]
+        assert za["twr"] == sorted([*ATZ_ICAOS, "EPKT", "EPSD", "EPWA"]), (sn, za["twr"])
+        assert {f"atz:{k}" for k in ATZ_ICAOS} | {"twr:EPKT", "twr:EPWA"} <= set(za["lines"]) and "atz:EPSD" not in za["lines"], sn
+        assert zt["twr"] == ["EPKT", "EPWA"] and not any(x.startswith("atz:") for x in zt["lines"]), sn
+        assert not any(x.startswith("atz:") for x in res[f"atz-apptwr-{sn}"]["lines"]), sn
     for key, out in res.items():
         assert out["outside"] == 0 and out["holes"] == [], (key, out["outside"], out["holes"])
+        assert out["states"] in ([], ["on"]), key  # tylko obsadzone (bez ciemnych plakietek samego ATIS)
         # kolejność układania: APP, TWR, ACC, FIS
         assert out["order"] == sorted(out["order"], key=["app", "twr", "acc", "fis"].index), key
         # plakietka w środku: punkt pod nią albo najwyżej lekko obok (PLATE_MAX × 1,5 w tłoku); ACC i FIS dalej
@@ -1539,7 +1569,7 @@ LBL_SCRIPT = r"""
 const radio = await import(process.argv[2]);
 // plakietki z tablicy: częstotliwość online albo z tablicy, nazwa stanowiska, kontroler online, kto, opis
 const FQ = { EPWA_APP: "128.805", EPWA_S_APP: "135.930", EPWA_N_APP: "125.055", EPWA_TWR: "118.305", EPWA_ATIS: "120.455",
-  EPWW_N_CTR: "130.675", EPWW_DBT_CTR: "134.225", EPWA_I_APP: "123.975" };
+  EPWW_N_CTR: "130.675", EPWW_DBT_CTR: "134.225", EPWA_I_APP: "123.975", EPBA_R_TWR: "118.330", EPSD_R_TWR: "125.335" };
 const ctx = (online) => ({ freq: (cs) => online[cs]?.frequency || FQ[cs] || "", nm: (cs) => cs.replace(/^EP/, "").replace(/_/g, " "),
   dn: (cs) => `name ${cs}`, on: (cs) => online[cs] || null, who: (cs) => (online[cs] ? `${cs} ${online[cs].frequency} – Jan` : ""),
   pos: (cs, fq = "") => `${cs} · pos${fq ? ` ${fq}` : ""}`, net: true });
@@ -1560,13 +1590,17 @@ const o = {
   // plakietki APP: sam WA APP na całą TMA Warszawa (i TMA Radom), WA S APP na swoją część i TMA Radom
   appAll: radio.appPlate(plate("EPWA_APP", TMA.map((g) => g.id)), ctx(ON("EPWA_APP")), TMA, flow),
   appS: radio.appPlate(plate("EPWA_S_APP", ["TMA Warszawa · EPWA_S_APP", "TMA Radom"]), ctx(ON("EPWA_S_APP")), TMA, null),
-  // plakietki TWR: wieża online (TWR i TWR/A z ATIS), sam ATIS na TWR/A
-  twrOn: [false, true].map((twra) => radio.twrPlate(twrP(["EPWA_TWR"], ["EPWA_ATIS"]), ctr, ctx(ON("EPWA_TWR", "EPWA_ATIS")), twra)),
-  atisOnly: radio.twrPlate(twrP([], ["EPWA_ATIS"]), { ...ctr, owners: ["EPWA_APP"] }, ctx(ON("EPWA_ATIS", "EPWA_APP")), true),
-  // ATIS online na innej częstotliwości niż z listy stanowisk: w dymku ta z sieci, jak na plakietce
+  // plakietka TWR: wieża online (ta sama na TWR i TWR/A; 0.14.2 bez litery ATIS), ATIS lotniska w dymku
+  twrOn: radio.twrPlate(twrP(["EPWA_TWR"], ["EPWA_ATIS"]), ctr, ctx(ON("EPWA_TWR", "EPWA_ATIS"))),
+  // ATIS online na innej częstotliwości niż z listy stanowisk: w dymku ta z sieci
   atisFq: radio.twrPlate(twrP(["EPWA_TWR"], ["EPWA_ATIS"]), ctr,
-    ctx({ ...ON("EPWA_TWR"), EPWA_ATIS: { callsign: "EPWA_ATIS", frequency: "121.080", atis_code: "K" } }), true),
-  atisOff: radio.twrPlate(twrP(["EPWA_TWR"], []), ctr, ctx(ON("EPWA_TWR")), true),
+    ctx({ ...ON("EPWA_TWR"), EPWA_ATIS: { callsign: "EPWA_ATIS", frequency: "121.080", atis_code: "K" } })),
+  atisOff: radio.twrPlate(twrP(["EPWA_TWR"], []), ctr, ctx(ON("EPWA_TWR"))),
+  // ATZ (TWR/A, 0.14.2): stanowisko radio lotniska online z granicą ATZ; bez ATZ – sama plakietka (w dymku lotnisko)
+  atz: radio.atzPlate({ id: "ATZ EPBA", icao: "EPBA", at: [49.79, 18.94], twr: ["EPBA_R_TWR"], nominal: "EPBA_R_TWR",
+    frequency: "118.330", zone: true }, ctx(ON("EPBA_R_TWR"))),
+  atzBare: radio.atzPlate({ id: "EPSD", icao: "EPSD", at: [53.39, 14.63], twr: ["EPSD_R_TWR"], nominal: "EPSD_R_TWR",
+    frequency: null, zone: false }, ctx(ON("EPSD_R_TWR"))),
   // ACC: kilka sektorów warstwy – skrót stanowiska, jeden – litera i warstwa
   acc: radio.accPlate({ owner: "EPWW_N_CTR", sectors: [sec("B"), sec("G")], at: [52, 19] }, "LOW", ctx(ON("EPWW_N_CTR")), bd),
   accOne: radio.accPlate({ owner: "EPWW_DBT_CTR", sectors: [sec("B")], at: [53, 16] }, "HIGH", ctx(ON("EPWW_DBT_CTR")), bd),
@@ -1574,8 +1608,7 @@ const o = {
   fisAt: radio.fisPlate("EPWA_I_APP", null, ctx(ON("EPWA_I_APP")), FIS).at,
   evil: radio.plateHtml({ kind: "app", k: '"><b>k', id: "<img src=x>", fq: "<s>1</s>", code: "<i>", rt: '"><b>x</b>' }),
 };
-o.html = Object.fromEntries(["appAll", "acc", "accOne", "fis", "atisOnly"].map((k) => [k, radio.plateHtml(o[k])]));
-o.html.twr = o.twrOn.map(radio.plateHtml);
+o.html = Object.fromEntries(["appAll", "acc", "accOne", "fis", "twrOn", "atz"].map((k) => [k, radio.plateHtml(o[k])]));
 console.log(JSON.stringify(o));
 """
 
@@ -1584,8 +1617,9 @@ def test_js_plates(tmp_path):
     """Plakietki podglądów (tabs/radio.js, 0.13.2 – issue #27: jak kafelki – jasne pole, częstotliwość, małe ID w prawym
     górnym rogu, tylko stanowiska online): ACC (accPlate: jeden sektor warstwy – "B HIGH", kilka – skrót stanowiska),
     APP (appPlate: ID stanowiska i jego częstotliwość, w dymku TMA, części, inne obsługiwane TMA i alarmy przepływu),
-    TWR (twrPlate: wieża online, na TWR/A z żółtą literą ATIS obok ID; sam ATIS – ciemna plakietka z częstotliwością
-    ATIS), FIS (fisPlate: jedna na stanowisko, w dymku jego obszary). Każda z częstotliwością, dane przez esc()."""
+    TWR (twrPlate: wieża online, ATIS lotniska w dymku; 0.14.2, issue #35: bez żółtej litery ATIS i bez plakietek samego
+    ATIS), ATZ (atzPlate, TWR/A: stanowisko AFIS albo radio lotniska, jak plakietka wieży), FIS (fisPlate: jedna na
+    stanowisko, w dymku jego obszary). Każda z częstotliwością, dane przez esc()."""
     node = shutil.which("node")
     if not node:
         pytest.skip("brak Node.js")
@@ -1608,23 +1642,27 @@ def test_js_plates(tmp_path):
     # wygląd kafelka: ID w prawym górnym rogu (rb-tr), pod nim częstotliwość; data-k = granica stanowiska na podglądzie
     assert out["html"]["appAll"] == ('<div class="rb-pl app on" data-k="EPWA_APP" data-rt="' + a["rt"].replace("\n", "\n")
                                      + '"><span class="rb-tr"><span class="rb-id">WA APP</span></span><span class="rb-fq">128.805</span></div>')
-    # plakietka TWR: wieża online; litera ATIS tylko na TWR/A (żółte pole obok ID); kliknięcie: AERODROME
-    t0, t1 = out["twrOn"]
-    assert (t0["state"], t0["fq"], t0["code"], t0["atis"]) == ("on", "118.305", "", False) and t1["code"] == "K"
-    h0, h1 = out["html"]["twr"]
-    assert '<span class="rb-tr"><span class="rb-id">WA TWR</span></span><span class="rb-fq">118.305</span>' in h0
-    assert '<span class="rb-tr"><b class="rb-code">K</b><span class="rb-id">WA TWR</span></span><span class="rb-fq">118.305</span>' in h1
-    assert 'class="rb-pl twr on" data-k="EPWA" data-icao="EPWA" tabindex="0" role="button"' in h1
-    assert t1["icao"] == "EPWA" and t1["rt"].split("\n")[-1] == "Click: AERODROME"
-    assert "ATIS: EPWA_ATIS · pos 120.455 – online, information K" in t1["rt"]
+    # plakietka TWR: wieża online, bez litery ATIS (0.14.2: ATIS w rzędzie u góry i w dymku); kliknięcie: AERODROME
+    t = out["twrOn"]
+    assert {k: t[k] for k in ("kind", "k", "id", "fq", "state", "icao")} == {
+        "kind": "twr", "k": "EPWA", "id": "WA TWR", "fq": "118.305", "state": "on", "icao": "EPWA"}
+    assert not {"code", "atis"} & set(t)
+    assert out["html"]["twrOn"].startswith('<div class="rb-pl twr on" data-k="EPWA" data-icao="EPWA" tabindex="0" role="button"')
+    assert out["html"]["twrOn"].endswith('<span class="rb-tr"><span class="rb-id">WA TWR</span></span><span class="rb-fq">118.305</span></div>')
+    assert t["rt"].split("\n") == ["CTR Warszawa · EPWA", "Position: EPWA_TWR · pos", "Now: EPWA_TWR 118.305 – Jan",
+                                   "ATIS: EPWA_ATIS · pos 120.455 – online, information K", "Click: AERODROME"]
     assert "ATIS: EPWA_ATIS · pos 121.080 – online, information K" in out["atisFq"]["rt"]
-    assert "ATIS: EPWA_ATIS · pos – offline" in out["atisOff"]["rt"] and out["atisOff"]["code"] == ""
-    # sam ATIS (wieża offline, TWR/A): ciemna plakietka z częstotliwością ATIS (jasnofioletowa: klasa atis), w dymku,
-    # kto przejmuje wieżę
-    ao = out["atisOnly"]
-    assert (ao["state"], ao["atis"], ao["id"], ao["fq"], ao["code"]) == ("off", True, "WA ATIS", "120.455", "K")
-    assert out["html"]["atisOnly"].startswith('<div class="rb-pl twr off atis" data-k="EPWA" data-icao="EPWA"')
-    assert "Tower offline – covered by EPWA_APP 128.805 – Jan" in ao["rt"]
+    assert "ATIS: EPWA_ATIS · pos – offline" in out["atisOff"]["rt"]
+    assert not any("rb-code" in h or " atis" in h or "<b" in h for h in out["html"].values())
+    # ATZ (TWR/A): jak plakietka wieży (rodzaj twr: miejsce obok małego obszaru, kliknięcie: AERODROME), data-k = ICAO
+    # (granica ATZ z tym samym data-k)
+    z = out["atz"]
+    assert {k: z[k] for k in ("at", "kind", "k", "id", "fq", "state", "icao")} == {
+        "at": [49.79, 18.94], "kind": "twr", "k": "EPBA", "id": "BA R TWR", "fq": "118.330", "state": "on", "icao": "EPBA"}
+    assert z["rt"].split("\n") == ["ATZ EPBA", "Position: EPBA_R_TWR · pos", "Now: EPBA_R_TWR 118.330 – Jan", "Click: AERODROME"]
+    assert out["html"]["atz"].startswith('<div class="rb-pl twr on" data-k="EPBA" data-icao="EPBA" tabindex="0" role="button"')
+    zb = out["atzBare"]
+    assert (zb["fq"], zb["id"], zb["rt"].split("\n")[0]) == ("125.335", "SD R TWR", "Aerodrome EPSD")
     # ACC: nazwa wg liczby sektorów warstwy, częstotliwość stanowiska, w dymku warstwa z przekrojem i alarmy przepływu
     acc, one = out["acc"], out["accOne"]
     assert (acc["kind"], acc["k"], acc["id"], acc["fq"]) == ("acc", "EPWW_N_CTR", "N", "130.675")
@@ -1837,8 +1875,8 @@ def test_radio_keyboard_mid_title_and_small_plates():
     """0.13.2 (przegląd): Esc zamyka panel LOA z każdego miejsca strony (nasłuch na dokumencie, gdy RADIO jest widoczne,
     zdjęty w destroy – fokus znika z kodu FIR-u przy odświeżaniu i po kliknięciu w tekst panelu); fokus z klawiatury
     wraca po odświeżeniu na ten sam kod FIR-u, plakietkę TWR albo ATIS (focusSel); mały MID pod swoim tytułem (czarne
-    tło tytułu zasłaniało róg granicy FIR-u na 1600×900 i 1366×768); na 1366×768 litera ATIS na plakietce TWR/A tej
-    samej wysokości co ID (częstotliwość siedziała na dolnej krawędzi)."""
+    tło tytułu zasłaniało róg granicy FIR-u na 1600×900 i 1366×768); na 1366×768 częstotliwość kafelka i plakietki bez
+    dodatkowej wysokości linii (siedziała na dolnej krawędzi; 0.14.2: plakietki bez litery ATIS)."""
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
     assert radio.count('"Escape"') == 1 and 'e.key !== "Escape" || loaBox.hidden || !visible()' in radio
@@ -1849,7 +1887,8 @@ def test_radio_keyboard_mid_title_and_small_plates():
     assert mp.index("renderTitle(m)") < mp.index("projection(") and 'm.key === "MID" ? "bottom" : "middle"' in mp
     assert 'm.key === "MID" && t?.offsetHeight ? t.offsetTop + t.offsetHeight + 2 : 0' in mp
     small = re.search(r"@media \(max-height: 820px\) \{(.*?)\n\}", css, re.S).group(1)
-    assert re.search(r"\.rb-pl \.rb-fq, \.rb-pl \.rb-code, \.rb-bd \{ line-height: 1; \}", small)
+    assert re.search(r"\.rb-box \.rb-fq, \.rb-pl \.rb-fq, \.rb-bd \{ line-height: 1; \}", small)
+    assert ".rb-pl .rb-code" not in css and ".rb-pl.atis" not in css
 
 
 def test_frontend_imports_resolve():
@@ -1864,6 +1903,72 @@ def test_frontend_imports_resolve():
     assert "sectors.css" not in index and not (FRONTEND / "css" / "sectors.css").exists()
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     assert "subtabs(" not in radio and "text-shadow" not in (FRONTEND / "css" / "radio.css").read_text("utf-8")
+
+
+FIT_SCRIPT = r"""
+// tory wierszy siatki strony RADIO (pageGrid) dla siatki i FIR-ów z /api/radio/board
+import fs from "fs";
+const rb = await import(process.argv[2]);
+const bd = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify(rb.pageGrid(bd.grid, bd.firs).rows));
+"""
+# okna od 1280×720 do 2560×1300, w tym okno przeglądarki na monitorze 1920×1080 (ok. 1920×940–970)
+FIT_SCREENS = ((1280, 720), (1366, 768), (1536, 730), (1536, 864), (1600, 850), (1600, 900), (1920, 800), (1920, 821),
+               (1920, 850), (1920, 900), (1920, 940), (1920, 950), (1920, 970), (1920, 1000), (1920, 1080), (2560, 1300))
+# wysokość okna poza siatką strony (pasek u góry, odstępy .rb, rząd wskaźników i ATIS) – zmierzona w przeglądarce;
+# niskie okno (do 820 px): mniejsze odstępy
+FIT_CHROME = {True: 64, False: 68}
+
+
+def rb_page_model(w, h):
+    """Rozmiary strony RADIO jak w radio.css: --rb-f (częstotliwość), --rb-lf, --rb-th i --rb-lv0..2 (px)."""
+    f = min(15.0, max(11.0, min(0.008 * w, 0.022 * h - 7)))
+    lf, compact = max(10.0, f - 3), h <= 820
+    if compact:
+        return f, compact, {"th": 1.6 * f + 5, "lv0": 2.0, "lv1": lf, "lv2": 2 * lf + 2}
+    return f, compact, {"th": 1.75 * f + 7, "lv0": 2.0, "lv1": 1.1 * lf + 2, "lv2": 2.2 * lf + 6}
+
+
+def test_radio_page_fits_screens(board, tmp_path):
+    """0.14.2 (issue #35, właściciel projektu: strona zwykle na monitorach 1920×1080, nie 2K): rozmiar strony RADIO (--rb-f)
+    zależy od szerokości i od wysokości okna, więc cała siatka (kafelki stałej wysokości, rzędy liczb najmniej --rb-lv*)
+    mieści się bez przewijania i bez ucinania od 1280×720 do 2560×1300 – także w oknie przeglądarki na monitorze
+    1920×1080 (ok. 1920×940–970), gdzie do 0.14.1 ucinało dolny rząd (LKAA MT, legenda). 1366×768, 1600×900 i pełny
+    ekran 1920×1080 bez zmian (stałe SCREENS podglądu LOW). Model jak w radio.css, tory wierszy z pageGrid dla siatki
+    z seeda (sprawdzone w przeglądarce: zrzuty 0.14.2)."""
+    css = (FRONTEND / "css" / "radio.css").read_text("utf-8")
+    assert ".rb { --rb-f: clamp(11px, min(.8vw, var(--view-h) * .022 - 7px), 15px);" in css
+    assert "--rb-lf: max(10px, calc(var(--rb-f) - 3px))" in css and "--rb-th: calc(var(--rb-f) * 1.75 + 7px)" in css
+    assert "--rb-lv0: 2px; --rb-lv1: calc(var(--rb-lf) * 1.1 + 2px); --rb-lv2: calc(var(--rb-lf) * 2.2 + 6px);" in css
+    small = re.search(r"@media \(max-height: 820px\) \{(.*?)\n\}", css, re.S).group(1)
+    assert "--rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: var(--rb-lf);" in small
+    assert "--rb-lv2: calc(var(--rb-lf) * 2 + 2px)" in small
+    # --view-h: widoczna wysokość okna (style.css, ta sama co menu)
+    assert "--view-h: 100vh" in (FRONTEND / "css" / "style.css").read_text("utf-8")
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("brak Node.js")
+    (tmp_path / "radioboard.mjs").write_text((FRONTEND / "js" / "radioboard.js").read_text("utf-8"), "utf-8")
+    (tmp_path / "board.json").write_text(json.dumps({"grid": board["grid"], "firs": board["firs"]}), "utf-8")
+    (tmp_path / "fit.mjs").write_text(FIT_SCRIPT, "utf-8")
+    r = subprocess.run([node, str(tmp_path / "fit.mjs"), (tmp_path / "radioboard.mjs").as_uri(), str(tmp_path / "board.json")],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    kinds = [re.search(r"--rb-(th|lv\d)", t).group(1) for t in json.loads(r.stdout)]
+    n = {k: kinds.count(k) for k in ("th", "lv0", "lv1", "lv2")}
+    # 19 wierszy szkicu (3..21): 19 kafelków i 20 rzędów liczb
+    assert n == {"th": 19, "lv0": 2, "lv1": 18, "lv2": 0}, n
+    slack = {}
+    for w, h in FIT_SCREENS:
+        f, compact, px = rb_page_model(w, h)
+        need = sum(n[k] * px[k] for k in n)
+        slack[f"{w}x{h}"] = round(h - FIT_CHROME[compact] - need, 1)
+    # zapas najmniej 10 px przy każdym oknie (zmierzone w przeglądarce: nic nie wychodzi poza stronę ani swoją komórkę)
+    assert min(slack.values()) >= 10, slack
+    # 1366×768, 1600×900 i 1920×1080 jak w 0.14.1 (stałe SCREENS podglądu LOW), 1920×950 o ok. 1 px mniejsze
+    assert [rb_page_model(w, h)[0] for w, h in ((1366, 768), (1600, 900), (1920, 1080), (2560, 1300))] == pytest.approx(
+        [11, 12.8, 15, 15])
+    assert rb_page_model(1920, 950)[0] == pytest.approx(13.9)
 
 
 def test_layer_column_buttons_fit_label():

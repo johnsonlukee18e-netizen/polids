@@ -3,7 +3,8 @@
 // i podglądów jak na szkicu, wygląd kafelków z 0.13.1, wysokości między kafelkami). Testowane w Node
 // (test_radio_board.py).
 
-// Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy)
+// Warstwy z kolumny przycisków (PANDORA: ATIS / LOW MID HIGH / APP / TWR / TWR/A / FIS; OAT pomijamy). 0.14.2 (issue #35,
+// właściciel projektu: "TWR/A to jednak TWR + ATZ"): TWR/A to wieże z CTR i stanowiska AFIS i radio lotnisk z ATZ, bez ATIS
 export const LAYERS = [
   { id: "atis", label: "ATIS", tip: "ATIS of Polish aerodromes at the top, next to the configuration boxes (online with the information letter)" },
   { id: "low", label: "LOW", tip: "ACC sectors on the left preview: LOW (cross-section at FL330)" },
@@ -11,7 +12,7 @@ export const LAYERS = [
   { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH (FL400)" },
   { id: "app", label: "APP", tip: "APP positions online: TMA boundary, name and frequency (on the LOW preview)" },
   { id: "twr", label: "TWR", tip: "Towers online: CTR boundary, name and frequency (on the LOW preview; turns TWR/A off)" },
-  { id: "twra", label: "TWR/A", tip: "Towers online and aerodrome ATIS: CTR boundary, name, frequency and ATIS (on the LOW preview; turns TWR off)" },
+  { id: "twra", label: "TWR/A", tip: "TWR + ATZ: towers online with their CTR, and aerodrome AFIS and radio stations online with their ATZ \u2013 boundary, name and frequency (on the LOW preview; turns TWR off)" },
   { id: "fis", label: "FIS", tip: "FIS positions online: FIS area boundary, name and frequency (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
