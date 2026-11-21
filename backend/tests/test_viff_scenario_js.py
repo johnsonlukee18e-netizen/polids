@@ -23,12 +23,28 @@ const full = { id: "EP-<X>", active: true, description: "opis", tvs: [{ id: "EP-
   times: [{ from: "1800", to: "2000", date: "2026-10-18" }, { from: "0100", to: "0200", date: null }], booked: true };
 const bare = { id: "EP-EMPTY", active: false, description: "", tvs: [], positions: [], anypositions: [], nopositions: [],
   start: null, end: null, times: [], booked: false };
+// 0.14.2: to samo okno w start/end i w times (atrapa EP_NFIR do zrzutów) i okno z activationPeriods (żywe dane EP-KKTMA)
+const nfir = { id: "EP_NFIR", active: false, description: "NFIR open", tvs: [{ id: "EP-BH" }], positions: ["EPWW_N_CTR"],
+  anypositions: [], nopositions: [], start: "1600", end: "2200", times: [{ from: "1600", to: "2200", date: null }], booked: true };
+const kk = { id: "EP-KKTMA", active: true, tvs: [], positions: [], anypositions: ["EPKK_APP"], nopositions: [], start: null,
+  end: null, times: [{ from: "1900", to: "2100", date: "2026-11-21" }], booked: true };
+const long = { id: "EP-LONG", tvs: [], positions: [], anypositions: ["EPKK_APP"], nopositions: [], start: null, end: null, booked: false,
+  times: [{ from: "1900", to: "2100", date: "2026-11-21", to_date: "2026-11-23" }, { from: "2300", to: "0100", date: "2026-11-21" }] };
 console.log(JSON.stringify({
   tips: [nsfir, full, bare].map(v.scnTip),
   cond: [nsfir, full, bare].map((s) => v.scnCond(s)),
   condHtml: [nsfir, full, bare].map((s) => v.scnCond(s, { html: true })),
   // pola, których starszy backend nie podaje
   partial: v.scnTip({ id: "EP-OLD", tvs: [{ id: "EP-KTTMA" }] }),
+  // 0.14.2 (issue #35): warunki bez okien czasu (lista scenariuszy w FMP) i okna w jednej linii (kolumna TIME)
+  condNoTime: [nsfir, full, bare, nfir, { ...bare, booked: true }].map((s) => v.scnCond(s, { times: false })),
+  condNfir: [v.scnCond(nfir), v.scnCond(nfir, { html: true })],
+  time: [nsfir, full, bare, nfir, kk, { id: "EP-OLD" }, null].map(v.scnTimeText),
+  // przegląd 0.14.2: okres activationPeriods o długości doby lub dłuższy z datą końca (to_date)
+  long: [v.scnTimeText(long), v.scnCond(long), v.scnCond(long, { html: true }), v.scnCond(long, { times: false })],
+  // przegląd 0.14.2: active = obowiązuje teraz (isActive), enabled = włączony w vIFF
+  enabled: [{ ...kk, active: false, enabled: true }, { ...kk, active: true, enabled: true }, { ...kk, active: false, enabled: false },
+    { ...kk, active: true, enabled: false }, kk].map((s) => [v.scnEnabledIdle(s), v.scnTip(s)]),
 }));
 """
 
@@ -74,3 +90,40 @@ def test_map_row_uses_tooltip_not_description():
     assert "s.description" not in src and "description" not in src.split("const scnHtml")[1].split("\n")[0]
     assert 'const scnHtml = (s, byId) => `<div class="vs-scn ${s.active ? "on" : ""}" title="${esc(scnTip(s))}">' in src
     assert '<div class="vs-cond">${scnCond(s, { html: true })}</div>' in src
+
+
+def test_scenario_conditions_and_time_for_fmp_list(js):
+    """0.14.2 (issue #35): lista scenariuszy w OTHER › FMP ma osobną kolumnę TIME, więc warunki bez okien czasu;
+    domyślne scnCond (MAP, dymki) bez zmian, tylko to samo okno podane dwa razy pokazane raz."""
+    assert js["condNoTime"] == [
+        "when online: EPWW_N_CTR + EPWW_S_CTR",
+        "when online: EPWA_APP or EPWA_W_APP · and offline: EPWW_CTR · bookings count too",
+        "no position conditions",
+        "when online: EPWW_N_CTR · bookings count too",
+        "bookings count too",
+    ]
+    assert js["condNfir"] == ["when online: EPWW_N_CTR · bookings count too · time 1600–2200",
+                              "when online: <b>EPWW_N_CTR</b> · bookings count too · time <b>1600–2200</b>"]
+    # bez okna (albo 0000-2359) H24; okna bez powtórek, z datą przed godzinami
+    assert js["time"] == ["H24", "0600–1200, 2026-10-18 1800–2000, 0100–0200", "H24", "1600–2200", "2026-11-21 1900–2100",
+                          "H24", "H24"]
+    for t in js["time"] + js["condNoTime"]:
+        assert not POLISH.search(t)
+
+
+def test_scenario_long_period_and_enabled_flag(js):
+    """Przegląd 0.14.2: okno dłuższe niż doba z datą końca (inaczej "1900–2100" wygląda na 2 h jednego dnia), okno
+    przez północ bez niej; włączony, ale nieobowiązujący teraz scenariusz ma w dymku "(enabled, not active now)"
+    (wiersz listy i podglądu w OTHER › FMP, wiersz scenariusza na MAP)."""
+    t, cond, html, no_time = js["long"]
+    assert t == "2026-11-21 1900–2026-11-23 2100, 2026-11-21 2300–0100"
+    assert cond == "when online: EPKK_APP · 2026-11-21 time 1900–2026-11-23 2100 · 2026-11-21 time 2300–0100"
+    assert html == "when online: <b>EPKK_APP</b> · 2026-11-21 time <b>1900–2026-11-23 2100</b> · 2026-11-21 time <b>2300–0100</b>"
+    assert no_time == "when online: EPKK_APP"
+    idle = [x[0] for x in js["enabled"]]
+    tips = [x[1] for x in js["enabled"]]
+    assert idle == [True, False, False, False, False]
+    rest = "no traffic volumes · when online: EPKK_APP · bookings count too · 2026-11-21 time 1900–2100"
+    assert tips == ["Scenario EP-KKTMA (enabled, not active now): " + rest] + ["Scenario EP-KKTMA: " + rest] * 4
+    for x in tips:
+        assert not POLISH.search(x)
