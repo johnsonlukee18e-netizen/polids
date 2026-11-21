@@ -93,7 +93,8 @@ def short(b):
 def test_layout_seed_matches_sketch():
     """Okienka, nazwy i granice jak na szkicu właściciela projektu (ESSA = ESAA), w kolumnach A..M (1..13); 0.13.2 (issue #27): znów
     SAS (EDDC_SAS_APP, EDMM) i L (ESMS_APP, ESAA) jak w 0.13.0 i siatka całej strony w seedzie (rząd u góry, BERLIN,
-    przyciski warstw, podglądy, stan danych, legenda, komórki kodów FIR-ów)."""
+    przyciski warstw, podglądy, stan danych, legenda, komórki kodów FIR-ów). 0.14.2 (issue #35, właściciel projektu): ESAA
+    i UMKK o jeden wiersz wyżej (kod w wierszu 3, okienka od wiersza 4) – mniej zasłaniają północ LOW i HIGH."""
     lay = json.loads(SEED.read_text("utf-8"))
     got = {f["fir"]: [(b["id"], b["upper"], b["lower"], b["col"], b["row"]) for b in f["boxes"]] for f in lay["firs"]}
     assert got == {
@@ -101,10 +102,10 @@ def test_layout_seed_matches_sketch():
         "EDUU": [("OSE2", 660, 365, 3, 7), ("OSE1", 365, 285, 3, 8), ("HVL2", 660, 365, 3, 11), ("HVL1", 365, 285, 3, 12)],
         # SPE1 (Spree, kafelek EDUU SPE) na szkicu obok MEI pod nazwą EDMM, jak na zdjęciu PANDORY i w LOA
         "EDMM": [("MEI", 315, 165, 2, 15), ("SPE1", 660, 315, 3, 15), ("SAS", 165, 0, 2, 16)],
-        "ESAA": [("9", 660, 365, 5, 5), ("6", 660, 365, 6, 5), ("8", 365, 195, 5, 6), ("7", 365, 0, 6, 6), ("L", 195, 0, 5, 7)],
+        "ESAA": [("9", 660, 365, 5, 4), ("6", 660, 365, 6, 4), ("8", 365, 195, 5, 5), ("7", 365, 0, 6, 5), ("L", 195, 0, 5, 6)],
         "LKAA": [("NU", 660, 305, 5, 19), ("SU", 660, 305, 6, 19), ("NL", 305, 125, 5, 20), ("SL", 305, 125, 6, 20),
                  ("MT", 125, 0, 6, 21)],
-        "UMKK": [("ACC", 999, 0, 10, 5)], "LZBB": [("U", 660, 305, 10, 19), ("BB", 305, 80, 10, 20)],
+        "UMKK": [("ACC", 999, 0, 10, 4)], "LZBB": [("U", 660, 305, 10, 19), ("BB", 305, 80, 10, 20)],
         # EYVL L/E: FL255 jak w pliku sektorów, nie 225 ze szkicu (właściciel projektu 28.10.2026)
         "EYVL": [("U", 660, 365, 12, 3), ("M", 365, 335, 12, 4), ("L", 335, 255, 12, 5), ("E", 255, 95, 12, 6)],
         "UMMV": [("ACC", 660, 75, 12, 9)], "UKLV": [("RLV", 660, 55, 12, 15)]}
@@ -127,8 +128,8 @@ def test_layout_seed_matches_sketch():
     assert lay["berlin"] == {"col": 1, "row": 6, "box": {"col": 1, "row": 7, "cols": 2}}
     assert all(set(f) == {"fir", "merge", "name", "boxes"} for f in lay["firs"])
     assert {f["fir"]: (f["name"]["col"], f["name"]["row"], f["name"].get("cols", 1)) for f in lay["firs"]} == {
-        "EDWW": (2, 4, 1), "EDUU": (3, 6, 1), "EDMM": (2, 14, 1), "ESAA": (5, 4, 2), "LKAA": (5, 18, 2),
-        "UMKK": (10, 4, 1), "LZBB": (10, 18, 1), "EYVL": (13, 3, 1), "UMMV": (13, 9, 1), "UKLV": (13, 15, 1)}
+        "EDWW": (2, 4, 1), "EDUU": (3, 6, 1), "EDMM": (2, 14, 1), "ESAA": (5, 3, 2), "LKAA": (5, 18, 2),
+        "UMKK": (10, 3, 1), "LZBB": (10, 18, 1), "EYVL": (13, 3, 1), "UMMV": (13, 9, 1), "UKLV": (13, 15, 1)}
     cs = {(f["fir"], b["id"]): b["callsign"] for f in lay["firs"] for b in f["boxes"]}
     assert (cs[("EDMM", "SAS")], cs[("ESAA", "L")]) == ("EDDC_SAS_APP", "ESMS_APP")
     for f in lay["firs"]:
@@ -182,7 +183,8 @@ def test_layout_boxes_map_to_known_callsigns(client):
     take("fmp", **g["fmp"])
     # kody przy prawej krawędzi (EYVL, UMMV, UKLV): ADVISORY pod kodem; reszta: nazwa i ADVISORY na prawo
     room = {f["fir"]: (f["room"]["cols"], f["room"]["rows"]) for f in d["firs"]}
-    assert room == {"EDWW": (3, 1), "EDUU": (2, 1), "EDMM": (2, 1), "ESAA": (4, 1), "LKAA": (3, 1), "UMKK": (2, 1),
+    # 0.14.2: ESAA w wierszu 3 – nazwa do kolumny G (FMP w H3)
+    assert room == {"EDWW": (3, 1), "EDUU": (2, 1), "EDMM": (2, 1), "ESAA": (3, 1), "LKAA": (3, 1), "UMKK": (2, 1),
                     "LZBB": (3, 1), "EYVL": (1, 2), "UMMV": (1, 2), "UKLV": (1, 2)}
     assert [s["fir"] for s in rb.STACKS] == ["ESAA", "EDWW", "EDUU", "EDMM", "LKAA", "UMKK", "EYVL", "UMMV", "UKLV", "LZBB"]
     assert all(set(s) == {"fir", "title"} and s["title"] for s in rb.STACKS)
@@ -260,17 +262,17 @@ def test_stack_axes_fixed_when_merged(client):
 
 def test_merge_esaa(client):
     # ESAA_CTR obsługuje wszystkie: prostokąt 2 × 3 z pustą komórką obok L (0.13.2: L znów jest, jak w 0.13.0) – jeden
-    # kafelek w komórce 9
+    # kafelek w komórce 9 (0.14.2: o wiersz wyżej, od wiersza 4)
     (b,) = boxes(get(client, [ctl("ESAA_CTR", "126.825")]), "ESAA")
-    assert short(b) == ("ESAA", 660, 0, 5, 5, 1, 1, "ESAA_CTR") and len(b["members"]) == 5
+    assert short(b) == ("ESAA", 660, 0, 5, 4, 1, 1, "ESAA_CTR") and len(b["members"]) == 5
     # ESMM_6 i ESMM_9: 6 obsługuje 6, 8, 7 – prostokąt z 9 w środku nie, więc tylko ciąg 6 + 7 w kolumnie F
     es = {b["label"]: b for b in boxes(get(client, [ctl("ESMM_6_CTR", "135.805"), ctl("ESMM_9_CTR", "135.985")]), "ESAA")}
-    assert short(es["6"]) == ("6", 660, 0, 6, 5, 1, 1, "ESMM_6_CTR") and es["6"]["id"] == "6+7"
-    assert short(es["8"]) == ("8", 365, 195, 5, 6, 1, 1, "ESMM_6_CTR") and not es["8"]["merged"]
+    assert short(es["6"]) == ("6", 660, 0, 6, 4, 1, 1, "ESMM_6_CTR") and es["6"]["id"] == "6+7"
+    assert short(es["8"]) == ("8", 365, 195, 5, 5, 1, 1, "ESMM_6_CTR") and not es["8"]["merged"]
     assert es["9"]["owner"] == "ESMM_9_CTR" and es["L"]["owner"] is None and set(es) == {"9", "6", "8", "L"}
     # sam ESMS_APP: tylko okienko L (APP, nie łączy się z sektorami ESMM)
     es = {b["label"]: b for b in boxes(get(client, [ctl("ESMS_APP", "134.980")]), "ESAA")}
-    assert short(es["L"]) == ("L", 195, 0, 5, 7, 1, 1, "ESMS_APP") and set(es) == {"9", "6", "8", "7", "L"}
+    assert short(es["L"]) == ("L", 195, 0, 5, 6, 1, 1, "ESMS_APP") and set(es) == {"9", "6", "8", "7", "L"}
     assert all(b["owner"] is None for k, b in es.items() if k != "L")
 
 
@@ -403,7 +405,7 @@ def test_net_error_no_advisory(client):
     d = client.get("/api/radio/board").json()
     assert d["net"]["ok"] is False
     assert all(not f["advisory"] and not f["staffed"] for f in d["firs"])
-    assert all(i["value"] == "0" for i in d["indicators"]) and d["plates"] == {"app": [], "twr": []}
+    assert all(i["value"] == "0" for i in d["indicators"]) and d["plates"] == {"app": [], "twr": [], "atz": []}
     # BERLIN: bez danych o zalogowanych nie wiadomo, czy jest ATIS – bez konfiguracji (strona: kreska), nie czerwone
     # „No ATIS” (dawniej WEST domyślny)
     assert (d["berlin"]["config"], d["berlin"]["source"], d["berlin"]["preferred"]) == (None, "UNKNOWN", False)
@@ -681,7 +683,7 @@ def test_flow_viff_failure_safe(client):
 
 # --- plakietki APP i TWR tylko dla zalogowanych
 def test_plates_nobody(client):
-    assert get(client)["plates"] == {"app": [], "twr": []}
+    assert get(client)["plates"] == {"app": [], "twr": [], "atz": []}
 
 
 def test_plates_app_split(client):
@@ -717,13 +719,39 @@ def test_plates_app_alone_and_directors(client):
 def test_plates_twr(client):
     d = get(client, [ctl("EPKK_TWR", "123.255")], [atis("EPGD_ATIS", "A", ["GDANSK INFO A"], "129.630")])
     twr = {p["icao"]: p for p in d["plates"]["twr"]}
-    assert set(twr) == {"EPKK", "EPGD"}
-    assert (twr["EPKK"]["twr"], twr["EPKK"]["frequency"], twr["EPKK"]["layers"]) == (["EPKK_TWR"], "123.255",
-                                                                                    ["twr", "twra"])
-    # sam ATIS: plakietka tylko na warstwie TWR/A
-    assert (twr["EPGD"]["twr"], twr["EPGD"]["atis"], twr["EPGD"]["layers"]) == ([], ["EPGD_ATIS"], ["twra"])
+    # 0.14.2 (issue #35, właściciel projektu: "TWR/A to jednak TWR + ATZ"): sam ATIS lotniska (EPGD) bez plakietki – ATIS jest
+    # w rzędzie u góry; plakietka tylko z wieżą online, ta sama na TWR i TWR/A (bez warstw)
+    assert set(twr) == {"EPKK"} and "layers" not in twr["EPKK"]
+    assert (twr["EPKK"]["twr"], twr["EPKK"]["frequency"], twr["EPKK"]["atis"]) == (["EPKK_TWR"], "123.255", [])
+    assert next(a for a in d["atis"] if a["callsign"] == "EPGD_ATIS")["online"] and d["plates"]["atz"] == []
     ctr = {g["icao"]: g for g in d["twr"]}
     lon0, lat0, lon1, lat1 = ctr["EPKK"]["box"]
     assert lat0 <= twr["EPKK"]["at"][0] <= lat1 and lon0 <= twr["EPKK"]["at"][1] <= lon1  # w środku CTR
     # APP obsługujący CTR z góry to nie wieża: bez plakietki TWR
     assert get(client, [ctl("EPGD_APP", "127.280")])["plates"]["twr"] == []
+
+
+def test_plates_atz(client):
+    """0.14.2 (issue #35, właściciel projektu: "TWR/A to jednak TWR + ATZ"): stanowisko AFIS albo radio lotniska online (EPxx_I_TWR,
+    EPxx_R_TWR) – plakietka ATZ w środku swojej ATZ (geo.atz z ICAO lotniska), z częstotliwością z sieci; ATZ należy
+    tylko do stanowiska swojego lotniska (APP nad ATZ jej nie obsługuje, jak na MAP). Stanowisko lotniska bez CTR
+    i bez ATZ (EPSD): sama plakietka w punkcie lotniska (zone False). Wieża z CTR (EPKT) zostaje plakietką TWR."""
+    d = get(client, [ctl("EPBA_R_TWR", "118.330"), ctl("EPML_I_TWR", "119.105"), ctl("EPPL_R_TWR", "122.805"),
+                     ctl("EPKT_TWR", "129.255")])
+    atz = {p["icao"]: p for p in d["plates"]["atz"]}
+    assert set(atz) == {"EPBA", "EPML", "EPPL"}
+    assert {k: (p["twr"], p["frequency"], p["nominal"], p["zone"], p["id"]) for k, p in atz.items()} == {
+        "EPBA": (["EPBA_R_TWR"], "118.330", "EPBA_R_TWR", True, "ATZ EPBA"),
+        "EPML": (["EPML_I_TWR"], "119.105", "EPML_I_TWR", True, "ATZ EPML"),
+        # EPPL: lista OWNER ATZ bez stanowiska lotniska – stanowisko z listy stanowisk
+        "EPPL": (["EPPL_R_TWR"], "122.805", "EPPL_R_TWR", True, "ATZ EPPL")}
+    lon0, lat0, lon1, lat1 = rb._box([{"geom": z["geometry"]} for z in client.get("/api/radio/board?geo=1").json()["geo"]["atz"]
+                                      if z["atz"] == "EPBA"])
+    assert lat0 <= atz["EPBA"]["at"][0] <= lat1 and lon0 <= atz["EPBA"]["at"][1] <= lon1  # w środku ATZ
+    assert [p["icao"] for p in d["plates"]["twr"]] == ["EPKT"]
+    assert {"EPBA_R_TWR", "EPML_I_TWR", "EPPL_R_TWR"} <= set(d["pos"]) and "EPBA_R_TWR" in d["online"]
+    # APP nad ATZ: bez plakietki ATZ
+    assert get(client, [ctl("EPKK_APP", "121.075")])["plates"]["atz"] == []
+    # lotnisko bez CTR i bez ATZ: sama plakietka w punkcie lotniska
+    (p,) = get(client, [ctl("EPSD_R_TWR", "125.335")])["plates"]["atz"]
+    assert (p["icao"], p["zone"], p["twr"], p["frequency"]) == ("EPSD", False, ["EPSD_R_TWR"], "125.335") and p["at"]

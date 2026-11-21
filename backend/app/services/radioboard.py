@@ -1,8 +1,9 @@
 """RADIO jako jedna strona, jak w systemie PANDORA (GET /api/radio/board).
 
 Trzy podglądy FIR EPWW: sektory ACC w warstwach LOW, MID i HIGH (data/seed/ownership.json), a do tego warstwy
-APP (TMA), TWR (CTR lotnisk), FIS i pasek ATIS. Każda etykieta ma kolejność przejmowania (chain); właściciel to
-pierwsze stanowisko z tej kolejności, które jest teraz online (dopasowanie z /api/radio/online, z aliasami sąsiadów).
+APP (TMA), TWR (CTR lotnisk), TWR/A (0.14.2: TWR i ATZ lotnisk ze stanowiskami AFIS i radio), FIS i pasek ATIS.
+Każda etykieta ma kolejność przejmowania (chain); właściciel to pierwsze stanowisko z tej kolejności, które jest teraz
+online (dopasowanie z /api/radio/online, z aliasami sąsiadów).
 Sąsiedzi: okienka FIR-ów sąsiednich w siatce całej strony wg szkicu właściciela projektu (0.13.2, issue #27: miejsca kafelków jak na
 szkicu, wygląd jak w 0.13.1; data/seed/radio_layout.json); kolejność przejmowania okienka z kafelków sektorów
 graniczących z FIR EPWW jak w VACS (profil ACC_EPWW z data/seed/vacs_epww.json, bez FMP), uzupełniona listami OWNER
@@ -54,6 +55,7 @@ INFO = re.compile(r"_(?:I|IE|IW|IS|IN|FIS)_[A-Z]+$")  # stanowiska informacji (E
 DIR_SLICE = re.compile(r"^EP[A-Z]{2}_DIR\d")  # wycinki dyrektora przy pasie (EPWA_DIR11_A, EPKK_DIR07)
 ACC_CS = re.compile(r"^EPWW_[A-Z0-9_]*(?:CTR|FSS)$")
 FIS_NAME = re.compile(r"^FIS_|^[A-Z]{3}_FIS_|^EPWW-MIDSEA$")
+ATZ_NAME = re.compile(r"^(EP[A-Z]{2})_ATZ")  # ATZ lotniska (EPBA_ATZ, EPGL_ATZ_A): warstwa TWR/A (0.14.2)
 EP_ICAO = re.compile(r"EP[A-Z]{2}")
 
 
@@ -339,8 +341,9 @@ def _uniq_chains(sl: list[dict]) -> list[list[str]]:
 
 
 def ctr_groups(slices: list[dict], own: dict, coords: dict, positions: dict) -> list[dict]:
-    """Warstwa TWR: CTR lotnisk (wieża = pierwsze stanowisko TWR z listy OWNER), ATIS lotniska do TWR/ATIS; ramka CTR
-    (box) do odsunięcia etykiety obok CTR; centre = środek CTR (najdalej od krawędzi) na plakietkę wieży (0.13.0)."""
+    """Warstwy TWR i TWR/A: CTR lotnisk (wieża = pierwsze stanowisko TWR z listy OWNER), ATIS lotniska do dymku
+    plakietki wieży; ramka CTR (box) do odsunięcia etykiety obok CTR; centre = środek CTR (najdalej od krawędzi) na
+    plakietkę wieży (0.13.0)."""
     by: dict[str, list[dict]] = {}
     for s in slices:
         by.setdefault(sector_group("EPWW", s["name"], "ctr"), []).append({**s, "chain": air_chain(s["name"], s["owners"], own)})
@@ -356,6 +359,40 @@ def ctr_groups(slices: list[dict], own: dict, coords: dict, positions: dict) -> 
         out.append({"id": key, "icao": icao, "at": at, "box": _box(sl), "nominal": nominal, "chains": chains,
                     "atis": atis, "hi": max(s["hi"] for s in sl), "centre": part_anchor(sl, []) or at})
     return sorted(out, key=lambda g: g["id"])
+
+
+def atz_groups(slices: list[dict], coords: dict, positions: dict, ctr_icaos=()) -> list[dict]:
+    """Warstwa TWR/A (0.14.2, issue #35, właściciel projektu: "TWR/A to jednak TWR + ATZ"): ATZ lotnisk bez CTR (wycinki
+    EPxx_ATZ…, jedna grupa na lotnisko). ATZ należy tylko do stanowisk TWR tego lotniska (AFIS EPxx_I_TWR, radio
+    EPxx_R_TWR; jak na MAP) – APP ani ACC nad ATZ jej nie obsługują. stations = te stanowiska z listy stanowisk,
+    nominal = pierwsze z nich z listy OWNER ATZ (bez tego – pierwsze wg znaku: EPPL, EPPT); at = lotnisko, centre =
+    środek ATZ na plakietkę, zone = jest kształt ATZ. Stanowiska TWR lotniska bez CTR i bez ATZ, ale ze współrzędnymi
+    lotniska: sama plakietka (zone False), żeby stanowisko online nigdy nie było niewidoczne; bez współrzędnych – nic."""
+    def stations_of(icao: str) -> list[str]:
+        return sorted(cs for cs in positions if cs.split("_")[0] == icao and facility(cs) == "TWR")
+
+    skip = set(ctr_icaos)
+    by: dict[str, list[dict]] = {}
+    for s in slices:
+        if (m := ATZ_NAME.match(s["name"])) and m.group(1) not in skip:
+            by.setdefault(m.group(1), []).append(s)
+    out = []
+    for icao, sl in by.items():
+        st = stations_of(icao)
+        if not st:
+            continue
+        nominal = next((cs for s in sl for cs in s["owners"] if cs in st), st[0])
+        at = list(coords[icao]) if icao in coords else label_point(_largest(sl)["geom"])
+        out.append({"id": f"ATZ {icao}", "icao": icao, "at": at, "box": _box(sl), "nominal": nominal, "stations": st,
+                    "hi": max(s["hi"] for s in sl), "centre": part_anchor(sl, []) or at, "zone": True})
+    for icao in sorted({cs.split("_")[0] for cs in positions if facility(cs) == "TWR" and EP_ICAO.fullmatch(cs.split("_")[0])}
+                       - skip - set(by)):
+        if icao in coords:
+            st = stations_of(icao)
+            at = list(coords[icao])
+            out.append({"id": icao, "icao": icao, "at": at, "box": [], "nominal": st[0], "stations": st, "hi": 0,
+                        "centre": at, "zone": False})
+    return sorted(out, key=lambda g: g["icao"])
 
 
 def fis_groups(slices: list[dict], own: dict) -> list[dict]:
@@ -999,8 +1036,9 @@ def app_plates(static: dict, online: dict, positions: dict | None = None) -> lis
 
 
 def twr_plates(static: dict, online: dict, atis: list[dict], positions: dict | None = None) -> list[dict]:
-    """Plakietki TWR tylko dla zalogowanych: w środku CTR, gdy wieża lotniska jest online (warstwy TWR i TWR/A),
-    albo sam ATIS lotniska (tylko TWR/A). twr: zalogowane wieże tego lotniska, atis: zalogowane ATIS."""
+    """Plakietki TWR tylko dla zalogowanych: w środku CTR, gdy wieża lotniska jest online (warstwy TWR i TWR/A; 0.14.2:
+    bez plakietek samego ATIS – ATIS jest w rzędzie u góry). twr: zalogowane wieże tego lotniska, atis: zalogowane
+    ATIS lotniska (do dymku)."""
     on_atis: dict[str, list[str]] = {}
     for a in atis:
         if a.get("online"):
@@ -1013,11 +1051,21 @@ def twr_plates(static: dict, online: dict, atis: list[dict], positions: dict | N
         order = [cs for ch in g["chains"] for cs in ch]
         twr = sorted((cs for cs in online if cs.split("_")[0] == icao and facility(cs) == "TWR" and is_on(cs, online)),
                      key=lambda cs: (order.index(cs) if cs in order else len(order), cs))
-        at = on_atis.get(icao, [])
-        if twr or at:
-            out.append({"id": g["id"], "icao": icao, "at": g.get("centre") or g["at"], "twr": twr, "atis": at,
-                        "frequency": freq_of(twr[0], online, positions) if twr else None,
-                        "layers": ["twr", "twra"] if twr else ["twra"]})
+        if twr:
+            out.append({"id": g["id"], "icao": icao, "at": g.get("centre") or g["at"], "twr": twr,
+                        "atis": on_atis.get(icao, []), "frequency": freq_of(twr[0], online, positions)})
+    return out
+
+
+def atz_plates(static: dict, online: dict, positions: dict | None = None) -> list[dict]:
+    """Plakietki ATZ (warstwa TWR/A, 0.14.2) tylko dla zalogowanych: stanowisko AFIS albo radio lotniska online – w środku
+    jego ATZ (zone False: sama plakietka w punkcie lotniska). twr: zalogowane stanowiska TWR tego lotniska."""
+    out = []
+    for g in static.get("atz") or ():
+        on = sorted(cs for cs in online if cs.split("_")[0] == g["icao"] and facility(cs) == "TWR" and is_on(cs, online))
+        if on:
+            out.append({"id": g["id"], "icao": g["icao"], "at": g.get("centre") or g["at"], "twr": on,
+                        "nominal": g["nominal"], "frequency": freq_of(on[0], online, positions), "zone": g["zone"]})
     return out
 
 
@@ -1060,7 +1108,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
     Obrysy stanowisk na podglądzie LOW (0.13.2, właściciel projektu: granice tylko zalogowanych, tylko zewnętrzne, bez sektorów MVA
     TMA): kształty TMA i CTA (areas.tma: kolejność bez ACC, dyrektorów i informacji – kto jest pierwszy online, ten
     obsługuje kształt), CTR (grupa CTR jak twr[].id) i FIS (kolejność bez ACC) – area_shapes; strona sumuje kształty
-    jednego stanowiska (dissolve.js)."""
+    jednego stanowiska (dissolve.js). 0.14.2: także ATZ (geo.atz z ICAO lotniska, atz: atz_groups) do warstwy TWR/A."""
     kinds: dict[str, list[dict]] = {"acc": [], "tma": [], "ctr": [], "fis": []}
     for s in epww_slices:
         k = sector_kind(s["fir"], s["name"])
@@ -1074,6 +1122,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
             acc_geo.append({"letter": m.group(1), "name": s["name"], "lo": s["lo"], "hi": s["hi"],
                             "geometry": simplify(s["geom"], 0.002, 4)})
     fis_sl = [s for s in kinds["fis"] if FIS_NAME.match(s["name"])]
+    atz_sl = [s for s in kinds["fis"] if ATZ_NAME.match(s["name"])]
     # kształt TMA → klucz TMA (jak tma[].tma i flow.tma): czerwone tło TMA z alarmem przepływu na podglądzie LOW;
     # wspólne części kilku TMA i CTA bez klucza
     parts_by, dirs = tma_parts(kinds["tma"], own)
@@ -1090,9 +1139,12 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
         return [cs for cs in air_chain(s["name"], s["owners"], own)
                 if cs not in radar and (not ACC_CS.match(cs) or INFO.search(cs))]
 
+    ctr = ctr_groups(kinds["ctr"], own, coords, positions)
+    # ATZ (0.14.2): kształty z ICAO lotniska (geo.atz, jak atz[].icao) – granica ATZ na TWR/A
     areas = {"tma": area_shapes(kinds["tma"], "t", app_chain, tma=lambda s: tma_key.get(s["name"])),
              "ctr": area_shapes(kinds["ctr"], "c", ctr=lambda s: sector_group("EPWW", s["name"], "ctr")),
-             "fis": area_shapes(fis_sl, "f", fis_chain)}
+             "fis": area_shapes(fis_sl, "f", fis_chain),
+             "atz": area_shapes(atz_sl, "z", atz=lambda s: ATZ_NAME.match(s["name"]).group(1))}
     geo = {"border": simplify(border_geom, 0.002), "firs": [{"id": f["id"], "geometry": simplify(f["geometry"], 0.02, 2)}
                                                            for f in firs_geo],
            "acc": acc_geo, **{k: [{x: v for x, v in a.items() if x != "chains"} for a in sl] for k, sl in areas.items()}}
@@ -1101,7 +1153,8 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
     return {"layers": own.get("layers") or {}, "acc_positions": sorted(acc_pos),
             "acc_short": {cs: (v or {}).get("short") or cs for cs, v in acc_pos.items()},
             "sectors": acc_sectors(own), "tma": tma_groups(kinds["tma"], own),
-            "twr": ctr_groups(kinds["ctr"], own, coords, positions), "fis": fis_groups(fis_sl, own),
+            "twr": ctr, "atz": atz_groups(atz_sl, coords, positions, {g["icao"] for g in ctr}),
+            "fis": fis_groups(fis_sl, own),
             "atis": atis, "areas": {k: [{"id": a["id"], "chains": a["chains"]} for a in areas[k]] for k in ("tma", "fis")},
             "geo": geo, "layout": layout_static(layout or {}, tiles), "plates": tma_plate_static(kinds["tma"], own)}
 
@@ -1128,6 +1181,9 @@ def _referenced(static: dict) -> set[str]:
         refs.update(cs for ch in g["chains"] for cs in ch)
         if g.get("atis"):
             refs.add(g["atis"])
+    for g in static.get("atz") or ():
+        refs.add(g["nominal"])
+        refs.update(g["stations"])
     for a in (k for sl in (static.get("areas") or {}).values() for k in sl):
         refs.update(cs for ch in a["chains"] for cs in ch)
     for f in (static.get("layout") or {}).get("firs") or ():
@@ -1144,7 +1200,7 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     """Stan tablicy dla zestawu zalogowanych (online: znak stanowiska → kontroler, jak /api/radio/online).
     Także grid (siatka strony wg szkicu: kolumny, rodzaje kolumn, BERLIN, przyciski, podglądy, stan danych, legenda;
     0.13.2), firs (okienka FIR-ów sąsiednich w komórkach siatki, po łączeniu; kod FIR-u: name i room), indicators,
-    plates (APP i TWR tylko dla zalogowanych), areas (0.13.2: kto obsługuje kształty TMA/CTA i FIS – obrysy
+    plates (APP, TWR i ATZ tylko dla zalogowanych), areas (0.13.2: kto obsługuje kształty TMA/CTA i FIS – obrysy
     zalogowanych na LOW), acc_short (skróty stanowisk ACC do plakietek), berlin (berlin_config z feedu i METAR, liczy
     endpoint) i flow (flow_alerts z vIFF, liczy endpoint; None = brak danych)."""
     sectors = [{**s, "owner": first_online(s["chain"], online)} for s in static["sectors"]]
@@ -1199,6 +1255,7 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
             "online": {cs: v for cs, v in online.items() if cs in refs or cs in extra},
             "grid": lay.get("grid") or {}, "firs": fir_blocks(lay, online, positions, net_ok),
             "indicators": indicators(lay, online, sectors, static.get("acc_short") or {}),
-            "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions)},
+            "plates": {"app": app_plates(static, online, positions), "twr": twr_plates(static, online, atis, positions),
+                       "atz": atz_plates(static, online, positions)},
             "berlin": berlin or berlin_config([], net_ok=net_ok),
             "flow": {"ok": bool(flow.get("ok")), "sectors": flow.get("sectors") or {}, "tma": flow.get("tma") or {}}}
