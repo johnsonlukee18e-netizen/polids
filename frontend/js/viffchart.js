@@ -213,7 +213,7 @@ export function fmpRows(data) {
       + (n.peak === null ? "" : `${DOT}peak ${n.peak} within the hour`);
     const code = tv.id.startsWith(prefix) ? tv.id.slice(prefix.length) : tv.id;
     return {
-      id: tv.id, code, label: tvLabel(tv.id),
+      id: tv.id, code, label: tvLabel(tv.id), volumes: Array.isArray(tv.volumes) ? tv.volumes : [],
       active, restricted: !!tv.restricted, ...n, entriesMax, occupancyMax,
       capacity: pairText(n.entries, entriesMax), occupancyText: pairText(n.occupancy, occupancyMax),
       capacityReg: regBinds(n.entriesCap, n.entriesReg), occupancyReg: regBinds(n.occupancyCap, n.occupancyReg),

@@ -10,8 +10,8 @@ export const LAYERS = [
   { id: "mid", label: "MID", tip: "ACC sectors on the small preview: MID (FL350)" },
   { id: "high", label: "HIGH", tip: "ACC sectors on the right preview: HIGH (FL400)" },
   { id: "app", label: "APP", tip: "APP positions online: TMA boundary, name and frequency (on the LOW preview)" },
-  { id: "twr", label: "TWR", tip: "Towers online: CTR boundary, name and frequency (on the LOW preview)" },
-  { id: "twra", label: "TWR/A", tip: "Towers online and aerodrome ATIS: CTR boundary, name, frequency and ATIS (on the LOW preview)" },
+  { id: "twr", label: "TWR", tip: "Towers online: CTR boundary, name and frequency (on the LOW preview; turns TWR/A off)" },
+  { id: "twra", label: "TWR/A", tip: "Towers online and aerodrome ATIS: CTR boundary, name, frequency and ATIS (on the LOW preview; turns TWR off)" },
   { id: "fis", label: "FIS", tip: "FIS positions online: FIS area boundary, name and frequency (on the LOW preview)" },
 ];
 export const LAYER_IDS = LAYERS.map((l) => l.id);
@@ -78,6 +78,13 @@ export function utcHhmm(iso) {
   const t = Date.parse(String(iso || "").replace(/(\.\d{3})\d+/, "$1"));
   return Number.isNaN(t) ? "\u2013" : new Date(t).toISOString().slice(11, 16) + "Z";
 }
+// 0.14.1: wiek danych w minutach (czas ISO z feedu, także z 7 cyframi ułamka sekundy); zły czas = null
+export function ageMin(iso, now = Date.now()) {
+  const t = Date.parse(String(iso || "").replace(/(\.\d{3})\d+/, "$1"));
+  return Number.isFinite(t) ? Math.max(0, (now - t) / 60000) : null;
+}
+// dane starsze niż STALE_MIN minut (feed w pamięci 30 s, odświeżanie co 30 s, mała różnica zegarów) = stare
+export const STALE_MIN = 3;
 // liczba kontrolerów na tablicy: online = stanowisko → kontroler; ten sam kontroler pod znakiem sąsiada (alias_of)
 // i ATIS-y nie liczą się osobno
 export const controllersOn = (online) => new Set(Object.entries(online || {})
@@ -193,8 +200,10 @@ export function labelOpts(kind) {
 // liczbą zasłonięć, z nich ta o najmniejszym koszcie (nałożenie gorsze niż dłuższa linia i więcej skróconych).
 // lines = false (plakietki RADIO od 0.13.2: bez linii prowadzących): bez kar za linie, tylko odległość, obrysy
 // i nałożenia. Wynik: [{dx, dy, v, hit}] – przesunięcie środka, numer odmiany (0 = pełna) i czy coś zasłania.
-const WC = 0.5, WV = [0, 25, 100], WX = 40, HIT = 500, ROUNDS = 4, STRETCH = 1.5;
-export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26, far = 90, rings = 14, cover = null, lines = true } = {}) {
+// 0.14.1 (RADIO): clear = margines (px) wokół etykiety, w którym obrys też się liczy (plakietka nie stoi tuż na granicy,
+// którą opisuje); it.out(r) = część etykiety poza jej własnym obszarem (0..1), waga WOUT
+const WC = 0.5, WV = [0, 25, 100], WX = 40, HIT = 500, ROUNDS = 4, STRETCH = 1.5, WOUT = 60;
+export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26, far = 90, rings = 14, cover = null, lines = true, clear = 0 } = {}) {
   const pins = items.map((it, i) => (it.pin ? [it.x, it.y, i] : null)).filter(Boolean);
   const over = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
   const rectAt = (it, s, dx, dy) => ({ x0: it.x + dx - s.w / 2 - gap / 2, y0: it.y + dy - s.h / 2 - gap / 2,
@@ -241,7 +250,8 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
             const r = rectAt(it, s, dx, dy);
             if (outside(r) || placed.some((p) => over(r, p) > 0)) continue;
             if (dots(r).length) continue;  // kropka lotniska i TMA (swoja albo cudza) zostaje widoczna
-            let cost = d + pv + coverOf(cover, r) * wc;
+            const rc = clear ? { x0: r.x0 - clear, y0: r.y0 - clear, x1: r.x1 + clear, y1: r.y1 + clear } : r;
+            let cost = d + pv + coverOf(cover, rc) * wc + (it.out ? it.out(r) * WOUT : 0);
             if (cost >= best) continue;
             if (lines) cost += leads.reduce((acc, l) => acc + (crosses(...l, r) ? WX : 0), 0);
             if (lines && d > 0) {

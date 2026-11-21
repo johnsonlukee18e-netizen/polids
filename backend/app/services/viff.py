@@ -35,9 +35,34 @@ FLIGHT_STATES = {
 }
 
 
-def hhmm(value) -> str | None:
-    """'1520' albo '152000' → '1520'; puste → None (vIFF podaje godziny UTC bez daty)."""
+# czas z datą jak w /etfms/airspaces (11.2026: "2026-11-21T00:11:00.000Z", wyliczone z milisekundami)
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$")
+
+
+def iso_time(value) -> datetime | None:
+    """Czas ISO 8601 z datą i godziną → datetime w UTC (bez strefy = UTC); inne wartości (także sama data) = None."""
     s = str(value or "").strip()
+    m = _ISO.match(s)
+    if not m or len(s) <= 10:
+        return None
+    try:
+        dt = datetime.fromisoformat(s[:-1] + "+00:00" if s.endswith("Z") else s)
+    except ValueError:
+        return None
+    return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def hhmm(value) -> str | None:
+    """'1520', '152000' albo czas ISO z datą ('2026-11-21T15:20:00.000Z') → '1520'; puste i sama data → None.
+    0.14.1 (właściciel projektu: "Fix graphs when selecting TV on FMP page"): vIFF podaje w krotkach lotów
+    /etfms/airspaces czasy ISO z datą, a stara reguła brała z nich rok ("2026" = 20:26), więc wszystkie loty sektora
+    wpadały w jedną minutę i wykresy ENTRY/OCC (OTHER › FMP i MAP) pokazywały same linie przepustowości."""
+    dt = iso_time(value)
+    if dt is not None:
+        return dt.strftime("%H%M")
+    s = str(value or "").strip()
+    if _ISO.match(s):  # sama data bez godziny
+        return None
     return s[:4] if len(s) >= 4 and s[:4].isdigit() else None
 
 
@@ -265,8 +290,14 @@ def sector_load(tv: str, buckets: list[dict], now: datetime, horizon: int = 60) 
         for t in b.get("flights") or []:
             if not isinstance(t, list) or len(t) < 3:
                 continue
-            entry = _minutes(t[3] if len(t) > 3 and hhmm(t[3]) else t[1], now_min)
-            exit_ = _minutes(t[4] if len(t) > 4 and hhmm(t[4]) else t[2], now_min)
+            raw_in = t[3] if len(t) > 3 and hhmm(t[3]) else t[1]
+            raw_out = t[4] if len(t) > 4 and hhmm(t[4]) else t[2]
+            if iso_time(raw_in) is not None:  # czas z datą (0.14.1): dokładnie względem teraz
+                entry = abs_minutes(raw_in, today=now.date()) - now_min
+                x = abs_minutes(raw_out, today=now.date()) if iso_time(raw_out) is not None else None
+                exit_ = x - now_min if x is not None else None
+            else:
+                entry, exit_ = _minutes(raw_in, now_min), _minutes(raw_out, now_min)
             if entry is None:
                 continue
             if exit_ is None or exit_ < entry:
@@ -299,18 +330,45 @@ CHART_STEP, CHART_SPAN = 20, 60
 _MAX_TRANSIT = 720
 
 
+def abs_minutes(value, day: int = 0, hour: int | None = None, today=None) -> int | None:
+    """Czas z krotki lotu vIFF jako minuty od dzisiejszej 00:00 UTC. Czas ISO z datą: dokładnie (today = dzisiejsza
+    data UTC; wczoraj ujemne, jutro od 1440). 'HHMM' bez daty: w dobie danych day (-1, 0, 1), a przy godzinie koszyka
+    hour najbliżej niej (w koszyku 00 wejście 2355 jest z poprzedniej doby). Nic z tego = None."""
+    dt = iso_time(value)
+    if dt is not None and today is not None:
+        return (dt.date() - today).days * 1440 + dt.hour * 60 + dt.minute
+    t = hhmm(value)
+    if t is None:
+        return None
+    m = day * 1440 + _mins(t)
+    if hour is not None and 0 <= hour < 24:
+        m += round((day * 1440 + hour * 60 - m) / 1440) * 1440
+    return m
+
+
+def _exit_minutes(value, entry_raw, entry: int, today=None) -> int:
+    """Wyjście lotu w minutach od dzisiejszej 00:00, po wejściu entry. Czas ISO dokładnie; 'HHMM' jako czas trwania od
+    wejścia (przez północ). Przejście krótsze niż minuta, dłuższe niż _MAX_TRANSIT albo bez wyjścia = minuta w sektorze."""
+    x = abs_minutes(value, today=today) if iso_time(value) is not None and today is not None else None
+    if x is None:
+        t, e = hhmm(value), hhmm(entry_raw)
+        x = entry + (_mins(t) - _mins(e)) % 1440 if t and e else None
+    dur = x - entry if x is not None else 0
+    return entry + (dur if 0 < dur <= _MAX_TRANSIT else 1)
+
+
 def _abs_hhmm(m: int) -> str:
     """Minuty od dzisiejszej 00:00 (także ujemne i po północy) → 'HHMM'."""
     m %= 1440
     return f"{m // 60:02d}{m % 60:02d}"
 
 
-def tv_flights(tv: str, days: dict) -> list[dict]:
+def tv_flights(tv: str, days: dict, today=None) -> list[dict]:
     """Loty jednego TV z całodobowych danych /etfms/airspaces: days = {przesunięcie doby (-1, 0, 1): odpowiedź}.
     Wejście i wyjście w minutach od dzisiejszej 00:00 (wczoraj ujemne, jutro od 1440). Czasy wyliczone, a bez nich
-    planowane (jak sector_load); doba wejścia z godziny koszyka jak w flight_profile (w koszyku 00 wejście 2355 jest
-    z poprzedniej doby). Lot przez pełną godzinę jest w dwóch koszykach (i tuż po północy w dwóch dobach): jeden wpis
-    na znak i minutę wejścia."""
+    planowane (jak sector_load). Czas ISO z datą (vIFF od 11.2026) liczony dokładnie od dzisiejszej daty today; stary
+    'HHMM' bez daty w dobie danych, najbliżej godziny koszyka (abs_minutes). Lot przez pełną godzinę jest w dwóch
+    koszykach (i tuż po północy w dwóch dobach): jeden wpis na znak i minutę wejścia."""
     found: dict[tuple, dict] = {}
     for day, data in days.items():
         buckets = data.get(tv) if isinstance(data, dict) else None
@@ -321,15 +379,13 @@ def tv_flights(tv: str, days: dict) -> list[dict]:
             for t in b.get("flights") or []:
                 if not isinstance(t, list) or len(t) < 3:
                     continue
-                entry = (hhmm(t[3]) if len(t) > 3 else None) or hhmm(t[1])
-                exit_ = (hhmm(t[4]) if len(t) > 4 else None) or hhmm(t[2])
-                if not entry:
+                calc = len(t) > 3 and hhmm(t[3]) is not None
+                raw_in = t[3] if calc else t[1]
+                raw_out = t[4] if len(t) > 4 and hhmm(t[4]) is not None else t[2]
+                e = abs_minutes(raw_in, day, hour, today)
+                if e is None:
                     continue
-                e = day * 1440 + _mins(entry)
-                if hour is not None and hour < 24:  # najbliżej godziny koszyka (przejście przez północ)
-                    e += round((day * 1440 + hour * 60 - e) / 1440) * 1440
-                dur = (_mins(exit_) - _mins(entry)) % 1440 if exit_ else 0
-                x = e + (dur if 0 < dur <= _MAX_TRANSIT else 1)
+                x = _exit_minutes(raw_out, raw_in, e, today)
                 found[(str(t[0]), e)] = {"callsign": str(t[0]), "entry": e, "exit": x,
                                          "airborne": bool(t[5]) if len(t) > 5 else None}
     return sorted(found.values(), key=lambda f: (f["entry"], f["callsign"]))
@@ -385,7 +441,7 @@ def sector_series(tv: str, days: dict, now: datetime, row: dict) -> dict:
     end = start + minutes
     # tylko loty, które mogą się liczyć: w sektorze po początku okna i z wejściem przed końcem ostatniego słupka
     # (dane to cała doba albo dwie); kolejność po wejściu zostaje, więc słupki liczymy bisekcją
-    flights = [f for f in tv_flights(tv, days) if f["exit"] > start and f["entry"] < end + CHART_SPAN]
+    flights = [f for f in tv_flights(tv, days, now.date()) if f["exit"] > start and f["entry"] < end + CHART_SPAN]
     entry_at = [f["entry"] for f in flights]
     # zajętość z tablicy różnic: +1 w minucie wejścia, -1 w minucie wyjścia (przycięte do okna), potem suma bieżąca
     diff = [0] * (minutes + 2)
@@ -639,13 +695,13 @@ def flight_profile(callsign: str, days: list, now: datetime, yesterday: dict | N
                     entry, exit_ = c_in or p_in, c_out or p_out
                     if not entry:
                         continue
-                    e_abs = day * 1440 + _mins(entry)
-                    if hour is not None and hour < 24:  # najbliżej godziny koszyka (przejście przez północ)
-                        e_abs += round((day * 1440 + hour * 60 - e_abs) / 1440) * 1440
+                    raw_in, raw_out = (t[3] if c_in else t[1]), (t[4] if c_out else t[2])
+                    # czas ISO z datą dokładnie, 'HHMM' najbliżej godziny koszyka (abs_minutes)
+                    e_abs = abs_minutes(raw_in, day, hour, now.date())
                     if (day == 1 and e_abs >= 1440 + 720) or (day == -1 and e_abs < -720):
                         continue
                     # wyjście po wejściu, także po północy
-                    x_abs = e_abs + (((_mins(exit_) - _mins(entry)) % 1440 or 1) if exit_ else 1)
+                    x_abs = _exit_minutes(raw_out, raw_in, e_abs, now.date()) if exit_ else e_abs + 1
                     state = "past" if x_abs <= now_abs else "now" if e_abs <= now_abs else "next"
                     found[(tv, e_abs)] = (e_abs, {"tv": tv, "label": tv_label(tv), "planned_entry": p_in, "planned_exit": p_out,
                                                   "entry": entry, "exit": exit_, "state": state})

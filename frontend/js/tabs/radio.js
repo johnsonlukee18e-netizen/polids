@@ -29,7 +29,7 @@ import { api, esc, h, lsGet, lsSet, navigate, remember } from "../api.js";
 import { labelPoint } from "../coverage.js";
 import { MIN_HOLE, SLIVER, dissolve, pointIn, ringStats } from "../dissolve.js";
 import { displayName, loadDisplayNames, posName } from "../posname.js";
-import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, FMP_LS, LAYERS, LAYER_IDS, LEVEL_FT, accPlateName, argOf, bboxOf,
+import { ADVISORY_FQ, DEFAULT_LAYERS, EPWW_BBOX, FMP_LS, LAYERS, LAYER_IDS, LEVEL_FT, STALE_MIN, accPlateName, ageMin, argOf, bboxOf,
   bboxOrDefault, cellArea, controllersOn, coverGrid, flText, fmpTarget, fmpTip, labelOpts, limText, limTip, loaPlace,
   pageGrid, parseArg, pathAll, pathOf, placeLabels, projection, ringsOf, sliceAt, tipPos, utcHhmm } from "../radioboard.js";
 
@@ -110,7 +110,7 @@ export function accGroups(accs, sectors, layer, ver = "", border = null) {
     if (!g.sectors.includes(s)) g.sectors.push(s);
     g.slices.push(sl);
   });
-  return [...by.values()].map((g) => {
+  const out = [...by.values()].map((g) => {
     const key = `rb|${ver}|${g.owner}|${g.slices.map((sl) => `${sl.name}:${sl.lo}`).sort().join(",")}`;
     const u = inEpww(key, dissolve(key, g.slices.map((sl) => sl.geometry)), border);
     const big = g.slices.reduce((a, sl) => (areaOf(sl.geometry) > areaOf(a.geometry) ? sl : a));
@@ -118,9 +118,32 @@ export function accGroups(accs, sectors, layer, ver = "", border = null) {
     return { ...g, sectors: g.sectors.sort((a, b) => a.id.localeCompare(b.id)), geom: u?.geometry || null,
       area: u ? u.area : g.slices.reduce((a, sl) => a + areaOf(sl.geometry), 0), at };
   }).sort((a, b) => b.area - a.area);
+  return toBorder(out, accs, sectors, layer, ver, border, own);
 }
-// części granicy FIR-u bez obsadzonych (mp) z wycinkiem bez nikogo (sl); same szczeliny między obsadzonym obszarem
-// a granicą (cypel kłodzki przy obsadzonym sektorze) zostają czarne jak obsadzony obszar obok
+// 0.14.1: obszar stanowiska do samej granicy FIR-u – szczeliny między jego wycinkami a granicą (cypel kłodzki, paski
+// przy Królewcu i na południowym wschodzie) należą do obszaru, który ich dotyka, więc granatowa granica idzie po
+// granicy FIR-u zamiast w poprzek cypla (pod nią wisiała jasna pętla granicy FIR-u). Szczelina, która dotyka też
+// sektora bez nikogo, zostaje szara (freeArea), i żadna nie należy do dwóch obszarów (od największego). Bez granicy,
+// bez biblioteki albo po błędzie – obszar jak dotąd
+function toBorder(groups, accs, sectors, layer, ver, border, own) {
+  if (!groups.length || !hasBorder(border)) return groups;
+  const state = arr(accs).map((a) => `${a.name}:${a.lo}:${own.get(a.letter)?.owner || ""}`).sort().join(",");
+  const fa = freeArea(accs, sectors, layer, ver, border), grey = fa?.geom ? polysOf(fa.geom) : [];
+  const claimed = [];
+  return groups.map((g) => {
+    if (!g.geom) return g;
+    const others = arr(accs).filter((a) => !g.slices.includes(a)).map((a) => polysOf(a.geometry)).filter((p) => p.length);
+    const ext = clipped(`rbown|${ver}|${layer}|${g.owner}|${state}`, (pc) => {
+      const full = greyParts(pc, pc.difference(polysOf(border), ...others), g.slices);
+      return full.length ? pc.difference(full, ...(grey.length ? [grey] : []), ...claimed) : [];
+    });
+    if (!ext || !ext.geometry.coordinates.length) return g;
+    claimed.push(ext.geometry.coordinates);
+    return { ...g, geom: ext.geometry, area: ext.area };
+  });
+}
+// części mp (wielokąty z granicy FIR-u bez innych wycinków), które dotykają wycinków sl; szczeliny między obsadzonym
+// obszarem a granicą (cypel kłodzki przy obsadzonym sektorze) od 0.14.1 należą do tego obszaru (toBorder)
 function greyParts(pc, mp, sl) {
   const free = sl.map((a) => ({ p: polysOf(a.geometry), b: bboxOf(a.geometry) })).filter((x) => x.p.length);
   const meet = (a, b) => a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
@@ -231,14 +254,16 @@ export function groupTip(g, title, x, extra = [], now = null) {
 // o zalogowanych (bez ADVISORY i bez zer we wskaźnikach), FIR otwartego LOA
 const onlineLine = (o) => `${o.callsign} ${o.frequency || ""} \u2013 ${o.name || "?"}`.replace(/  +/g, " ");
 // wskaźnik (0.13.1: dużo mniejszy, w rzędzie u góry strony): mała żółta nazwa nad małym szarym polem z wartością (ALL+S,
-// 2H+L+D, 2); w dymku znaczenie i liczone stanowiska. Wartość dłuższa niż pole (ACC GAT przy 4 i więcej stanowiskach
-// ACC) od początku, z wielokropkiem na końcu (rb-indt)
+// 2H+L+D, 2); w dymku znaczenie i liczone stanowiska. Wartość dłuższa niż pole od początku, z wielokropkiem na końcu
+// (rb-indt). 0.14.1: ACC GAT szerszy (wide), APP GD, APP KK i APP PO węższe (narrow) – cały rząd tej samej szerokości;
+// 0 i kreska (nikogo, brak danych) przygaszone (nil)
+const IND_W = { "ACC GAT": " wide", "APP GD": " narrow", "APP KK": " narrow", "APP PO": " narrow" };
 export function indicatorHtml(i, x) {
   const ps = arr(i.positions);
   const rt = [`${i.id}${i.tip ? `: ${i.tip}` : ""}`, ...(x.net === false ? ["Now: no data"] : ps.length ? ps.map(onlineLine) : ["Nobody online"])].join("\n");
-  const v = x.net === false ? "\u2013" : String(i.value ?? "0");
+  const v = x.net === false ? "\u2013" : String(i.value ?? "0"), nil = v === "0" || v === "\u2013";
   return `<div class="rb-indc" data-rt="${esc(rt)}"><div class="rb-ind">${esc(i.id)}</div>`
-    + `<div class="rb-indv"><span class="rb-indt">${esc(v)}</span></div></div>`;
+    + `<div class="rb-indv${IND_W[i.id] || ""}${nil ? " nil" : ""}"><span class="rb-indt">${esc(v)}</span></div></div>`;
 }
 // miejsce w siatce strony ({gc, gr} z cellArea) jako styl elementu
 const placeAt = (a) => (a ? ` style="grid-column: ${a.gc}; grid-row: ${a.gr}"` : "");
@@ -431,6 +456,22 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
 export const linesSvg = (lines, P) => `<g class="rb-own">${arr(lines).map((l) => `<path class="${l.kind}${l.geom ? "" : " fb"}" data-k="${esc(l.k)}"`
   + ` d="${l.geom ? (l.kind === "acc" ? pathAll(l.geom, P) : pathOf(l.geom, P)) : arr(l.shapes).map((g) => pathOf(g, P)).join("")}"/>`).join("")}</g>`;
 
+// 0.14.1: część prostokąta plakietki poza obszarem stanowiska (ścieżka SVG d w pikselach podglądu): 9 punktów (rogi,
+// środki boków, środek), w punkcie poza obszarem share/9; jeden kontekst canvas na całą zakładkę (isPointInPath)
+let hitCtx = null;
+export function outShare(dd, share = 1) {
+  if (typeof Path2D === "undefined" || typeof document === "undefined") return null;
+  hitCtx ||= document.createElement("canvas").getContext("2d");
+  if (!hitCtx) return null;
+  const path = new Path2D(dd);
+  return (r) => {
+    const xs = [r.x0, (r.x0 + r.x1) / 2, r.x1], ys = [r.y0, (r.y0 + r.y1) / 2, r.y1];
+    let n = 0;
+    xs.forEach((x) => ys.forEach((y) => { if (!hitCtx.isPointInPath(path, x, y, "evenodd")) n += 1; }));
+    return (share * n) / 9;
+  };
+}
+
 // Czerwone tło (0.13.0, właściciel projektu): przestrzeń z ograniczeniem przepływu albo z zajętością ponad 80 % dopuszczalnej –
 // sektor ACC na podglądzie swojej warstwy (wycinki jego litery na wysokości podglądu: slices = sliceAt) i TMA na LOW
 // (kształty z kluczem TMA: tmaGeo), także bez nikogo. Kształty jednej przestrzeni sumowane (dissolve.js, w pamięci wg
@@ -497,8 +538,10 @@ export default {
         ${MAPS.map(mapHtml).join("")}
         <div class="rb-status"></div>
         <div class="rb-legend">
+          <span data-rt="Neighbour sector box with a controller: light box, frequency, sector ID in the corner"><i class="rb-sw box"></i>neighbour staffed</span>
+          <span data-rt="Neighbour sector box without a controller: dark box, ID only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} next to its code"><i class="rb-sw box-off"></i>neighbour unstaffed</span>
           <span data-rt="Position online (EPWW ACC sector on its level preview; APP, TWR, FIS on LOW with their layers): navy boundary around the whole area it controls and a plate with its name and frequency"><i class="rb-sw on"></i>position online</span>
-          <span data-rt="EPWW ACC sector of the preview level without a controller: grey area, no boundary and no plate. Neighbour box without a controller: dark, ID only; nobody in the whole FIR \u2013 ADVISORY ${ADVISORY_FQ} next to its code"><i class="rb-sw off"></i>EPWW unstaffed</span>
+          <span data-rt="EPWW ACC sector of the preview level without a controller: grey area, no boundary and no plate"><i class="rb-sw off"></i>EPWW sector unstaffed</span>
           <span class="rb-lg-flow" data-rt="${esc(FLOW_TIP)}"><i class="rb-sw flow"></i>flow alert</span>
         </div>
         <div class="rb-loa" role="dialog" aria-label="LOA" hidden></div>
@@ -533,7 +576,9 @@ export default {
     // wysokości (jedna linia); przycisk ATIS chowa tylko treść (visibility), więc nic się nie przesuwa ani przy
     // przełączaniu, ani gdy ATIS-y się logują.
     // Gdy pozycje się nie mieszczą (wszystkie ATIS-y online z literami, ATIS-y dzielone): najpierw ciaśniej (tight),
-    // potem ostatnie pozycje w jednej "+N" z listą w dymku – nic nie znika bez śladu
+    // potem ostatnie pozycje w jednej "+N" z listą w dymku – nic nie znika bez śladu.
+    // 0.14.1: do "+N" najpierw ATIS-y offline (od prawej), dopiero potem online – ATIS online z literą nie chowa się,
+    // dopóki na pasku stoi jakikolwiek offline; pozostałe zostają w kolejności alfabetycznej
     function renderAtis() {
       const box = $(".rb-atis"), inn = box.firstElementChild, off = !layers.has("atis");
       box.classList.toggle("off", off);
@@ -557,12 +602,14 @@ export default {
       const btns = [...inn.querySelectorAll(".rb-at")], more = document.createElement("span");
       more.className = "rb-at-more";
       inn.append(more);
-      let n = 0;
-      while (btns.length > 1 && (n === 0 || over())) {
-        btns.pop().remove();
-        n += 1;
-        more.textContent = `+${n}`;
-        more.dataset.rt = ["More ATIS:", ...items.slice(items.length - n).map((it) => it.line)].join("\n");
+      const isOn = (i) => (btns[i].classList.contains("on") ? 1 : 0);
+      const order = btns.map((b, i) => i).sort((a, b) => isOn(a) - isOn(b) || b - a), gone = [];
+      while (gone.length < btns.length - 1 && (gone.length === 0 || over())) {
+        const i = order[gone.length];
+        btns[i].remove();
+        gone.push(i);
+        more.textContent = `+${gone.length}`;
+        more.dataset.rt = ["More ATIS:", ...[...gone].sort((a, b) => a - b).map((j) => items[j].line)].join("\n");
       }
     }
 
@@ -611,12 +658,13 @@ export default {
       btnKey = key;
       const col = Number(buttons?.col) || 1;
       const go = fmp ? cellArea(fmp, top) : null;
-      $(".rb-btns").innerHTML = rows.map((r) => {
+      // 0.14.1: FMP pierwszy w dokumencie (stoi nad ATIS, więc Tab dochodzi do niego przed przyciskami warstw)
+      $(".rb-btns").innerHTML = (go ? `<div class="rb-bt rb-go" style="grid-column: ${go.gc}; grid-row: ${go.gr}">`
+        + `<button type="button" data-go="fmp" data-rt="${esc(fmpTip(d?.fmp))}">FMP</button></div>` : "") + rows.map((r) => {
         const a = cellArea({ col, row: r.row }, top);
         return `<div class="rb-bt" style="grid-column: ${a.gc}; grid-row: ${a.gr}">${r.layers.map((l) => `<button type="button" data-ly="${l.id}"`
           + ` data-rt="${esc(l.tip)}" aria-pressed="false">${esc(l.label)}</button>`).join("")}</div>`;
-      }).join("") + (go ? `<div class="rb-bt rb-go" style="grid-column: ${go.gc}; grid-row: ${go.gr}">`
-        + `<button type="button" data-go="fmp" data-rt="${esc(fmpTip(d?.fmp))}">FMP</button></div>` : "");
+      }).join("");
       renderButtons();
     }
 
@@ -631,22 +679,29 @@ export default {
       // zasłaniało róg granicy FIR-u na 1600×900 i 1366×768); LOW i HIGH na całym polu (tytuł nic tam nie zasłania)
       renderTitle(m);
       const t = p.querySelector(".rb-title"), top = m.key === "MID" && t?.offsetHeight ? t.offsetTop + t.offsetHeight + 2 : 0;
-      const { P } = projection(border, { x: 0, y: top, w: W, h: H - top }, 0.03, m.key === "MID" ? "bottom" : "middle");
+      const { P, box } = projection(border, { x: 0, y: top, w: W, h: H - top }, 0.03, m.key === "MID" ? "bottom" : "middle");
       const accs = sliceAt(geo.acc, LEVEL_FT[m.key]), shown = layers.has(m.layer), x = px();
       const groups = shown ? accGroups(accs, d.sectors, m.key, geoVer, geo.border) : [];
-      const free = shown ? freeArea(accs, d.sectors, m.key, geoVer, geo.border) : null;
+      // 0.14.1: bez danych o zalogowanych (net false) bez szarego pola – szare znaczy "nikogo", a tego nie wiadomo
+      const free = shown && x.net !== false ? freeArea(accs, d.sectors, m.key, geoVer, geo.border) : null;
       const { lines, plates } = previewItems(d, geo, m.key, layers, groups, x, geoVer);
       m.svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
       m.svg.setAttribute("width", W);
       m.svg.setAttribute("height", H);
+      // 0.14.1 (jak na zdjęciu PANDORY): granice FIR-ów sąsiadów tylko krótkimi odcinkami od granicy FIR EPWW – maska
+      // z pasem wzdłuż granicy (near px w każdą stronę, ok. 8 % szerokości Polski na podglądzie); bez granicy bez maski
+      const bd = pathOf(geo.border, P), near = Math.round(Math.max(12, box.w * 0.08)), mk = `rbnear-${m.key}`;
+      const defs = bd ? `<defs><mask id="${mk}" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">`
+        + `<path class="rb-near" d="${bd}" style="stroke-width: ${2 * near}px"/></mask></defs>` : "";
       // kolejność (kolory: radio.css): cienkie granice FIR-ów, FIR EPWW (czarny – kryje granice sąsiadów), szare sektory
-      // ACC bez nikogo, czerwone tło alarmów przepływu (sektory ACC warstwy, na LOW także TMA – zawsze, bez względu na
-      // warstwy i obsadę), granica FIR EPWW, granatowe granice obszarów stanowisk online
-      m.svg.innerHTML = `<g class="rb-firs">${arr(geo.firs).map((f) => `<path d="${pathOf(f.geometry, P)}"/>`).join("")}</g>`
-        + `<path class="rb-land" d="${pathOf(geo.border, P)}"/>`
+      // ACC bez nikogo, granica FIR EPWW, czerwone tło alarmów przepływu (sektory ACC warstwy, na LOW także TMA – zawsze,
+      // bez względu na warstwy i obsadę; 0.14.1: nad granicą FIR-u, więc czerwona krawędź jest cała), granatowe granice
+      // obszarów stanowisk online
+      m.svg.innerHTML = defs + `<g class="rb-firs"${bd ? ` mask="url(#${mk})"` : ""}>${arr(geo.firs).map((f) => `<path d="${pathOf(f.geometry, P)}"/>`).join("")}</g>`
+        + `<path class="rb-land" d="${bd}"/>`
         + (free ? `<g class="rb-free">${free.geom ? `<path d="${pathAll(free.geom, P)}"/>` : free.shapes.map((g) => `<path class="fb" d="${pathOf(g, P)}"/>`).join("")}</g>` : "")
+        + `<path class="rb-border" d="${bd}"/>`
         + flowSvg(flowAreas(d, m.key, accs, geo.tma, x, geoVer, geo.border), P)
-        + `<path class="rb-border" d="${pathOf(geo.border, P)}"/>`
         + linesSvg(lines, P);
       // plakietki: wstawiamy, mierzymy, układamy (ważniejsze pierwsze: APP, TWR, ACC, FIS) bez nakładania się, każda
       // w środku swojego obszaru, przy tłoku lekko odsunięta (bez linii prowadzących)
@@ -657,8 +712,21 @@ export default {
       const obstacles = [...p.querySelectorAll(".rb-title")].filter((e) => e.offsetWidth && e.offsetHeight).map(rel);
       // granice stanowisk online pod plakietkami: plakietka ACC i FIS nie zasłania granic TMA i CTR (labelOpts)
       const cover = lines.length ? coverGrid(lines.flatMap((l) => (l.geom ? [l.geom] : arr(l.shapes)).flatMap((g) => ringsOf(g).map((r) => r.map(P)))), W, H) : null;
-      const moves = placeLabels(plates.map((it, i) => ({ x: pts[i][0], y: pts[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight, ...labelOpts(it.kind) })),
-        { x: 2, y: 2, w: W - 4, h: H - 4 }, { obstacles, cover, lines: false });
+      // 0.14.1: plakietka ACC, APP i FIS w miarę możliwości w swoim obszarze (kara za część poza nim: outShare), z dala
+      // od granic (clear: 3 px przy okładaniu granic) i w FIR EPWW (kara za część poza Polską trzy razy większa – inaczej
+      // na małym MID plakietka węższego niż ona sektora wolała wisieć za granicą FIR-u niż na granicy wewnętrznej);
+      // plakietka większa niż mała TMA i tak wystaje; wieża bez tego (stoi obok małego CTR)
+      const own = new Map(lines.filter((l) => l.kind !== "twr").map((l) => [`${l.kind}|${l.k}`, l.geom
+        ? (l.kind === "acc" ? pathAll(l.geom, P) : pathOf(l.geom, P)) : arr(l.shapes).map((g) => pathOf(g, P)).join("")]).filter(([, dd]) => dd));
+      const fir = bd ? outShare(bd, 3) : null;
+      const outOf = (it) => {
+        const dd = own.get(`${it.kind}|${it.k}`), o = dd ? outShare(dd, it.kind === "app" ? 0.5 : 1) : null;
+        return o && fir ? (r) => o(r) + fir(r) : o || fir;
+      };
+      const moves = placeLabels(plates.map((it, i) => {
+        const out = it.kind !== "twr" ? outOf(it) : null;
+        return { x: pts[i][0], y: pts[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight, ...labelOpts(it.kind), ...(out ? { out } : {}) };
+      }), { x: 2, y: 2, w: W - 4, h: H - 4 }, { obstacles, cover, lines: false, clear: 3 });
       els.forEach((e, i) => {
         const { dx, dy } = moves[i], [x0, y0] = pts[i];
         e.style.left = `${Math.round(x0 + dx - e.offsetWidth / 2)}px`;
@@ -683,16 +751,23 @@ export default {
     }
     // stan danych: sieć, brak granicy FIR-u, błąd strony i brak danych o ograniczeniach przepływu (wtedy legenda czerwonego
     // tła przygaszona: brak czerwieni nie znaczy „bez ograniczeń”); całość także w dymku (wąska kolumna)
+    // 0.14.1: dane sieci starsze niż STALE_MIN minut (wiek względem czasu serwera net.now) – czerwony napis z wiekiem,
+    // a stare dane albo błąd przy wczytanych danych także czerwoną linią pod rzędem u góry (rb-stale); bez pierwszych
+    // danych dopisek o ponownej próbie
     function renderStatus() {
       const s = $(".rb-status");
       const n = d ? controllersOn(d.online) : 0;
       const net = d?.net, noFlow = !!d && d.flow?.ok === false;
-      s.innerHTML = `<span>${!d ? (err ? `<span class="error">${esc(err)}</span>` : "Loading\u2026")
-        : `${net?.ok ? `Updated ${esc(utcHhmm(net.updated))} \u00b7 ${n} on the board` : `<span class="error">${esc(net?.error || "No data")}</span>`}`
+      const ref = Date.parse(String(net?.now || "")), age = net?.ok ? ageMin(net.updated, Number.isFinite(ref) ? ref : Date.now()) : null;
+      const old = age !== null && age >= STALE_MIN;
+      const upd = old ? `<span class="error">Data from ${esc(utcHhmm(net.updated))} (${Math.floor(age)} min old)</span>` : `Updated ${esc(utcHhmm(net?.updated))}`;
+      s.innerHTML = `<span>${!d ? (err ? `<span class="error">${esc(err)} \u2013 retrying every ${REFRESH_MS / 1000} s</span>` : "Loading\u2026")
+        : `${net?.ok ? `${upd} \u00b7 ${n} on the board` : `<span class="error">${esc(net?.error || "No data")}</span>`}`
           + (noFlow ? ` <span class="error">Flow data unavailable</span>` : "")
           + (noBorder ? ` <span class="error">No FIR EPWW boundary: previews without the FIR outline.</span>` : "")
           + (err ? ` <span class="error">${esc(err)}</span>` : "")}</span>`;
       s.dataset.rt = s.textContent;
+      el.classList.toggle("rb-stale", old || (!!d && (!!err || net?.ok === false)));
       const lg = $(".rb-lg-flow");
       lg.classList.toggle("na", noFlow);
       lg.dataset.rt = noFlow ? `${FLOW_TIP}\n${FLOW_NA}` : FLOW_TIP;
@@ -777,6 +852,8 @@ export default {
       if (e.target.closest("button[data-go]")) return navigate("other", fmpTarget(d?.fmp, lsGet(FMP_LS)));
       const b = e.target.closest("button[data-ly]");
       if (!b) return;
+      // 0.14.1: dymek przycisku znika po kliknięciu (wraca dopiero po zjechaniu kursorem)
+      tip.hidden = true;
       const s = new Set(layers);
       if (s.has(b.dataset.ly)) s.delete(b.dataset.ly); else s.add(b.dataset.ly);
       // TWR/A (wieże i ATIS) zawiera TWR: włączenie jednej z nich wyłącza drugą
@@ -819,7 +896,9 @@ export default {
       loaBox.innerHTML = "";
       markLoa();
     }
-    async function openLoa(fir, title) {
+    // 0.14.1: dymek kodu FIR-u znika, gdy panel się otwiera; z klawiatury (kb) fokus od razu w filtrze panelu (albo na ✕)
+    async function openLoa(fir, title, kb = false) {
+      tip.hidden = true;
       if (loaFir === fir) return closeLoa();
       loaFir = fir;
       markLoa();
@@ -837,6 +916,8 @@ export default {
       if (loaFir !== fir) return;
       loaBox.innerHTML = html;
       loaBox.querySelector(".rb-loa-b").scrollTop = 0;
+      // filtr przed ✕ (querySelector z listą selektorów bierze pierwszy w kolejności dokumentu, a ✕ stoi w nagłówku)
+      if (kb) (loaBox.querySelector(".rb-loa-q") || loaBox.querySelector(".rb-loa-x"))?.focus({ preventScroll: true });
     }
     el.addEventListener("click", (e) => {
       const hd = e.target.closest(".rb-fh[data-fir]");
@@ -844,7 +925,7 @@ export default {
     });
     el.addEventListener("keydown", (e) => {
       const hd = e.target.closest?.(".rb-fh[data-fir]");
-      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || ""); }
+      if (hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLoa(hd.dataset.fir, hd.dataset.title || "", true); }
     });
     // Esc na całym dokumencie, gdy RADIO jest widoczne (0.13.2, przegląd): klik w tekst panelu przenosi fokus na body,
     // a przy odświeżaniu bez fokusu w RADIO nic go nie przywraca – Esc na samym RADIO wtedy nie działał. Fokus po
@@ -860,7 +941,13 @@ export default {
     };
     document.addEventListener("keydown", onKey);
     loaBox.addEventListener("click", (e) => {
-      if (e.target.closest(".rb-loa-x")) return closeLoa();
+      if (e.target.closest(".rb-loa-x")) {
+        // 0.14.1: ✕ z klawiatury (Enter, spacja: detail 0) – fokus wraca na kod tego FIR-u
+        const fir = loaFir;
+        closeLoa();
+        if (e.detail === 0) el.querySelector(`.rb-fh[data-fir="${CSS.escape(fir || "")}"]`)?.focus({ preventScroll: true });
+        return;
+      }
       const doc = e.target.closest("button[data-coord]");
       // COORDINATION › DOKUMENTY z tym LOA
       if (doc) navigate("coordination", "docs/" + doc.dataset.coord);
@@ -878,7 +965,7 @@ export default {
     // --- dymek (jeden pływający, stałej szerokości – radio.css) i podświetlenie granicy pod plakietką. Miejsce: tipPos
     // (na prawo i pod kursorem, przy prawej i dolnej krawędzi okna po drugiej stronie kursora, zawsze 12 px od brzegu);
     // wysokość z treści, najwyżej okno bez dwóch odstępów (radio.css)
-    let tipFor = null;
+    let tipFor = null, tipKb = false;
     const moveTip = (e) => {
       const { left, top } = tipPos(e.clientX, e.clientY, tip.offsetWidth, tip.offsetHeight, window.innerWidth, window.innerHeight);
       tip.style.left = `${left}px`;
@@ -892,6 +979,7 @@ export default {
     el.addEventListener("mouseover", (e) => {
       const t = e.target.closest("[data-rt]");
       if (t === tipFor) return;
+      tipKb = false;
       hl(tipFor, false);
       tipFor = t;
       if (!t) { tip.hidden = true; return; }
@@ -904,6 +992,30 @@ export default {
     });
     el.addEventListener("mousemove", (e) => { if (tipFor) moveTip(e); });
     el.addEventListener("mouseleave", () => { hl(tipFor, false); tipFor = null; tip.hidden = true; });
+    // 0.14.1: dymek także przy fokusie z klawiatury (Tab; nie po kliknięciu myszą): pod elementem, w oknie jak przy
+    // kursorze (tipPos); plakietka TWR podświetla swój CTR. Znika z utratą fokusu
+    el.addEventListener("focusin", (e) => {
+      const t = e.target.closest?.("[data-rt]");
+      if (!t || !e.target.matches(":focus-visible")) return;
+      hl(tipFor, false);
+      tipFor = t;
+      tipKb = true;
+      tip.style.left = tip.style.top = "0px";
+      tip.textContent = t.dataset.rt;
+      tip.hidden = false;
+      const r = t.getBoundingClientRect();
+      const { left, top } = tipPos(r.left, r.bottom, tip.offsetWidth, tip.offsetHeight, window.innerWidth, window.innerHeight);
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
+      hl(t, true);
+    });
+    el.addEventListener("focusout", () => {
+      if (!tipKb) return;
+      hl(tipFor, false);
+      tipFor = null;
+      tipKb = false;
+      tip.hidden = true;
+    });
 
     return {
       activate(arg) {
