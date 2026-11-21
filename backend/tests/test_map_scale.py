@@ -91,6 +91,30 @@ T.app = m.towerOnBadge({ callsign: "EPKK_APP" }, [pr("ctr", "EPKK")], new Set(["
 T.other = m.towerOnBadge(KK, [pr("ctr", "EPKK")], new Set(["EPKT_TWR"]));
 T.otherCtr = m.towerOnBadge({ callsign: "EPKT_TWR" }, [pr("ctr", "EPKK")], new Set(["EPKT_TWR"]));
 T.foreign = m.towerOnBadge({ callsign: "ESGG_TWR" }, [pr("nb", "ESAA")], new Set(["ESGG_TWR"]));
+// wieże sąsiadów (wycinki nb z plików .ese, grupa = FIR): strefa lotniska po pierwszym właścicielu z OWNER
+const nb = (name, owners, group = "LKAA") => ({ kind: "nb", group, name, owner_callsigns: owners });
+const LKMT = { callsign: "LKMT_TWR", frequency: "120.805" }, EKRN = { callsign: "EKRN_P_TWR", frequency: "118.330" };
+const nbBadged = m.towerBadges([{ icao: "LKMT", facilities: { TWR: [LKMT] } }, { icao: "EKRN", facilities: { TWR: [EKRN] } }]);
+const lkmtCtr = nb("LKMT_CTR", ["LKMT_TWR", "LKMT_APP", "LKAA_R_CTR"]), ekrnCtr = nb("EKRN_CTR", ["EKRN_P_TWR", "EKDK_A_CTR"], "EKDK");
+T.nbBadged = [...nbBadged].sort();
+T.lkmt = m.towerOnBadge(LKMT, [lkmtCtr], nbBadged);
+T.lkmtNoBadge = [m.towerOnBadge(LKMT, [lkmtCtr], new Set()), m.towerOnBadge(LKMT, [lkmtCtr], m.towerBadges([]))];
+T.ekrnFl10 = m.towerOnBadge(EKRN, [ekrnCtr], nbBadged);
+T.ekrnTma = m.towerOnBadge(EKRN, [ekrnCtr, nb("EKRN TMA B", ["EKRN_P_TWR", "EKDK_A_CTR"], "EKDK")], nbBadged);
+T.umkk = m.towerOnBadge({ callsign: "UMKK_TWR" }, [nb("KALININGRAD CTR 1", ["UMKK_TWR", "UMKK_APP"], "UMKK")], new Set(["UMKK_TWR"]));
+T.esmkTma = m.towerOnBadge({ callsign: "ESMK_TWR" }, [nb("ESMK CTR", ["ESMK_TWR"], "ESAA"), nb("ESMK TMA A", ["ESMK_TWR"], "ESAA")],
+  new Set(["ESMK_TWR"]));
+T.eykaTma = m.towerOnBadge({ callsign: "EYKA_TWR" }, [nb("EYKA-CTR", ["EYKA_TWR"], "EYVL"), nb("EYKA-TMA-A", ["EYKA_TWR"], "EYVL")],
+  new Set(["EYKA_TWR"]));
+T.uklnTma = m.towerOnBadge({ callsign: "UKLN_TWR" }, [nb("UKLN_TMA_Z1_TWR", ["UKLN_TWR"], "UKLV")], new Set(["UKLN_TWR"]));
+// wycinek pod APP sąsiada (wieża tylko w zastępstwie) i strefy płyty pod GND tego samego lotniska
+T.estaApp = m.towerOnBadge({ callsign: "ESTA_TWR" }, [nb("ESTA CTR", ["ESTA_TWR"], "ESAA"), nb("ESTA LAHOLM", ["ESTA_APP", "ESTA_TWR"], "ESAA")],
+  new Set(["ESTA_TWR"]));
+T.eddbApron = m.towerOnBadge({ callsign: "EDDB_N_TWR" }, [nb("EDDBTWRN", ["EDDB_N_TWR"], "EDWW"), nb("EDDBAPRA", ["EDDB_E_GND", "EDDB_N_TWR"], "EDWW")],
+  new Set(["EDDB_N_TWR"]));
+// sektor ACC sąsiada przejęty przez wieżę innego lotniska i wycinek innego lotniska: etykieta zostaje
+T.nbAcc = m.towerOnBadge(LKMT, [lkmtCtr, nb("LKAA_R", ["LKAA_R_CTR", "LKMT_TWR"])], nbBadged);
+T.nbOther = m.towerOnBadge(LKMT, [nb("LKTB_CTR", ["LKTB_TWR", "LKMT_TWR"])], nbBadged);
 T.empty = [m.towerOnBadge(null, [pr("ctr", "EPKK")], badged), m.towerOnBadge(KK, [], badged), m.towerOnBadge(KK, null, badged)];
 // symulowana wieża (sekcja Pozycje): plakietka lotniska z zestawu aktywnego, więc bez etykiety; ukryta: bez plakietki
 const posOf = (cs) => (cs === "EPKK_TWR" ? { frequency: "118.100" } : null);
@@ -207,10 +231,11 @@ def test_map_uses_scale_and_badges():
 
 def test_tower_label_on_badge(js):
     """Issue #35: wieża we własnym CTR (EPKK_TWR) albo ATZ (EPBA_R_TWR) z T na plakietce lotniska bez etykiety obszaru;
-    z TMA / CTA top-down, w cudzej TRA, bez plakietki (warstwa ATC wyłączona, ukryta) i APP etykieta zostaje."""
+    z TMA / CTA top-down, w cudzej TRA, bez plakietki (warstwa ATC wyłączona, ukryta) i APP etykieta zostaje.
+    Tak samo wieże sąsiadów w ich CTR (LKMT_TWR, EKRN_P_TWR na FL10, UMKK_TWR) zamiast dwóch tabliczek przy granicy."""
     t = js["tower"]
-    # tylko TWR lotnisk EP z plakietki (ESGG, GND i APP pominięte)
-    assert t["badged"] == ["EPKK_TWR"] and t["badgedNone"] == [[], []]
+    # TWR wszystkich lotnisk z plakietką, także sąsiadów (GND i APP pominięte)
+    assert t["badged"] == ["EPKK_TWR", "ESGG_TWR"] and t["badgedNone"] == [[], []]
     assert t["kk"] is True and t["baAtz"] is True
     assert t["kkNoBadge"] == [False, False]
     assert t["lbTma"] is False and t["llCta"] is False and t["tra"] is False
@@ -219,6 +244,21 @@ def test_tower_label_on_badge(js):
     # symulacja z sekcji Pozycje: plakietka z przerywaną ramką, więc też bez etykiety; ukryta wieża: bez plakietki
     assert t["sim"] == ["EPKK_TWR"] and t["simOn"] is True
     assert t["live"] == ["EPKK_TWR"] and t["hidden"] == []
+
+
+def test_neighbour_tower_label_on_badge(js):
+    """Recenzja 0.14.2: wieża sąsiada we własnym CTR (LKMT_TWR nad LKMT_CTR, EKRN_P_TWR na FL10 tylko w EKRN_CTR,
+    UMKK_TWR w "KALININGRAD CTR 1") miała etykietę "LKMT TWR 120.805" tuż nad szarą plakietką "LKMT T". Teraz bez
+    etykiety; z TMA ("EKRN TMA B", "ESMK TMA A", "EYKA-TMA-A", "UKLN_TMA_Z1_TWR"), w wycinku pod APP lub ACC i bez
+    plakietki zostaje."""
+    t = js["tower"]
+    assert t["nbBadged"] == ["EKRN_P_TWR", "LKMT_TWR"]
+    assert t["lkmt"] is True and t["ekrnFl10"] is True and t["umkk"] is True and t["eddbApron"] is True
+    assert t["lkmtNoBadge"] == [False, False]
+    assert t["ekrnTma"] is False and t["esmkTma"] is False and t["eykaTma"] is False and t["uklnTma"] is False
+    assert t["estaApp"] is False and t["nbAcc"] is False and t["nbOther"] is False
+    # wycinek sąsiada bez nazwy i właścicieli nie jest strefą lotniska
+    assert t["foreign"] is False
 
 
 def test_map_tower_label_wiring():

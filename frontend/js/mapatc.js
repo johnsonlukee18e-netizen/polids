@@ -79,16 +79,34 @@ export function ctrBadges(firs, labelled = [], prefix = "EPWW") {
 // 0.14.2 (issue #35, właściciel projektu: "gdy TWR kontroluje CTR to nie wyświetlaj dodatkowo jej tabliczki, skoro już
 // na tabliczce lotniska widać, że jest TWR zalogowany"). Wieża we własnym CTR miała dwie tabliczki: etykietę obszaru
 // (drawOwned: "KK TWR 118.100") i literę T na plakietce lotniska tuż obok ("EPKK T").
-// towerBadges: znaki pod T na narysowanych plakietkach lotnisk EP (airports: lotniska z plakietką z drawAtc, puste przy
-// wyłączonej warstwie ATC albo błędzie danych: wtedy etykieta wieży zostaje).
-export const towerBadges = (airports) => new Set((airports || []).filter((ap) => /^EP[A-Z]{2}$/.test(ap?.icao || ""))
+// towerBadges: znaki pod T na narysowanych plakietkach lotnisk, w Polsce i u sąsiadów (airports: lotniska z plakietką
+// z drawAtc, sąsiedzi już tylko wokół Polski; puste przy wyłączonej warstwie ATC albo błędzie danych: wtedy etykieta
+// wieży zostaje).
+export const towerBadges = (airports) => new Set((airports || []).filter((ap) => /^[A-Z]{4}$/.test(ap?.icao || ""))
   .flatMap((ap) => (ap.facilities?.TWR || []).map((c) => c?.callsign).filter(Boolean)));
 
-// Bez etykiety obszaru tylko wieża lotniska EP (EPKK_TWR, EPBA_R_TWR) z T na plakietce, której cały widoczny obszar
-// (prs: wycinki grupy z drawOwned) to CTR albo ATZ tego samego lotniska. Wieża z TMA lub CTA top-down (EPLB, EPSY,
-// EPLL...) zostaje z etykietą: plakietka nie mówi, kto ma TMA. Tak samo TRA innego lotniska (grupa EPTR..).
+// nazwa wycinka sąsiada z rodzajem przestrzeni większej niż strefa lotniska ("EKRN TMA A", "EYKA-TMA-A", "UMBB TMA 1",
+// "UKLN_TMA_Z1_TWR", "ESDF TMA"); ICAO na początku nazwy pominięte, żeby jego litery się nie liczyły
+const WIDER = /TMA|CTA|ACC|FIS|APP|DEP/;
+// stanowisko lotniska (DEL / GND / TWR) danego ICAO: pierwsze w kolejności OWNER wycinka strefy lotniska sąsiada
+const aerodromeStation = (cs, icao) => new RegExp(`^${icao}_(?:[A-Z0-9]+_)*(?:TWR|GND|DEL)$`).test(String(cs || "").toUpperCase());
+// Wycinek to własna strefa lotniska wieży: w FIR-ze EPWW CTR albo ATZ tego lotniska (grupa = ICAO, nie TRA EPTR..);
+// u sąsiada (kind nb, grupa = FIR, np. LKAA) wycinek, którego pierwszy właściciel z OWNER to stanowisko lotniska tego
+// samego ICAO (LKMT_CTR: LKMT_TWR, "KALININGRAD CTR 1": UMKK_TWR, EDDBAPRA: EDDB_E_GND), a nazwa nie mówi o TMA, CTA,
+// ACC, FIS, APP ani DEP. Wycinek pod APP ("ESTA LAHOLM": ESTA_APP) albo ACC sąsiada nie jest strefą lotniska.
+const ownZone = (pr, icao) => {
+  if (pr?.kind === "ctr" || pr?.kind === "atz") return pr.group === icao;
+  if (pr?.kind !== "nb") return false;
+  const name = String(pr.name || "").toUpperCase();
+  return !WIDER.test(name.startsWith(icao) ? name.slice(icao.length) : name) && aerodromeStation(pr.owner_callsigns?.[0], icao);
+};
+
+// Bez etykiety obszaru tylko wieża (EPKK_TWR, EPBA_R_TWR, LKMT_TWR, EKRN_P_TWR) z T na plakietce lotniska, której cały
+// widoczny obszar (prs: wycinki grupy z drawOwned) to strefa tego samego lotniska (ownZone). Wieża z TMA lub CTA
+// top-down (EPLB, EPSY, EPLL..., u sąsiada EKRN TMA A, ESMK TMA A) zostaje z etykietą: plakietka nie mówi, kto ma TMA.
+// Tak samo TRA innego lotniska (grupa EPTR..).
 export function towerOnBadge(c, prs, badged) {
   const cs = String(c?.callsign || "").toUpperCase(), icao = cs.split("_")[0];
-  if (!/^EP[A-Z]{2}_(?:[A-Z0-9]+_)*TWR$/.test(cs) || !badged?.has?.(c.callsign) || !prs?.length) return false;
-  return prs.every((pr) => (pr?.kind === "ctr" || pr?.kind === "atz") && pr.group === icao);
+  if (!/^[A-Z]{4}_(?:[A-Z0-9]+_)*TWR$/.test(cs) || !badged?.has?.(c.callsign) || !prs?.length) return false;
+  return prs.every((pr) => ownZone(pr, icao));
 }
