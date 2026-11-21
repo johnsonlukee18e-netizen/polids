@@ -17,7 +17,7 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 TOPBAR = (FRONTEND / "js" / "topbar.js").read_text("utf-8")
 STYLE = (FRONTEND / "css" / "style.css").read_text("utf-8")
-SANS = 'Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif'
+SANS = '"Atkinson Hyperlegible Next", Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif'  # 0.13.7, Arial zapasowo
 POLISH = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
 
 
@@ -324,11 +324,16 @@ def test_topbar_focus_and_other_windows(js):
 # --- czcionka i grubość ---------------------------------------------------------------------------------------------
 
 def test_sans_tokens_whole_app():
-    """Decyzja właściciela (0.13.0): cały program czcionką bezszeryfową, także --mono (dane, METAR, kody)."""
+    """Decyzja właściciela (0.13.0): cały program czcionką bezszeryfową, także --mono (dane, METAR, kody).
+    0.13.7: Atkinson Hyperlegible Next z serwera PolIDS (dwa pliki woff2), cyfry tabelaryczne na body."""
     root = _rule(STYLE, ":root")
     for token in ("--mono", "--ui", "--sans"):
         assert f"{token}: {SANS};" in root, token
     assert "font: 13px/1.4 var(--sans);" in _rule(STYLE, "body")
+    assert "font-variant-numeric: tabular-nums;" in _rule(STYLE, "body")
+    for f in ("AtkinsonHyperlegibleNext-Regular-latin.woff2", "AtkinsonHyperlegibleNext-Regular-latin-ext.woff2"):
+        assert (FRONTEND / "fonts" / f).stat().st_size > 1000, f
+        assert f"/static/fonts/{f}" in STYLE, f
     # nigdzie w arkuszach, na stronach logowania i offline ani w SVG róży wiatrów nie zostaje czcionka o stałej szerokości
     for path in [*(FRONTEND / "css").glob("*.css"), FRONTEND / "login.html", FRONTEND / "offline.html"]:
         text = _nocomments(path.read_text("utf-8"))

@@ -5,6 +5,15 @@
    płaskie przyciski. Kolorystyka czarno-zielona. Bez poświaty (glow) i cieni pod tekstem: napisy mają być czytelne.
    Ostre krawędzie jak w oryginale PAŻP: przyciski, kafelki, karty, pola, plakietki i dymki bez zaokrągleń (border-radius: 0);
    50% tylko dla prawdziwych kółek (kropki, okrągłe znaczniki na mapie). */
+/* 0.13.7: czcionka Atkinson Hyperlegible Next (Braille Institute, SIL OFL 1.1, fonts/OFL.txt), tylko krój zwykły 400:
+   rozróżnia znaki mylone w kodach (I z szeryfami, l z ogonkiem, 1 z daszkiem, 0 przekreślone), ma polskie litery.
+   Dwa pliki woff2 (latin 12 KB, latin-ext 7 KB) z serwera PolIDS, bez Google Fonts; Arial zostaje zapasowo */
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/static/fonts/AtkinsonHyperlegibleNext-Regular-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/static/fonts/AtkinsonHyperlegibleNext-Regular-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
 :root {
   --bg: #000;
   --panel: #0d0f0d;
@@ -22,12 +31,12 @@
   --warn: #f2d21b;
   --bad: #e0302a;
   --cyan: #3ec7e0;
-  /* 0.13.0 (decyzja właściciela, issue #23): cały program czcionką bezszeryfową jak PANDORA. Trzy nazwy zostają (--mono:
+  /* 0.13.0 (decyzja właściciela, issue #23): cały program czcionką bezszeryfową jak PANDORA (od 0.13.7 Atkinson Hyperlegible Next). Trzy nazwy zostają (--mono:
      dane, METAR, kody, czasy; --ui: etykiety i przyciski; --sans: treść NM UI), ale to ta sama czcionka, więc żaden układ
-     nie może zakładać stałej szerokości znaków (cyfry w Arialu mają równą szerokość, litery nie) */
-  --mono: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
-  --ui: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
-  --sans: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
+     nie może zakładać stałej szerokości znaków (litery mają różną szerokość; cyfry równą dzięki tabular-nums na body) */
+  --mono: "Atkinson Hyperlegible Next", Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
+  --ui: "Atkinson Hyperlegible Next", Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
+  --sans: "Atkinson Hyperlegible Next", Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
   --menu-lime: #ccff66;   /* napis SYT OP w menu (jasnozielony jak w PANDORZE) */
   --topbar-h: 18px;       /* pasek Reload | Brighter | Darker u góry ekranu */
   /* 0.13.1 (issue #25): każdy przycisk menu i podmenu 137 x 28 px z marginesem 1,5 px z każdej strony (3 px między
@@ -49,7 +58,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 /* pasek u góry na całą szerokość, pod nim menu (lewa kolumna) i zakładki (main); pasek offline (.srv-off) jest fixed */
-body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); overflow: hidden; display: grid;
+body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); font-variant-numeric: tabular-nums; overflow: hidden; display: grid;
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr); }
 /* wysokość przycisku menu i podmenu: 28 px, a w niskim oknie mniej, po równo w obu kolumnach (rzędy dalej na jednej
    wysokości), tak żeby 21 przycisków menu, zegar, logo i użytkownik zmieściły się bez przewijania; najmniej 16 px.

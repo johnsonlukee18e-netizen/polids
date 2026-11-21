@@ -187,13 +187,13 @@ def test_css_look():
 
 def test_css_font_sans():
     """Czcionka jak w całym programie (bezszeryfowa, zwykła grubość), nigdy o stałej szerokości: METAR w var(--mono),
-    a --mono to od 0.13.0 Arial."""
+    a --mono to od 0.13.0 Arial, od 0.13.7 Atkinson Hyperlegible Next z Arialem zapasowo."""
     css = re.sub(r"/\*.*?\*/", "", CSS_SRC.read_text("utf-8"), flags=re.S)
     assert not re.search(r"monospace|courier|consolas|menlo|monaco|dejavu sans mono|liberation mono", css, re.I)
     assert "table.mt-tab { border-collapse: collapse; width: 100%; font: 18px/1.45 var(--mono); color: #fff; }" in css
     style = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "style.css").read_text("utf-8"), flags=re.S)
     mono = re.search(r"--mono:\s*([^;]+);", style).group(1)
-    assert mono.startswith("Arial") and "monospace" not in mono
+    assert mono.startswith('"Atkinson Hyperlegible Next", Arial') and "monospace" not in mono
 
 
 def test_toolbar_switch_first():

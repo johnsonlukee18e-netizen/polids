@@ -364,7 +364,7 @@ export default {
             <span class="pos-txt"><span class="cs">${esc(cs)}</span><span class="nm"></span>
             <span class="booked-txt">${hhmm(bookings[cs][0].start)}–${hhmm(bookings[cs][0].end)}</span></span></div>`).join("")
           + `<p class="hint">${msg}</p>`;
-        // zmierzona w czcionce nazwy stacji (nie liczba znaków w ch: w Arialu litery mają różną szerokość)
+        // zmierzona w czcionce nazwy stacji (nie liczba znaków w ch: litery mają różną szerokość)
         const nm = el.querySelector(".nm");
         if (nm) el.style.setProperty("--nm-w", `${textWidth(names, nm)}px`);
         // kolumna znaków tak samo: najdłuższy znak tej listy (EPKK_RZ_APP ok. 86 px), nie stała szerokość na każde lotnisko

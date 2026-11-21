@@ -21,7 +21,7 @@ MODES = ("none", "dev", "vatsim")
 RATINGS = {-1: "INA", 0: "SUS", 1: "OBS", 2: "S1", 3: "S2", 4: "S3", 5: "C1", 6: "C2", 7: "C3",
            8: "I1", 9: "I2", 10: "I3", 11: "SUP", 12: "ADM"}
 # dostępne bez logowania (manifest PWA przeglądarka pobiera bez ciasteczek)
-PUBLIC_PREFIXES = ("/auth/", "/static/icons/")
+PUBLIC_PREFIXES = ("/auth/", "/static/icons/", "/static/fonts/")
 PUBLIC_PATHS = {"/healthz", "/manifest.webmanifest", "/sw.js", "/favicon.ico", "/static/offline.html"}
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _DEV_SECRET = "dev-only-insecure-secret-do-not-use-on-a-server"  # noqa: S105

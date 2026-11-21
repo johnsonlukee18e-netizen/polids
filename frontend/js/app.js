@@ -167,6 +167,10 @@ tickLoop();
     console.error(e);
   }
   await showUser();
+  // 0.13.7: przed pierwszym ekranem czcionka musi być wczytana: textWidth() (api.js) mierzy kolumny w canvas, a z Arialem
+  // zapasowym wyszłyby za wąskie; najwyżej 1,5 s czekania, potem dalej (font-display: swap)
+  await Promise.race([document.fonts?.load('13px "Atkinson Hyperlegible Next"'), new Promise((r) => setTimeout(r, 1500))])
+    .catch(() => {});
   // po uruchomieniu zawsze HOME ("?"), niezależnie od adresu zapamiętanego w przeglądarce; to pierwszy wpis historii (n = 0)
   depth = 0;
   open("home");

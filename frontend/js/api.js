@@ -387,7 +387,7 @@ export function splitTaf(raw) {
 }
 
 // Szerokość (px) najdłuższego z napisów w czcionce elementu el: kolumna "na najdłuższą nazwę listy" bez liczenia znaków
-// (0.13.0: Arial zamiast Consolas, wielka litera jest szersza niż 1ch). Bez kontekstu canvas zgrubnie 0.75em na znak.
+// (od 0.13.0 czcionka proporcjonalna, wielka litera jest szersza niż 1ch). Bez kontekstu canvas zgrubnie 0.75em na znak.
 let measurer;
 export function textWidth(texts, el) {
   const cs = getComputedStyle(el);
