@@ -6,10 +6,15 @@ const RECAT = {
 // skrót kategorii RECAT-EU obok litery ("E|M↓"): J = super, strzałka = górna / dolna część kategorii
 const RECAT_SHORT = { A: "J", B: "H\u2191", C: "H\u2193", D: "M\u2191", E: "M\u2193", F: "L" };
 const WTC = { L: "Light", M: "Medium", H: "Heavy", J: "Super" };
-// opis typu wg ICAO Doc 8643 (np. L2J): rodzaj statku, liczba silników (C = sprzężone), rodzaj silników
-const KIND = { L: "landplane", S: "seaplane", A: "amphibian", G: "gyrocopter", H: "helicopter", T: "tiltrotor" };
+// rodzaj silników z opisu typu wg ICAO Doc 8643 (trzecia litera, np. L2J): do dymku kolumny silników
 const ENGINE = { J: "jet", T: "turboprop/turboshaft", P: "piston", E: "electric", R: "rocket" };
-// brak wartości w pięciu głównych kratkach rozwinięcia (półpauza)
+// 0.14.0 (issue #28): rodzaj silników w kolumnie listy ("2 Jet"), kategoria ICAO z opisu typu; T śmigłowca
+// i tiltrotora to turbina wałowa (Turboshaft, niżej w engineLabel)
+const ENGINE_KIND = { J: "Jet", T: "Turboprop", P: "Piston", E: "Electric", R: "Rocket" };
+// engine_type z bazy (typ bez opisu ICAO), także "turbojet/turbofan": kategoria wg pierwszego rodzaju
+const ENGINE_TYPE = { turbofan: "Jet", turbojet: "Jet", jet: "Jet", turboprop: "Turboprop", propfan: "Turboprop",
+  turboshaft: "Turboshaft", piston: "Piston", electric: "Electric", rocket: "Rocket" };
+// brak wartości w kratkach rozwinięcia (półpauza)
 const NONE = "\u2013";
 // Przyciski producentów u góry (0.13.1, issue #25): [klucz ?maker= w backendzie (tam dopasowanie różnych zapisów
 // nazwy), etykieta, dymek, kolejność grup w widoku producenta (nazwy producenta w bazie małymi literami; grupy spoza
@@ -24,9 +29,10 @@ export const MAKERS = [
   ["ga", "GA", "General aviation: Pilatus, Diamond, Cessna, Piper, Aero AT-3, Robinson, Bell, Tecnam",
     ["pilatus", "diamond", "cessna", "piper", "aero", "robinson", "bell", "tecnam"]],
 ];
-// kolumny listy (issue #25): kod ICAO, producent, pełna nazwa, liczba silników, WTC (ICAO), RECAT-EU
+// kolumny listy (issue #25): kod ICAO, producent, pełna nazwa, silniki (0.14.0, issue #28: liczba i rodzaj),
+// WTC (ICAO), RECAT-EU
 export const COLUMNS = [["icao", "ICAO", ""], ["mk", "Manufacturer", ""], ["name", "Name", ""],
-  ["eng", "Engines", "Number of engines"], ["wtc", "WTC", "ICAO wake turbulence category"],
+  ["eng", "Engines", "Number and type of engines"], ["wtc", "WTC", "ICAO wake turbulence category"],
   ["recat", "RECAT", "RECAT-EU wake turbulence category"]];
 // rekordów na liście: ALL ma więcej typów (2821), wtedy dopisek "first … shown"
 const LIMIT = 1000;
@@ -69,17 +75,22 @@ const span = (lo, hi, f) => {
 const unit = (v, u) => (v ? `${v}${u}` : "");
 const pre = (p, v) => (v ? `${p}${v}` : "");
 
-// opis typu słownie: "L2J" -> "landplane, 2 × jet"
-export function describe(d) {
-  if (!d || d.length < 3) return "";
-  return `${KIND[d[0]] || "?"}, ${d[1] === "C" ? "coupled" : `${d[1]} \u00d7`} ${ENGINE[d[2]] || "?"}`;
-}
-// silniki do kratki ENG: liczba (z bazy albo z opisu typu) i rodzaj; T w opisie śmigłowca i tiltrotora (H2T, T2T)
-// to turbina wałowa
+// silniki słownie z bazy (dymek kolumny silników, gdy mówi więcej niż kolumna, np. "2 turbofan" przy "2 Jet"):
+// liczba (z bazy albo z opisu typu) i rodzaj; T w opisie śmigłowca i tiltrotora (H2T, T2T) to turbina wałowa
 export function engines(a) {
   const d = a.description || "";
   const kind = a.engine_type || (d[2] === "T" ? (/^[HT]/.test(d) ? "turboshaft" : "turboprop") : ENGINE[d[2]]);
   const count = a.engine_count ?? (d[1] === "C" ? "coupled" : /^\d$/.test(d[1] || "") ? d[1] : null);
+  return [count, kind].filter((x) => x != null && x !== "").join(" ");
+}
+// 0.14.0 (issue #28): kolumna silników z liczbą i rodzajem, np. "2 Jet", "4 Turboprop", "1 Piston", "2 Turboshaft"
+// (śmigłowiec). Liczba z bazy albo z opisu typu, sprzężone bez liczby w bazie (LCT) jako "Coupled"; rodzaj
+// z opisu typu, bez opisu z engine_type z bazy; nieznany rodzaj: sama liczba, nic nie wiadomo: pusto
+export function engineLabel(a) {
+  const d = a.description || "";
+  const count = a.engine_count ?? (d[1] === "C" ? "Coupled" : /^\d$/.test(d[1] || "") ? d[1] : null);
+  let kind = ENGINE_KIND[d[2]] || ENGINE_TYPE[String(a.engine_type || "").toLowerCase().split("/")[0].trim()] || "";
+  if (d[2] === "T" && /^[HT]/.test(d)) kind = "Turboshaft";
   return [count, kind].filter((x) => x != null && x !== "").join(" ");
 }
 // kod literowy lotniska (ARC) wg rozpiętości skrzydeł: A < 15 m, B < 24, C < 36, D < 52, E < 65, F < 80;
@@ -91,17 +102,18 @@ export function arcCode(a) {
 }
 
 // Wiersz listy (domyślny widok, issue #25): sześć kolumn w kolejności COLUMNS. {key, value, title?, cls?}:
-// silniki jako sama liczba (C = sprzężone, z opisu typu, gdy brak w bazie; pusto dla balonu, szybowca, ZZZZ),
-// rodzaj silników w dymku; WTC z nazwą kategorii w dymku; RECAT-EU z kategorią słownie w dymku, cls = kolor kategorii
+// silniki z liczbą i rodzajem (0.14.0, issue #28, engineLabel; pusto dla balonu, szybowca, ZZZZ), w dymku rodzaj
+// silników z bazy, gdy mówi więcej (np. turbofan); WTC z nazwą kategorii w dymku; RECAT-EU z kategorią słownie
+// w dymku, cls = kolor kategorii
 export function cells(a) {
-  const d = a.description || "";
-  const count = a.engine_count ?? (d[1] === "C" ? "C" : /^\d$/.test(d[1] || "") ? d[1] : "");
+  const eng = engineLabel(a);
+  const more = engines(a);
   const recat = a.recat && RECAT[a.recat];
   return [
     { key: "icao", value: a.icao || "" },
     { key: "mk", value: a.manufacturer || "" },
     { key: "name", value: a.model || "" },
-    { key: "eng", value: String(count), title: engines(a) },
+    { key: "eng", value: eng, title: more.toLowerCase() !== eng.toLowerCase() ? more : "" },
     { key: "wtc", value: a.wtc || "", title: WTC[a.wtc] || "" },
     { key: "recat", value: recat ? `${a.recat}|${RECAT_SHORT[a.recat]}` : a.recat || "",
       title: recat ? `RECAT-EU ${a.recat} \u2013 ${RECAT[a.recat]}` : "", cls: a.recat ? `recat-${a.recat}` : "" },
@@ -114,32 +126,28 @@ export function record(a, i) {
 export const tableHead = () => `<thead><tr>${COLUMNS.map(([k, l, t]) =>
   `<th class="${k}"${t ? ` title="${t}"` : ""}>${l}</th>`).join("")}</tr></thead>`;
 
-// Kratki rozwinięcia: mała etykieta nad dużą wartością, kolor wg kategorii (id = identyfikacja, perf = osiągi,
-// wake = masa i turbulencja, dim = wymiary). Najpierw pięć głównych (issue #25: wingspan, length, height, MLW,
-// MTOW), zawsze w tej kolejności i zawsze widoczne (brak = półpauza, none); dalej pozostałe, puste pomijane.
-// ICAO, WTC i RECAT są w wierszu nad rozwinięciem. {cat, label, value, title?, main?, none?}
-export function boxes(a) {
-  const b = (cat, label, value, extra) => ({ cat, label, value, ...extra });
-  // śmigłowiec i wiatrakowiec: w polu rozpiętości jest średnica wirnika
+// Kratki rozwinięcia: mała etykieta nad dużą wartością. 0.14.0 (issue #28): trzy linijki po trzy kratki, zawsze
+// w tej kolejności i zawsze widoczne (brak = półpauza, none): 1) rozpiętość, ARC, długość (bez wysokości),
+// 2) MTOW, MLW, WTC, 3) VMO, MMO, pułap. Kolor linijki wg kategorii (dim = wymiary, wake = masa i turbulencja,
+// perf = osiągi). Pozostałe dane (wysokość, IATA, opis typu, WTG) nie są pokazywane, ale zostają w bazie i w API.
+// [kategoria, [{cat, label, value, title?, none?} x 3]] x 3
+export function lines(a) {
+  // linijka: kategoria i kratki [etykieta, wartość, dymek?]
+  const line = (cat, ...row) => [cat, row.map(([label, value, title]) => ({ cat, label, value: value || NONE,
+    ...(title ? { title } : {}), ...(value ? {} : { none: true }) }))];
+  // śmigłowiec i wiatrakowiec: w polu rozpiętości jest średnica wirnika (bez ARC)
   const rotor = /^[HG]/.test(a.description || "");
-  const main = [
-    b("dim", rotor ? "ROTOR" : "WINGSPAN", a.wingspan ? `${num(a.wingspan)} m` : ""),
-    b("dim", "LENGTH", a.length ? `${num(a.length)} m` : ""),
-    b("dim", "HEIGHT", a.height ? `${num(a.height)} m` : ""),
-    b("wake", "MLW", unit(span(a.mlw, a.mlw_max, tons), " t")),
-    b("wake", "MTOW", a.mtow ? `${tons(a.mtow)} t` : ""),
-  ].map((x) => ({ ...x, main: true, ...(x.value ? {} : { value: NONE, none: true }) }));
-  const rest = [
-    b("id", "IATA", a.iata),
-    b("id", "DESC", a.description, { title: describe(a.description) }),
-    b("perf", "ENG", engines(a)),
-    b("perf", "VMO", unit(span(a.vmo_kt, a.vmo_kt_max, num), " kt")),
-    b("perf", "MMO", pre("M", span(a.mmo, a.mmo_max, mach))),
-    b("perf", "CEILING", pre("FL", span(a.ceiling_ft, a.ceiling_ft_max, flevel))),
-    b("wake", "WTG", a.wtg),
-    b("dim", "ARC", arcCode(a)),
-  ].filter((x) => x.value != null && x.value !== "");
-  return [...main, ...rest];
+  return [
+    line("dim", [rotor ? "ROTOR" : "WINGSPAN", a.wingspan ? `${num(a.wingspan)} m` : "", rotor ? "Rotor diameter" : ""],
+      ["ARC", arcCode(a), "Aerodrome reference code (wingspan)"],
+      ["LENGTH", a.length ? `${num(a.length)} m` : ""]),
+    line("wake", ["MTOW", a.mtow ? `${tons(a.mtow)} t` : ""],
+      ["MLW", unit(span(a.mlw, a.mlw_max, tons), " t")],
+      ["WTC", a.wtc || "", WTC[a.wtc]]),
+    line("perf", ["VMO", unit(span(a.vmo_kt, a.vmo_kt_max, num), " kt")],
+      ["MMO", pre("M", span(a.mmo, a.mmo_max, mach))],
+      ["CEILING", pre("FL", span(a.ceiling_ft, a.ceiling_ft_max, flevel))]),
+  ];
 }
 const box = (x) => `<div class="acb ${x.cat}${x.none ? " none" : ""}"${x.title ? ` title="${esc(x.title)}"` : ""}>`
   + `<span class="lbl">${x.label}</span><span class="val">${esc(x.value)}</span></div>`;
@@ -149,25 +157,23 @@ let PERF = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.asp
 const perfUrl = (icao) => PERF.replace(/default\.aspx.*$/i, `details.aspx?ICAO=${encodeURIComponent(icao)}`);
 const link = (href, text, cls) => `<a${cls ? ` class="${cls}"` : ""} href="${esc(href)}" target="_blank" rel="noopener">${text} \u2197</a>`;
 
-// Rozwinięcie (klik w wiersz, issue #25 "dodatkowy widok"): wiersz pod klikniętym na całą szerokość tabeli, u góry
-// zdjęcie, niżej pięć głównych kratek, pozostałe kratki, opis typu i kategorii RECAT-EU słownie, na końcu odnośniki
-// (strona osiągów typu, kolejne zdjęcia, wyszukiwarka bazy osiągów dla typów bez własnej strony)
+// Rozwinięcie (klik w wiersz, issue #25 "dodatkowy widok"): wiersz pod klikniętym na całą szerokość tabeli.
+// 0.14.0 (issue #28): zdjęcie po lewej, dane na prawo od zdjęcia (rozwinięcie niższe): trzy linijki kratek (lines),
+// pod nimi odnośniki (strona osiągów typu, kolejne zdjęcia, wyszukiwarka bazy osiągów dla typów bez własnej strony).
+// Pod zdjęcie dane schodzą tylko wtedy, gdy obok nich na zdjęcie zostaje mniej niż 220 px (aircraft.css, .ac-split
+// z zawijaniem)
 export function detail(a) {
   const q = encodeURIComponent(searchName(a));
-  const all = boxes(a);
-  const rest = all.filter((x) => !x.main);
-  const lines = [a.description && describe(a.description) && `${a.description} \u2013 ${describe(a.description)}`,
-    a.recat && RECAT[a.recat] && `RECAT-EU ${a.recat} \u2013 ${RECAT[a.recat]}`].filter(Boolean);
-  return `<tr class="ac-detail-row"><td colspan="${COLUMNS.length}"><div class="ac-detail">
+  return `<tr class="ac-detail-row"><td colspan="${COLUMNS.length}"><div class="ac-detail"><div class="ac-split">
     <div class="photo-box"><span class="hint">Loading photo\u2026</span></div>
-    <div class="ac-boxes main">${all.filter((x) => x.main).map(box).join("")}</div>
-    ${rest.length ? `<div class="ac-boxes">${rest.map(box).join("")}</div>` : ""}
-    ${lines.length ? `<div class="ac-info">${lines.map((l) => `<div>${esc(l)}</div>`).join("")}</div>` : ""}
-    <div class="ac-links">${link(perfUrl(a.icao), "Performance", "ac-perf")}
-      ${link(`https://www.jetphotos.com/photo/keyword/${q}`, "More photos")}
-      ${link(`https://www.google.com/search?tbm=isch&q=${q}`, "Image search")}
-      ${link(PERF, "Performance search")}</div>
-  </div></td></tr>`;
+    <div class="ac-data">
+      <div class="ac-boxes">${lines(a).map(([cat, row]) => `<div class="ac-line ${cat}">${row.map(box).join("")}</div>`).join("")}</div>
+      <div class="ac-links">${link(perfUrl(a.icao), "Performance", "ac-perf")}
+        ${link(`https://www.jetphotos.com/photo/keyword/${q}`, "More photos")}
+        ${link(`https://www.google.com/search?tbm=isch&q=${q}`, "Image search")}
+        ${link(PERF, "Performance search")}</div>
+    </div>
+  </div></div></td></tr>`;
 }
 
 // Podpis pod zdjęciem: odnośnik do strony zdjęcia (autor i licencja) nazwany wg funkcji, bez nazwy serwisu;

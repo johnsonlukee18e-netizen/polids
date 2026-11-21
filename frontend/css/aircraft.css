@@ -1,14 +1,16 @@
 /* AIRCRAFT (0.13.1, issue #25): u góry przyciski producentów (AIRBUS, BOEING, BOMBARDIER, EMBRAER, GA) tej samej
    wielkości co przyciski menu, pod nimi wyszukiwanie i zwarta tabela: jeden wiersz na typ (ICAO, producent, pełna
-   nazwa, liczba silników, WTC, RECAT-EU). Klik w wiersz otwiera pod nim rozwinięcie na całą szerokość tabeli: zdjęcie
-   u góry, niżej wartości w kratkach (mała etykieta nad dużą wartością, kolor kratki wg kategorii: identyfikacja
-   niebieska, osiągi szaroniebieska, masa i turbulencja bursztynowa, wymiary fioletowa) i odnośniki. Ciemne tła,
-   ostre krawędzie, bez cieni (poza wewnętrznym paskiem zaznaczenia), napisy zwykłej grubości. */
+   nazwa, liczba i rodzaj silników, WTC, RECAT-EU). Klik w wiersz otwiera pod nim rozwinięcie na całą szerokość
+   tabeli: od 0.14.0 (issue #28) zdjęcie po lewej, na prawo od niego wartości w trzech linijkach kratek (mała etykieta
+   nad dużą wartością, kolor kratki wg kategorii: wymiary fioletowa, masa i turbulencja bursztynowa, osiągi
+   szaroniebieska) i pod nimi odnośniki. Ciemne tła, ostre krawędzie, bez cieni (poza wewnętrznym paskiem
+   zaznaczenia), napisy zwykłej grubości. */
 /* padding u góry jak w kolumnach menu: rząd przycisków producentów na wysokości pierwszego rzędu menu (← i ALL) */
 .ac-pane { display: flex; flex-direction: column; gap: 8px; padding-top: var(--col-pad); }
 .ac-pane > .toolbar { margin-bottom: 0; }
 .ac-pane .toolbar .count { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ac-list { flex: 1; min-height: 0; overflow: auto; }
+/* kontener rozmiaru: rozwinięcie mierzy widoczną szerokość listy (100cqi niżej), także gdy tabela przewija się w bok */
+.ac-list { flex: 1; min-height: 0; overflow: auto; container-type: inline-size; }
 
 /* przyciski producentów: 137 x --btn-h z marginesem 1,5 px jak każdy przycisk menu i podmenu (miary z style.css,
    w niskim oknie niższe razem z menu); lewa krawędź pierwszego przycisku równo z polem wyszukiwania */
@@ -19,26 +21,33 @@
 .ac-makers .gbtn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
 
 /* tabela typów: stałe szerokości kolumn (table-layout: fixed), więc nie skacze przy pisaniu w polu wyszukiwania;
-   najwyżej 980 px (przy 1600 px bez pustej przerwy między nazwą a silnikami), pełna nazwa ICAO się zawija; co
-   najmniej 640 px (stałe kolumny 460 px, na nazwę zostaje 180 px): w wąskim panelu (tablet pionowo) lista
-   .ac-list przewija się w bok, a kolumna nazwy nie znika */
-table.ac-table { width: 100%; min-width: 640px; max-width: 980px; table-layout: fixed; }
-.ac-table th.icao { width: 64px; }
-.ac-table th.mk { width: 200px; }
-.ac-table th.eng { width: 74px; }
-.ac-table th.wtc { width: 52px; }
+   pełna nazwa ICAO się zawija. 0.14.0 (issue #28): większa czcionka i wyższe wiersze, kolumny bliżej siebie: tabela
+   najwyżej 760 px (dawniej 980 px przy czcionce 13 px; na nazwę zostaje najwyżej 280 px, więc w szerokim oknie
+   silniki, WTC i RECAT nie odjeżdżają od nazwy), co najmniej 640 px (stałe kolumny 480 px, na nazwę zostaje 160 px):
+   w wąskim panelu (tablet pionowo) lista .ac-list przewija się w bok, a kolumna nazwy nie znika. Producent 170 px
+   (dziewięć na dziesięć nazw w jednej linijce), silniki 112 px ("2 Turboshaft" w jednej linijce) */
+table.ac-table { width: 100%; min-width: 640px; max-width: 760px; table-layout: fixed; }
+.ac-table th.icao { width: 72px; }
+.ac-table th.mk { width: 170px; }
+.ac-table th.eng { width: 112px; }
+.ac-table th.wtc { width: 56px; }
 .ac-table th.recat { width: 70px; }
-.ac-table th.eng, .ac-table th.wtc, .ac-table th.recat { text-align: center; }
+.ac-table th.wtc, .ac-table th.recat { text-align: center; }
 .ac-table td { vertical-align: baseline; overflow-wrap: anywhere; }
 /* kliknięty wiersz przewijany do widoku nie chowa się pod przyklejonym nagłówkiem */
 .ac-table tr { scroll-margin-top: 24px; }
 .ac-table tr.ac-rec { cursor: pointer; }
-.ac-table td.icao { font: 15px/1.35 var(--mono); color: #fff; letter-spacing: .3px; white-space: nowrap; }
+/* 0.14.0 (issue #28): wiersze typów wyższe, czcionka 16 px (kod ICAO 17 px; dawniej 13 i 15 px) */
+.ac-table tr.ac-rec td { padding: 7px 8px; font-size: 16px; line-height: 1.35; }
+.ac-table tr.ac-rec td.icao { font-size: 17px; font-family: var(--mono); color: #fff; letter-spacing: .3px; white-space: nowrap; }
 .ac-table td.mk { color: #c9d1c9; }
 /* nazwa łamana na spacjach i łącznikach, w środku słowa tylko wtedy, gdy samo się nie mieści (ciąg nazw
    rozdzielonych ukośnikiem, np. Astar/Ecureuil/SuperStar, przeglądarka traktuje jak jedno słowo) */
 .ac-table td.name { color: var(--text); overflow-wrap: break-word; }
-.ac-table td.eng, .ac-table td.wtc, .ac-table td.recat { text-align: center; white-space: nowrap; font-family: var(--mono); }
+.ac-table td.wtc, .ac-table td.recat { text-align: center; white-space: nowrap; font-family: var(--mono); }
+/* silniki (0.14.0, issue #28: "2 Jet") do lewej, liczby jedna pod drugą; łamane tylko na spacji (rzadkie
+   "Coupled Turboprop" w dwóch linijkach), nie w środku słowa */
+.ac-table td.eng { font-family: var(--mono); overflow-wrap: normal; }
 .ac-table td.eng, .ac-table td.wtc { color: #fff; }
 /* RECAT-EU w kolorze kategorii jak w filtrze (A, B czerwone; C, D żółte; E, F zielone), także w zaznaczonym wierszu
    (selektor silniejszy od białego napisu table.data tr.selected td) */
@@ -60,31 +69,41 @@ table.ac-table tbody tr.ac-msg td { padding: 8px; background: none !important; b
    podświetlenia pod myszą (table.data tr:hover td w style.css ma !important) */
 table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; background: var(--sel) !important;
   box-shadow: inset 3px 0 0 var(--green-hi); cursor: default; }
-.ac-detail { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.ac-detail .photo-box { max-width: 100%; }
+/* 0.14.0 (issue #28): rozwinięcie najwyżej na widoczną szerokość listy (100cqi = .ac-list bez paddingu komórki
+   22 px) i przyklejone do jej lewej krawędzi, więc przy liście przewiniętej w bok (wąski panel) dane nie uciekają
+   poza widok. Co najmniej na szerokość kratek (min-content): w liście węższej od kratek rozwinięcie jest szersze od
+   widoku, przy przewijaniu w bok dochodzi do prawej krawędzi komórki i odkleja się, więc resztę kratek widać po
+   przewinięciu (bez tego przyklejone rozwinięcie ucinało prawe kratki na stałe) */
+.ac-detail { position: sticky; left: 12px; width: min(100%, calc(100cqi - 22px)); min-width: min-content; }
+/* zdjęcie po lewej, dane na prawo od niego; zdjęcie wypełnia miejsce obok danych, najwyżej do swojej szerokości
+   (max-content). Dane schodzą pod zdjęcie (zawinięcie) dopiero wtedy, gdy obok nich na zdjęcie zostaje mniej niż
+   220 px: próg wg szerokości kratek danego typu, nie stała szerokość panelu */
+.ac-split { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; }
+.ac-split > .photo-box { flex: 1 1 220px; min-width: 0; max-width: max-content; }
+.ac-data { flex: none; width: min-content; display: flex; flex-direction: column; gap: 8px; }
 .ac-detail .photo-box p { margin: 0; }
-/* zdjęcie w proporcjach pliku, najwyżej 640 x 300 px */
+/* zdjęcie w proporcjach pliku, najwyżej 640 x 300 px (obok danych zwykle węższe) */
 .ac-detail .photo-box img { display: block; max-width: min(640px, 100%); max-height: 300px; background: #000;
   border: 1px solid var(--line); margin-bottom: 4px; }
 /* tekst pomocniczy i podpis zdjęcia czytelne na zielonym tle zaznaczenia */
 .ac-detail .hint { color: #c9d1c9; }
 .ac-detail .photo-box a { color: var(--cyan); text-decoration: none; }
 .ac-detail .photo-box a:hover { text-decoration: underline; }
-.ac-info { font: 13px/1.6 var(--mono); color: #dfe5df; }
+/* odnośniki pod kratkami, zawijane do ich szerokości */
 .ac-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .ac-links a { color: var(--cyan); text-decoration: none; }
 .ac-links a:hover { text-decoration: underline; }
 
-/* kratki */
-.ac-boxes { display: flex; flex-wrap: wrap; gap: 4px; }
-.acb { display: flex; flex-direction: column; align-items: center; min-width: 46px; padding: 2px 8px 3px; border: 1px solid; border-radius: 0; }
+/* kratki: trzy linijki po trzy (0.14.0, issue #28), kolumny równej szerokości w linijkach (siatka; linijka sama nie
+   rysuje pudełka, display: contents). Kolumny max-content: przy width: min-content (.ac-data) kolumna auto brała
+   min-width kratki (88 px) i "345–360 kt" wystawało poza kratkę */
+.ac-boxes { display: grid; grid-template-columns: repeat(3, max-content); justify-content: start; gap: 4px; }
+.ac-line { display: contents; }
+.acb { display: flex; flex-direction: column; align-items: center; min-width: 88px; padding: 2px 8px 3px; border: 1px solid; border-radius: 0; }
 .acb > .lbl { font: 10px/1.25 var(--mono); letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; }
 .acb > .val { font: 18px/1.25 var(--mono); color: #fff; white-space: nowrap; }
-/* pięć głównych wartości (wymiary i masy) równej szerokości; brak wartości jako szara półpauza */
-.ac-boxes.main .acb { min-width: 84px; }
+/* brak wartości jako szara półpauza */
 .acb.none > .val { color: var(--muted); }
-.acb.id { background: #0b1b29; border-color: #1f4a6c; }
-.acb.id > .lbl { color: #80b6dd; }
 .acb.perf { background: #11181d; border-color: #36474f; }
 .acb.perf > .lbl { color: #a0b4bf; }
 .acb.wake { background: #1f1607; border-color: #6b4a13; }
