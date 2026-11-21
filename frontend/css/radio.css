@@ -196,9 +196,13 @@
 .rb-flow path { fill: var(--rb-flow); stroke: var(--rb-flow-line); stroke-width: 1.2; fill-rule: evenodd; cursor: help; }
 .rb-flow path.fb { stroke: none; fill-rule: nonzero; }
 .rb-flow path:hover { fill: #8e1a1a; }
-/* plakietki (radio.js: miejsce z placeLabels, bez linii prowadzących) */
-.rb-lbls { position: absolute; inset: 0; pointer-events: none; }
+/* plakietki (radio.js: miejsce z placeLabels, bez linii prowadzących). 0.14.2 (przegląd): plakietka ATZ bez wolnego
+   miejsca nigdy nie zasłania wieży, APP, ACC ani FIS – pod innymi plakietkami (under: ujemny z-index z radio.js;
+   isolation: warstwa plakietek osobno, więc under zostaje nad mapą) albo ukryta (hide) */
+.rb-lbls { position: absolute; inset: 0; pointer-events: none; isolation: isolate; }
 .rb-pl { position: absolute; left: 0; top: 0; pointer-events: auto; min-width: var(--rb-tw); height: var(--rb-th); }
+.rb-pl.under { z-index: -1; }
+.rb-pl.hide { display: none; }
 .rb-tr { align-self: start; display: inline-flex; align-items: center; gap: 3px; }
 .rb-pl.twr { cursor: pointer; }
 .rb-pl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
