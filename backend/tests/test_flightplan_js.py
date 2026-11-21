@@ -15,6 +15,8 @@ FRONTEND = ROOT_DIR / "frontend"
 JS = FRONTEND / "js"
 
 NODE_SCRIPT = r"""
+// airspace.js (importowany przez fmp.js) rozszerza klasę Leafleta przy wczytaniu; w przeglądarce L jest globalny
+globalThis.L = { CircleMarker: { extend: (o) => o } };
 const fp = await import(process.argv[2]);
 const v = await import(process.argv[3]);
 const fmp = await import(process.argv[4]);
@@ -80,10 +82,10 @@ def js(tmp_path_factory):
         pytest.skip("brak Node.js")
     d = tmp_path_factory.mktemp("fpljs")
     (d / "api.mjs").write_text((JS / "api.js").read_text("utf-8"), "utf-8")
-    for name in ("flightplan", "viffchart", "fmp"):
+    # 0.14.0: fmp.js importuje też airspace.js (kolory stanowisk), dissolve.js i radioboard.js (podglądy konfiguracji)
+    for name in ("flightplan", "viffchart", "fmp", "airspace", "dissolve", "radioboard"):
         src = (JS / f"{name}.js").read_text("utf-8")
-        (d / f"{name}.mjs").write_text(src.replace('"./api.js"', '"./api.mjs"').replace('"./viffchart.js"', '"./viffchart.mjs"'),
-                                       "utf-8")
+        (d / f"{name}.mjs").write_text(re.sub(r'"\./([a-z]+)\.js"', r'"./\1.mjs"', src), "utf-8")
     (d / "run.mjs").write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(d / "run.mjs"), *((d / f"{n}.mjs").as_uri() for n in ("flightplan", "viffchart", "fmp"))],
                        capture_output=True, text=True, timeout=60)

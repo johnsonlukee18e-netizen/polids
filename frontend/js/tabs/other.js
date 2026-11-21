@@ -3,7 +3,7 @@ import { mountBombPhone } from "../bombphone.js";
 import { mountChecklists } from "../checklist.js";
 import { isCoordFile, mountDocs } from "../docs.js";
 import { cleanCallsign, mountFlightPlan } from "../flightplan.js";
-import { cleanTv, mountFmp } from "../fmp.js";
+import { fmpArg, mountFmp, parseFmpArg, savedCfg } from "../fmp.js";
 import { mountHolding } from "../holding.js";
 import { mountRegcause } from "../regcause.js";
 import { mountSquawk } from "../squawk.js";
@@ -19,7 +19,8 @@ import { mountVfrMinima } from "../vfrminima.js";
 // id: DOCS, jak do 0.12.6.
 // Adresy "#other/<id>", a z zapamiętanym stanem "#other/docs/<plik w data/docs>" (bez pliku: pierwszy dokument),
 // "#other/checklist/<id checklisty>" (bez id: pierwsza), "#other/squawk/<kod>", "#other/flight-plan/<ZNAK>"
-// i "#other/fmp/<TV>" (sektor z wykresami ENTRY i OCC, np. EP-BH). Stare "#docs/<plik>", "#checklist/<id>"
+// i "#other/fmp/<TV>" (sektor z wykresami ENTRY i OCC, np. EP-BH; 0.14.0: także z konfiguracją sektorów –
+// "#other/fmp/2N" i "#other/fmp/2N/EP-BH"). Stare "#docs/<plik>", "#checklist/<id>"
 // i "#squawk/<kod>" przekierowuje app.js; stare "#phraseology" otwiera OTHER w jego stanie, a "#other/phraseology"
 // to nieznane id (DOCS). LOA i LOP (do 0.12.2 w DOCS, np. z RADIO) otwiera COORDINATION › DOKUMENTY:
 // "#other/docs/LOA/<plik>" → "#coordination/docs/LOA/<plik>".
@@ -33,8 +34,8 @@ export default {
     // stan podzakładek, który przetrwa ponowne rysowanie (każde kliknięcie w podmenu rysuje od nowa):
     // file: dokument DOCS ("" = pierwszy), chkId: checklista ("" = pierwsza), sqCode: kod SQUAWK w adresie, sqText:
     // tekst pola SQUAWK (kod albo filtr, jak w dawnej osobnej zakładce), fpCs: znak FLIGHT PLAN, fmpTv: sektor FMP
-    // z wykresami ("" = żaden)
-    let file = "", chkId = "", sqCode = "", sqText = "", fpCs = "", fmpTv = "";
+    // z wykresami ("" = żaden), fmpCfg: konfiguracja sektorów FMP (0.14.0; na początek ostatnia z pamięci przeglądarki)
+    let file = "", chkId = "", sqCode = "", sqText = "", fpCs = "", fmpTv = "", fmpCfg = savedCfg();
     let sub = null, live = null;   // live: obiekt strony na ekranie (z render), np. docs z pick()
     // Strona: {id, label, render(pane) → obiekt strony albo nic, arg() → stan do adresu, set(rest) → stan z adresu,
     // update(live) → otwarta strona pokazuje nowy stan z adresu, resume(live) → przycisk menu przy otwartej stronie}.
@@ -61,10 +62,15 @@ export default {
         update: (fp) => fp.activate(fpCs), resume: (fp) => fp.activate(),
         render: (pane) => mountFlightPlan(pane, { start: fpCs, onLookup: (cs) => { fpCs = cleanCallsign(cs); remember("other", argOf()); } }) },
       // 0.13.1: kliknięty sektor (wykresy ENTRY i OCC po prawej) w adresie; każdy klik to krok do cofnięcia (onPick),
-      // drugi klik w ten sam wiersz albo ✕ zamyka wykresy ("#other/fmp"); przycisk menu: dane starsze niż 60 s od nowa
-      { id: "fmp", label: "FMP", arg: () => fmpTv, set: (tv) => { fmpTv = cleanTv(tv); },
-        update: (fmp) => fmp.activate(fmpTv), resume: (fmp) => fmp.activate(),
-        render: (pane) => mountFmp(pane, { start: fmpTv, onPick: (tv) => { fmpTv = cleanTv(tv); remember("other", argOf()); } }) },
+      // drugi klik w ten sam wiersz albo ✕ zamyka wykresy ("#other/fmp"); przycisk menu: dane starsze niż 60 s od nowa.
+      // 0.14.0 (Marek): przed sektorem konfiguracja sektorów ("2N/EP-BH"); adres mówi wszystko ("#other/fmp/EP-BH" =
+      // bez konfiguracji), zapamiętana konfiguracja tylko na początek; kod spoza tabeli strona poprawia bez kroku (fix)
+      { id: "fmp", label: "FMP", arg: () => fmpArg(fmpCfg, fmpTv), set: (a) => { ({ cfg: fmpCfg, tv: fmpTv } = parseFmpArg(a)); },
+        update: (fmp) => fmp.activate(fmpArg(fmpCfg, fmpTv)), resume: (fmp) => fmp.activate(),
+        render: (pane) => mountFmp(pane, { start: fmpArg(fmpCfg, fmpTv), onPick: (a, fix) => {
+          ({ cfg: fmpCfg, tv: fmpTv } = parseFmpArg(a));
+          remember("other", argOf(), { replace: !!fix });
+        } }) },
       { id: "holding", label: "HOLDING", render: (pane) => mountHolding(pane) },
       { id: "position", label: "POSITION" },
       { id: "regcause", label: "REGCAUSE", render: (pane) => mountRegcause(pane) },

@@ -535,8 +535,9 @@ def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
     stack_tiles; kilka kafelków = ich stanowiska, potem ich kolejności, bez powtórek), stanowiska FIR-u do dymku (area:
     stanowiska kafelków tego FIR-u i z ich kolejności o prefiksie tego FIR-u, także z kafelków, których szkic nie ma),
     komórka kodu FIR-u (name) i miejsce na nazwę i ADVISORY obok niego (room: head_room), siatka strony (grid: kolumny,
-    wiersze, rząd u góry, BERLIN, przyciski, podglądy, stan danych, legenda, rodzaje kolumn) i zajęte komórki
-    (occupied: łączenie okienek tylko przez puste komórki, nigdy na kod FIR-u, podgląd albo przycisk)."""
+    wiersze, rząd u góry, BERLIN, przyciski, podglądy, stan danych, legenda, przycisk FMP – 0.14.0, rodzaje kolumn)
+    i zajęte komórki (occupied: łączenie okienek tylko przez puste komórki, nigdy na kod FIR-u, podgląd albo
+    przycisk)."""
     title = {s["fir"]: s["title"] for s in STACKS}
     grid = layout.get("grid") or {}
     occupied: dict[tuple[int, int], str] = {}
@@ -573,11 +574,12 @@ def layout_static(layout: dict, tiles: dict[str, list[dict]]) -> dict:
     buttons = layout.get("buttons") or {}
     for row in (buttons.get("rows") or {}).values():
         occupied[(int(buttons.get("col") or 0), int(row))] = "buttons"
-    # podglądy (prostokąty LOW, HIGH, MID), stan danych i legenda: stałe miejsca, połączone okienko ich nie zajmie
+    # podglądy (prostokąty LOW, HIGH, MID), stan danych, legenda i przycisk FMP (0.14.0): stałe miejsca, połączone
+    # okienko ich nie zajmie
     maps = {k: _cell(v) for k, v in (layout.get("maps") or {}).items()}
     for k, c in maps.items():
         occupied.update(dict.fromkeys(_cells_of(c), f"map:{k}"))
-    places = {k: _cell(layout[k]) for k in ("status", "legend") if layout.get(k)}
+    places = {k: _cell(layout[k]) for k in ("status", "legend", "fmp") if layout.get(k)}
     for k, c in places.items():
         occupied.update(dict.fromkeys(_cells_of(c), k))
     ncols, nrows = int(grid.get("cols") or 0), int(grid.get("rows") or 0)
