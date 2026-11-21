@@ -1,4 +1,4 @@
-// MAP: kto obsługuje przestrzeń w punkcie kursora (podziałka wysokości w dymku) i plakietki CTR bez dublowania.
+// MAP: kto obsługuje przestrzeń w punkcie kursora (podziałka wysokości w dymku), plakietki CTR i etykiety wież bez dublowania.
 // Czyste funkcje bez Leafleta (testy w Node: backend/tests/test_map_scale.py).
 import { esc } from "./api.js";
 
@@ -74,4 +74,21 @@ export function ctrBadges(firs, labelled = [], prefix = "EPWW") {
       if (list.length) out[id] = list;
     });
   return out;
+}
+
+// 0.14.2 (issue #35, właściciel projektu: "gdy TWR kontroluje CTR to nie wyświetlaj dodatkowo jej tabliczki, skoro już
+// na tabliczce lotniska widać, że jest TWR zalogowany"). Wieża we własnym CTR miała dwie tabliczki: etykietę obszaru
+// (drawOwned: "KK TWR 118.100") i literę T na plakietce lotniska tuż obok ("EPKK T").
+// towerBadges: znaki pod T na narysowanych plakietkach lotnisk EP (airports: lotniska z plakietką z drawAtc, puste przy
+// wyłączonej warstwie ATC albo błędzie danych: wtedy etykieta wieży zostaje).
+export const towerBadges = (airports) => new Set((airports || []).filter((ap) => /^EP[A-Z]{2}$/.test(ap?.icao || ""))
+  .flatMap((ap) => (ap.facilities?.TWR || []).map((c) => c?.callsign).filter(Boolean)));
+
+// Bez etykiety obszaru tylko wieża lotniska EP (EPKK_TWR, EPBA_R_TWR) z T na plakietce, której cały widoczny obszar
+// (prs: wycinki grupy z drawOwned) to CTR albo ATZ tego samego lotniska. Wieża z TMA lub CTA top-down (EPLB, EPSY,
+// EPLL...) zostaje z etykietą: plakietka nie mówi, kto ma TMA. Tak samo TRA innego lotniska (grupa EPTR..).
+export function towerOnBadge(c, prs, badged) {
+  const cs = String(c?.callsign || "").toUpperCase(), icao = cs.split("_")[0];
+  if (!/^EP[A-Z]{2}_(?:[A-Z0-9]+_)*TWR$/.test(cs) || !badged?.has?.(c.callsign) || !prs?.length) return false;
+  return prs.every((pr) => (pr?.kind === "ctr" || pr?.kind === "atz") && pr.group === icao);
 }
