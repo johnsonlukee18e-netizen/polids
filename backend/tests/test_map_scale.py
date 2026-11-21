@@ -1,6 +1,7 @@
 """0.14.0 (issue #28, MAP): dymek przestrzeni jako prosta podziałka wysokości (frontend/js/mapatc.js: altScale,
 altScaleHtml) zamiast długich wierszy z rodzajem, nazwą, ID, zakresem, częstotliwością i "since", oraz plakietki CTR
-FIR-u EPWW bez dublowania z etykietą obszaru stanowiska (ctrBadges). Funkcje wykonane w Node."""
+FIR-u EPWW bez dublowania z etykietą obszaru stanowiska (ctrBadges). 0.14.2 (issue #35): wieża we własnym CTR / ATZ
+bez etykiety obszaru, gdy jest już T na plakietce lotniska (towerBadges, towerOnBadge). Funkcje wykonane w Node."""
 import json
 import re
 import shutil
@@ -70,6 +71,39 @@ const act = pt.activeOnline({ positions: {}, firs: {}, controllers: [] }, { base
   { posOf: (cs) => (cs === "EPWW_N_CTR" ? { frequency: "130.675" } : null), firOf: (cs) => pt.firsOf(cs, vatspy) });
 out.simBadge = m.ctrBadges(act.firs, []);
 out.simLabelled = m.ctrBadges(act.firs, [act.positions.EPWW_N_CTR]);
+
+// 0.14.2 (issue #35): etykieta obszaru wieży tylko, gdy nie ma jej T na plakietce lotniska albo ma też TMA / CTA
+const pr = (kind, group) => ({ kind, group });
+const KK = { callsign: "EPKK_TWR", frequency: "118.100" };
+const badged = m.towerBadges([{ icao: "EPKK", facilities: { TWR: [KK], GND: [{ callsign: "EPKK_GND" }] } },
+  { icao: "ESGG", facilities: { TWR: [{ callsign: "ESGG_TWR" }] } }, { icao: "EPWA", facilities: { APP: [{ callsign: "EPWA_APP" }] } },
+  null, { icao: "EPGD" }]);
+const T = {};
+T.badged = [...badged].sort();
+T.badgedNone = [[...m.towerBadges(null)], [...m.towerBadges([])]];
+T.kk = m.towerOnBadge(KK, [pr("ctr", "EPKK"), pr("ctr", "EPKK")], badged);
+T.kkNoBadge = [m.towerOnBadge(KK, [pr("ctr", "EPKK")], new Set()), m.towerOnBadge(KK, [pr("ctr", "EPKK")], null)];
+T.lbTma = m.towerOnBadge({ callsign: "EPLB_TWR" }, [pr("ctr", "EPLB"), pr("tma", "EPLB")], new Set(["EPLB_TWR"]));
+T.llCta = m.towerOnBadge({ callsign: "EPLL_TWR" }, [pr("ctr", "EPLL"), pr("cta", "CTA03")], new Set(["EPLL_TWR"]));
+T.baAtz = m.towerOnBadge({ callsign: "EPBA_R_TWR" }, [pr("atz", "EPBA")], new Set(["EPBA_R_TWR"]));
+T.tra = m.towerOnBadge({ callsign: "EPKI_R_TWR" }, [pr("atz", "EPTR28")], new Set(["EPKI_R_TWR"]));
+T.app = m.towerOnBadge({ callsign: "EPKK_APP" }, [pr("ctr", "EPKK")], new Set(["EPKK_APP"]));
+T.other = m.towerOnBadge(KK, [pr("ctr", "EPKK")], new Set(["EPKT_TWR"]));
+T.otherCtr = m.towerOnBadge({ callsign: "EPKT_TWR" }, [pr("ctr", "EPKK")], new Set(["EPKT_TWR"]));
+T.foreign = m.towerOnBadge({ callsign: "ESGG_TWR" }, [pr("nb", "ESAA")], new Set(["ESGG_TWR"]));
+T.empty = [m.towerOnBadge(null, [pr("ctr", "EPKK")], badged), m.towerOnBadge(KK, [], badged), m.towerOnBadge(KK, null, badged)];
+// symulowana wieża (sekcja Pozycje): plakietka lotniska z zestawu aktywnego, więc bez etykiety; ukryta: bez plakietki
+const posOf = (cs) => (cs === "EPKK_TWR" ? { frequency: "118.100" } : null);
+const kkAd = { EPKK: { name: "x", lat: 50, lon: 19.8 } };
+const simAct = pt.activeOnline({ positions: {}, firs: {}, controllers: [] }, { base: "online", ovr: { EPKK_TWR: true } }, { posOf });
+const simBadged = m.towerBadges(pt.activeAtc({ airports: [] }, simAct, kkAd).airports);
+T.sim = [...simBadged];
+T.simOn = m.towerOnBadge(simAct.positions.EPKK_TWR, [pr("ctr", "EPKK")], simBadged);
+const on = { positions: { EPKK_TWR: KK }, firs: {}, controllers: [KK] };
+const atc = { airports: [{ icao: "EPKK", name: "x", lat: 50, lon: 19.8, facilities: { TWR: [KK] } }] };
+T.live = [...m.towerBadges(pt.activeAtc(atc, pt.activeOnline(on, { base: "online", ovr: {} }, { posOf }), kkAd).airports)];
+T.hidden = [...m.towerBadges(pt.activeAtc(atc, pt.activeOnline(on, { base: "online", ovr: { EPKK_TWR: false } }, { posOf }), kkAd).airports)];
+out.tower = T;
 console.log(JSON.stringify(out));
 """
 
@@ -159,7 +193,7 @@ def test_map_uses_scale_and_badges():
     """map.js: dymek z altScale / altScaleHtml, plakietki CTR EPWW po etykietach obszarów (drawCtr w drawAirspace,
     ctrBadges z lblCtl), kontury FIR-ów bez plakietek; karta etykiety z innymi na tej samej częstotliwości."""
     src = (JS / "tabs" / "map.js").read_text("utf-8")
-    assert 'import { altScale, altScaleHtml, ctrBadges } from "../mapatc.js";' in src
+    assert 'import { altScale, altScaleHtml, ctrBadges, towerBadges, towerOnBadge } from "../mapatc.js";' in src
     draw = src.split("function drawAirspace() {")[1].split("\n  }\n")[0]
     assert draw.index("drawOwned(all)") < draw.rindex("drawCtr();") < draw.index("declutter();")
     assert "if (!slices) { drawCtr();" in draw
@@ -169,6 +203,40 @@ def test_map_uses_scale_and_badges():
     assert "[layers.atc, layers.firs, layers.firCtr].forEach" in src
     card = src.split("const ctlCard = (c) => {")[1].split("\n  };")[0]
     assert "x.frequency === c.frequency" in card and "same.map((x) => controllerRows(x))" in card
+
+
+def test_tower_label_on_badge(js):
+    """Issue #35: wieża we własnym CTR (EPKK_TWR) albo ATZ (EPBA_R_TWR) z T na plakietce lotniska bez etykiety obszaru;
+    z TMA / CTA top-down, w cudzej TRA, bez plakietki (warstwa ATC wyłączona, ukryta) i APP etykieta zostaje."""
+    t = js["tower"]
+    # tylko TWR lotnisk EP z plakietki (ESGG, GND i APP pominięte)
+    assert t["badged"] == ["EPKK_TWR"] and t["badgedNone"] == [[], []]
+    assert t["kk"] is True and t["baAtz"] is True
+    assert t["kkNoBadge"] == [False, False]
+    assert t["lbTma"] is False and t["llCta"] is False and t["tra"] is False
+    assert t["app"] is False and t["other"] is False and t["otherCtr"] is False and t["foreign"] is False
+    assert t["empty"] == [False, False, False]
+    # symulacja z sekcji Pozycje: plakietka z przerywaną ramką, więc też bez etykiety; ukryta wieża: bez plakietki
+    assert t["sim"] == ["EPKK_TWR"] and t["simOn"] is True
+    assert t["live"] == ["EPKK_TWR"] and t["hidden"] == []
+
+
+def test_map_tower_label_wiring():
+    """map.js: drawOwned pomija etykietę wieży z T na plakietce (po kolorze, przed lbl), drawAtc zbiera wieże
+    z narysowanych plakietek i przerysowuje przestrzeń, gdy zestaw się zmienił; legenda."""
+    src = (JS / "tabs" / "map.js").read_text("utf-8")
+    own = src.split("function drawOwned(all) {")[1].split("\n  }\n")[0]
+    assert "labelTwr = twrKey();" in own
+    skip = "if (towerOnBadge(g.c, g.vs.map((v) => v.pr), badgeTwr)) return;"
+    assert own.index("ownColor.set(g.c.callsign, g.color);") < own.index(skip) < own.index("lbl(at,")
+    atc = src.split("function drawAtc() {")[1].split("\n  }\n")[0]
+    assert "badgeTwr = towerBadges(shown);" in atc
+    assert "if (net.useOnline && slices && twrKey() !== labelTwr) drawAirspace();" in atc
+    assert atc.index("atcAds = new Set(") < atc.index("badgeTwr = towerBadges(shown);")
+    assert atc.index("drawAds();") < atc.index("drawAirspace();")
+    # deklaracje przed pierwszym użyciem (drawAtc wołane asynchronicznie, ale bez TDZ w mainMap)
+    assert src.index("let badgeTwr = new Set(), labelTwr = \"\";") < src.index("function drawOwned(all) {")
+    assert "a TWR in its own CTR only as T on the aerodrome badge" in src
 
 
 def test_new_module_rules():
