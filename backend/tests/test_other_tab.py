@@ -163,7 +163,7 @@ step("fmp-pick2", () => last("fmp").opts.onPick("EP-WATMA"));
 step("fmp-away", () => { sub.click("holding"); sub.click("fmp"); });
 step("fmp-other", () => { sub.click("position"); view.activate("fmp/EP-GDTMA"); });
 step("fmp-menu2", () => view.activate(undefined));
-// 0.14.0 (Marek): konfiguracja sektorów w adresie (#other/fmp/2N, #other/fmp/2N/EP-BH), wybór na stronie (onPick),
+// 0.14.0 (właściciel projektu): konfiguracja sektorów w adresie (#other/fmp/2N, #other/fmp/2N/EP-BH), wybór na stronie (onPick),
 // poprawka adresu (nieznana konfiguracja: replace) i powrót z innej podzakładki z ostatnią konfiguracją
 step("fmp-cfg", () => view.activate("fmp/2n"));
 step("fmp-cfg-tv", () => view.activate("fmp/2N/ep-bh"));
@@ -468,7 +468,7 @@ def test_other_flight_plan_and_fmp_addresses(js):
     assert oth["log"][-1] == ["remember", "other", "fmp/EP-GDTMA", False]
     menu2 = _step(js, "fmp-menu2")
     assert menu2["fmp"][2]["calls"] == [["activate", "<menu>"]] and menu2["log"] == [["remember", "other", "fmp/EP-GDTMA", False]]
-    # 0.14.0 (Marek): "#other/fmp/2n" przy otwartym FMP: konfiguracja (wielkimi literami) do otwartej strony
+    # 0.14.0 (właściciel projektu): "#other/fmp/2n" przy otwartym FMP: konfiguracja (wielkimi literami) do otwartej strony
     cfg = _step(js, "fmp-cfg")
     assert len(cfg["fmp"]) == 3 and cfg["fmp"][2]["calls"][-1] == ["activate", "2N"]
     assert cfg["log"] == [["remember", "other", "fmp/2N", False]]

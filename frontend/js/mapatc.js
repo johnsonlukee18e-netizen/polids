@@ -7,7 +7,7 @@ const DASH = "\u2013";
 const altText = (ft) => (!ft ? "GND" : ft <= 6500 ? `${ft} ft` : "FL" + String(Math.round(ft / 100)).padStart(3, "0"));
 const keys = (who) => (who || []).map((w) => w.key).sort().join("|");
 
-// 0.14.0 (issue #28, Marek: "bardzo długie, niepotrzebne objaśnienia; wystarczy prosta podziałka wysokości z id
+// 0.14.0 (issue #28, właściciel projektu: "bardzo długie, niepotrzebne objaśnienia; wystarczy prosta podziałka wysokości z id
 // kontrolera, imieniem i nazwiskiem oraz wysokościami granicznymi"). Dymek po najechaniu na przestrzeń zamiast wierszy
 // z rodzajem, nazwą, ID, zakresem, częstotliwością i "since": cała kolumna przestrzeni w punkcie kursora, od góry.
 // slices: wycinki w tym punkcie {lo, hi: granice w stopach, size: pole (mniejsze = dokładniejsze, np. CTR w TMA),
@@ -39,7 +39,7 @@ export function altScale(slices) {
 }
 
 // HTML dymka z altScale: granica w osobnej linijce, pod nią obsługujący pasma (nazwa stanowiska, częstotliwość
-// i imię i nazwisko, jak panel Positions z obrazka Marka w issue #28;
+// i imię i nazwisko, jak panel Positions z obrazka właściciela projektu w issue #28;
 // symulacja: SYM; nieobsadzone: "–"); kreska po lewej w kolorze stanowiska jak jego obszar na mapie. lv: rysowany
 // poziom (null = wszystkie): pasmo z tym poziomem wyróżnione. alt: zapis granicy (altLabel z airspace.js).
 export function altScaleHtml(rows, { lv = null, alt = altText } = {}) {

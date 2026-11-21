@@ -3,7 +3,7 @@
 // Reload: wczytuje całą stronę od nowa (po aktualizacji serwera nowa wersja aplikacji; zainstalowane okno PWA nie ma
 // przycisku przeglądarki) i wraca do tego samego ekranu. Adres ekranu czeka w sessionStorage tej karty na jedno
 // uruchomienie (takeReload w app.js, po otwarciu HOME); każde inne uruchomienie (F5, nowe okno) otwiera HOME jak dotąd.
-// Brighter / Darker: jasność całego ekranu, krok 12 % od -2 do +2 (76-124 %, Marek 28.10.2026), zapamiętana w tej
+// Brighter / Darker: jasność całego ekranu, krok 12 % od -2 do +2 (76-124 %, właściciel projektu 28.10.2026), zapamiętana w tej
 // przeglądarce (localStorage); na granicy zakresu przycisk jest wyłączony, a dymek podaje bieżącą jasność. Filtr CSS na <html>, nigdy
 // na main ani #views: filtr na przodku robi z niego blok zawierający dla position: fixed, więc dymki RADIO (.rb-tip)
 // i pasek offline przesuwałyby się o szerokość menu i wysokość paska (pomiar w mapie rundy 16); <html> tego nie robi.

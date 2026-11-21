@@ -82,7 +82,7 @@ export function bookingText(b, now = new Date()) {
   return `Booking: ${b?.callsign || "?"} ${bookingTime(b, now)}${type}${b?.active ? " · in progress" : ""}`;
 }
 
-// na częstotliwości stanowiska z danych (`active` z /api/vatsim/me; 0.13.6, Marek: na 199.998 "jakby go nie było")
+// na częstotliwości stanowiska z danych (`active` z /api/vatsim/me; 0.13.6, właściciel projektu: na 199.998 "jakby go nie było")
 export const onFrequency = (c) => c?.active !== false && !/^199\.998/.test(String(c?.frequency || ""));
 
 // obserwator i ATIS to też połączenia z CID kontrolera, ale nie stanowiska; bez częstotliwości stanowiska też nie

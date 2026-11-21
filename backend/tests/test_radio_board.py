@@ -104,7 +104,7 @@ def test_board_overlays(board):
 
 
 def test_board_tma_parts(board):
-    """Warstwa APP (runda 11, Marek): TMA podzielone na części wg stanowiska części (WA APP, WA N APP, WA S APP),
+    """Warstwa APP (runda 11, właściciel projektu): TMA podzielone na części wg stanowiska części (WA APP, WA N APP, WA S APP),
     TMA proceduralne z wieżą lotniska, EPRZ domyślnie KK RZ APP; dyrektor (WA DIR, KK DIR, KT DIR) nie jest częścią."""
     tma = {g["id"]: g for g in board["tma"]}
     assert len(tma) == len(board["tma"])  # id bez powtórek
@@ -188,7 +188,7 @@ def test_board_atis(board):
     atis = {a["callsign"]: a for a in board["atis"]}
     assert atis["EPWA_ATIS"]["online"] and not atis["EPKK_ATIS"]["online"]
     assert board["online"]["EPWA_ATIS"]["atis_code"] == "K"
-    # 0.13.6 (Marek: "wyswietlaj tylko kontrolerow po czestotliwosciach aktywnych poprawnych dla sektorow"): ATIS na
+    # 0.13.6 (właściciel projektu: "wyswietlaj tylko kontrolerow po czestotliwosciach aktywnych poprawnych dla sektorow"): ATIS na
     # częstotliwości, której nie ma żadne stanowisko z danych (EPWA_D_ATIS na 121.130), jakby go nie było
     assert "EPWA_D_ATIS" not in atis and "EPWA_D_ATIS" not in board["online"] and "EPWA_D_ATIS" not in board["pos"]
     assert not any(a.get("extra") for a in board["atis"])   # drugi ATIS z AIP (123.430): test_board_atis_from_aip
@@ -279,7 +279,7 @@ def test_board_neighbour_firs(board):
 
 
 def test_board_geo(client):
-    """0.13.2 (issue #27, Marek: "mapy całe czarne"): geometria bez sąsiadów (bez sektorów ACC, TMA i CTR sąsiadów –
+    """0.13.2 (issue #27, właściciel projektu: "mapy całe czarne"): geometria bez sąsiadów (bez sektorów ACC, TMA i CTR sąsiadów –
     granice FIR-ów sąsiadów zostają jako cienkie linie); kształty TMA/CTA, CTR i FIS FIR EPWW do granic stanowisk
     online (id, nazwa, geometria; TMA z kluczem TMA, CTR z grupą CTR), bez kolejności przejmowania."""
     d = client.get("/api/radio/board?geo=1").json()
@@ -360,14 +360,14 @@ def test_board_fis_warszawa_information(client, monkeypatch):
     assert not set(both["EPWW_I_CTR"]) & set(ie)
 
 
-# ACC Visualization z plvacc.pl/acc-sectors (zrzut Marka 14.11.2026): DBF+G 133.180, DB+T 127.025, TC+J 134.875,
+# ACC Visualization z plvacc.pl/acc-sectors (zrzut właściciela projektu 14.11.2026): DBF+G 133.180, DB+T 127.025, TC+J 134.875,
 # JR 130.875 i _ALLFIR LM 125.450 online; ten sam podział na HIGH, MID i LOW
 ACC_VIS = {"F": "EPWW_DBF_CTR", "G": "EPWW_DBF_CTR", "B": "EPWW_DBT_CTR", "D": "EPWW_DBT_CTR", "T": "EPWW_TCJ_CTR",
            "C": "EPWW_TCJ_CTR", "J": "EPWW_JR_CTR", "R": "EPWW_JR_CTR", "N": "EPWW_ALL_CTR", "E": "EPWW_ALL_CTR"}
 
 
 def test_board_config_from_active_frequency(client, monkeypatch):
-    """0.13.5 (Marek: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): sektory ACC obsługuje
+    """0.13.5 (właściciel projektu: "bierz pod uwagę aktywną częstotliwość kontrolera, a nie jego callsign"): sektory ACC obsługuje
     stanowisko z częstotliwości, na której kontroler pracuje, nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT, EPWW_DBT_CTR
     na 133.180 to DBF, EPWW_ALL_CTR na 130.875 to JR, EPWW_J_CTR na 125.450 to ALL. Wynik jak na zrzucie ACC
     Visualization: F i G – DBF, B i D – DBT (D HIGH z tabeli om), T i C – TCJ, J i R – JR, N i E – ALL, na każdej
@@ -855,7 +855,7 @@ def test_js_layout_helpers(js):
     u = st["eduu"]
     assert u["rows"] == ["l1", "t", "l1", "t", "l2", "t", "l1", "t", "l1"]
     assert u["marks"] == [["1", "1", 660], ["1", "3", 365], ["1", "5", 285, 660], ["1", "7", 365], ["1", "9", 285]]
-    # połączone HVL2 + HVL1 (0.13.5, Marek: "napraw te ogromne kwadraty"): zwykły kafelek w komórce HVL2, nad nim jego
+    # połączone HVL2 + HVL1 (0.13.5, właściciel projektu: "napraw te ogromne kwadraty"): zwykły kafelek w komórce HVL2, nad nim jego
     # górna granica, pod nim dolna, rzędy liczb bez zmian
     h = st["hvl"]
     assert h["rows"] == u["rows"] and h["tiles"][2] == ["HVL2+HVL1", "1 / 2", "6 / 7"]
@@ -941,7 +941,7 @@ def test_js_stack_size_fixed_all_merges(tmp_path):
     nikogo, żadna liczba poza swoim rzędem. EDUU_H12_CTR we wszystkich czterech okienkach EDUU łączy je przez puste
     wiersze szkicu 9 i 10 (dawniej stos o dwa rzędy kafelków wyższy, strona skakała przy logowaniu). 0.13.2 (issue #27):
     stackGrid na wszystkich kolumnach i wierszach siatki strony (jak pageGrid), więc tory są torami strony.
-    0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki z granicami całego
+    0.13.5 (właściciel projektu: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki z granicami całego
     okienka. Tory bez zmian także wtedy, gdy przy kafelku byłyby dwie liczby w rzędzie na jedną (EDUU OSE1 + HVL2, 660,
     pod OSE2, 365; ESAA 8 + 7, do 0, nad L, od 195): przy tej krawędzi granica członka z komórki kafelka, jak bez
     łączenia (365, 195)."""
@@ -1072,7 +1072,7 @@ ALT_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Alt", "cid": 30 + i} for i, (cs, fq) in enumerate((
         ("EPWA_S_APP", "135.930"), ("EPWA_TWR", "118.305"), ("EPGD_APP", "127.280"), ("EPWA_I_APP", "123.975"),
         ("EPWW_J_CTR", "124.625"), ("EPSY_TWR", "118.030"), ("EPWW_C_CTR", "133.475"), ("EPWW_DTC_CTR", "125.340")))]}
-# APP podzielone (0.13.0, Marek): WA APP + WA N + WA S + dyrektor WA F, KK APP + KK E + dyrektor KK KK, wieże WA i KK
+# APP podzielone (0.13.0, właściciel projektu): WA APP + WA N + WA S + dyrektor WA F, KK APP + KK E + dyrektor KK KK, wieże WA i KK
 SPLIT_FEED = {**FEED, "controllers": [
     {"callsign": cs, "frequency": fq, "name": "Split", "cid": 50 + i} for i, (cs, fq) in enumerate((
         ("EPWA_APP", "128.805"), ("EPWA_N_APP", "125.055"), ("EPWA_S_APP", "135.930"), ("EPWA_F_APP", "129.380"),
@@ -1090,7 +1090,7 @@ INFO_FEED = {**FEED, "controllers": [
 
 
 def test_js_twr_layout(client, board, tmp_path, monkeypatch):
-    """0.13.0 (Marek: "jak nikt nie siedzi, nie pokazuj tysiąca plakietek APP i TWR"), 0.13.2 (issue #27): na podglądzie
+    """0.13.0 (właściciel projektu: "jak nikt nie siedzi, nie pokazuj tysiąca plakietek APP i TWR"), 0.13.2 (issue #27): na podglądzie
     LOW granice i plakietki tylko stanowisk online – APP: jedna plakietka na stanowisko APP w środku obsługiwanych części
     TMA (WA APP + WA N + WA S: trzy; dyrektor bez plakietki) i granatowa granica tych części, wieża online: granica CTR
     i plakietka, TWR/A także sam ATIS (ciemna plakietka z częstotliwością ATIS, bez granicy), FIS online: granica jego
@@ -1245,7 +1245,7 @@ console.log(JSON.stringify(out));
 
 
 def test_js_acc_groups(client, board, tmp_path):
-    """Runda 12 (Marek): na podglądach LOW/MID/HIGH sektory ACC jednego stanowiska to jeden obszar z jedną plakietką
+    """Runda 12 (właściciel projektu): na podglądach LOW/MID/HIGH sektory ACC jednego stanowiska to jeden obszar z jedną plakietką
     (accGroups); po błędzie sumy same wycinki. 0.13.2 (issue #27): stałe przekroje (LOW FL330), sektory bez nikogo
     jako jedno szare pole bez granic (freeArea)."""
     node = shutil.which("node")
@@ -1467,7 +1467,7 @@ def test_js_neighbour_boxes(tmp_path):
     assert part.count('class="rb-box on"') == 1 and part.count('class="rb-fq"') == 1
     assert '<span class="rb-id">U</span><span class="rb-fq">132.280</span>' in part and part.count("Now: unstaffed") == 3
     assert "Online: EYVL_U_CTR 132.280 – Ona" in part and 'class="rb-fh down" data-fir="EYVL"' in part
-    # połączone (0.13.5, Marek: "napraw te ogromne kwadraty"): jeden zwykły kafelek w komórce U (wiersz 3 szkicu),
+    # połączone (0.13.5, właściciel projektu: "napraw te ogromne kwadraty"): jeden zwykły kafelek w komórce U (wiersz 3 szkicu),
     # ID połączonego (L), granice całego okienka tuż nad nim i pod nim (660 / 133.305 / 95 jak EYVL na zdjęciu PANDORY)
     # i w dymku; komórki M, L, E puste; tory strony te same co bez łączenia
     mg = out["merged"]
@@ -1664,7 +1664,7 @@ console.log(JSON.stringify({
 
 
 def test_js_preview_tooltips(tmp_path):
-    """Dymki podglądów (tabs/radio.js accTip, groupTip, nowText; runda 15, Marek: "wywal hierarchię dziedziczenia"):
+    """Dymki podglądów (tabs/radio.js accTip, groupTip, nowText; runda 15, właściciel projektu: "wywal hierarchię dziedziczenia"):
     przestrzeń, stanowisko i kto ją teraz obsługuje – bez kolejności przejmowania (Coverage order, ›) i bez stanowiska
     sektora z kolejnością; bez danych o zalogowanych "Now: no data" bez nazwy dostawcy."""
     node = shutil.which("node")
@@ -1747,7 +1747,7 @@ console.log(JSON.stringify(out));
 
 
 def test_js_flow_and_tip_position(tmp_path):
-    """0.13.0 (Marek): czerwone tło przestrzeni z ograniczeniem przepływu albo zajętością ponad 80 % – sektor ACC na
+    """0.13.0 (właściciel projektu): czerwone tło przestrzeni z ograniczeniem przepływu albo zajętością ponad 80 % – sektor ACC na
     podglądzie swojej warstwy, TMA na LOW (jeden obrys sumy jej kształtów), także bez nikogo, w dymku powód; dymek
     stałej szerokości, na prawo od kursora, przy prawej krawędzi okna na lewo (12 px od brzegu), przy dolnej nad
     kursorem; szerokość nigdy nie maleje (radio.css)."""
@@ -1809,7 +1809,7 @@ def test_js_flow_and_tip_position(tmp_path):
 
 
 def test_radio_page_without_provenance_notes():
-    """Runda 15 (Marek): na stronie RADIO bez kolejności przejmowania i bez dopisków, skąd jest wartość, opis albo układ
+    """Runda 15 (właściciel projektu): na stronie RADIO bez kolejności przejmowania i bez dopisków, skąd jest wartość, opis albo układ
     (VACS, VATSpy, plik .ese/sektora, om.plvacc.pl, VATSIM jako źródło) – w kodzie strony poza komentarzami."""
     for name in ("tabs/radio.js", "radioboard.js"):
         lines = (FRONTEND / "js" / name).read_text("utf-8").splitlines()
@@ -1905,7 +1905,7 @@ def test_layer_column_buttons_fit_label():
     # liczby przy swoich kafelkach w rozciągniętym rzędzie liczb
     for at, rule in (("up", "align-self: end"), ("dn", "align-self: start"), ("two", "justify-content: space-between")):
         assert re.search(rf"\.rb-bd\.{at} \{{[^}}]*{rule}", css), at
-    # podglądy (0.13.2, Marek): czarne, kolory jako zmienne – granatowa granica stanowiska online, szare sektory bez
+    # podglądy (0.13.2, właściciel projektu): czarne, kolory jako zmienne – granatowa granica stanowiska online, szare sektory bez
     # nikogo, cienkie granice FIR-ów
     assert "--rb-navy: #2f45c8" in css and re.search(r"\.rb-own path \{[^}]*stroke: var\(--rb-navy\); stroke-width: 2", css)
     assert re.search(r"\.rb-free path \{[^}]*fill: var\(--rb-free\)", css) and ".rb-land { fill: #000; }" in css

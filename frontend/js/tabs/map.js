@@ -52,7 +52,7 @@ const AIR_TAG = { acc: "ACC", tma: "TMA", cta: "CTA", ctr: "CTR", oth: "FIS/ATZ"
 const PICK_OF = Object.fromEntries(AIR.flatMap((a) => a.kinds.map((k) => [k, a.id])));
 const OTH_HEAD = { fis: "FIS", atz: "ATZ / TRA", oth: "other" };
 // przestrzenie z kolejnością przejmowania z chains.js (APP/TWR z .ese, potem ACC): z niej obsługujący (ownerOf);
-// samej kolejności nie pokazujemy (0.12.6, Marek: bez hierarchii w opisie przestrzeni)
+// samej kolejności nie pokazujemy (0.12.6, właściciel projektu: bez hierarchii w opisie przestrzeni)
 const CHAIN_KINDS = ["tma", "cta", "ctr"];
 const LEVELS = [15, 50, 100, 200, 300, 370];
 // Przełączniki widoczności spoza warstw przestrzeni (0.13.1, issue #25: wszystkie ustawienia wyświetlania w sekcji
@@ -257,7 +257,7 @@ function mainMap(ctx) {
   });
   paintLegend();
 
-  // Sekcje panelu zwijane kliknięciem w nagłówek. 0.13.1 (issue #25, Marek): wszystkie domyślnie zwinięte; zapisane są
+  // Sekcje panelu zwijane kliknięciem w nagłówek. 0.13.1 (issue #25, właściciel projektu): wszystkie domyślnie zwinięte; zapisane są
   // tylko rozwinięte (map.open). Dawny map.sections (Ruch, Przestrzeń, Trasa… rozwinięte domyślnie) pomijamy, żeby
   // po aktualizacji panel u każdego startował zwinięty
   const open = new Set(store.get("map.open", []).filter((k) => typeof k === "string"));
@@ -309,7 +309,7 @@ function mainMap(ctx) {
   $(".ms-hide").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.add("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
   $(".ms-show").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.remove("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
 
-  // Punkt jako symbol EuroScope z nazwą obok. Symbole mniejsze niż do 0.12.4 (Marek, 0.12.5: nie zasłaniają mapy):
+  // Punkt jako symbol EuroScope z nazwą obok. Symbole mniejsze niż do 0.12.4 (właściciel projektu, 0.12.5: nie zasłaniają mapy):
   // skala 1 = jednostki SYMBOLS w pikselach; nazwa tuż za prawym brzegiem symbolu
   const pointMarker = (p, { color, label = true, scale = 1, weight = 1.3, permanent = true, cls = "lbl", popup = true, tooltip = true } = {}) => {
     const sym = symbolFor(p.kind);
@@ -705,7 +705,7 @@ function mainMap(ctx) {
     });
   }
 
-  // Obsada wg kontrolerów online (runda 12, Marek): widoczne wycinki tego samego obsługującego (APP / TWR w TMA, CTA i CTR,
+  // Obsada wg kontrolerów online (runda 12, właściciel projektu): widoczne wycinki tego samego obsługującego (APP / TWR w TMA, CTA i CTR,
   // ACC także top-down, sąsiad, FIS) jako jeden obszar w kolorze stanowiska z jedną etykietą: granica tylko tam, gdzie
   // zmienia się obsługujący. Wycinków bez nikogo nie rysujemy. Grupa = kontroler (znak z sieci; ten sam kontroler pod
   // znakiem sąsiada z alias_of też), kolor wg stanowiska z kolejności przejmowania (stałe kolory ACC EPWW).
@@ -770,7 +770,7 @@ function mainMap(ctx) {
     }
     tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   };
-  // 0.14.0 (issue #28, Marek: "bardzo długie, niepotrzebne objaśnienia; wystarczy prosta podziałka wysokości z id
+  // 0.14.0 (issue #28, właściciel projektu: "bardzo długie, niepotrzebne objaśnienia; wystarczy prosta podziałka wysokości z id
   // kontrolera, imieniem i nazwiskiem oraz wysokościami granicznymi"): dymek przestrzeni to podziałka wysokości
   // w punkcie kursora (altScale, altScaleHtml z mapatc.js) zamiast wierszy z rodzajem, nazwą, ID, zakresem,
   // częstotliwością i "since": granice pionowe od góry, między nimi stanowisko (nazwa jak w etykietach na mapie)
@@ -960,7 +960,7 @@ function mainMap(ctx) {
     return `${tags} ${where}: choose ${at.length ? (at.length > 1 ? `${at[0]}–${at[at.length - 1]}` : at[0]) + " or " : ""}“all levels”`;
   };
   // opis pod przełącznikami: liczba wycinków, kto jest online (bez opisu kolejności przejmowania i skąd ona jest:
-  // Marek, 0.12.5 i 0.12.6)
+  // Właściciel projektu, 0.12.5 i 0.12.6)
   function renderInfo(lv) {
     const el = $(".sector-info");
     if (sliceErr) { el.innerHTML = `<span class="error">Sectors unavailable: ${esc(sliceErr)}</span>`; return; }
@@ -1022,7 +1022,7 @@ function mainMap(ctx) {
     if (feats.length) drawFirs(layers.firCtr, { features: feats }, on, { panes });
   };
 
-  // --- Pozycje (runda 12, Marek): drzewo FIR → ACC / FIS / lotniska → stanowiska z polem wyboru. Zaznaczone = zestaw
+  // --- Pozycje (runda 12, właściciel projektu): drzewo FIR → ACC / FIS / lotniska → stanowiska z polem wyboru. Zaznaczone = zestaw
   // aktywny: domyślnie zalogowani (zielona nazwa), kliknięcie symuluje logowanie stanowiska offline (SYM, kontur
   // przerywany) albo ukrywa zalogowanego. Z zestawu aktywnego korzystają sektoryzacja (obsada wg kontrolerów online),
   // plakietki lotnisk i plakietka CTR FIR-u. Wybór, rozwinięte gałęzie i wyszukiwanie do końca sesji przeglądarki (sessionStorage).
@@ -1515,7 +1515,7 @@ function mainMap(ctx) {
     $(".traffic-info").textContent = `${plural(ep.length, "aircraft", "aircraft")} in EP traffic (departures ${n.dep}, arrivals ${n.arr}, `
       + `transits through EPWW ${n.trn}) · ${trafficAt}. Hover an aircraft: label; click: flight details and route.`;
   };
-  // Etykieta samolotu (0.12.6, Marek): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
+  // Etykieta samolotu (0.12.6, właściciel projektu): bez stałych etykiet i bez białego dymka. Trzy linijki P21 (p21Html z airspace.js)
   // w nieprzezroczystym okienku po najechaniu na samolot, u wybranego lotu cały czas. Własna warstwa nad plakietkami
   // lotnisk i etykietami stanowisk (pod kartami lotnisk, atcTip = 700); okienko w granicach mapy i obok nakładek
   // Leafleta (panel lotu, wykres TV, przyciski; acLabelSpot), przy otwarciu, po każdym przerysowaniu ruchu (moveend)

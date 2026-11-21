@@ -88,7 +88,7 @@ def test_docs_moved_to_other():
     radio = (FRONTEND / "js" / "tabs" / "radio.js").read_text("utf-8")
     # 0.12.3: LOA z panelu RADIO otwiera się w COORDINATION › DOKUMENTY (OTHER › DOCS pokazuje pozostałe dokumenty)
     assert 'navigate("coordination", "docs/" + doc.dataset.coord)' in radio and 'navigate("docs"' not in radio
-    # 0.14.0 (Marek): jedyne przejście z RADIO do OTHER to przycisk FMP (OTHER › FMP), nie dokumenty
+    # 0.14.0 (właściciel projektu): jedyne przejście z RADIO do OTHER to przycisk FMP (OTHER › FMP), nie dokumenty
     assert radio.count('navigate("other"') == 1 and 'navigate("other", fmpTarget(' in radio
 
 

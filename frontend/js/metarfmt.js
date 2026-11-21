@@ -1,4 +1,4 @@
-// METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): grupy w kolorach, zjawiska z opisem
+// METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie właściciela projektu): grupy w kolorach, zjawiska z opisem
 // [EN / PL] tuż za grupą, przełącznik COLOURED / MONO. Czyste funkcje (bez DOM), testy w Node: test_metar_fmt_js.py.
 // Kod tylko w ASCII: polskie litery opisów jako \u escape (zasada projektu; polskie litery tylko w komentarzach).
 // Klasy części grupy: mt-key (zielony: dzień, kierunek wiatru, zjawisko, RMK, pas RVR, CB/TCU), mt-val (jasnozielony:

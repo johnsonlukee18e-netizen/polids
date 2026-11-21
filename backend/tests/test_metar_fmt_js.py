@@ -1,4 +1,4 @@
-"""METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie Marka): kolory grup, opis zjawisk [EN / PL],
+"""METEO › METAR i TAF jak strona METAR w PANDORZE (0.13.1, zdjęcie właściciela projektu): kolory grup, opis zjawisk [EN / PL],
 COLOURED / MONO; 0.14.0 (issue #28): DECODED / RAW (opis zjawisk można wyłączyć). Czyste funkcje
 z frontend/js/metarfmt.js uruchamiane w Node, pasek i arkusz sprawdzane w tekście."""
 import json

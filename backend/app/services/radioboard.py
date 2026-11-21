@@ -3,7 +3,7 @@
 Trzy podglądy FIR EPWW: sektory ACC w warstwach LOW, MID i HIGH (data/seed/ownership.json), a do tego warstwy
 APP (TMA), TWR (CTR lotnisk), FIS i pasek ATIS. Każda etykieta ma kolejność przejmowania (chain); właściciel to
 pierwsze stanowisko z tej kolejności, które jest teraz online (dopasowanie z /api/radio/online, z aliasami sąsiadów).
-Sąsiedzi: okienka FIR-ów sąsiednich w siatce całej strony wg szkicu Marka (0.13.2, issue #27: miejsca kafelków jak na
+Sąsiedzi: okienka FIR-ów sąsiednich w siatce całej strony wg szkicu właściciela projektu (0.13.2, issue #27: miejsca kafelków jak na
 szkicu, wygląd jak w 0.13.1; data/seed/radio_layout.json); kolejność przejmowania okienka z kafelków sektorów
 graniczących z FIR EPWW jak w VACS (profil ACC_EPWW z data/seed/vacs_epww.json, bez FMP), uzupełniona listami OWNER
 z plików .ese sąsiadów; okienko obsługuje pierwsze stanowisko online z tej kolejności (controlled_by), okienka jednego
@@ -472,7 +472,7 @@ def stack_tiles(items: list[dict], ese: dict[str, list[str]] | None = None, know
 # APP GD, APP WA, APP KK, APP PO), BERLIN, przyciski warstw, podglądy, stan danych i legenda, czerwone tło przy
 # ograniczeniach przepływu i plakietki APP/TWR tylko dla zalogowanych. Komórki, id, granice i reguły:
 # data/seed/radio_layout.json (col/row: kolumna A..M = 1..13 i wiersz szkicu).
-MERGE_FIRS = frozenset({"EDUU", "EDMM", "ESAA", "EYVL", "LZBB", "LKAA"})  # EDWW nigdy (Marek)
+MERGE_FIRS = frozenset({"EDUU", "EDMM", "ESAA", "EYVL", "LZBB", "LKAA"})  # EDWW nigdy (właściciel projektu)
 FREQ = re.compile(r"^1[1-3]\d\.\d{2,3}$")
 OBS_FREQ = "199.998"
 
@@ -632,7 +632,7 @@ def merged_label(members: list[dict], owner: str, fir: str) -> str:
 
 
 def _merged(members: list[dict], fir: str) -> dict:
-    """Połączone okienko (0.13.5, Marek: "napraw te ogromne kwadraty"): zwykły kafelek jednej komórki, jak na zdjęciu
+    """Połączone okienko (0.13.5, właściciel projektu: "napraw te ogromne kwadraty"): zwykły kafelek jednej komórki, jak na zdjęciu
     PANDORY (EYVL 660 / 133.305 / 95), w komórce najwyższego członka (przy kilku w tym wierszu – lewego), z granicami
     od najwyższej górnej do najniższej dolnej; komórki pozostałych członków zostają puste. members: okienka w środku
     z ich komórkami (dymek; strona liczy z nich wysokości rzędów liczb jak bez łączenia)."""
@@ -752,14 +752,14 @@ def frequencies_on(callsigns: list[str], online: dict) -> int:
 
 
 def wa_config(radar: int, director: bool) -> str:
-    """Konfiguracja APP WA (Marek): jedno stanowisko APP (zwykle EPWA_APP) = HL, dwa (z EPWA_N_APP) = H+L, trzy
+    """Konfiguracja APP WA (właściciel projektu): jedno stanowisko APP (zwykle EPWA_APP) = HL, dwa (z EPWA_N_APP) = H+L, trzy
     (jeszcze EPWA_S_APP) = 2H+L; dyrektor (EPWA_F_APP) dopisuje +D; nikt = 0."""
     head = "" if not radar else "HL" if radar == 1 else "H+L" if radar == 2 else f"{radar - 1}H+L"
     return "+".join(x for x in (head, "D" if director else "") if x) or "0"
 
 
 def indicator_value(rule: dict, online: dict, sectors: list[dict], acc_short: dict[str, str]) -> tuple[str, list[str]]:
-    """Wartość wskaźnika u góry strony (konfiguracja, Marek 28.10.2026) i liczone stanowiska; nikt → "0".
+    """Wartość wskaźnika u góry strony (konfiguracja, właściciel projektu 28.10.2026) i liczone stanowiska; nikt → "0".
     acc: litery sektorów zalogowanych ACC EPWW (skrót stanowiska: S, DBF; ALL i ALH w całości), od tego, który ma
     najwięcej sektorów (ALL+S); wa: konfiguracja APP WA (wa_config: HL, H+L, 2H+L, +D) z aktywnych częstotliwości
     stanowisk h i dyrektora d; count: liczba aktywnych częstotliwości APP (APP GD, KK, PO)."""
@@ -784,7 +784,7 @@ def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str
     return out
 
 
-# BERLIN (Marek): konfiguracja pasów EDDB z ATIS (24/25 = WEST, 06/07 = EAST; numery sprzed 2024 też), bez ATIS
+# BERLIN (właściciel projektu): konfiguracja pasów EDDB z ATIS (24/25 = WEST, 06/07 = EAST; numery sprzed 2024 też), bez ATIS
 # preferowana wg wiatru z METAR: WEST, chyba że wiatr w plecy na 24 przekracza 5 kt; bez METAR – WEST (domyślna)
 EDDB_RWYS = ("06L", "06R", "24L", "24R", "07L", "07R", "25L", "25R")
 EDDB_WEST_HDG = 246
@@ -862,7 +862,7 @@ def berlin_config(stations: list[dict], metar_raw: str | None = None, net_ok: bo
             "tip": f"{head}: preferred by wind {w[1]}"}
 
 
-# Czerwone tło (Marek): ograniczenie przepływu teraz albo ruch ponad 80 % dopuszczalnej zajętości. Traffic volumes:
+# Czerwone tło (właściciel projektu): ograniczenie przepływu teraz albo ruch ponad 80 % dopuszczalnej zajętości. Traffic volumes:
 # EP-BH = sektor B górny (HB), EP-WATMA(D) = TMA EPWA, złożone przez swoje wolumeny EPWW-BH,EPWW-CH (gdy każdy
 # jednoznaczny), całe FIR-y (EP-ALLFIR, EP-NFIR, EP-SFIR) pomijamy
 OCC_ALERT = 0.8
@@ -968,7 +968,7 @@ def tma_plate_static(slices: list[dict], own: dict) -> dict:
 
 
 def app_plates(static: dict, online: dict, positions: dict | None = None) -> list[dict]:
-    """Plakietki APP tylko dla zalogowanych (Marek): jedna na stanowisko APP (bez dyrektora i informacji), w środku
+    """Plakietki APP tylko dla zalogowanych (właściciel projektu): jedna na stanowisko APP (bez dyrektora i informacji), w środku
     części TMA, które teraz obsługuje w swojej TMA (sam EPWA_APP: cała TMA Warszawa, jedna plakietka; WA APP, WA N
     i WA S: trzy). covers: wszystkie części i TMA, które obsługuje (np. TMA Radom), do dymku. Wieża TMA proceduralnej
     (EPSC_TWR) ma plakietkę TWR, nie APP."""
@@ -1057,7 +1057,7 @@ def build_static(*, own: dict, epww_slices: list[dict], vacs_tiles: list[dict], 
     nb_chains: listy OWNER (znaki) wycinków sąsiadów z plików .ese (i Białorusi z pliku EPWW) – do kolejności kafelków
     (tile_chain; 0.13.2: geometrii sąsiadów na podglądach już nie ma); layout: data/seed/radio_layout.json (siatka
     strony, okienka FIR-ów sąsiednich i wskaźniki – layout_static).
-    Obrysy stanowisk na podglądzie LOW (0.13.2, Marek: granice tylko zalogowanych, tylko zewnętrzne, bez sektorów MVA
+    Obrysy stanowisk na podglądzie LOW (0.13.2, właściciel projektu: granice tylko zalogowanych, tylko zewnętrzne, bez sektorów MVA
     TMA): kształty TMA i CTA (areas.tma: kolejność bez ACC, dyrektorów i informacji – kto jest pierwszy online, ten
     obsługuje kształt), CTR (grupa CTR jak twr[].id) i FIS (kolejność bez ACC) – area_shapes; strona sumuje kształty
     jednego stanowiska (dissolve.js)."""
@@ -1161,7 +1161,7 @@ def board(static: dict, online: dict, positions: dict, feed_atis: list[dict] = (
     twr = [local(g) for g in static["twr"]]
     fis = [local(g) for g in static["fis"]]
     # ATIS: polskie stanowiska ATIS z pliku .ese oraz zalogowane EP**_ATIS spoza niego (np. EPWA_D_ATIS). 0.13.6
-    # (Marek: "nie po nazwach"): feed_atis to już tylko ATIS-y na poprawnej częstotliwości (on_frequency, z drugim
+    # (właściciel projektu: "nie po nazwach"): feed_atis to już tylko ATIS-y na poprawnej częstotliwości (on_frequency, z drugim
     # ATIS-em z AIP: EPWA ATIS DEP 123.430) – na 199.998 albo na częstotliwości spoza danych ich tu nie ma
     # Znak stanowiska z pliku na drugiej częstotliwości z AIP (EPWA_ATIS na 123.430), gdy stanowisko jest wolne:
     # w jego wierszu, z częstotliwością z sieci (rozstrzyga częstotliwość, nie to, że znak jest na liście)

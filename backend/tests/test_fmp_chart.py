@@ -609,7 +609,7 @@ def test_fmp_page_behaviour(tmp_path):
     assert o["destroyed"] == [[1], 0, True]
 
 
-# 0.14.0 (Marek: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane konfiguracje"): pasek CONFIGURATION na atrapie DOM
+# 0.14.0 (właściciel projektu: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane konfiguracje"): pasek CONFIGURATION na atrapie DOM
 CFG_SCRIPT = r"""
 globalThis.__pending = [];
 globalThis.__scrolled = [];

@@ -1,7 +1,7 @@
-"""OTHER › FMP: konfiguracje sektorów ACC EPWW (0.14.0, Marek: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane
+"""OTHER › FMP: konfiguracje sektorów ACC EPWW (0.14.0, właściciel projektu: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane
 konfiguracje"; GET /api/radio/configs).
 
-Tabela konfiguracji jest w data/seed/fmp_configs.json: kod (1X … 5X), napis jak w tabeli Marka ("ALL+NFIR") i otwarte
+Tabela konfiguracji jest w data/seed/fmp_configs.json: kod (1X … 5X), napis jak w tabeli właściciela projektu ("ALL+NFIR") i otwarte
 stanowiska pod nazwami z tabeli (ALL, SFIR, NFIR, EFIR, DTC, DBFG, JR, ALH, FG, DBT, TCJ, NE → stanowiska ACC
 z ownership.json). Warstwa sektora (LOW, MID, HIGH) należy w konfiguracji do pierwszego stanowiska swojej kolejności
 przejmowania (ownership.json sectors), które jest w tej konfiguracji otwarte – ta sama zasada, którą RADIO stosuje do

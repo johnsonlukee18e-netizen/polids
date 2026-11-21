@@ -1,6 +1,6 @@
 """AERODROME (runda 10): listy lotnisk FIR-ów (podzakładki EPWW … UKLV) i karta lotniska zagranicznego.
 
-Marek, 12.10.2026: "pozostałe zakładki to lista lotnisk w danym FIR (dla Niemiec ED oddzielnie i wojskowe ET
+Właściciel projektu, 12.10.2026: "pozostałe zakładki to lista lotnisk w danym FIR (dla Niemiec ED oddzielnie i wojskowe ET
 oddzielnie) - w tym VFR i MIL"; "dla każdego lotniska podany METAR, TAF, pozycje dla danego lotniska jak TWR, GND,
 DEL, ATIS, APP". Źródła zewnętrzne (METAR, TAF, VATSIM) są podstawione."""
 
@@ -178,7 +178,7 @@ def test_airport_positions_order_and_online():
 
 
 def test_airport_positions_only_on_frequency():
-    """0.13.6 (Marek: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
+    """0.13.6 (właściciel projektu: "jeśli kontroler ma częstotliwość 199.998, to jakby go nie było; wyświetlaj tylko kontrolerów po
     częstotliwościach aktywnych poprawnych dla sektorów, nie po nazwach"): na karcie lotniska tylko zalogowani na
     częstotliwości stanowiska tego lotniska."""
     known = [{"callsign": "EPWA_APP", "frequency": "128.805"}, {"callsign": "EPWA_F_APP", "frequency": "129.380"},
@@ -317,7 +317,7 @@ ED_FIR_CODES = {"EDGG", "EDWW", "EDMM", "EDUU", "EDYY", "EDXX", "ETXX"}
 
 
 def test_ed_et_lists_cover_german_ese_airports(client, fakes):
-    """Marek: "dodać EDGG ese żeby na pewno były wszystkie lotniska w ED/ET". Każde lotnisko ED*/ET* z plików .ese
+    """Właściciel projektu: "dodać EDGG ese żeby na pewno były wszystkie lotniska w ED/ET". Każde lotnisko ED*/ET* z plików .ese
     EDGG, EDWW i EDMM (prefiksy [POSITIONS], warunki ACTIVE sektorów, lotniska SID/STAR) jest na liście ED albo ET,
     poza kodami FIR/UIR; lądowiska bez współrzędnych w navdata (EDBW, EDHP) z nazwą ze stanowiska (ED_EXTRA)."""
     import re

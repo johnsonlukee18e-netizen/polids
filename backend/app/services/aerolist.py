@@ -8,7 +8,7 @@ szpitalach i platformy morskie są pomijane.
 Każde lotnisko ma rank (0 główne lotnisko miasta, 1 ze stanowiskami ATC, 2 pozostałe): przy kilku trafieniach
 wyszukiwarki Enter otwiera to ważniejsze ("warszawa" → EPWA, nie EPBC), oraz alias (inne nazwy do wyszukiwania).
 
-Przypisanie do FIR-u (Marek, 12.10.2026: "dla Niemiec ED oddzielnie i wojskowe ET oddzielnie"):
+Przypisanie do FIR-u (właściciel projektu, 12.10.2026: "dla Niemiec ED oddzielnie i wojskowe ET oddzielnie"):
 EP* → EPWW, ES* → ESAA, ED* → ED (cywilne), ET* → ET (wojskowe), LK* → LKAA, LZ* → LZBB, UMK* → UMKK,
 pozostałe UM* → UMMV (Białoruś), EY* → EYVL, UK* leżące w granicy FIR UKLV z VATSpy → UKLV
 (gdy granicy brak albo jest nieużywalna: UKL*)."""
@@ -85,7 +85,7 @@ MIL = frozenset(("ESCF", "ESCM", "ESDF", "ESIB", "ESPE", "LKCV", "LKNA", "LKKB",
 _HELI = re.compile(r"SJUKHUS|LASARETT|HELIKOPTER|KLINIK|KRANKENHAUS|HOSPITAL|HELIPORT|KRIEGERS FLAK|MEERWIND")
 HELI = frozenset(("ESHG", "ESEG"))   # STOCKHOLM/GAMLA STAN, GALLIVARE/VASSARA
 
-# Lądowiska z listy PANDORY (zdjęcie od Marka, 12.10.2026), których nie ma w navdata ani w airports.csv
+# Lądowiska z listy PANDORY (zdjęcie od właściciela projektu, 12.10.2026), których nie ma w navdata ani w airports.csv
 EP_EXTRA = {"EPGB": "GOLUBIE", "EPGN": "GLINIANY LAS", "EPGO": "GORASZKA", "EPGW": "ULIM"}
 # Lądowiska ze stanowiskami w niemieckich plikach .ese, których nie ma w navdata (bez współrzędnych): nazwa ze
 # stanowiska (EDBW_I_TWR "Werneuchen Radio", EDHP_I_TWR "Pellworm Radio" w pakiecie EDWW), żeby lista ED miała wszystkie
@@ -287,7 +287,7 @@ def airport_positions(icao: str, known: list[dict], controllers: list[dict], alt
 
     known: stanowiska z danych (plik .ese EPWW, vacs-data, pliki .ese sąsiadów); controllers: data feed VATSIM
     (kontrolerzy i ATIS). Dopasowanie jak w EuroScope (match_positions, 0.13.5): prefiks, typ i aktywna częstotliwość.
-    0.13.6 (Marek: "nie po nazwach"): na karcie tylko zalogowani na częstotliwości stanowiska tego lotniska; na
+    0.13.6 (właściciel projektu: "nie po nazwach"): na karcie tylko zalogowani na częstotliwości stanowiska tego lotniska; na
     199.998, na częstotliwości spoza danych albo drugi na zajętym stanowisku – jakby ich nie było. alt: te same znaki
     z częstotliwością z innego źródła (positions.alt_stations: ETNH_TWR 122.100 z pliku EDWW obok 125.600 z vacs-data) –
     zalogowany na którejkolwiek z nich jest w wierszu swojego znaku."""

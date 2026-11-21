@@ -1,4 +1,4 @@
-"""RADIO 0.13.0 (issue #23, szkic Marka): okienka FIR-ów sąsiednich w siatce (data/seed/radio_layout.json), łączenie
+"""RADIO 0.13.0 (issue #23, szkic właściciela projektu): okienka FIR-ów sąsiednich w siatce (data/seed/radio_layout.json), łączenie
 okienek jednego stanowiska, wskaźniki u góry, BERLIN WEST/EAST, czerwone tło przy ograniczeniach przepływu i plakietki
 APP/TWR tylko dla zalogowanych (GET /api/radio/board i czyste funkcje radioboard.py). 0.13.2 (issue #27): znów jedna
 siatka całej strony wg szkicu (grid, name, room), SAS i L z powrotem w stosach EDMM i ESAA."""
@@ -91,7 +91,7 @@ def short(b):
 
 # --- seed układu
 def test_layout_seed_matches_sketch():
-    """Okienka, nazwy i granice jak na szkicu Marka (ESSA = ESAA), w kolumnach A..M (1..13); 0.13.2 (issue #27): znów
+    """Okienka, nazwy i granice jak na szkicu właściciela projektu (ESSA = ESAA), w kolumnach A..M (1..13); 0.13.2 (issue #27): znów
     SAS (EDDC_SAS_APP, EDMM) i L (ESMS_APP, ESAA) jak w 0.13.0 i siatka całej strony w seedzie (rząd u góry, BERLIN,
     przyciski warstw, podglądy, stan danych, legenda, komórki kodów FIR-ów)."""
     lay = json.loads(SEED.read_text("utf-8"))
@@ -105,7 +105,7 @@ def test_layout_seed_matches_sketch():
         "LKAA": [("NU", 660, 305, 5, 19), ("SU", 660, 305, 6, 19), ("NL", 305, 125, 5, 20), ("SL", 305, 125, 6, 20),
                  ("MT", 125, 0, 6, 21)],
         "UMKK": [("ACC", 999, 0, 10, 5)], "LZBB": [("U", 660, 305, 10, 19), ("BB", 305, 80, 10, 20)],
-        # EYVL L/E: FL255 jak w pliku sektorów, nie 225 ze szkicu (Marek 28.10.2026)
+        # EYVL L/E: FL255 jak w pliku sektorów, nie 225 ze szkicu (właściciel projektu 28.10.2026)
         "EYVL": [("U", 660, 365, 12, 3), ("M", 365, 335, 12, 4), ("L", 335, 255, 12, 5), ("E", 255, 95, 12, 6)],
         "UMMV": [("ACC", 660, 75, 12, 9)], "UKLV": [("RLV", 660, 55, 12, 15)]}
     # łączenie tylko EDUU, EDMM, ESAA, EYVL, LZBB, LKAA; nigdy EDWW
@@ -115,7 +115,7 @@ def test_layout_seed_matches_sketch():
     assert not any(k in i for i in lay["indicators"] for k in ("col", "row"))
     # 0.13.2: siatka strony wg szkicu – przyciski w kolumnie H (ATIS r5, LOW/MID/HIGH r6, APP r8, TWR r10, TWR/A r12,
     # FIS r14), podglądy LOW D–G 8–17, HIGH I–K 6–17, MID H 16–21, stan danych H15, legenda A–C 18–21
-    # 0.14.0 (Marek): przycisk FMP w wolnej komórce kolumny przycisków nad ATIS (H3)
+    # 0.14.0 (właściciel projektu): przycisk FMP w wolnej komórce kolumny przycisków nad ATIS (H3)
     assert set(lay) == {"note", "grid", "indicators", "berlin", "buttons", "maps", "status", "legend", "fmp", "firs"}
     assert lay["fmp"] == {"col": 8, "row": 3}
     assert lay["grid"] == {"cols": 13, "rows": 21, "top": 2}
@@ -218,7 +218,7 @@ def test_nobody_online_no_merge_advisory(client):
 def test_merge_eyvl_alone(client):
     d = get(client, [ctl("EYVL_CTR", "133.305", "Vilnius")])
     (b,) = boxes(d, "EYVL")
-    # 0.13.5 (Marek: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (U), jak EYVL
+    # 0.13.5 (właściciel projektu: "napraw te ogromne kwadraty"): połączone okienko to zwykły kafelek jednej komórki (U), jak EYVL
     # na zdjęciu PANDORY: 660 nad nim, 95 pod nim
     assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR") and b["merged"] and b["frequency"] == "133.305"
     assert [m["id"] for m in b["members"]] == ["U", "M", "L", "E"]
@@ -342,7 +342,7 @@ def test_merge_same_frequency(client):
     # 133.305 to stanowisko EYVL_CTR (częstotliwość, nie znak), a EYVL_CTR na niej siedzi pod swoim znakiem
     (b,) = boxes(get(client, [ctl("EYVL_U_CTR", "133.305"), ctl("EYVL_CTR", "133.305")]), "EYVL")
     assert short(b) == ("L", 660, 95, 12, 3, 1, 1, "EYVL_CTR")
-    # 0.13.6 (Marek): częstotliwość spoza pliku (118.000) albo 199.998 to jakby nikogo nie było, choć znaki pasują
+    # 0.13.6 (właściciel projektu): częstotliwość spoza pliku (118.000) albo 199.998 to jakby nikogo nie było, choć znaki pasują
     for fq in ("118.000", "199.998", ""):
         ey = boxes(get(client, [ctl("EYVL_U_CTR", fq), ctl("EYVL_CTR", fq)]), "EYVL")
         assert all(b["owner"] is None and not b["merged"] for b in ey), fq
@@ -440,7 +440,7 @@ def test_indicators_cover_app_parts(client):
 
 
 def test_indicator_rules_pure():
-    """Wskaźniki to konfiguracje (Marek 28.10.2026): APP WA HL / H+L / 2H+L, dyrektor +D; pozostałe APP = liczba
+    """Wskaźniki to konfiguracje (właściciel projektu 28.10.2026): APP WA HL / H+L / 2H+L, dyrektor +D; pozostałe APP = liczba
     aktywnych częstotliwości APP; ACC GAT = litery sektorów online (ALL i ALH w całości)."""
     def on(*cs, fq=None):
         return {c: {"callsign": c, "frequency": fq or f"12{i}.000", "name": None} for i, c in enumerate(cs)}

@@ -1,7 +1,7 @@
 {
  "source": "om",
  "source_label": "om.plvacc.pl › Sector ownerships and top-down rules (AIRAC 2610)",
- "note": "Tabele pierwszeństwa z om.plvacc.pl/docs/2610/ownerships (wklejone przez Marka 06.10.2026). Poprawione literówki: ACC G LOW nr 3: EPWW_N_cTR -> EPWW_N_CTR; ACC J MID nr 4: EPWW_E_FIR -> EPWW_E_CTR. B, C, D HIGH i T MID od 0.13.5 (Marek 14.11.2026) też wprost z tabeli om, jak w ACC Ownership Manager (plvacc.pl/acc-sectors: D HIGH obsługuje DB+T przed DBF+G); kolejność z pliku .ese w ese_differences.",
+ "note": "Tabele pierwszeństwa z om.plvacc.pl/docs/2610/ownerships (wklejone przez właściciela projektu 06.10.2026). Poprawione literówki: ACC G LOW nr 3: EPWW_N_cTR -> EPWW_N_CTR; ACC J MID nr 4: EPWW_E_FIR -> EPWW_E_CTR. B, C, D HIGH i T MID od 0.13.5 (właściciel projektu 14.11.2026) też wprost z tabeli om, jak w ACC Ownership Manager (plvacc.pl/acc-sectors: D HIGH obsługuje DB+T przed DBF+G); kolejność z pliku .ese w ese_differences.",
  "url": "https://om.plvacc.pl/docs/2610/ownerships",
  "layers": {
   "LOW": {

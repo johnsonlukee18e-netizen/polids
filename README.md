@@ -159,7 +159,7 @@ podstawa chmur; lotniska wojskowe: widzialność z odpowiednikiem RVR, tylko odl
 warunków odwołania (histereza w pamięci procesu, po restarcie albo przerwie w METAR-ach ponad 90 min od zera; starszy
 METAR z innego zapytania dostaje stan z nowszego), potem przez 30 min od godziny odwołania „LVP CANCELLED”. Lotniska, dla
 których AIP nie przewiduje LVP (VFR, część wojskowych, EPRA, EPZG), mają „LVP not applicable”. EPWA i EPPO: z tekstu AD 2.22
-wklejonego przez Marka (strony eAIP urywały się przy pobieraniu). W 0.13.2 progi sprawdzone z eAIP AIRAC AMDT 11-26 (AD 2.22
+wklejonego przez właściciela projektu (strony eAIP urywały się przy pobieraniu). W 0.13.2 progi sprawdzone z eAIP AIRAC AMDT 11-26 (AD 2.22
 i MIL AD 4.20; źródło każdego wpisu to paragraf AIP), poza EPWA (strona urywa się przed AD 2.22): EPSY i EPMO wprowadzają
 LVP przy podstawie ≤ 200 ft, lotniska wojskowe odwołują przy widzialności ≥ 800 m (przy dokładnie 800 m LVP trwa, bo to
 także próg wprowadzenia). Nieznana podstawa chmur (VV///, BKN///) i warstwa nieznanej ilości poniżej progu (//////,

@@ -156,7 +156,7 @@ export const TL_FT = 8000;
 // strzałkę wznoszenia albo zniżania; mniejsza to wahania wysokości w locie poziomym
 export const VS_ARROW_FT = 100;
 
-// Etykieta samolotu jak w PEGASUS_21 (PAŻP; Marek, 0.12.5; od 0.12.6 trzy linijki, bez "h  s  r" i RFL): czcionka
+// Etykieta samolotu jak w PEGASUS_21 (PAŻP; właściciel projektu, 0.12.5; od 0.12.6 trzy linijki, bez "h  s  r" i RFL): czcionka
 // o stałej szerokości. 1: znak wywoławczy i prędkość względem ziemi w węzłach (3 cyfry); 2: poziom z Mode C, poniżej
 // poziomu przejściowego "A" i wysokość w setkach stóp ("A 53" = 5300 ft), wyżej FL ("270"), ze strzałką ↑ / ↓, gdy
 // wysokość zmieniła się od poprzedniego odczytu (p.vs z climbRates); 3: typ z kategorią turbulencji ("DC10H")
@@ -185,7 +185,7 @@ export function p21Html(p, { exit = null } = {}) {
   }).join("");
 }
 
-// Samolot: sylwetka obrócona wg kursu (14 px). Od 0.12.6 bez stałej etykiety (Marek): etykieta P21 tylko w okienku po
+// Samolot: sylwetka obrócona wg kursu (14 px). Od 0.12.6 bez stałej etykiety (właściciel projektu): etykieta P21 tylko w okienku po
 // najechaniu, a u wybranego lotu cały czas (MAP, acLabelSpot). cls: dodatkowa klasa ikony (MAP: dep / arr / trn =
 // odlot, przylot, tranzyt przez FIR EPWW; out = wybrany lot spoza ruchu EP).
 export function aircraftMarker(p, { cls = "" } = {}) {
@@ -246,7 +246,7 @@ export function climbRates(pilots, hist, now, minAge = 25000) {
 // Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).
 // Linie: [[x, y], ...] rysowane jako łamana, a gdy ostatni punkt = pierwszy, jako zamknięty wielokąt (closePath, bez
 // rozłączenia w narożniku startowym); okrąg: {circle: promień}.
-// Lotnisko (Marek, 0.12.5): jeden zamknięty, symetryczny sześciokąt wokół punktu lotniska. Do 0.12.4 sześć osobnych
+// Lotnisko (właściciel projektu, 0.12.5): jeden zamknięty, symetryczny sześciokąt wokół punktu lotniska. Do 0.12.4 sześć osobnych
 // odcinków, z których ostatni zaczynał się w (-4, -2) zamiast (-6, -2): na lewym końcu wystawał "ogonek" i zostawała dziura.
 export const SYMBOLS = {
   aerodrome: [[[-3, -3], [3, -3], [6, 0], [3, 3], [-3, 3], [-6, 0], [-3, -3]]],

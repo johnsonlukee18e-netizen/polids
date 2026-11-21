@@ -63,7 +63,7 @@ export default {
         render: (pane) => mountFlightPlan(pane, { start: fpCs, onLookup: (cs) => { fpCs = cleanCallsign(cs); remember("other", argOf()); } }) },
       // 0.13.1: kliknięty sektor (wykresy ENTRY i OCC po prawej) w adresie; każdy klik to krok do cofnięcia (onPick),
       // drugi klik w ten sam wiersz albo ✕ zamyka wykresy ("#other/fmp"); przycisk menu: dane starsze niż 60 s od nowa.
-      // 0.14.0 (Marek): przed sektorem konfiguracja sektorów ("2N/EP-BH"); adres mówi wszystko ("#other/fmp/EP-BH" =
+      // 0.14.0 (właściciel projektu): przed sektorem konfiguracja sektorów ("2N/EP-BH"); adres mówi wszystko ("#other/fmp/EP-BH" =
       // bez konfiguracji), zapamiętana konfiguracja tylko na początek; kod spoza tabeli strona poprawia bez kroku (fix)
       { id: "fmp", label: "FMP", arg: () => fmpArg(fmpCfg, fmpTv), set: (a) => { ({ cfg: fmpCfg, tv: fmpTv } = parseFmpArg(a)); },
         update: (fmp) => fmp.activate(fmpArg(fmpCfg, fmpTv)), resume: (fmp) => fmp.activate(),

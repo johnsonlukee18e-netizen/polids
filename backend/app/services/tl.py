@@ -1,6 +1,6 @@
 """Poziom przejściowy (TL) w FIR EPWW: jeden dla całego kraju.
 
-Zasada podana przez Marka 08.10.2026 (OM PL vACC › Transition level pisze „poniżej 995 hPa”, tu liczy się
+Zasada podana przez właściciela projektu 08.10.2026 (OM PL vACC › Transition level pisze „poniżej 995 hPa”, tu liczy się
 także 995):
 - normalnie TL = FL080,
 - gdy na którymkolwiek kontrolowanym lotnisku QNH wynosi 995 hPa lub mniej, w całym kraju TL = FL090.

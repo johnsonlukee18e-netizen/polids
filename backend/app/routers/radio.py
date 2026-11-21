@@ -336,7 +336,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     nie zmieni (np. po imporcie).
     Błąd VATSIM nie psuje tablicy: `net.ok=false` i komunikat, nikt online (okienka sąsiadów bez częstotliwości i bez
     ADVISORY, bo nie wiadomo, czy ktoś tam jest).
-    Siatka strony wg szkicu Marka (data/seed/radio_layout.json; 0.13.2, issue #27: miejsca jak na szkicu, kafelki jak
+    Siatka strony wg szkicu właściciela projektu (data/seed/radio_layout.json; 0.13.2, issue #27: miejsca jak na szkicu, kafelki jak
     w 0.13.1): `grid` (kolumny, rodzaje kolumn, BERLIN, przyciski warstw, podglądy, stan danych i legenda), `firs`
     (okienka FIR-ów sąsiednich w komórkach siatki po łączeniu okienek jednego stanowiska; `name`/`room` = kod FIR-u
     i miejsce na nazwę i ADVISORY), `indicators` (ACC GAT, APP GD, APP WA, APP KK, APP PO), `berlin` (WEST/EAST
@@ -379,7 +379,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
             log.warning("RADIO: ograniczenia przepływu (%s)", exc)
     out = radioboard.board(static, online, positions, feed_atis, net_ok=net["ok"], berlin=berlin, flow=flow)
     out["net"] = net
-    # 0.14.0 (Marek): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli
+    # 0.14.0 (właściciel projektu): przycisk FMP otwiera OTHER › FMP z konfiguracją zalogowanych, gdy jest w tabeli
     out["fmp"] = _fmp_now(online) if net["ok"] else {"code": None, "label": None}
     out["ver"] = static["ver"]
     # kodowanie w wątku (jsonable_encoder to czysty Python); geometria już zakodowana w części stałej – bez tego
@@ -390,7 +390,7 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     return Response(body.encode("utf-8"), media_type="application/json")
 
 
-# --- OTHER › FMP: konfiguracje sektorów ACC (0.14.0, Marek): GET /api/radio/configs
+# --- OTHER › FMP: konfiguracje sektorów ACC (0.14.0, właściciel projektu): GET /api/radio/configs
 def _fmp_tables() -> tuple[dict, dict]:
     """ownership.json i fmp_configs.json; brak pliku: FileNotFoundError, uszkodzony: OSError albo ValueError."""
     return seed_json(settings.seed_dir / "ownership.json"), seed_json(settings.seed_dir / "fmp_configs.json")
@@ -411,7 +411,7 @@ def _fmp_now(online: dict) -> dict:
 
 @router.get("/configs")
 async def fmp_configs(geo: bool = False, have: str = "", db: Session = Depends(get_db)):
-    """Konfiguracje sektorów ACC EPWW do OTHER › FMP (0.14.0, Marek; data/seed/fmp_configs.json): `configs` w kolejności
+    """Konfiguracje sektorów ACC EPWW do OTHER › FMP (0.14.0, właściciel projektu; data/seed/fmp_configs.json): `configs` w kolejności
     tabeli – kod, napis jak w tabeli ("ALL+NFIR"), liczba stanowisk (`size`), stanowiska (nazwa z tabeli, znak, skrót,
     częstotliwość z ownership.json i warstwy sektorów, które obsługuje: `sectors` {LOW, MID, HIGH: litery}) i warstwy
     bez nikogo (`free`); właściciel warstwy = pierwsze stanowisko jej kolejności przejmowania (ownership.json), które

@@ -94,7 +94,7 @@ def sim_twins(stations: list, prefer: Collection[str]) -> dict[str, str]:
     return out
 
 
-# --- drzewo "Pozycje" w MAP (runda 12, Marek): FIR → ACC / FIS / lotniska → stanowiska
+# --- drzewo "Pozycje" w MAP (runda 12, właściciel projektu): FIR → ACC / FIS / lotniska → stanowiska
 # kolejność FIR-ów: najpierw EPWW, potem sąsiedzi (zakładki RADIO; EDGG osobno, choć w vacs-data jest w katalogu EDMM)
 TREE_FIRS = ("EPWW", "EDWW", "EDMM", "EDUU", "EDGG", "EKDK", "ESAA", "EYVL", "LKAA", "LZBB", "UKLV", "UMKK", "UMMV", "OTHER")
 TREE_FIR_NAMES = {"EPWW": "FIR Warszawa", "EDWW": "FIR Bremen", "EDMM": "FIR München", "EDUU": "UIR Rhein, UAC Maastricht",

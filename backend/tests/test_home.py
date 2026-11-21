@@ -117,7 +117,7 @@ def test_vatsim_me_logged_in(client, monkeypatch):
 
 
 def test_vatsim_me_active_frequency(client, monkeypatch):
-    """0.13.6 (Marek: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): połączenie na 199.998 albo na
+    """0.13.6 (właściciel projektu: "jesli kontroler ma czestotliwosc 199.998 to jakby go nie bylo"): połączenie na 199.998 albo na
     częstotliwości, której nie ma stanowisko z danych, nie ma stanowiska i ma active: false (HOME pisze je osobno)."""
     _login(client, monkeypatch)
     me = int(CID)
@@ -369,7 +369,7 @@ def test_times_and_lines(js):
                             "ATIS EPWA_ATIS (120.455) since 10:12Z · information K",
                             "You are connected to VATSIM as an observer (EPKK_OBS) since 10:12Z",
                             "You are connected to VATSIM as EPWA_APP",
-                            # 0.13.6 (Marek: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
+                            # 0.13.6 (właściciel projektu: na 199.998 "jakby go nie bylo"): połączenie bez stanowiska, nie na zielono
                             "You are connected to VATSIM as EPWW_ALL_CTR (199.998) since 10:12Z, not on a position frequency",
                             "You are connected to VATSIM as EPWW_X_CTR (118.000) since 10:12Z, not on a position frequency",
                             # ATIS poza częstotliwością stanowiska: bez litery (nie nadaje jako ATIS lotniska)

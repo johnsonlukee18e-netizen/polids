@@ -159,7 +159,7 @@ def test_saved_brightness_before_first_paint(tmp_path):
     res = json.loads(r.stdout)
     for v, got, want in res["out"]:
         assert got == want, v
-    # zakres -2..+2 (Marek 28.10.2026): -3, +3, -4, +4 (zapisane przy dawnym zakresie -4..+4) = bez filtra
+    # zakres -2..+2 (właściciel projektu 28.10.2026): -3, +3, -4, +4 (zapisane przy dawnym zakresie -4..+4) = bez filtra
     assert [x[1] for x in res["out"]][:9] == ["brightness(0.76)", "brightness(0.88)", "", "brightness(1.12)",
                                              "brightness(1.24)", "", "", "", ""]
     assert res["blocked"] == ""
@@ -274,7 +274,7 @@ def js(tmp_path_factory):
 
 
 def test_brightness_values(js):
-    # zapisana wartość tylko jako liczba całkowita -2..2 (Marek 28.10.2026; inaczej 0 = bez filtra, także -4..+4
+    # zapisana wartość tylko jako liczba całkowita -2..2 (właściciel projektu 28.10.2026; inaczej 0 = bez filtra, także -4..+4
     # z dawnego zakresu); krok 12 %, 76-124 %
     assert js["of"] == [2, -2, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0]
     assert js["clamp"] == [-2, -2, -1, 0, 1, 2, 2, 0]

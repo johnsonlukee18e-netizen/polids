@@ -152,7 +152,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
     atc, atis, net_error = [], None, None
     try:
         feed = await get_feed()
-        # 0.13.6 (Marek): tylko na częstotliwości stanowiska z danych – ATC i ATIS na 199.998 jakby ich nie było
+        # 0.13.6 (właściciel projektu): tylko na częstotliwości stanowiska z danych – ATC i ATIS na 199.998 jakby ich nie było
         stations = feed.get("controllers", []) + feed.get("atis", [])
         mine = on_frequency([c for c in stations if isinstance(c, dict)
                              and str(c.get("callsign") or "").startswith(ad.icao + "_")], known_stations(db))

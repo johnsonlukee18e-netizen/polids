@@ -20,8 +20,8 @@ import { capOf, fmpRows, loadClass, tvLabel } from "./viffchart.js";
 // Wybrany sektor jest w adresie (#other/fmp/EP-BH, onPick); bez listy lotów (tylko wykresy).
 // Odświeżanie co 60 s, gdy podzakładka jest na ekranie (wykres tylko przy wybranym sektorze); po powrocie serwera
 // (ONLINE_EVENT) od razu.
-// 0.14.0 (Marek): nad tabelą pasek CONFIGURATION z konfiguracjami sektorów ACC EPWW (GET /api/radio/configs, tabela
-// Marka w data/seed/fmp_configs.json): mały przycisk na każdy kod, w grupach wg liczby stanowisk (1..5), w dymku
+// 0.14.0 (właściciel projektu): nad tabelą pasek CONFIGURATION z konfiguracjami sektorów ACC EPWW (GET /api/radio/configs, tabela
+// Właściciela projektu w data/seed/fmp_configs.json): mały przycisk na każdy kod, w grupach wg liczby stanowisk (1..5), w dymku
 // "2N: ALL + NFIR" ze znakami i częstotliwościami. Konfiguracja zalogowanych teraz ma znak NOW; gdy zestaw online nie
 // pasuje do żadnej, krótka linia mówi, co jest otwarte ("Now: ALL+SFIR, not in the table"). Klik wybiera konfigurację
 // (drugi klik = żadna); wybrana pokazuje panel ze stanowiskami (nazwa z tabeli, znak, częstotliwość, online albo nie)
@@ -38,7 +38,7 @@ const NUM_CLS = { near: " near", over: " over" };
 const DASH = "\u2013", DOT = " \u00b7 ";
 // id sektora z adresu albo z wiersza tabeli: wielkie litery ("ep-bh" → "EP-BH", też "ED-EDWW-ALR"); inne napisy = "" (nic)
 export const cleanTv = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z]{2}-[A-Z0-9-]{1,20}$/.test(t) ? t : ""; };
-// 0.14.0 (Marek): kod konfiguracji sektorów z adresu albo z pamięci: cyfra i litera ("2n" → "2N"); inne napisy = ""
+// 0.14.0 (właściciel projektu): kod konfiguracji sektorów z adresu albo z pamięci: cyfra i litera ("2n" → "2N"); inne napisy = ""
 export const cleanCfg = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
 // adres podzakładki → {cfg, tv}: "2N", "2N/EP-BH", stare "EP-BH" (sam sektor, bez konfiguracji); zły kod albo sektor = ""
 export const parseFmpArg = (s) => { const t = String(s ?? ""), [a = "", ...r] = t.split("/"), cfg = cleanCfg(a); return { cfg, tv: cleanTv(cfg ? r.join("/") : t) }; };
@@ -62,7 +62,7 @@ function rowHtml(r, sel) {
     <td class="fmp-num${NUM_CLS[r.occupancyCls] || ""}" title="${esc(r.occupancyTip)}">${pairHtml(r.occupancy, r.occupancyMax, r.occupancyReg)}</td></tr>`;
 }
 
-// --- 0.14.0 (Marek): konfiguracje sektorów ACC (odpowiedź /api/radio/configs: configs, current, layers, geo)
+// --- 0.14.0 (właściciel projektu): konfiguracje sektorów ACC (odpowiedź /api/radio/configs: configs, current, layers, geo)
 const LAYER_KEYS = ["LOW", "MID", "HIGH"];
 const BAND_LAYER = { L: "LOW", M: "MID", H: "HIGH" };
 // "ALL+NFIR" → "ALL + NFIR"
@@ -197,7 +197,7 @@ function groupHead(g) {
 }
 
 // tabela dla odpowiedzi /api/viff/sectors; sel = id wybranego sektora (wiersz z klasą sel); czysta funkcja (testy w Node)
-// 0.14.0 (Marek): cfg = wybrana konfiguracja z /api/radio/configs – wiersze w grupach stanowisk (cfgGroupRows); bez
+// 0.14.0 (właściciel projektu): cfg = wybrana konfiguracja z /api/radio/configs – wiersze w grupach stanowisk (cfgGroupRows); bez
 // niej tabela dokładnie jak dotąd
 export function fmpHtml(data, sel = "", cfg = null) {
   const rows = fmpRows(data);
@@ -385,7 +385,7 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   // (wybór z adresu, nie z kliknięcia)
   const first = parseFmpArg(start);
   let sel = first.tv, chart = null, chartAt = 0, cseq = 0, reveal = !!sel;
-  // 0.14.0 (Marek): cfgSel = wybrana konfiguracja ("" = żadna), cd = ostatnia odpowiedź /api/radio/configs (cdErr: błąd
+  // 0.14.0 (właściciel projektu): cfgSel = wybrana konfiguracja ("" = żadna), cd = ostatnia odpowiedź /api/radio/configs (cdErr: błąd
   // ostatniego odświeżenia), geo = geometria podglądów (geoVer: jej wersja), grouped = konfiguracja, wg której jest
   // pogrupowana tabela na ekranie
   let cfgSel = first.cfg, cd = null, cdErr = "", cdAt = 0, kseq = 0, geo = null, geoVer = "", grouped = "";

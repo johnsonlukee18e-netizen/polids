@@ -105,7 +105,7 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
   .fmc-charts { grid-template-columns: minmax(0, 520px); }
 }
 
-/* --- 0.14.0 (Marek): pasek CONFIGURATION nad tabelą (konfiguracje sektorów ACC EPWW w grupach wg liczby stanowisk),
+/* --- 0.14.0 (właściciel projektu): pasek CONFIGURATION nad tabelą (konfiguracje sektorów ACC EPWW w grupach wg liczby stanowisk),
    panel wybranej konfiguracji (stanowiska z warstwami sektorów i trzy małe podglądy LOW/MID/HIGH w kolorach stanowisk
    jak na MAP) i grupy stanowisk w tabeli. Czarne tło, białe napisy, wybór zielony jak wybrany wiersz tabeli; znak NOW
    (konfiguracja zalogowanych teraz) jasnozielony z czarnym napisem. Zwykła grubość pisma, ostre krawędzie, bez cieni

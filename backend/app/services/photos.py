@@ -4,7 +4,7 @@ Brakujące zdjęcie aplikacja pobiera raz z Wikipedii (miniatura głównej grafi
 i zapisuje lokalnie, więc kolejne wyświetlenia działają bez internetu. Własne zdjęcie wystarczy wrzucić
 do data/photos/ jako <ICAO>.jpg.
 
-0.13.3 (Marek: "czemu BCS3 ma zdjęcie A321neo?"): wyszukiwarka Wikipedii brała pierwszy wynik dla hasła z nazwy ICAO
+0.13.3 (właściciel projektu: "czemu BCS3 ma zdjęcie A321neo?"): wyszukiwarka Wikipedii brała pierwszy wynik dla hasła z nazwy ICAO
 ("AIRBUS A-220-300"), a przy zapisie "A-220" pierwszym wynikiem bywał artykuł o innym modelu. Teraz:
 - typy, których nazwa ICAO nie prowadzi do właściwego artykułu (A220, CRJ, MD-80), biorą artykuł z TITLES;
 - hasło ma nazwę Airbusa bez łącznika ("A220-300"); z pięciu wyników wyszukiwania (pick) w kolejności wyszukiwarki
@@ -19,7 +19,7 @@ do data/photos/ jako <ICAO>.jpg.
   zastąpiony plik trafia do data/photos/replaced/;
 - adres zdjęcia ma "?v=<czas pliku>", żeby przeglądarka i Cloudflare nie pokazywały starej wersji po podmianie.
 
-0.13.4 (Marek po wdrożeniu 0.13.3: BCS3 "dalej pokazuje Airbusa"): zdjęcie pobrane wcześniej rozpoznajemy po adresie
+0.13.4 (właściciel projektu po wdrożeniu 0.13.3: BCS3 "dalej pokazuje Airbusa"): zdjęcie pobrane wcześniej rozpoznajemy po adresie
 grafiki z dowolnego serwera Wikimedia (*.wikimedia.org, nie tylko upload.wikimedia.org – API Wikipedii podaje dziś
 miniatury z thumb.wikimedia.org z parametrami "?utm_…", tak był zapisany BCS3 na polids.pl, więc 0.13.3 brała go za
 własne zdjęcie) i rozszerzeniu z samej ścieżki adresu; zdjęcie z podpisem artykułu o innym modelu uznane mimo to za

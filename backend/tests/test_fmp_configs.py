@@ -1,7 +1,7 @@
-"""OTHER › FMP: konfiguracje sektorów ACC EPWW (0.14.0, Marek: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane
+"""OTHER › FMP: konfiguracje sektorów ACC EPWW (0.14.0, właściciel projektu: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane
 konfiguracje", tabela 1X … 5X) i przycisk FMP na RADIO ("Zrób mały przycisk na stronie radio z tytułem FMP który
 przenosi do zakładki OTHER/FMP").
-Backend: tabela w data/seed/fmp_configs.json dokładnie jak u Marka, warstwy sektorów stanowisk konfiguracji z kolejności
+Backend: tabela w data/seed/fmp_configs.json dokładnie jak u właściciela projektu, warstwy sektorów stanowisk konfiguracji z kolejności
 przejmowania (ta sama zasada co RADIO dla zalogowanych – porównanie z /api/radio/board), konfiguracja teraz po
 częstotliwości jak na RADIO (199.998 się nie liczy, EPWW_DBF_CTR na 127.025 to DBT), GET /api/radio/configs z atrapą
 sieci (błąd sieci = nie wiadomo, kto jest online), geometria podglądów (geo, have) i fmp w /api/radio/board.
@@ -31,7 +31,7 @@ SEED = ROOT_DIR / "data" / "seed"
 FRONTEND = ROOT_DIR / "frontend"
 OWN = json.loads((SEED / "ownership.json").read_text("utf-8"))
 DATA = json.loads((SEED / "fmp_configs.json").read_text("utf-8"))
-# tabela Marka (20.11.2026) słowo w słowo
+# tabela właściciela projektu (20.11.2026) słowo w słowo
 TABLE = [("1X", "ALL"), ("1S", "SFIR"), ("1N", "NFIR"), ("1E", "EFIR"), ("1D", "DTC"),
          ("2X", "NFIR+SFIR"), ("2N", "ALL+NFIR"), ("2S", "ALL+SFIR"), ("2E", "ALL+EFIR"), ("2D", "ALL+DTC"),
          ("2G", "ALL+DBFG"), ("2J", "ALL+JR"), ("2U", "ALL+ALH"),
@@ -84,7 +84,7 @@ def configs(client, *ctrls, query=""):
 
 # --- dane
 
-def test_table_data_exactly_as_marek():
+def test_table_data_exactly_as_owner():
     assert [(c["code"], c["label"]) for c in DATA["configs"]] == TABLE
     assert DATA["positions"] == NAMES
     assert set(NAMES.values()) <= set(OWN["acc_positions"])
@@ -478,7 +478,7 @@ def test_fmp_files_conventions():
     # stanowisk panelu przewija się w poziomie zamiast ucinać kolumny warstw
     assert ".pane.fill > .fmp { overflow-y: auto; }" in css and ".pane.fill > .fmp > .fmp-main { min-height: 300px; }" in css
     assert ".fmp-cp-list { min-width: 0; max-width: 100%; overflow-x: auto; }" in css
-    assert "0.14.0 (Marek)" in src and "0.14.0 (Marek)" in (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
+    assert "0.14.0 (właściciel projektu)" in src and "0.14.0 (właściciel projektu)" in (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     # nazwy klas bez słów, po których blokery reklam chowają elementy
     names = set(re.findall(r"\.(fmp-[a-z0-9-]+)", css)) | set(re.findall(r'class="([a-z0-9 -]+)"', src))
     assert names and not any(re.search(r"(^|[\s-])(ad|ads|advert|banner|sponsor|promo)", n) for n in names)
