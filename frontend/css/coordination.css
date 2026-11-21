@@ -103,6 +103,10 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .chl-act { flex: none; display: flex; flex-wrap: wrap; gap: 6px; }
 .chl-act .btn { flex: 1; padding: 4px 8px; text-align: center; text-decoration: none; white-space: nowrap; }
 .chl-act .btn[hidden] { display: none; }   /* przycisk PDF dopiero po wczytaniu listy */
+/* 0.14.0 (issue #28): NEXT AIRAC bez opublikowanej poprawki następnego cyklu: karta z komunikatem (cykl i data wejścia)
+   zamiast strony błędu PAŻP; podzakładka .pane.fill jest bez paddingu, więc odstęp daje karta */
+.aip-next { margin: 12px 16px; max-width: 760px; }
+.aip-next p { margin: 0; line-height: 1.45; }
 
 /* 0.12.5: ostre krawędzie także w pozostałych zakładkach z tej części (AD MIL/VFR, INOP, OTHER z CHECKLIST, EMERGENCY,
    AUP, ABOUT): przyciski, pola, karty, kafelki i podmenu bez zaokrągleń, jak w PANDORZE */

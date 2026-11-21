@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,14 +20,20 @@ router = APIRouter(prefix="/api", tags=["system"])
 @router.get("/config")
 async def config():
     # cykl AIRAC i adresy eAIP z daty UTC przy każdym zapytaniu: nowy cykl bez restartu serwera; katalog poprawki
-    # sprawdzony u PAŻP (cykl bez poprawki → poprzednia), wynik w pamięci na cykl
+    # sprawdzony u PAŻP (cykl bez poprawki → poprzednia), wynik w pamięci na cykl.
+    # 0.14.0 (issue #28): także następny cykl (airac_next) i jego eAIP (aip_ifr_next, aip_vfr_next, aip_mil_next: adres
+    # albo "", gdy PAŻP poprawki jeszcze nie opublikował) dla przycisku NEXT AIRAC; oba sprawdzenia równolegle, razem
+    # najwyżej eaip.CONFIG_WAIT czekania
     today = eaip.utc_today()
+    links, nxt = await asyncio.gather(eaip.resolved_links(today), eaip.next_links(today))
     return {
         "name": settings.name, "tagline": settings.tagline, "version": VERSION, "auth_mode": settings.auth_mode,
         "airac": current_airac(today),
+        "airac_next": eaip.next_airac(today),
         "default_aerodrome": settings.default_aerodrome,
         "links": {
-            **await eaip.resolved_links(today),
+            **links,
+            **{f"{link}_next": url for link, url in nxt.items()},
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
             "performance_db": settings.performance_db_url,
         },

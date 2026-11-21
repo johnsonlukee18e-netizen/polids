@@ -150,12 +150,12 @@ main { flex: 1; min-width: 0; position: relative; }
 .menu nav, .submenu { overflow-x: hidden; scrollbar-width: none; }
 .menu nav::-webkit-scrollbar, .submenu::-webkit-scrollbar { display: none; }
 /* podmenu dłuższe niż menu (więcej niż --menu-rows = 21 rzędów, czyli elementów kolumny flex; litery mają po dwa
-   w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby każdy widoczny
-   rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu (w paddingu byłoby
-   widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do ostatniego, który mieści się
-   nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też całe rzędy. Przewijanie
-   (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap, margines przycisku nad
-   rzędem). 22 = --menu-rows + 1 */
+   w rzędzie i są krótsze; dziś tylko AD VFR: eAIP, NEXT AIRAC, odstęp i 69 lotnisk) przewija się o całe rzędy, żeby
+   każdy widoczny rząd stał na wysokości rzędu menu obok. Widać tylko całe rzędy: zamiast paddingu u góry i u dołu
+   (w paddingu byłoby widać 3 px przycisku z rzędu nad i pod widokiem) margines, a wysokość to całe rzędy do
+   ostatniego, który mieści się nad dołem okna (mod(); bez mod() 21 rzędów jak w menu), więc koniec przewijania to też
+   całe rzędy. Przewijanie (kółko, palec, klawiatura, reveal() w aip.js) zatrzymuje się na początku rzędu (scroll-snap,
+   margines przycisku nad rzędem). 22 = --menu-rows + 1 */
 .submenu:not(.letters):has(> :nth-child(22)) {
   max-height: calc(var(--menu-rows) * (var(--btn-h) + 2 * var(--btn-m))); margin-block: var(--col-pad); padding-block: 0;
   scroll-snap-type: y mandatory; }
@@ -562,10 +562,18 @@ dl.props dd { margin: 0; font-family: var(--mono); }
 .cs-pane { display: flex; flex-direction: column; gap: 8px; }
 .cs-pane > .toolbar { margin-bottom: 0; }
 .cs-list { flex: 1; min-height: 0; overflow: auto; }
-/* CALLSIGN: kod ICAO i callsign najważniejsze, operator i kraj mniejsze */
+/* CALLSIGN: kod ICAO, callsign, operator i kraj jedną czcionką i jednym rozmiarem; 0.14.0 (issue #28): operator i kraj
+   jak ICAO (białe, dawniej 12 px i szare), callsign zostaje żółty, Info (CARGO / MILITARY) bez zmian. Długa nazwa
+   łamie się między słowami w swojej komórce; słowo dłuższe niż kolumna (w bazie do 30 liter, np.
+   VERKEHRSFLIEGERSCHULE,FREIBURG) także w środku (anywhere), ale kolumna nie węższa niż min-width, więc tabela mieści
+   się w panelu od ok. 690 px szerokości jak dawniej (Chrome: 692 px bez przewijania w bok). Komórki wiersza wyrównane
+   do pierwszej linii tekstu (baseline): kod i callsign na wysokości początku nazwy */
+table.callsigns td { vertical-align: baseline; }
 table.callsigns td.icao { font: 20px var(--mono); color: #fff; width: 90px; }
 table.callsigns td.tel { font: 20px var(--mono); color: var(--yellow); }
-table.callsigns td.minor { font-size: 12px; color: var(--muted); }
+table.callsigns td.op, table.callsigns td.ctry { font: 20px var(--mono); color: #fff; overflow-wrap: anywhere; }
+table.callsigns td.op { min-width: 9em; }
+table.callsigns td.ctry { min-width: 6em; }
 .tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }
 .tag.cargo { color: #ffb020; border-color: #ffb020; }
 .tag.mil { color: #7fd0ff; border-color: #7fd0ff; }

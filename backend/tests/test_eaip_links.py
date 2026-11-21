@@ -277,7 +277,11 @@ def test_config_waits_at_most_config_wait(slow_pansa, monkeypatch):
     assert took < 0.3 + 0.4, took
     assert {k: first[k] for k in FALLBACK} == eaip.aip_links(DAY)
     assert strip({k: second[k] for k in FALLBACK}) == FALLBACK and took2 < 0.1
-    assert len(slow_pansa["seen"]) == 3 * (eaip.BACK_CYCLES + 1)
+    # 0.14.0 (issue #28): równolegle jedno sprawdzenie na pakiet dla następnego cyklu (11-26 "jest"); pierwsze
+    # /api/config po CONFIG_WAIT z wyliczonym adresem, drugie z wynikiem
+    nxt = {f"{k}_next": eaip.package_url(k, eaip.next_airac(DAY)) for k in FALLBACK}
+    assert {k: first[k] for k in nxt} == nxt and {k: second[k] for k in nxt} == nxt
+    assert len(slow_pansa["seen"]) == 3 * (eaip.BACK_CYCLES + 1) + 3
 
 
 def test_expired_entry_answers_at_once_and_refreshes(slow_pansa):
@@ -321,11 +325,14 @@ def test_startup_checks_in_background(pansa, monkeypatch):
     monkeypatch.setattr(eaip, "utc_today", lambda: DAY)
     with TestClient(main.app) as client:
         deadline = time.monotonic() + 5
-        while len(eaip._resolved) < 3 and time.monotonic() < deadline:
+        # 0.14.0 (issue #28): trzy pakiety bieżącego i trzy następnego cyklu (11-26 nie ma na udawanym serwerze)
+        while len(eaip._resolved) < 6 and time.monotonic() < deadline:
             time.sleep(0.02)
-        assert len(pansa["seen"]) == 3
-        assert strip({k: v for k, v in client.get("/api/config").json()["links"].items() if k in FALLBACK}) == folders(DAY)
-        assert len(pansa["seen"]) == 3
+        assert len(pansa["seen"]) == 6
+        links = client.get("/api/config").json()["links"]
+        assert strip({k: v for k, v in links.items() if k in FALLBACK}) == folders(DAY)
+        assert {k: links[f"{k}_next"] for k in FALLBACK} == {k: "" for k in FALLBACK}
+        assert len(pansa["seen"]) == 6
 
 
 # --- AD CIV (0.12.5, issue #18): przycisk lotniska = lista map z AD 2.24 strony AD 2 (GET /api/docs/charts/<ICAO>) ---
