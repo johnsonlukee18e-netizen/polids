@@ -133,7 +133,11 @@ export function chartHtml(tv, c, { pilot = () => null, sel = null, svg = null, e
       n && n.entries !== null ? `entries ${pair(n.entries, n.entriesCap)} from ${esc(n.entriesFrom)}Z` : "",
       n && n.occupancy !== null ? `in sector ${pair(n.occupancy, n.occupancyCap)}` : "",
       num(c.peak) ? `peak ${c.peak} at ${esc(c.peak_at)}Z` : ""].filter(Boolean).join(DOT_);
-    charts = `<div class="fmc-chart"><div class="fmc-title">ENTRY <span>entries in ${esc(c.span)} min, every ${esc(c.step)} min</span></div>${svg.entry(c)}</div>`
+    // przegląd 0.14.0 (issue #28): bez ruchu w oknie wykresu same linie przepustowości wyglądały jak dawny błąd, więc
+    // zdanie jak w OTHER › FMP (fmpChartHtml)
+    const quiet = !(c.occupancy || []).some((v) => v > 0) && !(c.entries || []).some((e) => e.count > 0);
+    charts = (quiet ? `<p class="hint fmc-empty">No traffic in this period.</p>` : "")
+      + `<div class="fmc-chart"><div class="fmc-title">ENTRY <span>entries in ${esc(c.span)} min, every ${esc(c.step)} min</span></div>${svg.entry(c)}</div>`
       + `<div class="fmc-chart"><div class="fmc-title">OCC <span>aircraft in the sector, per minute</span></div>${svg.occ(c)}</div>`
       + `<div class="fmc-legend"><span><i class="fmc-ok"></i>below 90 %</span><span><i class="fmc-near"></i>90${DASH_}100 %</span>`
       + `<span><i class="fmc-over"></i>over capacity</span><span><i class="fmc-nolim"></i>no limit</span>`

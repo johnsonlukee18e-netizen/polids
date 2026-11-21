@@ -124,6 +124,8 @@
 .as-scale .sc-b td.sc-n { padding: 1px 6px 1px 0; color: #c9d1c9; }
 .as-scale .sc-b.none td.sc-id { color: var(--muted); }
 .as-scale .sc-b.at td { background: #16301a; }
+/* dymek jest ciemny także na jasnym podkładzie: SYM w nim żółty jak na ciemnym (.map.light .pos-sim to ciemny żółty) */
+.map.light .as-scale .pos-sim { color: var(--yellow); border-color: var(--yellow); }
 /* podpowiedź pod liczbą przestrzeni (TMA / CTR poza wybranym poziomem) */
 .sector-info .as-note { color: var(--yellow); }
 

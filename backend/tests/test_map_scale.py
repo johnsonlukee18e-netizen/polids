@@ -178,3 +178,5 @@ def test_new_module_rules():
     css = (JS.parent / "css" / "map.css").read_text("utf-8")
     scale = "\n".join(line for line in css.splitlines() if ".as-scale" in line)
     assert scale and "bold" not in scale and "radius" not in scale and "shadow" not in scale
+    # przegląd: dymek jest ciemny także na jasnym podkładzie, więc SYM w podziałce zostaje jasnożółty
+    assert ".map.light .as-scale .pos-sim { color: var(--yellow); border-color: var(--yellow); }" in css

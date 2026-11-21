@@ -1164,10 +1164,15 @@ function mainMap(ctx) {
   let tmaP = null;
   const tmaLines = () => (tmaP ||= api("/api/nav/airspace?kind=tma").catch(() => { tmaP = null; return null; }));
   // obrys: litera sektora EPWW (EPWW-BH → sektory EPWWB na wszystkich poziomach) albo TMA lotniska (EPWA-TMA)
+  // przegląd 0.14.0 (issue #28): obrys rysuje drawViff i po wczytaniu wykresu loadChart; gdy oba czekają na wycinki
+  // (pierwsze wczytanie), rysuje tylko ostatnie wywołanie (areaSeq), bez podwójnego obrysu
+  let areaSeq = 0;
   const drawTvArea = async (tv) => {
+    const my = ++areaSeq;
     layers.viff.clearLayers();
     if (!tv) return;
     const [secs, tma] = await Promise.all([loadSlices().catch(() => null), tmaLines()]);
+    if (my !== areaSeq) return;
     const feats = [];
     tv.volumes.forEach((v) => {
       const [area, part = ""] = v.split("-");
@@ -1250,7 +1255,7 @@ function mainMap(ctx) {
   };
   const loadViff = async () => {
     $(".vf-card").classList.toggle("off", !$(".viff").checked);  // wyłączony vIFF: bez scenariuszy i listy TV
-    if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
+    if (!$(".viff").checked) { chartEl.style.display = "none"; drawTvArea(null); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
     try {
       // 0.13.1 (issue #25): bez zapisanego wyboru żaden TV nie jest wybierany sam, więc okno wykresu zostaje zamknięte;
       // wykres otwiera dopiero wybór TV przez użytkownika (zapisany w map.viff.sel i przywracany przy następnym wejściu)
@@ -1370,6 +1375,9 @@ function mainMap(ctx) {
     // 0.14.0 (issue #28): wykres TV (dwa wykresy jak w OTHER › FMP i lista lotów) nie wyżej niż mapa bez przycisków
     // zoomu u góry; reszta przewija się w panelu
     chartEl.style.maxHeight = Math.max(180, hgt - 110) + "px";
+    // przegląd 0.14.0 (issue #28): na wąskiej mapie (okno telefonu) panel nie szerszy niż mapa (560 px wychodziło
+    // za prawą krawędź i było ucięte); wykresy SVG zwężają się razem z panelem
+    chartEl.style.maxWidth = Math.max(240, w - 20) + "px";
     const ch = chartH();
     const clash = ch && w < chartEl.offsetWidth + 420 + 40;
     fdEl.style.maxHeight = Math.max(200, hgt - 20 - (clash ? ch + 34 : 0)) + "px";

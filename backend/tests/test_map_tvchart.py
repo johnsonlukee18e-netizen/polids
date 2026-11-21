@@ -109,6 +109,7 @@ console.log(JSON.stringify({
   note: vc.chartHtml(tv, c, { svg, note: "Not refreshed: x" }),
   noList: vc.chartHtml(null, { ...c, active: false }, { svg }),
   nullNow: [vc.chartNow(null), vc.chartNow({ ...c, now_at: null })],
+  quiet: vc.chartHtml(tv, { ...c, entries: c.entries.map((e) => ({ ...e, count: 0 })), occupancy: c.occupancy.map(() => 0) }, { svg }),
 }));
 """
 
@@ -177,6 +178,9 @@ def test_map_chart_states(js):
     # wykres bez wiersza listy (lista sektorów niedostępna): nagłówek z wykresu, bez listy lotów
     assert '<span class="vs-chip">inactive</span>' in js["noList"] and "no flight list" in js["noList"]
     assert js["nullNow"] == [None, None]
+    # przegląd: sektor bez ruchu w oknie wykresu (same linie przepustowości) ze zdaniem jak w OTHER › FMP
+    assert '<p class="hint fmc-empty">No traffic in this period.</p>' in js["quiet"] and js["quiet"].count("fmc-svg") == 2
+    assert "No traffic" not in js["html"] and "No traffic" not in js["wait"]
     for k in ("html", "wait", "err", "note", "noList"):
         assert "<b>" not in js[k] and "<b " not in js[k] and "<strong" not in js[k], k
 
@@ -191,6 +195,11 @@ def test_map_chart_wiring():
     assert "svg: { entry: entrySvg, occ: occSvg }" in src
     assert src.split("const loadViff = async () => {")[1].split("\n  };")[0].rstrip().endswith("loadChart();")
     assert 'chartEl.style.maxHeight = Math.max(180, hgt - 110) + "px";' in src
+    # przegląd: na wąskiej mapie panel nie szerszy niż mapa; obrys TV rysuje tylko ostatnie wywołanie drawTvArea
+    assert 'chartEl.style.maxWidth = Math.max(240, w - 20) + "px";' in src
+    area = src.split("const drawTvArea = async (tv) => {")[1].split("\n  };")[0]
+    assert area.index("const my = ++areaSeq;") < area.index("await Promise.all(") < area.index("if (my !== areaSeq) return;")
+    assert "layers.viff.clearLayers()" not in src.split("const loadViff = async () => {")[1].split("\n  };")[0]
     vc = (JS / "viffchart.js").read_text("utf-8")
     assert "fmp.js\"" not in vc and "from \"./fmp" not in vc
     # cały viffchart.js w ASCII poza komentarzami w osobnych linijkach
