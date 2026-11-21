@@ -1,4 +1,4 @@
-import { api, esc, h, ONLINE_EVENT } from "./api.js";
+import { api, esc, h, lsGet, lsSet, ONLINE_EVENT } from "./api.js";
 import { equipment, field18, levelText, voiceType, xlHtml } from "./xlabel.js";
 
 export { equipment, field18, levelText, voiceType };
@@ -142,9 +142,9 @@ export function fplHtml(d, opts = {}) {
 const EMPTY = `<p class="hint fpl-empty">Type a callsign and press Enter.</p>`;
 // KEY w oknie EXTENDED LABEL: "1" = nazwy pól widoczne (ten sam klucz co okno lotu STRIP w 0.12.5)
 const KEY_STORE = "polids.xlKey";
-// bez pamięci przeglądarki (tryb prywatny, zablokowana): KEY wyłączony na starcie i niezapamiętany
-const loadKey = () => { try { return localStorage.getItem(KEY_STORE) === "1"; } catch { return false; } };
-const saveKey = (on) => { try { localStorage.setItem(KEY_STORE, on ? "1" : "0"); } catch { /* ignore */ } };
+// bez pamięci przeglądarki (tryb prywatny, zablokowana): KEY wyłączony na starcie i niezapamiętany (lsGet / lsSet)
+const loadKey = () => lsGet(KEY_STORE) === "1";
+const saveKey = (on) => lsSet(KEY_STORE, on ? "1" : "0");
 
 export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) {
   const root = h(`<div class="fpl">

@@ -14,8 +14,8 @@ from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.eptraffic import ep_traffic
 from ..services import fplabel, motion
-from ..services.flightplan import (CALLSIGN_BAD, HOURS_DOWN, find_flight_plan, hours_pending, member_hours,
-                                   radio_callsigns)
+from ..services.flightplan import (CALLSIGN_BAD, HOURS_DOWN, cached_hours, find_flight_plan, hours_pending,
+                                   member_hours, radio_callsigns)
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import alt_stations, known_stations, online_stations
@@ -224,10 +224,17 @@ async def flight_plan(callsign: str, db: Session = Depends(get_db)):
         found["position"] |= motion.motion(cs)
     found["telephony"] = radio_callsigns(db, [cs]).get(cs)
 
+    # stan "w drodze" zaraz po member_hours (dane okna mogą liczyć się dłużej niż HOURS_WAIT_S)
     async def hours_of():
-        return await member_hours(found["pid"]) if found["pid"] else None
-    hours, found["label"] = await asyncio.gather(hours_of(), fplabel.extras(found, feed, db))
-    pending = not hours and bool(found["pid"]) and hours_pending(found["pid"])
+        if not found["pid"]:
+            return None, False
+        h = await member_hours(found["pid"])
+        return h, not h and hours_pending(found["pid"])
+    (hours, pending), found["label"] = await asyncio.gather(hours_of(), fplabel.extras(found, feed, db))
+    if pending and not hours_pending(found["pid"]):
+        # zapytanie skończyło się w tle w czasie liczenia danych okna: godziny z cache (po 404 i błędzie cache jest
+        # pusty, więc wtedy "Hours unavailable"), a nie "w drodze" ani błąd
+        hours, pending = cached_hours(found["pid"]), False
     return found | {"hours": hours, "hours_error": None if hours or pending else HOURS_DOWN, "hours_pending": pending}
 
 

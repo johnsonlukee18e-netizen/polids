@@ -235,8 +235,9 @@ async def _load_hours(cid: int) -> dict | None:
     return hours
 
 
-def _cached_hours(cid: int) -> dict | None:
-    """Godziny z ostatniej odpowiedzi w cache, także starszej niż HOURS_TTL_S (None = brak albo nieczytelna)."""
+def cached_hours(cid: int) -> dict | None:
+    """Godziny z ostatniej odpowiedzi w cache, także starszej niż HOURS_TTL_S (None = brak albo nieczytelna).
+    Router FLIGHT PLAN bierze stąd godziny, które doszły w tle, zanim policzył dane okna EXTENDED LABEL."""
     hit = peek(stats_url(cid))
     if not hit:
         return None
@@ -262,13 +263,13 @@ async def member_hours(cid, wait: float | None = None) -> dict | None:
     for k in [k for k, until in _miss.items() if until <= now]:
         del _miss[k]
     if cid in _miss:
-        return _cached_hours(cid)
+        return cached_hours(cid)
     task = _tasks.get(cid)
     if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
         task = _tasks[cid] = asyncio.ensure_future(_load_hours(cid))
         task.add_done_callback(lambda t, c=cid: _tasks.pop(c) if _tasks.get(c) is t else None)
     done, _pending = await asyncio.wait({task}, timeout=HOURS_WAIT_S if wait is None else wait)
-    return task.result() if done else _cached_hours(cid)
+    return task.result() if done else cached_hours(cid)
 
 
 def hours_pending(cid) -> bool:

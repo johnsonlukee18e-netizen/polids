@@ -43,7 +43,7 @@ const pending = { ...prefiled, callsign: "LOT46", hours_error: null, hours_pendi
 const receive = { ...online, flight_plan: { ...plan, remarks: "/r/ RMK/X" }, position: { ...online.position, heading: 0 } };
 // 0.14.2: okno EXTENDED LABEL dla różnych lotów (prefile z kodem, VFR bez RVSM, STATE, sam zapis FAA, grupa, długie pola)
 const pre2 = { callsign: "SPKAT", status: "prefiled", flight_plan: { ...plan, assigned_squawk: "7001", route: "SOXER L621 RILAB DCT BIMPA" },
-  position: null, label: null };
+  position: null, label: { proc: { kind: "SID", name: "SOXER7G", runway: "29" } } };
 const vfr = { callsign: "SPABC", status: "online", flight_plan: { rules: "V", aircraft_icao: "C172/L-SDFGY/S", aircraft: "C172",
   wake: "L", aircraft_faa: "C172/G", departure: "EPMO", arrival: "EPMO", altitude: "VFR", route: "VFR CIRCUITS RWY 26",
   remarks: "STS/NONRVSM" }, position: { altitude: 1500, groundspeed: 0, heading: 0, squawk: "7000" } };
@@ -100,7 +100,8 @@ console.log(JSON.stringify({
   exports: [typeof fp.mountFlightPlan, typeof fmp.mountFmp],
   eqGroup: fp.equipment("2/F16/M-SG/C"), eqFaaFull: fp.equipment("H/B738/L"),
   xl: Object.fromEntries(Object.entries({ online, prefiled, noplan, pre2, vfr, state, faa, group, big }).map(([k, d]) => [k, xlFlat(d)])),
-  xlHtml: { online: xl.xlHtml(online), key: xl.xlHtml(online, { key: true }), big: xl.xlHtml(big), noplan: xl.xlHtml(noplan) },
+  xlHtml: { online: xl.xlHtml(online), key: xl.xlHtml(online, { key: true }), big: xl.xlHtml(big), noplan: xl.xlHtml(noplan),
+    pre2: xl.xlHtml(pre2, { key: true }) },
   fplKey: fp.fplHtml(online, { key: true }),
   rvsm: [["SDFGRWY", "", ""], ["SDFGY", "STATE", ""], ["SDFGY", "NONRVSM", ""], ["SDFGY", "NONRVSM STATE", ""],
     [null, "", "H/B738/L"], [null, "", "B738/W"], [null, "", "B738/Z"], [null, "", "B738/G"], ["SDFGY", "", "H/B738/L"],
@@ -259,7 +260,8 @@ WIDTHS = {"cs": (7, 10), "wy": 2, "tel": 28, "xpdr": 6, "num": 2, "type": 6, "st
           "altn": 11, "proc": 7, "rwy": 6, "nfq": 7, "rules": 1, "route": 41, "xfl": 4, "cfl": 3, "rfl": 3, "rate": 10,
           "free": 20, "rvr": 6, "coord": 6, "navcom": 18, "surv": 15, "pbn": 16, "addr": 6, "sel": 3, "hdg": 3, "ias": 4,
           "mach": 3, "tas": 4, "gs": 4, "ivv": 4, "bvv": 4, "tar": 3, "roll": 3, "trk": 3}
-RIGHT = {"xpdr", "orcam", "nfq", "xfl", "coord", "pbn"}
+# do prawej krawędzi okna jak w Figure 2-6 (PBN nie: stoi w swojej kolumnie za SUR)
+RIGHT = {"xpdr", "orcam", "nfq", "xfl", "coord"}
 
 
 def test_xl_lines_follow_sdd(js):
@@ -291,6 +293,10 @@ def test_xl_widths_table_2_13(js):
             assert len(f["t"]) <= f["max"], (name, f)
     h = js["xlHtml"]["online"]
     assert 'data-f="route" style="--w:41"' in h and 'data-f="cs" style="--w:7"' in h
+    # PBN w kolumnie 35 (NAV/COM 18 + odstęp + SUR 15 + odstęp), bez klasy rt
+    assert '<span class="xl-f" data-f="pbn" style="--w:16"' in h
+    line6 = next(ln for ln in js["xl"]["online"] if ln["line"] == 6)["f"]
+    assert sum(f["w"] + 1 for f in line6[:2]) == 35 and not line6[2]["right"]
 
 
 def test_xl_values_online(js):
@@ -320,7 +326,8 @@ def test_xl_values_prefiled(js):
     for name in ("prefiled", "pre2"):
         v = _vals(js, name)
         assert v["xpdr"] is None and all(v[k] is None for k in LINES[6] + LINES[7]), name
-        assert v["cs"] and v["rfl"] and v["nfq"] is None and v["proc"] is None
+        assert v["cs"] and v["rfl"] and v["nfq"] is None
+    assert _vals(js, "prefiled")["proc"] is None and _vals(js, "prefiled")["rwy"] is None
     assert _vals(js, "prefiled")["route"] is None and _vals(js, "prefiled")["orcam"] is None   # trasa "DCT"
     v = _vals(js, "pre2")
     assert v["orcam"] == "7001" and _cls(js, "pre2")["orcam"] == ["y"] and v["route"] == "SOXER RILAB BIMPA"
@@ -401,8 +408,16 @@ def test_xl_key_mode(js):
     assert len(keys) == sum(map(len, LINES)) and keys[:4] == ["CALLSIGN", "W Y", "FULL CALLSIGN", "XPDR"]
     assert {"STAR", "RWY", "NEXT FREQ", "FIR EXIT", "ORCAM", "ADDR", "IVV", "TRK"} <= set(keys)
     assert _xl(on, "cs") == "LOT3827" and _xl(on, "hdg") == "360"
-    # prefile z lotniska EP (SID): nazwa pola SID
+    # prefile z lotniska EP (SID): nazwa pola SID, dymki procedury i pasa odlotu
+    assert [f["l"] for ln in js["xl"]["pre2"] for f in ln["f"] if f["k"] == "proc"] == ["SID"]
+    assert (_vals(js, "pre2")["proc"], _vals(js, "pre2")["rwy"]) == ("SOXER7G", "RWY29")
+    p = js["xlHtml"]["pre2"]
+    assert 'title="Departure procedure: SOXER7G"' in p and 'title="Departure runway: RWY29"' in p
+    assert '<span class="xl-k">SID</span>' in p and '<span class="xl-k">STAR</span>' not in p
+    # w powietrzu do EP: STAR, dymki procedury i pasa przylotu
     assert [f["l"] for ln in js["xl"]["online"] for f in ln["f"] if f["k"] == "proc"] == ["STAR"]
+    assert 'title="Arrival runway: RWY33"' in js["xlHtml"]["online"]
+    assert '<span class="xl-k">STAR</span>' in on and '<span class="xl-k">SID</span>' not in on
     assert 'class="xl-body key"' in js["fplKey"] and 'class="xl-body key"' not in js["html"]["online"]
 
 
@@ -533,11 +548,30 @@ def test_new_css_rules(name):
     assert f'href="/static/css/{name}"' in index
 
 
+def test_xl_window_fits_result():
+    """Okno EXTENDED LABEL mierzy się szerokością wyniku (kontener .fpl-out), nie ekranu: przy menu z lewej wynik bywa
+    węższy niż 54 znaki także na ekranie szerszym niż 640px. Najmniejsza szerokość okna i pól nie przekracza wyniku
+    i linii, a pole szersze niż linia zawija tekst (nic poza szarym oknem, wynik bez przewijania w poziomie)."""
+    css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "flightplan.css").read_text("utf-8"), flags=re.S)
+
+    def rule(sel):
+        return re.search(r"(?:^|\})\s*" + re.escape(sel) + r"\s*\{([^}]*)\}", css).group(1)
+
+    assert "container-type: inline-size" in rule(".fpl-out")
+    assert re.search(r"min-width:\s*min\(calc\(54 \* var\(--xl-c\)\), calc\(100cqi - 22px\)\)", rule(".xl-body"))
+    f = rule(".xl-f")
+    assert re.search(r"min-width:\s*min\(calc\(var\(--w\) \* var\(--xl-c\)\), 100%\)", f)
+    assert re.search(r"max-width:\s*100%", f) and re.search(r"white-space:\s*pre-wrap", f)
+    assert "max-width: 100%" in rule(".fpl-xl")
+
+
 def test_contract_exports():
     fp = (JS / "flightplan.js").read_text("utf-8")
     assert 'export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {})' in fp
     assert "activate(arg)" in fp and "focus," in fp and "destroy()" in fp and "export function fplHtml(d, opts = {})" in fp
     assert 'from "./strips.js"' not in fp and "removeEventListener(ONLINE_EVENT" in fp and "clearInterval" in fp
+    # pamięć przeglądarki (KEY) przez wspólne lsGet / lsSet z api.js, bez własnych try/catch
+    assert "localStorage" not in fp and "lsGet(KEY_STORE)" in fp and "lsSet(KEY_STORE" in fp
     fmp = (JS / "fmp.js").read_text("utf-8")
     assert 'export function mountFmp(pane, { start = "", onPick = () => {} } = {})' in fmp
     assert "activate(arg)" in fmp and "destroy()" in fmp
@@ -560,6 +594,8 @@ export const ONLINE_EVENT = "polids:online";
 export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const h = () => makeEl();
 export const api = (url) => new Promise((res, rej) => globalThis.__pending.push({ url, res, rej }));
+export function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+export function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { /* tryb prywatny */ } }
 """
 
 FP_MOUNT_SCRIPT = r"""

@@ -17,7 +17,9 @@
 .fpl-msg { font-size: 13px; }
 .fpl-msg.hint { color: var(--muted); }
 .fpl-msg.error { color: var(--bad); }
-.fpl-out { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* kontener rozmiaru: okno EXTENDED LABEL mierzy się szerokością wyniku (100cqi), nie ekranu (menu z lewej zostaje
+   przy każdej szerokości) */
+.fpl-out { display: flex; flex-direction: column; gap: 10px; min-width: 0; container-type: inline-size; }
 .fpl-empty, .fpl-err { margin: 4px 0; font-size: 14px; }
 
 /* nagłówek: znak, stan, odnośnik do mapy */
@@ -69,7 +71,9 @@
    wierszy (odstęp nad 3 i 7), kolory SDD: zielony znak, W/Y i pełny znak radiowy, żółte reguły, RFL, RVR i ORCAM,
    czerwone W/Y bez wyposażenia. Kolory w zmiennych na .fpl-xl (czarne tło okna to zmiana --xl-bg). Kolumny z Table
    2-13 w znakach (--w na polu) razy średnia szerokość znaku (--xl-c): czcionka nie ma stałej szerokości, więc to
-   najmniejsze szerokości kolumn, a nie siatka (dłuższa wartość przesuwa dalsze pola, za długie wiersze się zawijają). */
+   najmniejsze szerokości kolumn, a nie siatka (dłuższa wartość przesuwa dalsze pola, za długie wiersze się zawijają).
+   Okno ma 54 znaki szerokości, ale nigdy więcej niż wynik (22px = odstępy 2 x 10px i ramka 2 x 1px): w węższym
+   wyniku pola przechodzą do następnej linii, a pole szersze niż linia zawija tekst w sobie (nic poza oknem). */
 .fpl-xl { --xl-bg: #4d4d4d; --xl-line: #b0b0b0; --xl-bar: #66a696; --xl-text: #f2f2f2; --xl-g: #3cf03c; --xl-y: #ffff3c;
   --xl-r: #ff4040; --xl-c: .64em;
   flex: none; max-width: 100%; box-sizing: border-box; border: 1px solid var(--xl-line); border-radius: 0;
@@ -79,11 +83,12 @@
   font: 400 14px/1.45 var(--ui); letter-spacing: 1.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xl-head .xl-key { flex: none; padding: 0 10px; border-radius: 0; font: 400 12px/1 var(--ui); letter-spacing: .6px; }
 .xl-head .xl-key.on { background: var(--green-hi); border-color: var(--green-hi); color: #041a02; }
-.xl-body { padding: 6px 10px 8px; min-width: calc(54 * var(--xl-c)); box-sizing: content-box; }
+.xl-body { padding: 6px 10px 8px; min-width: min(calc(54 * var(--xl-c)), calc(100cqi - 22px)); box-sizing: content-box; }
 .xl-ln { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: var(--xl-c); min-height: 1.3em; }
 .xl-ln.gap { margin-top: .8em; }
-.xl-f { flex: none; display: inline-flex; flex-direction: column; min-width: calc(var(--w) * var(--xl-c)); white-space: pre; }
-/* pole do prawej krawędzi okna (kod transpondera, ORCAM, NEXT FREQ, FIR EXIT, COORD, PBN); Mode S: liczby do prawej
+.xl-f { flex: none; display: inline-flex; flex-direction: column; min-width: min(calc(var(--w) * var(--xl-c)), 100%);
+  max-width: 100%; white-space: pre-wrap; }
+/* pole do prawej krawędzi okna (kod transpondera, ORCAM, NEXT FREQ, FIR EXIT, COORD); Mode S: liczby do prawej
    w kolumnie jak w SDD (" 326 +20") */
 .xl-f.rt { margin-left: auto; text-align: right; }
 .xl-ln.nr .xl-f { text-align: right; }
@@ -96,7 +101,7 @@
 .xl-k { font: 400 9px/1.25 var(--ui); letter-spacing: .4px; color: #b8d8cc; white-space: nowrap; }
 .xl-body.key .xl-ln { min-height: calc(1.3em + 11px); }
 .xl-body.key .xl-f.nil .xl-v::before { content: "\2013"; color: #8f8f8f; }
-/* wąski ekran: bez najmniejszej szerokości okna, wiersze się zawijają (strona nie przewija się w poziomie) */
+/* telefon: wynik węższy niż najdłuższe słowo w polu; to przewija się w oknie, strona nie przewija się w poziomie */
 @media (max-width: 640px) {
   .xl-body { min-width: 0; overflow-x: auto; }
 }

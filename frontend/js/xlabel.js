@@ -249,7 +249,8 @@ export const XL_LINES = [
   { f: [
     { k: "navcom", l: "NAV/COM", n: "Navigation and communication equipment", w: 18, v: (d, x) => x.eq.navcom || null },
     { k: "surv", l: "SUR", n: "Surveillance equipment", w: 15, v: (d, x) => x.eq.surv || null },
-    { k: "pbn", l: "PBN", n: "PBN capabilities", w: 16, right: true, v: (d, x) => x.f18.PBN || null },
+    // PBN w swojej kolumnie za SUR (kolumna 35 jak w Figure 2-6), nie przy prawej krawędzi
+    { k: "pbn", l: "PBN", n: "PBN capabilities", w: 16, v: (d, x) => x.f18.PBN || null },
   ] },
   // Mode S: adres, wybrana wysokość, IAS, Mach, TAS, barometryczna prędkość pionowa i przechylenie nie istnieją
   // w danych sieci (szacunki wprowadzałyby w błąd), więc zostają puste; TAS z planu to nie TAS teraz
