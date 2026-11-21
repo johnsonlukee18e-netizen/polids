@@ -13,7 +13,9 @@ from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.eptraffic import ep_traffic
-from ..services.flightplan import CALLSIGN_BAD, HOURS_DOWN, find_flight_plan, hours_pending, member_hours
+from ..services import fplabel, motion
+from ..services.flightplan import (CALLSIGN_BAD, HOURS_DOWN, cached_hours, find_flight_plan, hours_pending,
+                                   member_hours, radio_callsigns)
 from ..services.http_cache import UpstreamError
 from ..services.neighbours import nb_owners
 from ..services.positions import alt_stations, known_stations, online_stations
@@ -203,15 +205,36 @@ async def flight_plan(callsign: str, db: Session = Depends(get_db)):
     z nazwy w sieci, PID (= CID), ratingiem i godzinami pilota i ATC (services/flightplan.py). Pilot online bez planu:
     flight_plan = null. Godziny nie opóźniają planu: bez odpowiedzi w HOURS_WAIT_S hours = null i hours_pending = true,
     gdy zapytanie jeszcze trwa (kończy się w tle; FLIGHT PLAN pyta wtedy ponownie po chwili), a hours_error tylko
-    wtedy, gdy godzin nie ma i nic już nie trwa. Końcówka nazwy jak kod lotniska odpada tylko dla znanego lotniska."""
+    wtedy, gdy godzin nie ma i nic już nie trwa. Końcówka nazwy jak kod lotniska odpada tylko dla znanego lotniska.
+
+    0.14.2 (issue #35, okno EXTENDED LABEL): telephony = pełny znak radiowy (telefonia linii + numer lotu albo null),
+    position (online) także vv_fpm, track i turn_rate z dwóch odczytów sieci (services/motion.py, null do drugiego
+    odczytu), label = punkty trasy przed samolotem, punkt i poziom wyjścia z FIR, STAR/SID z pasem
+    (services/fplabel.py; każda część null przy błędzie). Godziny i dane okna liczą się równolegle."""
     if not re.fullmatch(r"[A-Za-z0-9]{2,12}", callsign):
         raise HTTPException(400, CALLSIGN_BAD)
     cs = callsign.upper()
-    found = find_flight_plan(await _feed(), cs, _aerodromes(db))
+    feed = await _feed()
+    found = find_flight_plan(feed, cs, _aerodromes(db))
     if found is None:
         raise HTTPException(404, f"No flight plan for {cs}")
-    hours = await member_hours(found["pid"]) if found["pid"] else None
-    pending = not hours and bool(found["pid"]) and hours_pending(found["pid"])
+    # feed podmieniony w testach i atrapach omija vatsim.get_feed: odczyt do ruchu także tutaj (ten sam feed nic nie zmienia)
+    motion.observe(feed)
+    if found["position"] is not None:
+        found["position"] |= motion.motion(cs)
+    found["telephony"] = radio_callsigns(db, [cs]).get(cs)
+
+    # stan "w drodze" zaraz po member_hours (dane okna mogą liczyć się dłużej niż HOURS_WAIT_S)
+    async def hours_of():
+        if not found["pid"]:
+            return None, False
+        h = await member_hours(found["pid"])
+        return h, not h and hours_pending(found["pid"])
+    (hours, pending), found["label"] = await asyncio.gather(hours_of(), fplabel.extras(found, feed, db))
+    if pending and not hours_pending(found["pid"]):
+        # zapytanie skończyło się w tle w czasie liczenia danych okna: godziny z cache (po 404 i błędzie cache jest
+        # pusty, więc wtedy "Hours unavailable"), a nie "w drodze" ani błąd
+        hours, pending = cached_hours(found["pid"]), False
     return found | {"hours": hours, "hours_error": None if hours or pending else HOURS_DOWN, "hours_pending": pending}
 
 

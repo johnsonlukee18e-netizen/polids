@@ -1,13 +1,19 @@
-import { api, esc, h, ONLINE_EVENT } from "./api.js";
+import { api, esc, h, lsGet, lsSet, ONLINE_EVENT } from "./api.js";
+import { equipment, field18, levelText, voiceType, xlHtml } from "./xlabel.js";
 
-// OTHER › FLIGHT PLAN (0.13.0, issue #23): plan lotu po znaku wywoławczym (GET /api/vatsim/flightplan/<ZNAK>).
+export { equipment, field18, levelText, voiceType };
+
+// OTHER › FLIGHT PLAN (0.13.0, issue #23; 0.14.2, issue #35): lot po znaku wywoławczym (GET /api/vatsim/flightplan/<ZNAK>).
 // Jedno pole (wielkie litery; Enter albo SHOW pokazuje, Esc czyści pole), nad wynikiem nagłówek ze znakiem, stanem
-// ONLINE / PREFILED i (tylko online) odnośnikiem MAP › (#map/<ZNAK>: szczegóły lotu na mapie). Wartości w kratkach
-// w dwóch grupach: pilot (imię, nazwisko, PID, godziny pilota i ATC, rating) i plan lotu w kolejności pól planu ICAO
-// (7 znak + SSR, 8 reguły, 9 typ / turbulencja, 10 wyposażenie i łączność głosowa /V/ /R/ /T/, 13 lotnisko i EOBT,
-// 15 prędkość / poziom / trasa, 16 lotnisko docelowe / EET / zapasowe, 18 inne informacje rozbite na wskaźniki,
-// 19 autonomia); pilot online także "teraz" (SSR, wysokość, GS, kurs). Imię i nazwisko to podział nazwy z sieci
-// (heurystyka): pełna nazwa jest w dymku. Pole przewija się razem z paskiem tylko w wąskim oknie: przewija się wynik.
+// ONLINE / PREFILED i (tylko online) odnośnikiem MAP › (#map/<ZNAK>: szczegóły lotu na mapie). Pod nim okno
+// EXTENDED LABEL WINDOW jak w SDD 2014 (xlabel.js: osiem wierszy, kolory SDD, KEY = nazwy pól; stan KEY w pamięci
+// przeglądarki "polids.xlKey"), obok dane pilota (imię, nazwisko, PID, godziny pilota i ATC, rating) i, dla pilota
+// online, wysokość teraz (okno SDD nie ma wysokości, a SSR, GS i kurs pokazuje samo okno). Niżej cały plan lotu
+// w kratkach w kolejności pól planu ICAO (7 znak + SSR, 8 reguły, 9 typ / turbulencja, 10 wyposażenie i łączność
+// głosowa /V/ /R/ /T/, 13 lotnisko i EOBT, 15 prędkość / poziom / trasa, 16 lotnisko docelowe / EET / zapasowe,
+// 18 inne informacje rozbite na wskaźniki, 19 autonomia): okno skraca trasę i uwagi do szerokości SDD, a tu są całe.
+// Imię i nazwisko to podział nazwy z sieci (heurystyka): pełna nazwa jest w dymku. Pole przewija się razem z paskiem
+// tylko w wąskim oknie: przewija się wynik.
 // Pokazany plan odświeża się co 30 s, gdy podzakładka jest na ekranie (bez zmian w danych bez rysowania od nowa:
 // zaznaczony tekst zostaje); 404 przy odświeżeniu = pilot rozłączył się i nie ma prefile: plan znika.
 // Moduł nie zapisuje adresu sam: onLookup(znak) raz na każde wyszukanie z pola (OTHER zapisuje
@@ -28,42 +34,6 @@ const VOICE = { V: ["VOICE", "Full voice"], R: ["RECEIVE ONLY", "Receives voice,
 export const CALLSIGN_RE = /^[A-Z0-9]{2,12}$/;
 export const cleanCallsign = (v) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
 
-// Pola 10 i 18: equipment() i field18() przeniesione z dawnej zakładki STRIP (usuniętej w 0.13.0), bez zmian w działaniu.
-// pole 10 z pełnego typu: "B38M/M-SDE2E3FGHIJ1RWXY/LB1" → typ, WTC, NAV/COM, dozorowanie
-export function equipment(full) {
-  const m = /^([A-Z0-9]{2,4})(?:\/([LMHJ]))?(?:-([A-Z0-9]*))?(?:\/([A-Z0-9]*))?$/.exec(String(full || "").trim().toUpperCase());
-  if (!m) return { type: null, wake: null, navcom: null, surv: null };
-  return { type: m[1], wake: m[2] || null, navcom: m[3] || null, surv: m[4] ?? null };
-}
-
-const F18_KEYS = new Set(["STS", "PBN", "NAV", "COM", "DAT", "SUR", "DEP", "DEST", "DOF", "REG", "EET", "SEL", "TYP", "CODE",
-  "DLE", "OPR", "ORGN", "PER", "ALTN", "RALT", "TALT", "RIF", "RMK", "RVR", "RFP", "EUR", "IFP"]);
-// pole 18 z uwag: { PBN: "A1B1", DOF: "261028", RMK: "TCAS", ... } w kolejności z planu; "/V/", "/R/", "/T/" pomijamy
-// (łączność głosowa: voiceType, kratka Voice w polu 10)
-export function field18(remarks) {
-  const out = {};
-  let key = null;
-  for (const tok of String(remarks || "").toUpperCase().split(/\s+/)) {
-    if (!tok || /^\/[VRT]\/$/.test(tok)) continue;
-    const m = /^([A-Z]{3,4})\/(.*)$/.exec(tok);
-    if (m && F18_KEYS.has(m[1])) {
-      key = m[1];
-      out[key] = out[key] ? `${out[key]} ${m[2]}`.trim() : m[2];
-    } else {
-      // tekst bez wskaźnika przed sobą = uwagi
-      key = key || "RMK";
-      out[key] = out[key] ? `${out[key]} ${tok}` : tok;
-    }
-  }
-  return out;
-}
-
-// łączność głosowa z uwag: "V" (głos), "R" (tylko odbiór), "T" (tylko tekst); kilka znaczników: ostatni; null = brak
-export function voiceType(remarks) {
-  const found = String(remarks || "").toUpperCase().split(/\s+/).map((t) => /^\/([VRT])\/$/.exec(t)?.[1]).filter(Boolean);
-  return found.length ? found[found.length - 1] : null;
-}
-
 const has = (v) => v !== null && v !== undefined && v !== "";
 
 // pole 15, prędkość: TAS w węzłach jako N + 4 cyfry ("450" → "N0450"); gotowe "N0450", "K0830", "M078" bez zmian
@@ -71,23 +41,6 @@ export function speedText(tas) {
   const s = String(tas ?? "").trim().toUpperCase();
   if (/^(?:[NK]\d{4}|M\d{3})$/.test(s)) return s;
   return /^\d{1,4}$/.test(s) && Number(s) > 0 ? "N" + s.padStart(4, "0") : null;
-}
-
-// pole 15, poziom: "37000", "FL370", "F370", "370" (setki stóp) → "F370"; do 6500 ft wysokość ("3500" → "A035");
-// "VFR" i inne zapisy bez zmian
-export function levelText(alt) {
-  const s = String(alt ?? "").trim().toUpperCase();
-  if (!s) return null;
-  let m = /^FL?(\d{2,3})$/.exec(s);
-  if (m) return "F" + m[1].padStart(3, "0");
-  m = /^A(\d{2,3})$/.exec(s);
-  if (m) return "A" + m[1].padStart(3, "0");
-  if (/^\d+$/.test(s)) {
-    const n = Number(s), ft = n < 1000 ? n * 100 : n;
-    if (!ft) return null;
-    return (ft >= 6500 ? "F" : "A") + String(Math.round(ft / 100)).padStart(3, "0");
-  }
-  return s;
 }
 
 // czas trwania HHMM jako H:MM (EET, autonomia): "0130" → "1:30", "45" → "0:45"
@@ -138,15 +91,12 @@ function pilotHtml(d) {
   </div>${note}</section>`;
 }
 
-function positionHtml(p) {
+// teraz (pilot online): sama wysokość; SSR, GS i kurs są w oknie EXTENDED LABEL
+function nowHtml(p) {
   if (!p) return "";
-  const n = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null);
-  const alt = n(p.altitude), gs = n(p.groundspeed), hdg = n(p.heading);
+  const alt = typeof p.altitude === "number" && Number.isFinite(p.altitude) ? Math.round(p.altitude) : null;
   return `<section class="fpl-group fpl-now"><h3 class="fpl-h">Now</h3><div class="fpl-boxes">
-    ${box("SSR", p.squawk, { tip: "Transponder code set now" })}
     ${box("Altitude", alt === null ? null : `${alt} ft`)}
-    ${box("GS", gs === null ? null : `${gs} kt`, { tip: "Ground speed" })}
-    ${box("HDG", hdg === null ? null : String(((hdg % 360) + 360) % 360 || 360).padStart(3, "0"), { tip: "Heading" })}
   </div></section>`;
 }
 
@@ -175,8 +125,9 @@ function planHtml(d) {
   </section>`;
 }
 
-// cały wynik dla danych z /api/vatsim/flightplan; czysta funkcja (testy w Node), każdy tekst z sieci escapowany
-export function fplHtml(d) {
+// cały wynik dla danych z /api/vatsim/flightplan; czysta funkcja (testy w Node), każdy tekst z sieci escapowany;
+// opts.key = okno z nazwami pól (KEY)
+export function fplHtml(d, opts = {}) {
   const online = d.status === "online";
   const cs = String(d.callsign || "");
   return `<div class="fpl-head">
@@ -184,11 +135,16 @@ export function fplHtml(d) {
       <span class="fpl-state ${online ? "on" : "pre"}" title="${online ? "Pilot connected now" : "Flight plan filed before connecting"}">${online ? "ONLINE" : "PREFILED"}</span>
       ${online ? `<a class="fpl-map" href="#map/${encodeURIComponent(cs)}" title="Show the flight on the map">MAP \u203a</a>` : ""}
     </div>
-    <div class="fpl-row">${pilotHtml(d)}${online ? positionHtml(d.position) : ""}</div>
+    <div class="fpl-row">${xlHtml(d, { key: !!opts.key })}<div class="fpl-side">${pilotHtml(d)}${online ? nowHtml(d.position) : ""}</div></div>
     ${planHtml(d)}`;
 }
 
 const EMPTY = `<p class="hint fpl-empty">Type a callsign and press Enter.</p>`;
+// KEY w oknie EXTENDED LABEL: "1" = nazwy pól widoczne (ten sam klucz co okno lotu STRIP w 0.12.5)
+const KEY_STORE = "polids.xlKey";
+// bez pamięci przeglądarki (tryb prywatny, zablokowana): KEY wyłączony na starcie i niezapamiętany (lsGet / lsSet)
+const loadKey = () => lsGet(KEY_STORE) === "1";
+const saveKey = (on) => lsSet(KEY_STORE, on ? "1" : "0");
 
 export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) {
   const root = h(`<div class="fpl">
@@ -204,6 +160,8 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
   // cs = pokazywany znak ("" = pusty formularz); data = ostatnia odpowiedź; seq odrzuca spóźnione odpowiedzi;
   // shown = HTML na ekranie (ten sam wynik nie jest rysowany od nowa)
   let cs = "", data = null, failed = false, loadedAt = 0, seq = 0, timer = null, retry = null, dead = false, shown = EMPTY;
+  // key: nazwy pól w oknie EXTENDED LABEL; zostaje przy odświeżeniu i przy następnych lotach
+  let key = loadKey();
   const visible = () => root.isConnected && root.offsetParent !== null;
   const note = (text = "", cls = "hint") => { msg.className = "fpl-msg " + cls; msg.textContent = text; };
   const put = (html) => { if (html !== shown) { out.innerHTML = html; shown = html; } };
@@ -217,7 +175,7 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
       const d = await api(`/api/vatsim/flightplan/${encodeURIComponent(want)}`);
       if (dead || my !== seq) return;
       data = d; failed = false; loadedAt = Date.now();
-      put(fplHtml(d));
+      put(fplHtml(d, { key }));
       note();
       if (d.hours_pending && retry === null) retry = setTimeout(() => load(true), HOURS_RETRY_MS);
     } catch (e) {
@@ -262,6 +220,16 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
     else if (e.key === "Escape" && input.value) { e.preventDefault(); input.value = ""; }
   });
   root.querySelector(".fpl-go").addEventListener("click", submit);
+  // KEY w belce okna: nazwy pól nad wartościami (wynik rysowany od nowa, fokus wraca na KEY)
+  out.addEventListener("click", (e) => {
+    if (!e.target?.closest?.(".xl-key")) return;
+    key = !key;
+    saveKey(key);
+    if (data) {
+      put(fplHtml(data, { key }));
+      out.querySelector(".xl-key")?.focus();
+    }
+  });
   // serwer wrócił po przerwie: plan, którego nie udało się pobrać, od razu jeszcze raz
   const online = () => { if (cs && failed) load(!!data); };
   window.addEventListener(ONLINE_EVENT, online);

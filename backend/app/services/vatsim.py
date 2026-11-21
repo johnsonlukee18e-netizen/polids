@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 from ..config import settings
+from . import motion
 from .http_cache import fetch_text
 
 DATA_FEED = "https://data.vatsim.net/v3/vatsim-data.json"
@@ -35,7 +36,10 @@ async def _json(url: str, ttl: int):
 
 
 async def get_feed() -> dict:
-    return await _json(DATA_FEED, 30)
+    data = await _json(DATA_FEED, 30)
+    # 0.14.2: odczyt każdego pilota do ruchu w oknie EXTENDED LABEL (FLIGHT PLAN); ten sam feed z cache nic nie zmienia
+    motion.observe(data)
+    return data
 
 
 async def get_bookings() -> list[dict]:

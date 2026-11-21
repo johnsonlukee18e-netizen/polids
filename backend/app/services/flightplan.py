@@ -1,6 +1,7 @@
 """OTHER › FLIGHT PLAN (0.13.0, issue #23): plan lotu po znaku wywoławczym z data feed VATSIM (pilot online albo
 prefile) z danymi pilota: imię i nazwisko z nazwy w sieci, PID (= CID), rating pilota i godziny pilota i ATC
-z API członków VATSIM (/v2/members/{cid}/stats).
+z API członków VATSIM (/v2/members/{cid}/stats). 0.14.2: także pełny znak radiowy (telefonia linii + numer lotu) do
+wiersza 1 okna EXTENDED LABEL (radio_callsigns, wspólne z paskami AERODROME › TRAFFIC).
 
 API członków pytamy tylko o jednego pilota na jedno wyszukanie (nigdy hurtowo, np. dla wszystkich samolotów na mapie):
 ma limity zapytań. Godziny zmieniają się powoli, więc cache jest długi; członka bez statystyk (404) albo po błędzie
@@ -16,8 +17,10 @@ import time
 from datetime import datetime, timezone
 
 import httpx
+from sqlalchemy import select
 
 from ..config import settings
+from ..models import Callsign
 from .http_cache import UpstreamError, describe, fetch_text, forget, peek
 from .vatsim import assigned_squawk, fp_wake, parse_time
 
@@ -43,6 +46,8 @@ _EPOCH = datetime.min.replace(tzinfo=timezone.utc)
 _CODE = re.compile(r"[A-Za-z]{4}")
 _WRAP = "()[]{}<>-–|,.;:"
 _PUNCT = re.compile(r"[-–|/,.]+")
+# znak linii (trzy litery) i numer lotu: "LOT3827" → ("LOT", "3827"), "DLH4AB" → ("DLH", "4AB")
+RADIO_CS = re.compile(r"([A-Z]{3})(\d[A-Z0-9]{0,4})")
 
 
 def _s(value) -> str | None:
@@ -116,6 +121,21 @@ def plan_fields(fp: dict | None) -> dict | None:
         "revision_id": rev if isinstance(rev, int) and not isinstance(rev, bool) else None,
         "assigned_squawk": assigned_squawk(fp),
     }
+
+
+def radio_callsigns(db, callsigns) -> dict:
+    """Pełny znak wywoławczy: telefonia linii z ICAO_Airlines (tabela callsigns) + numer lotu, np. DLH4AB →
+    "LUFTHANSA 4AB" ({znak: tekst}). Znak bez prefiksu linii (SPKAT) albo prefiks bez telefonii: None. Jedno zapytanie
+    do bazy na całą listę (paski AERODROME › TRAFFIC, FLIGHT PLAN)."""
+    parts = {cs: m.groups() for cs in callsigns if (m := RADIO_CS.fullmatch(str(cs or "")))}
+    prefixes = {p for p, _ in parts.values()}
+    tel = dict(db.execute(select(Callsign.icao, Callsign.telephony)
+                          .where(Callsign.icao.in_(prefixes), Callsign.telephony.is_not(None), Callsign.telephony != "")).all()) if prefixes else {}
+    out = {}
+    for cs in callsigns:
+        p, n = parts.get(cs, (None, None))
+        out[cs] = f"{tel[p].strip().upper()} {n}" if p in tel else None
+    return out
 
 
 def _same(p, cs: str) -> bool:
@@ -215,8 +235,9 @@ async def _load_hours(cid: int) -> dict | None:
     return hours
 
 
-def _cached_hours(cid: int) -> dict | None:
-    """Godziny z ostatniej odpowiedzi w cache, także starszej niż HOURS_TTL_S (None = brak albo nieczytelna)."""
+def cached_hours(cid: int) -> dict | None:
+    """Godziny z ostatniej odpowiedzi w cache, także starszej niż HOURS_TTL_S (None = brak albo nieczytelna).
+    Router FLIGHT PLAN bierze stąd godziny, które doszły w tle, zanim policzył dane okna EXTENDED LABEL."""
     hit = peek(stats_url(cid))
     if not hit:
         return None
@@ -242,13 +263,13 @@ async def member_hours(cid, wait: float | None = None) -> dict | None:
     for k in [k for k, until in _miss.items() if until <= now]:
         del _miss[k]
     if cid in _miss:
-        return _cached_hours(cid)
+        return cached_hours(cid)
     task = _tasks.get(cid)
     if task is None or task.done() or task.get_loop() is not asyncio.get_running_loop():
         task = _tasks[cid] = asyncio.ensure_future(_load_hours(cid))
         task.add_done_callback(lambda t, c=cid: _tasks.pop(c) if _tasks.get(c) is t else None)
     done, _pending = await asyncio.wait({task}, timeout=HOURS_WAIT_S if wait is None else wait)
-    return task.result() if done else _cached_hours(cid)
+    return task.result() if done else cached_hours(cid)
 
 
 def hours_pending(cid) -> bool:
