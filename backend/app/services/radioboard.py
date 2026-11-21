@@ -822,7 +822,9 @@ def indicators(lay: dict, online: dict, sectors: list[dict], acc_short: dict[str
         value, counted = indicator_value(r, online, sectors, acc_short)
         note = ""
         if r.get("rule") == "acc" and (fmp or {}).get("code"):
-            note = f"Configuration {fmp['code']}" + (f": {fmp['label']}" if fmp.get("label") else "") + f" (sectors {value})"
+            # etykieta ze spacjami jak w OTHER › FMP i w dymku FMP (fmp.js spaced, radioboard.js fmpTip): "ALL + NFIR"
+            label = " + ".join(str(fmp["label"]).split("+")) if fmp.get("label") else ""
+            note = f"Configuration {fmp['code']}" + (f": {label}" if label else "") + f" (sectors {value})"
             value = fmp["code"]
         out.append({"id": r["id"], "tip": r.get("tip") or "", "value": value, "note": note,
                     "positions": [_who(cs, online) for cs in counted]})

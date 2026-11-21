@@ -1555,8 +1555,8 @@ console.log(JSON.stringify({
   marks: [{ gc: "1", gr: "5", n: [285, 660], at: "two" }, { gc: "2", gr: "1", n: [999], at: "up" }, { gc: "1", gr: "7", n: [0], at: "dn" }].map(radio.markHtml),
   ind: radio.indicatorHtml(ind, x), indNone: radio.indicatorHtml({ ...ind, value: "0", positions: [] }, x),
   indNet: radio.indicatorHtml({ ...ind, value: "0", positions: [] }, { ...x, net: false }),
-  indNote: radio.indicatorHtml({ ...ind, id: "ACC GAT", value: "2N", note: "Configuration 2N: ALL+NFIR (sectors N+ALL)" }, x),
-  indNoteNet: radio.indicatorHtml({ ...ind, id: "ACC GAT", value: "2N", note: "Configuration 2N: ALL+NFIR (sectors N+ALL)" }, { ...x, net: false }),
+  indNote: radio.indicatorHtml({ ...ind, id: "ACC GAT", value: "2N", note: "Configuration 2N: ALL + NFIR (sectors N+ALL)" }, x),
+  indNoteNet: radio.indicatorHtml({ ...ind, id: "ACC GAT", value: "2N", note: "Configuration 2N: ALL + NFIR (sectors N+ALL)" }, { ...x, net: false }),
   ber: radio.berlinHtml(ber), berPref: radio.berlinHtml({ ...ber, config: "WEST", preferred: true, tip: "" }),
   berNone: radio.berlinHtml({}),
   berNet: radio.berlinHtml({ ...ber, config: "EAST", preferred: true, tip: "" }, { ...x, net: false }),
@@ -1666,7 +1666,7 @@ def test_js_neighbour_boxes(tmp_path):
     assert ">–</span></div>" in out["indNet"] and ">0</span></div>" not in out["indNet"] and "Now: no data" in out["indNet"]
     # 0.14.2: ACC GAT z kodem konfiguracji FMP, w dymku druga linia z konfiguracją i literami sektorów; bez danych sieci – bez niej
     assert '<span class="rb-indt">2N</span>' in out["indNote"]
-    assert "ACC GAT: Warszawa APP configuration" in out["indNote"] and "\nConfiguration 2N: ALL+NFIR (sectors N+ALL)\nEPWA_APP 128.805" in out["indNote"]
+    assert "ACC GAT: Warszawa APP configuration" in out["indNote"] and "\nConfiguration 2N: ALL + NFIR (sectors N+ALL)\nEPWA_APP 128.805" in out["indNote"]
     assert "Configuration 2N" not in out["indNoteNet"] and "Now: no data" in out["indNoteNet"]
     # BERLIN: żółty napis i szare pole; czerwony napis (pref), gdy z ATIS nie wiadomo, który pas
     ber, pref = out["ber"], out["berPref"]

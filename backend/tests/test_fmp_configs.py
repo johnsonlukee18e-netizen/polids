@@ -255,7 +255,7 @@ def test_board_acc_indicator_shows_config_code(client):
         b = client.get("/api/radio/board").json()
         i = acc(b)
         assert i["value"] == code, code
-        assert i["note"].startswith(f"Configuration {code}: {by[code]['label']} (sectors ") and i["note"].endswith(")"), i["note"]
+        assert i["note"].startswith(f"Configuration {code}: {' + '.join(by[code]['label'].split('+'))} (sectors ") and i["note"].endswith(")"), i["note"]
         assert {p["callsign"] for p in i["positions"]} == {p["callsign"] for p in by[code]["positions"]}, code
         # pozostałe wskaźniki bez zmian i bez notki
         assert all(not x["note"] for x in b["indicators"] if x["id"] != "ACC GAT")
