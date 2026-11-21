@@ -407,27 +407,33 @@ def test_css_flat_and_linked():
 
 
 def test_css_three_lines_right_of_photo():
-    """0.14.0 (issue #28): dane na prawo od zdjęcia (flex w rzędzie, zdjęcie się zmniejsza, dane nie), trzy linijki
-    po trzy kratki w siatce; pod zdjęcie dane schodzą tylko w wąskim panelu (zapytanie o kontener rozwinięcia).
-    Rozwinięcie najwyżej na widoczną szerokość listy i przyklejone do jej lewej krawędzi (lista przewijana w bok)."""
+    """0.14.0 (issue #28): dane na prawo od zdjęcia (flex w rzędzie), trzy linijki po trzy kratki w siatce. Zdjęcie
+    wypełnia miejsce obok danych (najwyżej do swojej szerokości), dane się nie zmniejszają; pod zdjęcie schodzą
+    (zawinięcie) dopiero wtedy, gdy obok nich na zdjęcie zostaje mniej niż 220 px, więc próg zależy od szerokości
+    kratek typu (np. C172 w oknie 900 px zostaje obok zdjęcia, szersze kratki A30B schodzą pod zdjęcie).
+    Rozwinięcie najwyżej na widoczną szerokość listy i przyklejone do jej lewej krawędzi (lista przewijana w bok), ale
+    co najmniej na szerokość kratek: w liście węższej od kratek (okno ok. 640 px) przyklejone rozwinięcie ucinało
+    prawe kratki bez możliwości przewinięcia."""
     text = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
     split = _css_rule(".ac-split")
-    assert "display: flex;" in split and "flex-direction" not in split and "flex-wrap" not in split
+    assert "display: flex;" in split and "flex-direction" not in split and "flex-wrap: wrap;" in split
     assert "align-items: flex-start;" in split
     photo = _css_rule(".ac-split > .photo-box")
-    assert "flex: 0 1 auto;" in photo and "min-width: 0;" in photo
+    basis = re.search(r"flex: 1 1 (\d+)px;", photo)
+    assert basis and 200 <= int(basis.group(1)) <= 240, photo
+    assert "min-width: 0;" in photo and "max-width: max-content;" in photo
     data = _css_rule(".ac-data")
     assert "flex: none;" in data and "width: min-content;" in data
     # siatka 3 x 3: linijka bez własnego pudełka, kratki w kolumnach
     assert "grid-template-columns: repeat(3, max-content);" in _css_rule(".ac-boxes")
     assert "display: contents;" in _css_rule(".ac-line")
-    # dane pod zdjęciem dopiero w wąskim kontenerze rozwinięcia
+    # rozwinięcie: widoczna szerokość listy (jednostka cqi kontenera .ac-list), przyklejone, nie węższe od kratek;
+    # bez zawężania rozmiaru (container) samego rozwinięcia, bo wtedy min-content liczy się jak dla pustego
     detail = _css_rule(".ac-detail")
-    assert "container: ac-detail / inline-size;" in detail
     assert "position: sticky;" in detail and "width: min(100%, calc(100cqi - 22px));" in detail
+    assert "min-width: min-content;" in detail and "container" not in detail
     assert "container-type: inline-size;" in _css_rule(".ac-list")
-    q = re.search(r"@container ac-detail \(max-width: (\d+)px\) \{\s*\.ac-split \{ flex-direction: column; \}\s*\}", text)
-    assert q and 520 <= int(q.group(1)) <= 640
+    assert "@container" not in text
     # zdjęcie w proporcjach pliku
     img = _css_rule(".ac-detail .photo-box img")
     assert "max-height: 300px;" in img and "max-width: min(640px, 100%);" in img and "object-fit" not in img

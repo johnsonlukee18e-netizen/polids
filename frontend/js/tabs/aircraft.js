@@ -160,7 +160,8 @@ const link = (href, text, cls) => `<a${cls ? ` class="${cls}"` : ""} href="${esc
 // Rozwinięcie (klik w wiersz, issue #25 "dodatkowy widok"): wiersz pod klikniętym na całą szerokość tabeli.
 // 0.14.0 (issue #28): zdjęcie po lewej, dane na prawo od zdjęcia (rozwinięcie niższe): trzy linijki kratek (lines),
 // pod nimi odnośniki (strona osiągów typu, kolejne zdjęcia, wyszukiwarka bazy osiągów dla typów bez własnej strony).
-// Pod zdjęcie dane schodzą tylko w wąskim panelu (aircraft.css, @container ac-detail)
+// Pod zdjęcie dane schodzą tylko wtedy, gdy obok nich na zdjęcie zostaje mniej niż 220 px (aircraft.css, .ac-split
+// z zawijaniem)
 export function detail(a) {
   const q = encodeURIComponent(searchName(a));
   return `<tr class="ac-detail-row"><td colspan="${COLUMNS.length}"><div class="ac-detail"><div class="ac-split">
