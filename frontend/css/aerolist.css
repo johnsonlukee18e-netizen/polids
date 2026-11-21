@@ -59,6 +59,13 @@
    listą klawiatura dotykowa (keyboard.css), w wąskim panelu klawisze węższe jak w AIRCRAFT i CALLSIGN (cqw panelu) */
 .aero-find { container-type: inline-size; }
 .aero-find > .tkbd { --tk-w: min(56px, calc((100cqw - 41px) / 10)); margin-top: 8px; }
+/* wąskie albo niskie okno (wind.css: .aero-pane .content w naturalnej wysokości, przewija się cały panel): wyszukiwarka
+   zostaje na wysokość panelu, wyniki przewijają się w swoim okienku, a klawiatura stoi pod nim na dole (inaczej po
+   pierwszej literze zjeżdżała pod 100 wierszy wyników, np. na tablecie pionowo); okienko ma co najmniej 3 wiersze */
+.aero-pane.find-mode .content { flex: 1 1 auto; }
+.aero-find .alist-box { min-height: calc(3 * var(--alist-row-h)); }
+/* bardzo wąski panel (okno ok. 650 px): bez kolumny FIR, więcej miejsca na nazwę (FIR zostaje w dymku wiersza) */
+@container (max-width: 460px) { .aero-find-fir { display: none; } }
 .aero-find-fir { grid-column: 4; color: var(--muted); font: 14px var(--mono); }
 
 /* karta lotniska zagranicznego: METAR na całą szerokość, niżej TAF i stanowiska (APP, TWR, GND, DEL, ATIS) */

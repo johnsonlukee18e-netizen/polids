@@ -234,7 +234,18 @@ const isFilter = (cs) => ["EPWW_DBT_CTR", "EPWA_APP", "EPKK_APP"].includes(cs);
 const privateSync = ov.syncPosition({ seen: "EPKK_APP", position: "EPKK_APP", loaded: true }, api.choiceGet("test.blocked"), isFilter);
 blocked = false;
 
+// 0.14.0 (issue #28): overview.js przez import() z ponowną próbą (retryImport): dwa błędy (serwer nie odpowiada), potem
+// moduł; numery prób (nowy adres przy każdej), ta sama obietnica w trakcie wczytywania i po wczytaniu
+const tries = [];
+let fails = 2;
+const imp = home.retryImport((n) => { tries.push(n); return fails-- > 0 ? Promise.reject(new Error("offline")) : Promise.resolve({ n }); });
+const pending = imp() === imp();
+const retry = [];
+for (let i = 0; i < 4; i++) retry.push(await imp().then((m) => m.n, (e) => e.message));
+const retryOut = { pending, retry, tries, kept: imp() === imp() };
+
 console.log(JSON.stringify({
+  retryOut,
   posKey: api.POS_KEY,
   choice,
   privateSync,
@@ -411,13 +422,22 @@ def test_home_steps(js):
     assert js["steps"] == ["", "checkin", "", "checkin", "checkin", "", "", ""]
 
 
+def test_retry_import(js):
+    """0.14.0 (issue #28): nieudany import() przeglądarka zapamiętuje pod jego adresem (TRY AGAIN i powrót serwera nic by
+    nie dały aż do przeładowania strony), więc każda ponowna próba ma swój numer (?retry=n); w trakcie wczytywania
+    i po wczytaniu ta sama obietnica, bez nowego pobierania."""
+    assert js["retryOut"] == {"pending": True, "retry": ["offline", "offline", 2, 2], "tries": [0, 1, 2], "kept": True}
+
+
 def test_home_two_steps_in_one_tab():
     """Krok 1 (powitanie i wybór stanowiska) i krok 2 (SELF CHECK-IN z overview.js) w jednej zakładce; check-in
     wczytywany dopiero przy pierwszym otwarciu (HOME statycznie importuje tylko api.js); powrót do kroku 1 i wieża
     w check-inie to kroki do cofnięcia; adres zakładki zgłoszony z activate()."""
     home = (FRONTEND / "js" / "tabs" / "home.js").read_text("utf-8")
     assert '<div class="home-checkin" hidden></div>' in home and '<div class="home-main">' in home
-    assert 'import("../overview.js").then(({ mountOverview }) => {' in home
+    # overview.js pobierany już przy montowaniu HOME, ponowna próba po błędzie pod nowym adresem (retryImport)
+    assert 'const ovImport = retryImport((n) => import(n ? `../overview.js?retry=${n}` : "../overview.js"));' in home
+    assert "ovImport().catch(() => {});" in home and "ovLoading = ovImport().then(({ mountOverview }) => {" in home
     assert 'onGoto: (code) => navigate("aerodrome", code),' in home and 'onBack: () => navigate("home", ""),' in home
     assert "showStep(stepOf(arg, step));\n        remember(\"home\", step);" in home
     assert 'pane.classList.toggle("ci-mode", ci);' in home

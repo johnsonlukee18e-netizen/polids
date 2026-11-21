@@ -12,8 +12,8 @@ import { api, choiceGet, choiceSet, esc, h, navigate, ONLINE_EVENT, POS_KEY, rem
 // Wieża (TWR) zamiast check-inu otwiera od razu stronę INFO lotniska w AERODROME, jak wybór TWR w dawnym OVERVIEW.
 
 // POS_KEY z api.js (ten sam w overview.js): stanowisko wybrane w kroku 1 check-in otwiera od razu.
-// Moduł importuje statycznie tylko api.js (test powłoki wczytuje go w Node); overview.js wczytuje dopiero krok 2
-// (import() przy pierwszym otwarciu check-inu)
+// Moduł importuje statycznie tylko api.js (test powłoki wczytuje go w Node); overview.js przez import() w mount()
+// (ovImport niżej), montowany dopiero w kroku 2
 // stan VATSIM odświeżany, gdy krok 1 HOME jest na ekranie (data feed i tak co 30 s)
 const REFRESH_MS = 60000;
 
@@ -161,6 +161,15 @@ export function sessionTarget(p) {
     : { tab: "home", arg: CHECKIN, label: "SELF CHECK-IN" };
 }
 
+// 0.14.0 (issue #28): import() z ponowną próbą (czysta funkcja, testy w Node). load(n) zwraca obietnicę modułu, n = numer
+// próby (0 = pierwsza). Wczytywany albo wczytany moduł zostaje (każde wywołanie dostaje tę samą obietnicę), nieudana
+// próba jest zapominana, a następna dostaje kolejny numer: nieudany import() przeglądarka zapamiętuje pod jego adresem
+// (Chrome nie pobiera go drugi raz aż do przeładowania strony), więc ponowna próba musi iść pod innym (?retry=n)
+export function retryImport(load) {
+  let p = null, n = 0;
+  return () => (p ??= load(n).catch((e) => { p = null; n += 1; throw e; }));
+}
+
 const aerodromes = (n) => (n === 1 ? "aerodrome" : "aerodromes");
 
 export default {
@@ -260,14 +269,20 @@ export default {
 
     // --- 0.14.0 (issue #28): krok 2, SELF CHECK-IN ------------------------------------------------------------------
     const box = $(".home-checkin");
-    // overview.js przy pierwszym otwarciu check-inu; serwer nie odpowiada: komunikat z przyciskiem TRY AGAIN, ponowna
-    // próba także po powrocie serwera i przy następnym otwarciu kroku 2.
+    // overview.js pobierany od razu przy montowaniu HOME (serwer właśnie odpowiedział; do 0.13.6 statyczny import
+    // w AERODROME), a montowany dopiero w kroku 2. Ponowna próba po błędzie pod nowym adresem (retryImport);
+    // importy overview.js (api.js, meteo.js, checklist.js) to dalej te same, już wczytane moduły
+    const ovImport = retryImport((n) => import(n ? `../overview.js?retry=${n}` : "../overview.js"));
+    // błąd pokaże dopiero otwarcie kroku 2
+    ovImport().catch(() => {});
+    // serwer nie odpowiada przy otwarciu kroku 2: komunikat z przyciskiem TRY AGAIN, ponowna próba także po powrocie
+    // serwera i przy następnym otwarciu kroku 2.
     // Check-in już otwarty: zostaje ze swoim filtrem i checklistą, chyba że w kroku 1 wybrano inne stanowisko (sync)
     const openCheckin = () => {
       if (ov) { ov.sync(); return; }
       if (ovLoading) return;
       box.innerHTML = `<div class="hint home-ci-msg">Loading the self check-in\u2026</div>`;
-      ovLoading = import("../overview.js").then(({ mountOverview }) => {
+      ovLoading = ovImport().then(({ mountOverview }) => {
         box.innerHTML = "";
         ov = mountOverview(box, {
           // wieża wybrana w polu check-inu: strona INFO lotniska w AERODROME (krok do cofnięcia)

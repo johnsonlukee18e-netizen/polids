@@ -577,6 +577,14 @@ def test_find_page_contract():
     css = (ROOT_DIR / "frontend" / "css" / "aerolist.css").read_text("utf-8")
     assert ".aero-pane.find-mode > .toolbar { display: none; }" in css
     assert ".aero-find > .tkbd { --tk-w: min(56px, calc((100cqw - 41px) / 10));" in css
+    # wąskie albo niskie okno (wind.css: .aero-pane .content { flex: none }): wyszukiwarka na wysokość panelu, wyniki
+    # przewijane w okienku, klawiatura na dole (wcześniej po pierwszej literze zjeżdżała pod 100 wierszy wyników);
+    # reguła mocniejsza (3 klasy) niż .aero-pane .content z wind.css (2 klasy)
+    assert ".aero-pane.find-mode .content { flex: 1 1 auto; }" in css
+    assert ".aero-find .alist-box { min-height: calc(3 * var(--alist-row-h)); }" in css
+    assert "@container (max-width: 460px) { .aero-find-fir { display: none; } }" in css
+    wind = (ROOT_DIR / "frontend" / "css" / "wind.css").read_text("utf-8")
+    assert ".aero-pane .content, .aero-pane .aero-grid { flex: none; }" in wind
 
 
 def test_aerodrome_without_aip_hours(client):

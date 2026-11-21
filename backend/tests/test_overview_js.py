@@ -149,6 +149,19 @@ def test_back_button_only_with_on_back():
     assert "onGoto?.(goto);" in src and '$(".ov-back")?.addEventListener("click", () => onBack());' in src
 
 
+def test_refresh_only_on_screen():
+    """0.14.0 (issue #28): check-in w HOME nie jest niszczony po wyjściu z kroku 2 (krok 1, inna zakładka), więc co minutę
+    pyta serwer tylko, gdy jest na ekranie (wcześniej pytał bez końca w tle); po powrocie do kroku 2 (sync) od razu,
+    gdy ostatnie zapytanie jest starsze niż minuta, inaczej bez nowego zapytania."""
+    src = OVERVIEW_JS.read_text("utf-8")
+    assert "timer = setInterval(() => { if (el.isConnected && el.offsetParent !== null) load(); }, REFRESH_MS);" in src
+    assert "timer = setInterval(load, REFRESH_MS);" not in src
+    load = src[src.index("  const load = async () => {"):src.index("  const load = async () => {") + 120]
+    assert "askedAt = Date.now();" in load and "let askedAt = Date.now();" in src
+    sync = src[src.index("    sync() {"):src.index("    destroy() {")]
+    assert "if (next.position === position) {\n        if (Date.now() - askedAt >= REFRESH_MS) load();" in sync
+
+
 def test_overview_css_look():
     css = re.sub(r"/\*.*?\*/", "", OVERVIEW_CSS.read_text("utf-8"), flags=re.S)
     assert all(r.strip() == "0" for r in re.findall(r"border-radius:\s*([^;}]+)", css))

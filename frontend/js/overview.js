@@ -261,6 +261,8 @@ export function mountOverview(el, { onGoto, onBack } = {}) {
   // MINE / ALL, zapamiętane w tej przeglądarce
   let scope = scopeOf(lsGet(SCOPE_KEY));
   let timer = null, chk = null, destroyed = false, last = null, posLoaded = false;
+  // 0.14.0 (issue #28): chwila ostatniego zapytania (sync po powrocie do kroku 2 HOME odświeża dane starsze niż minuta)
+  let askedAt = Date.now();
 
   // lista stanowisk do filtra (ACC / APP / TWR); bez niej zostaje sam widok całego FIR-u
   const loadPositions = async () => {
@@ -343,6 +345,7 @@ export function mountOverview(el, { onGoto, onBack } = {}) {
 
   const load = async () => {
     const want = position;
+    askedAt = Date.now();
     let d;
     try {
       d = await api("/api/overview" + (want ? "?position=" + encodeURIComponent(want) : ""));
@@ -403,13 +406,18 @@ export function mountOverview(el, { onGoto, onBack } = {}) {
   window.addEventListener(ONLINE_EVENT, online);
 
   loadPositions().then(load);
-  timer = setInterval(load, REFRESH_MS);
+  // 0.14.0 (issue #28): w HOME check-in nie jest niszczony po wyjściu z kroku 2 (krok 1, inna zakładka), więc co minutę
+  // tylko na ekranie (el bez offsetParent = schowany); po powrocie od razu, gdy dane są starsze (sync niżej)
+  timer = setInterval(() => { if (el.isConnected && el.offsetParent !== null) load(); }, REFRESH_MS);
   return {
     // ponowne pokazanie otwartego check-inu: stanowisko wybrane w międzyczasie w kroku 1 HOME (tego okna) zamiast starego
     sync() {
       const next = syncPosition({ seen, position, loaded: posLoaded }, choiceGet(POS_KEY), listed);
       seen = next.seen;
-      if (next.position === position) return;
+      if (next.position === position) {
+        if (Date.now() - askedAt >= REFRESH_MS) load();   // 0.14.0 (issue #28): dane sprzed schowania check-inu
+        return;
+      }
       position = next.position;
       $(".ov-pos").value = position;
       open = new Set();
