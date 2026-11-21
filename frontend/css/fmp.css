@@ -129,6 +129,8 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
 .fmp-cp { flex: none; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 24px; padding: 6px 10px 8px;
   background: #000; border: 1px solid #3a3a3a; color: #fff; font: 400 13px/1.35 var(--ui); }
 .fmp-cp[hidden] { display: none; }
+/* wąskie okno (przegląd 0.14.0): tabela stanowisk przewija się w poziomie w panelu, zamiast ucinać kolumny MID i HIGH */
+.fmp-cp-list { min-width: 0; max-width: 100%; overflow-x: auto; }
 .fmp-cp-h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 3px; }
 .fmp-cp-code { font: 400 20px/1.2 var(--ui); letter-spacing: .4px; }
 .fmp-cp-lbl { color: var(--text); font-size: 14px; }
@@ -162,3 +164,9 @@ table.fmp-table tr.fmp-grp.free td { color: var(--yellow); }
 table.fmp-table tr.fmp-grp.other td { color: var(--text); }
 .fmp-grp-sub { margin-left: 10px; color: var(--muted); font-size: 12px; letter-spacing: 0; }
 table.fmp-table tr.fmp-none td { padding: 2px 12px 2px 28px; background: #000; color: var(--muted); font-size: 13px; cursor: default; }
+
+/* niskie albo wąskie okno (przegląd 0.14.0): pasek i panel konfiguracji nie zabierają tabeli całego miejsca – tabela
+   (z wykresami) ma co najmniej 300 px wysokości, a gdy wszystko się nie mieści, przewija się cały obszar FMP (pasek
+   i panel odjeżdżają w górę); w większym oknie bez zmian (przewija się tylko tabela) */
+.pane.fill > .fmp { overflow-y: auto; }
+.pane.fill > .fmp > .fmp-main { min-height: 300px; }

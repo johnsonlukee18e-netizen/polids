@@ -647,12 +647,24 @@ await tick();
 // po konfiguracjach: panel 2N, tabela w grupach stanowisk, przycisk 2N wybrany i z NOW, sektor dalej zaznaczony
 o.loaded = [panel.hidden, panel.innerHTML.includes('<span class="fmp-cp-code">2N</span>'), groups(),
   box.innerHTML.includes('<table class="fmp-table grouped">'), bar.innerHTML.includes('class="fmp-cb on now" data-cfg="2N"'), sel(), picks.length];
-// drugi klik w wybraną konfigurację: bez konfiguracji (krok historii z samym sektorem), tabela jak dotąd, bez zapytań
+// drugi klik w wybraną konfigurację: bez konfiguracji (krok historii z samym sektorem), tabela jak dotąd, bez zapytań;
+// przegląd 0.14.0: fokus z klawiatury na przycisku 2N wraca na nowy przycisk 2N (pasek rysowany od nowa)
+const focused = [], btn2N = { dataset: { cfg: "2N" } };
+bar.contains = (x) => x === btn2N;
+bar.kids['button[data-cfg="2N"]'] = { focus: (opt) => focused.push(opt) };
+globalThis.document = { activeElement: btn2N };
 clickCfg("2N");
+globalThis.document = { activeElement: null };
 o.off = [[...picks], panel.hidden, groups(), globalThis.__ls["fmp.config"], sel(), urls()];
-// klik w inną: krok historii z konfiguracją i sektorem, grupy tej konfiguracji
+o.focus = focused;
+// klik w inną: krok historii z konfiguracją i sektorem, grupy tej konfiguracji; wybrany wiersz przewinięty do widoku
+// w tabeli, a cały obszar FMP zostaje, gdzie był (przegląd 0.14.0: w niskim oknie przewija się cały obszar)
+root.scrollTop = 5;
+const push = globalThis.__scrolled.push.bind(globalThis.__scrolled);
+globalThis.__scrolled.push = (x) => { root.scrollTop = 99; return push(x); };
 clickCfg("1X");
 o.on = [[...picks].slice(1), panel.hidden, groups(), globalThis.__ls["fmp.config"], sel()];
+o.keep = [root.scrollTop, globalThis.__scrolled.includes("EP-BH")];
 // adres (Wstecz / Dalej): konfiguracja i sektor bez onPick
 page.activate("2N/EP-JL");
 o.addr = [picks.length, groups(), sel(), urls(), globalThis.__ls["fmp.config"]];
@@ -687,6 +699,8 @@ def test_fmp_page_configurations(tmp_path):
     assert o["loaded"] == [False, True, ["ALL", "NFIR", "OTHER"], True, True, ["EP-BH"], 0]
     assert o["off"] == [[["EP-BH", False]], True, [], "", ["EP-BH"], []]
     assert o["on"] == [[["1X/EP-BH", False]], False, ["ALL", "OTHER"], "1X", ["EP-BH"]]
+    # przegląd 0.14.0: fokus zostaje na przycisku konfiguracji; obszar FMP nie odjeżdża przy wyborze konfiguracji
+    assert o["focus"] == [{"preventScroll": True}] and o["keep"] == [5, True]
     assert o["addr"] == [2, ["ALL", "NFIR", "OTHER"], ["EP-JL"], ["/api/viff/sectors/EP-JL"], "2N"]
     assert o["unknown"] == [[["EP-BH", True]], True, [], ["EP-BH"], "", ["/api/viff/sectors/EP-BH"]]
     assert o["tvOnly"] == [[], ["EP-JL"], 3, ["/api/viff/sectors/EP-JL"]]

@@ -474,6 +474,10 @@ def test_fmp_files_conventions():
     src = (FRONTEND / "js" / "fmp.js").read_text("utf-8")
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "fmp.css").read_text("utf-8"), flags=re.S)
     assert not re.search(r"border-radius:\s*[1-9]|text-shadow|box-shadow:\s*0 0 [1-9]|drop-shadow|glow", css)
+    # przegląd 0.14.0: niskie albo wąskie okno – tabela co najmniej 300 px, a przewija się cały obszar FMP; lista
+    # stanowisk panelu przewija się w poziomie zamiast ucinać kolumny warstw
+    assert ".pane.fill > .fmp { overflow-y: auto; }" in css and ".pane.fill > .fmp > .fmp-main { min-height: 300px; }" in css
+    assert ".fmp-cp-list { min-width: 0; max-width: 100%; overflow-x: auto; }" in css
     assert "0.14.0 (Marek)" in src and "0.14.0 (Marek)" in (FRONTEND / "js" / "tabs" / "other.js").read_text("utf-8")
     # nazwy klas bez słów, po których blokery reklam chowają elementy
     names = set(re.findall(r"\.(fmp-[a-z0-9-]+)", css)) | set(re.findall(r'class="([a-z0-9 -]+)"', src))

@@ -417,9 +417,12 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     box.innerHTML = fmpHtml(data, sel, c);
     box.scrollTop = top;
   };
-  // pasek CONFIGURATION i panel wybranej konfiguracji (stanowiska i podglądy)
+  // pasek CONFIGURATION i panel wybranej konfiguracji (stanowiska i podglądy); przegląd 0.14.0: fokus z klawiatury
+  // na przycisku konfiguracji wraca na przycisk tego samego kodu (pasek rysowany od nowa po wyborze i co 60 s)
   const drawCfg = () => {
+    const a = globalThis.document?.activeElement, had = a && bar.contains?.(a) ? cleanCfg(a.dataset?.cfg) : "";
     bar.innerHTML = cfgBarHtml(cd, cfgSel, cdErr);
+    if (had) bar.querySelector?.(`button[data-cfg="${had}"]`)?.focus?.({ preventScroll: true });
     const c = cfgOf();
     panel.hidden = !c;
     panel.innerHTML = c ? `<div class="fmp-cp-list">${cfgPanelHtml(c, cd.current, cd.layers)}</div>`
@@ -499,7 +502,8 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     fixCfg();
     drawCfg();
     drawTable();
-    if (sel) keepRow();
+    // wybrany wiersz widoczny w tabeli; w niskim oknie cały obszar FMP zostaje, gdzie był (pasek pod kursorem)
+    if (sel) { const top = root.scrollTop; keepRow(); root.scrollTop = top; }
     if (user) onPick(fmpArg(cfgSel, sel));
   };
   box.addEventListener("click", (e) => {
