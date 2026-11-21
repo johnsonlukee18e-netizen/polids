@@ -122,6 +122,8 @@
 .as-scale .sc-a td { padding: 1px 0; color: var(--yellow); }
 .as-scale .sc-b td.sc-id { padding: 1px 10px 1px 8px; border-left: 3px solid #5a5a5a; color: #fff; white-space: nowrap; }
 .as-scale .sc-b td.sc-n { padding: 1px 6px 1px 0; color: #c9d1c9; }
+/* 0.14.0: częstotliwość stanowiska między nazwą a kontrolerem, jak w panelu Positions z obrazka Marka */
+.as-scale .sc-b td.sc-f { padding: 1px 10px 1px 0; color: var(--green-text); white-space: nowrap; }
 .as-scale .sc-b.none td.sc-id { color: var(--muted); }
 .as-scale .sc-b.at td { background: #16301a; }
 /* dymek jest ciemny także na jasnym podkładzie: SYM w nim żółty jak na ciemnym (.map.light .pos-sim to ciemny żółty) */

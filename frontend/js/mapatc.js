@@ -38,17 +38,18 @@ export function altScale(slices) {
   return out;
 }
 
-// HTML dymka z altScale: granica w osobnej linijce, pod nią obsługujący pasma (nazwa stanowiska i imię i nazwisko;
+// HTML dymka z altScale: granica w osobnej linijce, pod nią obsługujący pasma (nazwa stanowiska, częstotliwość
+// i imię i nazwisko, jak panel Positions z obrazka Marka w issue #28;
 // symulacja: SYM; nieobsadzone: "–"); kreska po lewej w kolorze stanowiska jak jego obszar na mapie. lv: rysowany
 // poziom (null = wszystkie): pasmo z tym poziomem wyróżnione. alt: zapis granicy (altLabel z airspace.js).
 export function altScaleHtml(rows, { lv = null, alt = altText } = {}) {
   if (!rows?.length) return "";
   return `<table class="as-scale">${rows.map((r) => {
-    if (r.alt !== undefined) return `<tr class="sc-a"><td colspan="2">${esc(alt(r.alt))}</td></tr>`;
+    if (r.alt !== undefined) return `<tr class="sc-a"><td colspan="3">${esc(alt(r.alt))}</td></tr>`;
     const at = lv !== null && r.lo <= lv && lv < r.hi ? " at" : "";
-    if (!r.who.length) return `<tr class="sc-b${at} none"><td class="sc-id">${DASH}</td><td></td></tr>`;
+    if (!r.who.length) return `<tr class="sc-b${at} none"><td class="sc-id">${DASH}</td><td></td><td></td></tr>`;
     return r.who.map((w) => `<tr class="sc-b${at}"><td class="sc-id"${/^#[0-9a-f]{3,8}$/i.test(w.color || "") ? ` style="border-left-color:${w.color}"` : ""}>`
-      + `${esc(w.id)}</td><td class="sc-n">${w.sim ? `<span class="pos-sim">SYM</span>` : esc(w.name || "")}</td></tr>`).join("");
+      + `${esc(w.id)}</td><td class="sc-f">${esc(w.freq || "")}</td><td class="sc-n">${w.sim ? `<span class="pos-sim">SYM</span>` : esc(w.name || "")}</td></tr>`).join("");
   }).join("")}</table>`;
 }
 

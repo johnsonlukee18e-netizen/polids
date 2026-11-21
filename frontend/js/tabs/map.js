@@ -777,13 +777,15 @@ function mainMap(ctx) {
   // z imieniem i nazwiskiem kontrolera, "–" bez obsady; kreska w kolorze obszaru stanowiska. Cała kolumna przestrzeni
   // w tym punkcie (wszystkie poziomy, włączone warstwy i wybór z list), pasmo z rysowanym poziomem wyróżnione.
   // Obsada wyłączona (podział pełny): stanowisko z kolejności przejmowania, bez nazwiska i bez koloru.
+  // częstotliwość stanowiska z danych (pełny podział bez sieci: nikt nie jest zalogowany)
+  const freqOf = (cs) => net.posBy[cs]?.frequency || net.vacs?.acc_positions?.[cs]?.frequency || "";
   const whoOf = (pr, own) => {
     if (!net.useOnline) {
       const cs = own.ch?.chain[0] || pr.callsign;
-      return cs ? [{ key: cs, id: displayName(cs), name: "" }] : [];
+      return cs ? [{ key: cs, id: displayName(cs), freq: (own.ch ? freqOf(cs) : "") || pr.frequency || "", name: "" }] : [];
     }
     const c = own.c || own.top;
-    return c ? [{ key: c.callsign, id: displayName(c.callsign), name: c.name || "", sim: !!c.sim,
+    return c ? [{ key: c.callsign, id: displayName(c.callsign), freq: c.frequency || "", name: c.name || "", sim: !!c.sim,
       color: ownColor.get(c.callsign) || colorFor(own.key || own.who || c.callsign) }] : [];
   };
   const hoverHtml = (x, y, lv) => {

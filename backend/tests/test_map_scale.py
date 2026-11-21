@@ -15,7 +15,8 @@ NODE_SCRIPT = r"""
 const m = await import(process.argv[2]);
 const pt = await import(process.argv[3]);
 const ctl = (cs, name, o = {}) => ({ key: cs, id: cs.replace(/_CTR$|_/g, (x) => (x === "_" ? " " : "")), name, ...o });
-const DBF = ctl("EPWW_DBF_CTR", "Petr Trojan", { color: "#fd8c7b" }), ALL = ctl("EPWW_ALL_CTR", "Petr Hruza", { color: "#4fcc92" });
+const DBF = ctl("EPWW_DBF_CTR", "Petr Trojan", { color: "#fd8c7b", freq: "133.180" });
+const ALL = ctl("EPWW_ALL_CTR", "Petr Hruza", { color: "#4fcc92", freq: "125.450" });
 const TWR = ctl("EPPO_TWR", "Jan Kowalski"), APP = ctl("EPWA_APP", "Anna Nowak"), DIR = ctl("EPWA_DIR", "Ewa Lis");
 const out = {};
 // obraz z issue: sektor D nad TMA Poznań N, ALL w środku (FL195-FL365), DBF nad i pod nim (TMA top-down)
@@ -101,15 +102,16 @@ def _lines(html):
 
 
 def test_reference_scale(js):
-    """Obraz map3 z issue: FL660 / DBF / FL365 / ALL / FL195 / DBF / FL095, z imieniem i nazwiskiem."""
+    """Obraz map3 z issue: FL660 / DBF / FL365 / ALL / FL195 / DBF / FL095, z częstotliwością, imieniem i nazwiskiem."""
     assert _who(js["ref"]) == [66000, ["EPWW_DBF_CTR"], 36500, ["EPWW_ALL_CTR"], 19500, ["EPWW_DBF_CTR"], 9500]
     assert _lines(js["refHtml"]) == [
-        ("sc-a", "FL660"), ("sc-b", "EPWW DBF | Petr Trojan"), ("sc-a", "FL365"), ("sc-b", "EPWW ALL | Petr Hruza"),
-        ("sc-a", "FL195"), ("sc-b", "EPWW DBF | Petr Trojan"), ("sc-a", "FL095")]
+        ("sc-a", "FL660"), ("sc-b", "EPWW DBF | 133.180 | Petr Trojan"), ("sc-a", "FL365"),
+        ("sc-b", "EPWW ALL | 125.450 | Petr Hruza"), ("sc-a", "FL195"), ("sc-b", "EPWW DBF | 133.180 | Petr Trojan"),
+        ("sc-a", "FL095")]
     html = js["refHtml"]
     assert html.startswith('<table class="as-scale">') and "border-left-color:#fd8c7b" in html
-    # krótko: bez rodzaju i nazwy przestrzeni, częstotliwości, "since", pogrubień
-    for gone in ("ACC", "TMA", "since", "133.180", "<b", "<strong", "airspaces here", "top-down"):
+    # krótko: bez rodzaju i nazwy przestrzeni, "since", pogrubień (częstotliwość jest, jak w panelu Positions z obrazka)
+    for gone in ("ACC", "TMA", "since", "<b", "<strong", "airspaces here", "top-down"):
         assert gone not in html, gone
     # rysowany poziom FL300: wyróżnione pasmo ALL (FL195-FL365)
     assert [c for c, _ in _lines(js["refLv"])] == ["sc-a", "sc-b", "sc-a", "sc-b at", "sc-a", "sc-b", "sc-a"]
@@ -119,14 +121,15 @@ def test_scale_merges_and_overlaps(js):
     assert _who(js["merged"]) == [66000, ["EPWW_DBF_CTR"], 9500]
     # TWR w CTR wygrywa z nieobsadzonym FIS; TMA i FIS bez obsady razem jako jedno pasmo "-"
     assert _who(js["mixed"]) == [66000, ["EPWW_DBF_CTR"], 19500, [], 2500, ["EPPO_TWR"], 0]
-    assert _lines(js["mixedHtml"]) == [("sc-a", "FL660"), ("sc-b", "EPWW DBF | Petr Trojan"), ("sc-a", "FL195"),
-                                       ("sc-b none", "– | "), ("sc-a", "2500 ft"), ("sc-b", "EPPO TWR | Jan Kowalski"),
+    assert _lines(js["mixedHtml"]) == [("sc-a", "FL660"), ("sc-b", "EPWW DBF | 133.180 | Petr Trojan"),
+                                       ("sc-a", "FL195"), ("sc-b none", "– |  | "), ("sc-a", "2500 ft"),
+                                       ("sc-b", "EPPO TWR |  | Jan Kowalski"),
                                        ("sc-a", "GND")]
     # przerwa: dwie granice bez pasma między nimi
     assert _who(js["gap"]) == [9500, ["EPWA_APP"], 6500, 2500, ["EPPO_TWR"], 0]
     # dwa stanowiska w jednym paśmie: oba (mniejszy obszar pierwszy), ten sam kontroler raz
     assert _who(js["two"]) == [9500, ["EPWA_APP", "EPWA_DIR"], 2500]
-    assert [t for _, t in _lines(js["twoHtml"])] == ["FL095", "EPWA APP | Anna Nowak", "EPWA DIR | Ewa Lis", "2500 ft"]
+    assert [t for _, t in _lines(js["twoHtml"])] == ["FL095", "EPWA APP |  | Anna Nowak", "EPWA DIR |  | Ewa Lis", "2500 ft"]
     assert js["bad"] == [] and js["badHtml"] == ""
 
 

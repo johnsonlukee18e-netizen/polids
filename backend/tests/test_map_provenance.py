@@ -33,12 +33,13 @@ def test_airspace_tooltip_without_takeover_order():
     for gone in ("chainHtml", "as-ch", "asc-src", "as-chr", "ACC per", "ownership order", "OWNER lists", "r.chs", ".chs."):
         assert gone not in code, gone
     # 0.14.0 (issue #28): dymek to podziałka wysokości (mapatc.js altScale / altScaleHtml): granice i stanowisko z imieniem
-    # i nazwiskiem kontrolera; bez rodzaju, nazwy i ID przestrzeni, częstotliwości, "since" i "top-down"
+    # i nazwiskiem kontrolera i częstotliwością stanowiska (jak panel Positions z obrazka Marka); bez rodzaju, nazwy i ID
+    # przestrzeni, "since" i "top-down"
     hover = code.split("const hoverHtml = (x, y, lv) => {")[1].split("\n  };")[0]
     assert "altScaleHtml(altScale(" in hover and "{ lv, alt: altLabel }" in hover and "<tr" not in hover
     who = code.split("const whoOf = (pr, own) => {")[1].split("\n  };")[0]
-    assert "id: displayName(c.callsign), name: c.name" in who
-    for gone in ("since", "top-down", "frequency", "logon_time", "full split", "group_label"):
+    assert "id: displayName(c.callsign), freq: c.frequency" in who and "name: c.name" in who
+    for gone in ("since", "top-down", "logon_time", "full split", "group_label"):
         assert gone not in who and gone not in hover, gone
     for gone in ("whoHtml", "KIND_TAG", "as-k as-"):
         assert gone not in code, gone
