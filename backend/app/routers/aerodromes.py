@@ -10,10 +10,11 @@ from starlette.concurrency import run_in_threadpool
 
 from ..config import settings
 from ..database import get_db
-from ..models import Aerodrome, AircraftType, AtcPosition, Callsign
+from ..models import Aerodrome, AircraftType, AtcPosition
 from ..services import dman as dman_service
 from ..services import viff as viff_service
 from ..services.aerolist import FIR_KEYS, FIR_LABELS, airport_entry, airport_positions, fir_key, fir_lists
+from ..services.flightplan import radio_callsigns
 from ..services.http_cache import UpstreamError
 from ..services.lvp import evaluate as evaluate_lvp
 from ..services.positions import all_positions, alt_stations, known_stations
@@ -177,21 +178,14 @@ async def status(icao: str, db: Session = Depends(get_db)):
     }
 
 
-RADIO_CS = re.compile(r"([A-Z]{3})(\d[A-Z0-9]{0,4})")
-
-
 def _radio_callsigns(db: Session, board: dict) -> None:
     """Pełny znak wywoławczy w polu telephony paska (do 0.12.6 wiersz 1 okna lotu STRIP; pole zostaje w odpowiedzi):
     telefonia linii z ICAO_Airlines + numer lotu, np. DLH4AB → "LUFTHANSA 4AB". Znak bez prefiksu linii (SPKAT) albo
-    prefiks bez telefonii: telephony = None."""
+    prefiks bez telefonii: telephony = None. 0.14.2: wspólne z FLIGHT PLAN (services/flightplan.radio_callsigns)."""
     strips = [s for k in ("departures", "arrivals", "local", "planned") for s in board.get(k, [])]
-    parts = {s["callsign"]: m.groups() for s in strips if (m := RADIO_CS.fullmatch(str(s.get("callsign") or "")))}
-    prefixes = {p for p, _ in parts.values()}
-    tel = dict(db.execute(select(Callsign.icao, Callsign.telephony)
-                          .where(Callsign.icao.in_(prefixes), Callsign.telephony.is_not(None), Callsign.telephony != "")).all()) if prefixes else {}
+    tel = radio_callsigns(db, [s.get("callsign") for s in strips])
     for s in strips:
-        p, n = parts.get(s.get("callsign"), (None, None))
-        s["telephony"] = f"{tel[p].strip().upper()} {n}" if p in tel else None
+        s["telephony"] = tel.get(s.get("callsign"))
 
 
 @router.get("/{icao}/strips")

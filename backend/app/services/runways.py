@@ -525,6 +525,21 @@ def runway_in_use(atis: dict | None, preferred: dict) -> dict:
     return {**preferred, "source": "SUGGESTED"}
 
 
+def runway_now(ad, parsed, lvp: dict | None, stations: list[dict], now: datetime | None = None) -> dict | None:
+    """Pas w użyciu jak w AERODROME › INFO: z ATIS (source "ATIS", litera), a bez pasa z ATIS preferowany
+    (source "SUGGESTED", powód wyboru). Lotnisko bez pasów w bazie: None. Wspólne dla OVERVIEW i okna EXTENDED LABEL
+    w FLIGHT PLAN (0.14.2, dawniej overview._runway); stations = kontrolerzy i ATIS z feedu (już po on_frequency)."""
+    if ad is None or not ad.runways:
+        return None
+    state = runway_state(ad, parsed, lvp, now)
+    atis = atis_state(stations, ad.icao, [r["designator"] for r in state["runways"]])
+    use = runway_in_use(atis, state["preferred"])
+    if not use.get("arr"):
+        return None
+    return {"arr": use["arr"], "dep": use["dep"] or use["arr"], "source": use["source"],
+            "letter": atis["letter"] if atis and use["source"] == "ATIS" else None, "reason": use.get("reason")}
+
+
 def suggest_runway(runways: list[dict], wind_dir: int | None, wind_speed: int | None,
                    calm_threshold_kt: int = 5, max_tailwind_kt: float = 5.0):
     """Zgodność wstecz: (wiersz pasa do lądowania, uzasadnienie)."""
