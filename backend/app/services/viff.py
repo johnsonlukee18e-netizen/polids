@@ -203,6 +203,29 @@ def _cap(value) -> int | None:
     return value if isinstance(value, int) and 0 < value < 999 else None
 
 
+def _hour(value) -> int | None:
+    """Godzina koszyka vIFF (pole "hour") jako 0..23: "15", "07", "7", 15, "1500", "15:00", "150000" albo czas z datą
+    ("2026-10-05T15:00:00Z"); inne wartości = None.
+    0.14.0 (issue #28): sectors() porównywał "hour" dosłownie z napisem "HH" ("07"), więc koszyk podany liczbą albo bez
+    zera z przodu nie pasował do żadnej godziny: puste godziny i loty, a na wykresie MAP sama linia przepustowości."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int):
+        return value if 0 <= value < 24 else None
+    s = str(value if value is not None else "").strip()
+    m = re.fullmatch(r"(\d{1,2})|(\d{2}):?\d{2}(?::?\d{2})?", s) or re.search(r"T(\d{2}):?\d{2}", s)
+    h = int(next(g for g in m.groups() if g is not None)) if m else None
+    return h if h is not None and h < 24 else None
+
+
+def _buckets(data, tv: str) -> list[dict]:
+    """Koszyki godzinowe jednego TV z odpowiedzi /etfms/airspaces ({TV: [koszyk, ...]}); inne kształty = brak."""
+    items = data.get(tv) if isinstance(data, dict) else None
+    return [b for b in items if isinstance(b, dict)] if isinstance(items, list) else []
+
+
 def restriction_active(r, now: datetime) -> bool:
     """Regulacja z definicji TV ({type, value, start: "HHMM", end: "HHMM", reason}) obowiązuje teraz; okno
     może przechodzić przez północ (2200–0200). Wspólna reguła dla AERODROME › OVERVIEW, OTHER › FMP i RADIO."""
@@ -253,8 +276,10 @@ def sector_load(tv: str, buckets: list[dict], now: datetime, horizon: int = 60) 
     occupancy = [sum(1 for f in ahead if f["entry"] <= m < f["exit"]) for m in range(horizon + 1)]
     windows = [{"from": m, "to": m + 20, "entries": sum(1 for f in ahead if m <= f["entry"] < m + 20)}
                for m in range(0, horizon, 20)]
-    hours = [{"hour": b.get("hour"), "entries": b.get("entriesCount"), "entries_cap": _cap(b.get("entriesCapacity")),
-              "peak": b.get("peakCount"), "peak_cap": _cap(b.get("peakCapacity")), "active": b.get("active")}
+    # godzina zawsze jako "HH" (0.14.0, issue #28): FMP (tvNow) szuka bieżącej godziny po napisie "HH" z pola now
+    hours = [{"hour": f"{h:02d}" if (h := _hour(b.get("hour"))) is not None else b.get("hour"), "entries": b.get("entriesCount"),
+              "entries_cap": _cap(b.get("entriesCapacity")), "peak": b.get("peakCount"), "peak_cap": _cap(b.get("peakCapacity")),
+              "active": b.get("active")}
              for b in buckets]
     clock = lambda m: (now.replace(second=0, microsecond=0) + timedelta(minutes=m)).strftime("%H%M")  # noqa: E731
     return {"id": tv, "hours": hours, "windows": windows, "occupancy": occupancy,
@@ -292,7 +317,7 @@ def tv_flights(tv: str, days: dict) -> list[dict]:
         for b in buckets if isinstance(buckets, list) else []:
             if not isinstance(b, dict):
                 continue
-            hour = _int(b.get("hour"))
+            hour = _hour(b.get("hour"))
             for t in b.get("flights") or []:
                 if not isinstance(t, list) or len(t) < 3:
                     continue
@@ -373,7 +398,7 @@ def sector_series(tv: str, days: dict, now: datetime, row: dict) -> dict:
     buckets = {}  # minuta początku godziny → koszyk vIFF
     for day, data in days.items():
         for b in (data.get(tv) if isinstance(data, dict) else None) or []:
-            hour = _int(b.get("hour")) if isinstance(b, dict) else None
+            hour = _hour(b.get("hour")) if isinstance(b, dict) else None
             if hour is not None and hour < 24:
                 buckets[day * 1440 + hour * 60] = b
     hours = []
@@ -486,30 +511,35 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
         defs = await _get("/etfms/trafficVolumes", {"filter": prefix, "active": "false", "activeAndDisabled": "true"}, ttl=600)
     except (UpstreamError, ValueError):
         defs = []
-    load = await _get("/etfms/airspaces", {"filter": prefix, "fromNow": "true", "date": today}) or {}
+    # 0.14.0 (issue #28): całodobowe /etfms/airspaces jak wykresy OTHER › FMP (sector_chart) i szczegóły lotu (flight):
+    # te same dane i ten sam klucz cache (jedno zapytanie na minutę zamiast osobnego "fromNow"); z koszyków bieżącej
+    # i następnej godziny liczymy wejścia, zajętość i loty (sector_load)
+    load = await _get("/etfms/airspaces", {"filter": prefix, "date": today}, ttl=60)
+    load = load if isinstance(load, dict) else {}
     # następna godzina po 23Z jest już jutro; jutrzejsza doba to dodatek (jak w sector_chart): błąd = pusta następna
     # godzina zamiast błędu całej tabeli FMP i wykresu
     nxt = {}
     if now.hour == 23:
         try:
-            nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}) or {}
+            nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}, ttl=60) or {}
         except (UpstreamError, ValueError):
             nxt = {}
     try:  # scenariusze też są dodatkiem: każdy błąd = pusta lista
         scns = await scenarios(prefix)
     except Exception:  # noqa: BLE001
         scns = []
-    cur_h, next_h = f"{now.hour:02d}", f"{(now.hour + 1) % 24:02d}"
+    cur_h, next_h = now.hour, (now.hour + 1) % 24
     info = {d["id"]: d for d in (defs if isinstance(defs, list) else []) if isinstance(d, dict) and d.get("id")}
     in_scn = {}  # TV → scenariusze, w których występuje
     for s in scns:
         for t in s["tvs"]:
             in_scn.setdefault(t["id"], []).append((s, t))
-    ids = sorted({i for i in [*info, *(load or {}), *in_scn] if i.startswith(prefix + "-")})
+    ids = sorted({i for i in [*info, *load, *in_scn] if isinstance(i, str) and i.startswith(prefix + "-")})
     out = []
     for tv in ids:
-        buckets = [b for b in (load or {}).get(tv, []) if b.get("hour") == cur_h]
-        buckets += [b for b in ((nxt or {}) if now.hour == 23 else (load or {})).get(tv, []) if b.get("hour") == next_h]
+        # koszyk godziny po _hour (godzina liczbą, "7" albo "07"), nie po dosłownym napisie "HH"
+        buckets = [b for b in _buckets(load, tv) if _hour(b.get("hour")) == cur_h]
+        buckets += [b for b in _buckets(nxt if now.hour == 23 else load, tv) if _hour(b.get("hour")) == next_h]
         d = info.get(tv, {})
         item = sector_load(tv, buckets, now)
         item.update({"volumes": [v for v in (d.get("volumes") or "").split(",") if v], "status": d.get("status"),
@@ -600,7 +630,7 @@ def flight_profile(callsign: str, days: list, now: datetime, yesterday: dict | N
     for day, data in [*([(-1, yesterday)] if yesterday is not None else []), *enumerate(days)]:
         for tv, buckets in (data.items() if isinstance(data, dict) else []):
             for b in buckets if isinstance(buckets, list) else []:
-                hour = _int(b.get("hour")) if isinstance(b, dict) else None
+                hour = _hour(b.get("hour")) if isinstance(b, dict) else None
                 for t in (b.get("flights") if isinstance(b, dict) else None) or []:
                     if not isinstance(t, list) or len(t) < 3 or str(t[0]).upper() != callsign:
                         continue

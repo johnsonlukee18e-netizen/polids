@@ -192,7 +192,7 @@ def test_sector_series_matches_direct_count():
         assert c["peak"] == peak and c["peak_at"] == viff._abs_hhmm(now.hour * 60 + now.minute + peak_from_now), now
 
 
-def _fake(calls, fail=(), days=None, load=None, exc=UpstreamError):
+def _fake(calls, fail=(), days=None, exc=UpstreamError):
     days = days or {"2026-10-05": DAY}
 
     async def get(path, params=None, ttl=None):
@@ -201,8 +201,8 @@ def _fake(calls, fail=(), days=None, load=None, exc=UpstreamError):
         if path == "/etfms/scenarios":
             return []
         if path == "/etfms/airspaces":
-            if "fromNow" in params:   # sectors(): bieżąca doba od teraz
-                return load or {}
+            # 0.14.0 (issue #28): sectors() bierze te same całodobowe dane co wykres (bez "fromNow"), w cache razem
+            assert set(params) == {"filter", "date"} and ttl == 60, params
             calls.append(params["date"])
             if params["date"] in fail:
                 raise exc("timeout")
@@ -217,16 +217,19 @@ def test_sector_chart_service():
         calls = []
         viff._get = _fake(calls)
         c = run(viff.sector_chart("ep-bh", NOW))
-        assert calls == ["2026-10-05"] and c["id"] == "EP-BH" and c["label"] == "sector B upper" and c["prefix"] == "EP"
+        # dzisiejsza doba dla wiersza tabeli (sectors()) i dla wykresu: to samo zapytanie (w aplikacji z cache)
+        assert calls == ["2026-10-05", "2026-10-05"] and c["id"] == "EP-BH" and c["label"] == "sector B upper" and c["prefix"] == "EP"
         # aktywność, przepustowość i regulacje jak wiersz tabeli FMP (sectors())
         row = next(s for s in run(viff.sectors("EP", NOW))["sectors"] if s["id"] == "EP-BH")
         for k in ("active", "entries_cap", "occupancy_cap", "restricted", "regulated", "scenarios", "volumes"):
             assert c[k] == row[k], k
         assert c["active"] is True and (c["entries_cap"], c["occupancy_cap"]) == (45, 14)
         assert [e["count"] for e in c["entries"]][:5] == [2, 1, 2, 1, 3] and len(c["occupancy"]) == 301
-        # doby potrzebne dla okna: 00:10 wczoraj i dziś, 19:10 dziś, 20:10 i 21:10 dziś i jutro
-        for when, dates in ((at(0, 10, 6), ["2026-10-05", "2026-10-06"]), (at(19), ["2026-10-05"]),
-                            (at(20), ["2026-10-05", "2026-10-06"]), (at(21), ["2026-10-05", "2026-10-06"])):
+        # doby potrzebne dla okna (po dzisiejszej dla sectors()): 00:10 wczoraj i dziś, 19:10 dziś, 20:10 i 21:10 dziś
+        # i jutro
+        for when, dates in ((at(0, 10, 6), ["2026-10-06", "2026-10-05", "2026-10-06"]), (at(19), ["2026-10-05"] * 2),
+                            (at(20), ["2026-10-05", "2026-10-05", "2026-10-06"]),
+                            (at(21), ["2026-10-05", "2026-10-05", "2026-10-06"])):
             calls.clear()
             assert run(viff.sector_chart("EP-BH", when)) is not None and calls == dates, when
         # nieznany TV
@@ -242,7 +245,7 @@ def test_sector_chart_service():
                 viff._get = _fake(calls, fail=("2026-10-06",), exc=exc)
                 c = run(viff.sector_chart("EP-BH", at(h)))
                 assert c is not None and c["start"] == f"{h - 1}00", (exc, h)
-                assert calls == (["2026-10-06"] if h == 23 else []) + ["2026-10-05", "2026-10-06"], (exc, h)
+                assert calls == ["2026-10-05"] + (["2026-10-06"] if h == 23 else []) + ["2026-10-05", "2026-10-06"], (exc, h)
         # błąd dzisiejszej doby: UpstreamError (router: 502)
         viff._get = _fake(calls, fail=("2026-10-05",))
         with pytest.raises(UpstreamError):
@@ -258,11 +261,11 @@ def test_sectors_tomorrow_optional():
     viff_get = viff._get
     try:
         calls = []
-        viff._get = _fake(calls, days={"2026-10-06": nxt}, load=load)
+        viff._get = _fake(calls, days={"2026-10-05": load, "2026-10-06": nxt})
         row = next(s for s in run(viff.sectors("EP", at(23)))["sectors"] if s["id"] == "EP-BH")
-        assert calls == ["2026-10-06"] and [h["entries"] for h in row["hours"]] == [4, 7]
+        assert calls == ["2026-10-05", "2026-10-06"] and [h["entries"] for h in row["hours"]] == [4, 7]
         for exc in (UpstreamError, ValueError):
-            viff._get = _fake(calls, fail=("2026-10-06",), days={"2026-10-06": nxt}, load=load, exc=exc)
+            viff._get = _fake(calls, fail=("2026-10-06",), days={"2026-10-05": load, "2026-10-06": nxt}, exc=exc)
             d = run(viff.sectors("EP", at(23)))
             row = next(s for s in d["sectors"] if s["id"] == "EP-BH")
             assert {s["id"] for s in d["sectors"]} == {"EP-BH", "EP-DM"} and [h["entries"] for h in row["hours"]] == [4], exc
@@ -270,7 +273,7 @@ def test_sectors_tomorrow_optional():
         # przed 23Z jutrzejsza doba nie jest potrzebna
         calls.clear()
         run(viff.sectors("EP", at(22)))
-        assert calls == []
+        assert calls == ["2026-10-05"]
     finally:
         viff._get = viff_get
 

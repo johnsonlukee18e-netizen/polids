@@ -17,7 +17,7 @@ from backend.app.routers import vatsim as vatsim_api  # noqa: E402
 from backend.app.services.http_cache import UpstreamError  # noqa: E402
 
 FRONTEND = ROOT_DIR / "frontend"
-MAP_JS = ("js/tabs/map.js", "js/airspace.js", "js/viffchart.js")
+MAP_JS = ("js/tabs/map.js", "js/airspace.js", "js/viffchart.js", "js/mapatc.js")
 
 
 def _code(name):
@@ -32,14 +32,18 @@ def test_airspace_tooltip_without_takeover_order():
     code = _code("js/tabs/map.js")
     for gone in ("chainHtml", "as-ch", "asc-src", "as-chr", "ACC per", "ownership order", "OWNER lists", "r.chs", ".chs."):
         assert gone not in code, gone
-    hover = code.split("const hoverHtml = (hits, lv) => {")[1].split("\n  };")[0]
-    # wiersz: rodzaj, nazwa z ID, zakres pionowy, kto obsługuje (whoHtml: częstotliwość, znak, imię, od kiedy)
-    assert '<td class="lv">${range(r.lo, r.hi)}</td><td>${r.w}</td></tr>`).join("")}</table>`' in hover
-    assert "<tr" in hover and hover.count("<tr") == 1
-    who = code.split("const whoHtml = (v) => {")[1].split("\n  };")[0]
-    assert "since ${hhmm(x.logon_time)}" in who and "top-down:" in who and "unstaffed" in who
+    # 0.14.0 (issue #28): dymek to podziałka wysokości (mapatc.js altScale / altScaleHtml): granice i stanowisko z imieniem
+    # i nazwiskiem kontrolera; bez rodzaju, nazwy i ID przestrzeni, częstotliwości, "since" i "top-down"
+    hover = code.split("const hoverHtml = (x, y, lv) => {")[1].split("\n  };")[0]
+    assert "altScaleHtml(altScale(" in hover and "{ lv, alt: altLabel }" in hover and "<tr" not in hover
+    who = code.split("const whoOf = (pr, own) => {")[1].split("\n  };")[0]
+    assert "id: displayName(c.callsign), name: c.name" in who
+    for gone in ("since", "top-down", "frequency", "logon_time", "full split", "group_label"):
+        assert gone not in who and gone not in hover, gone
+    for gone in ("whoHtml", "KIND_TAG", "as-k as-"):
+        assert gone not in code, gone
     css = re.sub(r"/\*.*?\*/", "", (FRONTEND / "css" / "map.css").read_text("utf-8"), flags=re.S)
-    assert ".as-ch" not in css and ".asc" not in css and "as-chr" not in css
+    assert ".as-ch" not in css and ".asc" not in css and "as-chr" not in css and ".as-k" not in css
     # przegląd: stałe max-width 640 px (dla dawnego wiersza kolejności) ucinało "since HH:MMZ" za ramką dymka;
     # teraz najwyżej szerokość mapy, a na wąskiej mapie zawija się ostatnia kolumna
     tip = re.search(r"\.leaflet-tooltip\.atc-tip\.as-tip \{([^}]*)\}", css).group(1)
@@ -83,7 +87,9 @@ def test_map_functional_names():
     # tytuł panelu bez AIRAC (cykl jest w stopce HOME i pod zegarem menu)
     assert '<div class="ms-head"><b>MAP</b>\n' in code
     chart = _code("js/viffchart.js")
-    assert '<span class="vf-stat">${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · peak' in chart
+    # 0.14.0 (issue #28): pod wykresami TV stan teraz (wejścia i samoloty w sektorze wobec przepustowości) i szczyt
+    assert '`entries ${pair(n.entries, n.entriesCap)} from ${esc(n.entriesFrom)}Z`' in chart
+    assert '`in sector ${pair(n.occupancy, n.occupancyCap)}`' in chart and '`peak ${c.peak} at ${esc(c.peak_at)}Z`' in chart
     assert "`ATFCM: ${v.atfcm_status}`" in chart
 
 
