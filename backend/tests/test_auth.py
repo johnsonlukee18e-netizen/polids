@@ -52,7 +52,7 @@ def test_gate_blocks_everything_else(client):
     assert r.status_code == 401 and r.json()["detail"] == "Login required"
     assert r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/openapi.json").status_code == 401
-    for path in ("/", "/docs", "/static/js/app.js", "/files/docs/Doc_4444_pl.pdf"):
+    for path in ("/", "/docs", "/static/js/app.js", "/files/docs/Doc_4444_pl.pdf", "/files/photos-manual/B738.jpg"):
         r = client.get(path)
         assert r.status_code == 303, path
         assert r.headers["location"].startswith("/auth/login?next=")

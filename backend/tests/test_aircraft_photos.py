@@ -6,7 +6,9 @@ numerem i ponowne sprawdzenie złych zdjęć zapisanych wcześniej (bez ruszania
 BCS3 "dalej pokazuje Airbusa"): adres grafiki z dowolnego serwera Wikimedia (thumb.wikimedia.org), rozszerzenie
 z samej ścieżki adresu, zdjęcie z artykułu o innym modelu nigdy nie jest pokazywane (bez zastępstwa idzie do replaced/,
 a typ zostaje bez zdjęcia), miniatury 960 px, log podmian i ukryć. Wikipedia nie jest dostępna z tego środowiska, więc
-odpowiedzi API są podstawione (httpx.MockTransport)."""
+odpowiedzi API są podstawione (httpx.MockTransport).
+0.14.2 (issue #35): zdjęcia dodane ręcznie w data/photos-manual/ z autorem w <ICAO>.txt (manual_photo) mają
+pierwszeństwo przed wszystkim w data/photos/, bez pytania Wikipedii i bez ruszania pobranych plików."""
 import json
 import os
 import tempfile
@@ -26,8 +28,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import main  # noqa: E402
 from backend.app.config import ROOT_DIR, settings  # noqa: E402
 from backend.app.services import photos  # noqa: E402
-from backend.app.services.photos import (TITLES, fetch_photo, local_photo, model_numbers, only_exact,  # noqa: E402
-                                         photo_query, pick, recheck, stale, title_fit, type_photo, type_words)
+from backend.app.services.photos import (TITLES, fetch_photo, local_photo, manual_photo,  # noqa: E402
+                                         model_numbers, only_exact, photo_query, pick, recheck, stale, title_fit,
+                                         type_photo, type_words)
 
 JPEG = b"\xff\xd8\xff\xe0test"
 REAL_CLIENT = httpx.AsyncClient  # wiki() można wywołać w teście kilka razy (podmienia klienta od nowa)
@@ -41,6 +44,14 @@ def photo_dir(monkeypatch, tmp_path):
     monkeypatch.setattr(photos, "_missing", set())
     monkeypatch.setattr(photos, "_own_logged", set())
     return tmp_path
+
+
+@pytest.fixture
+def manual_dir(monkeypatch, tmp_path_factory):
+    """Katalog zdjęć dodanych ręcznie (data/photos-manual/) osobno od data/photos/ testu."""
+    d = tmp_path_factory.mktemp("manual")
+    monkeypatch.setattr(settings, "manual_photos_dir", d)
+    return d
 
 
 def wiki(monkeypatch, search=None, pages=None, redirects=None, redirs=None, down=False, error=False):
@@ -644,6 +655,69 @@ def test_type_photo_never_fetches_over_own(monkeypatch, photo_dir):
     assert (photo_dir / "BCS3.jpg").read_bytes() == b"own"
 
 
+# --- 0.14.2 (issue #35): zdjęcia dodane ręcznie z autorem ---
+
+def test_manual_photo_with_author(monkeypatch, photo_dir, manual_dir):
+    """<ICAO>.jpg w data/photos-manual/ i autor z pierwszej niepustej linijki <ICAO>.txt (BOM, spacje zwinięte):
+    bez Wikipedii i bez plików w data/photos/."""
+    (manual_dir / "B738.jpg").write_bytes(JPEG)
+    (manual_dir / "B738.txt").write_text("\ufeff\n  Test   Author \nsecond line\n", "utf-8")
+    calls = wiki(monkeypatch, search=[{"title": "Boeing 737 Next Generation"}],
+                 pages={"Boeing 737 Next Generation": img("B738")})
+    got = get("B738")
+    assert got["url"].startswith("/files/photos-manual/B738.jpg?v=") and got["author"] == "Test Author"
+    assert got["credit"] == "" and got["page"] is None
+    assert calls == [] and list(photo_dir.iterdir()) == []
+    assert manual_photo("b738") == got
+
+
+def test_manual_photo_wins_over_auto(monkeypatch, photo_dir, manual_dir):
+    """Ręczne zdjęcie ma pierwszeństwo także przed pobranym zdjęciem do sprawdzenia (recheck): bez pobierania,
+    pobrane pliki zostają na miejscu (nic w replaced/)."""
+    old_auto(photo_dir, "BCS3", "Airbus A321neo")
+    assert recheck("BCS3", "A-220-300")
+    (manual_dir / "BCS3.JPG").write_bytes(JPEG)
+    calls = wiki(monkeypatch, pages={"Airbus A220": img("A220")})
+    got = get("BCS3")
+    assert got["url"].startswith("/files/photos-manual/BCS3.JPG?v=") and got["author"] == ""
+    assert calls == []
+    assert sorted(f.name for f in photo_dir.iterdir()) == ["BCS3.jpg", "BCS3.json"]
+    assert (photo_dir / "BCS3.jpg").read_bytes() == b"old"
+    # bez ręcznego zdjęcia dalej zwykła ścieżka (sprawdzenie i podmiana pobranego)
+    (manual_dir / "BCS3.JPG").unlink()
+    assert get("BCS3")["credit"] == "Wikipedia: Airbus A220"
+
+
+def test_manual_photo_names_and_caption(photo_dir, manual_dir):
+    # wielkość liter w nazwie dowolna, przy kilku plikach typu kolejność EXTS (jpg przed png)
+    (manual_dir / "a20n.webp").write_bytes(b"w")
+    assert manual_photo("A20N")["url"].startswith("/files/photos-manual/a20n.webp?v=")
+    (manual_dir / "C172.png").write_bytes(b"p")
+    (manual_dir / "C172.jpg").write_bytes(b"j")
+    assert manual_photo("C172")["url"].startswith("/files/photos-manual/C172.jpg?v=")
+    # bez pliku z autorem: pusty podpis
+    assert manual_photo("C172")["author"] == ""
+    # podpis najwyżej 120 znaków, bez powtórzonego "Photo:" na początku
+    (manual_dir / "A20N.TXT").write_text("Photo:  " + "x" * 200, "utf-8")
+    assert manual_photo("A20N")["author"] == "x" * photos.CAPTION_MAX and photos.CAPTION_MAX == 120
+    # plik z autorem nie w UTF-8: zdjęcie bez podpisu
+    (manual_dir / "A20N.TXT").write_bytes(b"Autor \xff\xfe z\xb3y")
+    assert manual_photo("A20N")["author"] == ""
+    # sam plik z autorem bez zdjęcia, inny typ, pusty kod: brak
+    (manual_dir / "B744.txt").write_text("Test Author", "utf-8")
+    assert manual_photo("B744") is None and manual_photo("B738") is None and manual_photo("--") is None
+    # inne pliki w katalogu (README.md) niczego nie psują
+    (manual_dir / "README.md").write_text("# x", "utf-8")
+    assert manual_photo("README") is None
+
+
+def test_manual_photo_missing_dir(monkeypatch, photo_dir, tmp_path_factory):
+    monkeypatch.setattr(settings, "manual_photos_dir", tmp_path_factory.mktemp("gone") / "none")
+    assert manual_photo("B738") is None
+    (photo_dir / "B738.jpg").write_bytes(b"own")
+    assert get("B738")["url"].startswith("/files/photos/B738.jpg?v=")
+
+
 # --- cała ścieżka przez API ---
 
 @pytest.fixture(scope="module")
@@ -690,3 +764,20 @@ def test_api_no_matching_article_is_404(client, monkeypatch, photo_dir):
     r = client.get(f"/api/aircraft/{a['id']}/photo")
     assert r.status_code == 404 and r.json()["detail"] == "No photo of this type"
     assert list(photo_dir.iterdir()) == []
+
+
+def test_api_manual_photo(client, monkeypatch, photo_dir, manual_dir):
+    """0.14.2 (issue #35): /api/aircraft/{id}/photo podaje ręczne zdjęcie z autorem, plik pod /files/photos-manual/."""
+    mount = next(r for r in main.app.routes if getattr(r, "path", "") == "/files/photos-manual")
+    monkeypatch.setattr(mount.app, "all_directories", [manual_dir])
+    (manual_dir / "B738.jpg").write_bytes(JPEG + b"manual")
+    (manual_dir / "B738.txt").write_text("Test Author", "utf-8")
+    calls = wiki(monkeypatch, down=True)
+    a = client.get("/api/aircraft", params={"q": "B738"}).json()[0]
+    r = client.get(f"/api/aircraft/{a['id']}/photo")
+    assert r.status_code == 200 and calls == []
+    got = r.json()
+    assert got["author"] == "Test Author" and got["page"] is None and got["credit"] == ""
+    f = client.get(got["url"])
+    assert f.status_code == 200 and f.content == JPEG + b"manual" and f.headers["content-type"] == "image/jpeg"
+    assert client.get("/files/photos-manual/B744.jpg").status_code == 404

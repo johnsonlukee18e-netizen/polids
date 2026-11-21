@@ -7,6 +7,11 @@ Brakujące zdjęcie aplikacja pobiera sama z Wikipedii przy pierwszym otwarciu t
 i zapisuje tutaj, więc później działa bez internetu. Wszystkie naraz: `python scripts/fetch_aircraft_photos.py`.
 Własne zdjęcie wystarczy wrzucić pod nazwą `<ICAO>.jpg`; ma pierwszeństwo przed pobieraniem.
 
+Od 0.14.2 zdjęcia dodawane ręcznie z autorem w podpisie trafiają do `data/photos-manual/` (opis w tamtejszym
+`README.md`): ten katalog jest w repozytorium i w obrazie dockera, a `data/photos` na serwerze to wolumen,
+do którego pliki z repozytorium nie trafiają. Zdjęcie z `data/photos-manual/` ma pierwszeństwo przed
+wszystkim w tym katalogu.
+
 Od 0.13.3 pobierane jest tylko zdjęcie z artykułu o tym modelu: dla A220 (BCS1, BCS3), CRJ i MD-80 tylko z artykułu
 rodziny podanego w `TITLES` (`backend/app/services/photos.py`), dla pozostałych z pięciu wyników wyszukiwania,
 w ich kolejności, artykuł z numerem z pierwszej nazwy ICAO w tytule albo w przekierowaniu na artykuł (np. Antonov

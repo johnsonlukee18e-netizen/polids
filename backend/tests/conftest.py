@@ -9,6 +9,9 @@ os.environ["POLIDS_AUTH_MODE"] = "none"
 os.environ["POLIDS_PUBLIC_URL"] = "http://localhost:1337"
 os.environ["POLIDS_SECRET_KEY"] = ""
 os.environ["POLIDS_STATE_DATABASE_URL"] = "sqlite:///" + os.path.join(tempfile.mkdtemp(), "state.db").replace("\\", "/")
+# 0.14.2 (issue #35): zdjęcia dodane ręcznie z pustego katalogu: pliki wrzucone do data/photos-manual/ w repozytorium
+# nie zmieniają wyników testów zdjęć (test_aircraft_photos podstawia własny katalog)
+os.environ["POLIDS_MANUAL_PHOTOS_DIR"] = tempfile.mkdtemp()
 
 
 @pytest.fixture

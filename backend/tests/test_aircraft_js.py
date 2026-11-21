@@ -9,7 +9,10 @@ odnośniki. Przyciski AIRBUS, BOEING, BOMBARDIER, EMBRAER, GA; grupy GA w kolejn
 0.14.0 (issue #28): "w kolumnie silników dodaj wiadomość o typie silnika, np. 2 Jet" (engineLabel); większa czcionka
 i wyższe wiersze, kolumny bliżej siebie (tabela najwyżej 760 px); dane na prawo od zdjęcia w trzech linijkach
 (lines): wingspan, ARC, length / MTOW, MLW, WTC / VMO, MMO, ceiling; reszta (wysokość, IATA, opis, silniki, WTG,
-opis słownie) nie jest pokazywana w rozwinięciu, ale zostaje w bazie i w API."""
+opis słownie) nie jest pokazywana w rozwinięciu, ale zostaje w bazie i w API.
+0.14.2 (issue #35): lista "praktycznie identyczna" z CALLSIGN (cała szerokość, 20 px, wiersze 32 px), wyraźniejsze
+paski wierszy, zdjęcie w ramce o stałym rozmiarze (dane obok się nie przesuwają), podpis "Photo: <autor>" przy
+zdjęciu dodanym ręcznie, bez odnośników More photos, Image search i Performance search."""
 import json
 import os
 import re
@@ -103,7 +106,8 @@ console.log(JSON.stringify({
   mlw: [[1970, 2047], [1202, 1247], [490, 522], [122000, 136000], [21850, null], [21850, 21850]]
     .map(([lo, hi]) => ac.lines({ icao: "X", mlw: lo, mlw_max: hi })[1][1].find((b) => b.label === "MLW").value),
   credit: [{ credit: "Wikipedia: ATR 72", page: "https://en.wikipedia.org/wiki/ATR_72" },
-    { credit: "J. Kowalski <own>", page: null }, { credit: "", page: null }].map(ac.photoCredit),
+    { credit: "J. Kowalski <own>", page: null }, { credit: "", page: null },
+    { credit: "", page: "https://x", author: "Test Author <x>" }, { credit: "", page: null, author: "" }].map(ac.photoCredit),
 }));
 """
 
@@ -261,13 +265,14 @@ def test_detail_markup(js):
     # wiersz pod klikniętym na całą szerokość tabeli (6 kolumn)
     assert html.startswith('<tr class="ac-detail-row"><td colspan="6"><div class="ac-detail"><div class="ac-split">')
     assert html.rstrip().endswith("</div></div></td></tr>")
-    # 0.14.0 (issue #28): zdjęcie, na prawo od niego dane (kratki w trzech linijkach, pod nimi odnośniki)
-    marks = ['class="photo-box"', 'class="ac-data"', 'class="ac-boxes"', 'class="ac-line dim"', 'class="ac-line wake"',
-             'class="ac-line perf"', 'class="ac-links"']
+    # 0.14.0 (issue #28): zdjęcie, na prawo od niego dane (kratki w trzech linijkach, pod nimi odnośnik). 0.14.2 (issue
+    # #35): w kolumnie zdjęcia ramka o stałym rozmiarze ("Loading photo…" do odpowiedzi) i pusta linijka podpisu
+    marks = ['class="photo-box"', 'class="photo-frame"', 'class="photo-credit hint"', 'class="ac-data"',
+             'class="ac-boxes"', 'class="ac-line dim"', 'class="ac-line wake"', 'class="ac-line perf"', 'class="ac-links"']
     assert [html.index(m) for m in marks] == sorted(html.index(m) for m in marks)
     split = html[html.index('<div class="ac-split">'):]
-    assert re.match(r'<div class="ac-split">\s*<div class="photo-box"><span class="hint">Loading photo…</span></div>\s*'
-                    r'<div class="ac-data">', split)
+    assert re.match(r'<div class="ac-split">\s*<div class="photo-box"><div class="photo-frame"><span class="hint">'
+                    r'Loading photo…</span></div><div class="photo-credit hint"></div></div>\s*<div class="ac-data">', split)
     assert _line_labels(html) == [["WINGSPAN", "ARC", "LENGTH"], ["MTOW", "MLW", "WTC"], ["VMO", "MMO", "CEILING"]]
     assert _line_labels(js["detail"]["EC35"])[0] == ["ROTOR", "ARC", "LENGTH"]
     # reszta danych zniknęła z rozwinięcia: wysokość, IATA, opis typu i kategorii słownie, silniki, WTG
@@ -276,19 +281,20 @@ def test_detail_markup(js):
         assert not re.search(r">(HEIGHT|IATA|DESC|ENG|WTG)<", d), k
         assert "ac-info" not in d and "landplane" not in d and "RECAT-EU" not in d, k
     assert "7.7 m" not in html and "AT7<" not in html
-    # strona osiągów typu jako pierwszy odnośnik, potem zdjęcia i wyszukiwarki
+    # 0.14.2 (issue #35): "usuń opcję "more images", "image search" oraz "performance search"": został jeden
+    # odnośnik, strona osiągów typu
     links = re.findall(r"<a[^>]*>([^<]+)</a>", html[html.index('class="ac-links"'):])
-    assert links == ["Performance ↗", "More photos ↗", "Image search ↗", "Performance search ↗"]
+    assert links == ["Performance ↗"]
     assert re.search(r'<a class="ac-perf" href="[^"]*details\.aspx\?ICAO=AT76"[^>]*>Performance ↗</a>', html)
-    assert "keyword/ATR%20ATR-72-600" in html
-    # wyszukiwarka bazy osiągów (typy bez własnej strony osiągów), nazwana wg funkcji
-    assert re.search(r'<a href="[^"]*/default\.aspx"[^>]*>Performance search ↗</a>', html)
     for k in ("AT76", "A30B", "EC35", "C08T", "ZZZZ"):
-        assert not PROVENANCE.search(_visible(js["detail"][k])), k
-    # nazwa z bazy w adresach wyszukiwarek zakodowana
-    assert "<test>" not in js["detail"]["EC35"] and "EC-135%20%3Ctest%3E" in js["detail"]["EC35"]
-    # 0.13.3: Airbus bez łącznika po A w wyszukiwarkach zdjęć (jak photo_query), inni producenci bez zmian
-    assert "keyword/AIRBUS%20A300" in js["detail"]["A30B"] and "A-300" not in js["detail"]["A30B"].split("ac-links")[1]
+        d = js["detail"][k]
+        assert d.count("<a ") == 1, k
+        for gone in ("More photos", "Image search", "Performance search", "jetphotos", "tbm=isch", "google",
+                     'default.aspx"', "keyword/"):
+            assert gone not in d, (k, gone)
+        assert not PROVENANCE.search(_visible(d)), k
+    # nazwa z bazy nigdzie w rozwinięciu bez escapowania
+    assert "<test>" not in js["detail"]["EC35"]
 
 
 def test_no_bold_markup(js):
@@ -333,13 +339,32 @@ PROVENANCE = re.compile(r"eurocontrol|icao_aircraft|aircraft-database|aircraft\.
 
 def test_photo_credit_names_no_source(js):
     # strona zdjęcia (autor, licencja) jako odnośnik nazwany wg funkcji; własny podpis bez strony jako tekst
-    page, own, empty = js["credit"]
+    page, own, empty, manual, manual_no_author = js["credit"]
     assert page == '<a href="https://en.wikipedia.org/wiki/ATR_72" target="_blank" rel="noopener">Photo page ↗</a>'
     assert not PROVENANCE.search(_visible(page))
     assert own == "J. Kowalski &lt;own&gt;" and empty == ""
+    # 0.14.2 (issue #35): zdjęcie dodane ręcznie: autor jako zwykły tekst (escapowany), bez odnośnika, także gdy
+    # odpowiedź ma stronę; bez autora pusty podpis
+    assert manual == "Photo: Test Author &lt;x&gt;" and "<a" not in manual and manual_no_author == ""
 
 
 # --- mount(): zachowanie z kodu źródłowego ---------------------------------------------------------------------------
+
+def test_photo_fills_fixed_frame():
+    """0.14.2 (issue #35): "dane samolotu przesuwają się po wczytaniu jego zdjęcia": photo() wpisuje zdjęcie albo
+    komunikat do ramki (.photo-frame), a podpis do linijki pod nią (.photo-credit); kolumna zdjęcia (.photo-box)
+    zostaje ta sama, więc rozwinięcie nie zmienia rozmiaru i nie jest przewijane drugi raz po wczytaniu zdjęcia."""
+    body = SRC[SRC.index("const photo = (det, a) => {"):SRC.index('list.addEventListener("click"')]
+    assert 'const frame = det.querySelector(".photo-frame");' in body
+    assert 'const cap = det.querySelector(".photo-credit");' in body
+    assert 'frame.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">`;' in body
+    assert "cap.innerHTML = photoCredit(p);" in body
+    assert 'frame.innerHTML = `<span class="hint">${esc(e.message)}</span>`;' in body
+    assert body.count("if (current !== a) return;") == 2
+    assert "photo-box" not in body and "pb." not in body and "classList" not in body
+    assert 'addEventListener("load"' not in SRC and "reveal(" not in body
+    assert "      photo(det, current);" in SRC
+
 
 def test_mount_table_and_detail_row():
     """Lista to tabela z nagłówkiem, wiersze w tbody; rozwinięcie wstawiane jako wiersz za klikniętym (nie krok
@@ -421,7 +446,10 @@ def test_css_three_lines_right_of_photo():
     photo = _css_rule(".ac-split > .photo-box")
     basis = re.search(r"flex: 1 1 (\d+)px;", photo)
     assert basis and 200 <= int(basis.group(1)) <= 240, photo
-    assert "min-width: 0;" in photo and "max-width: max-content;" in photo
+    # 0.14.2 (issue #35): kolumna zdjęcia najwyżej 450 px niezależnie od pliku (dawniej max-content, czyli szerokość
+    # wczytanego zdjęcia przesuwała dane), ramka i podpis jeden pod drugim
+    assert "min-width: 0;" in photo and "max-width: 450px;" in photo and "max-content" not in photo
+    assert "display: flex;" in photo and "flex-direction: column;" in photo
     data = _css_rule(".ac-data")
     assert "flex: none;" in data and "width: min-content;" in data
     # siatka 3 x 3: linijka bez własnego pudełka, kratki w kolumnach
@@ -434,9 +462,17 @@ def test_css_three_lines_right_of_photo():
     assert "min-width: min-content;" in detail and "container" not in detail
     assert "container-type: inline-size;" in _css_rule(".ac-list")
     assert "@container" not in text
-    # zdjęcie w proporcjach pliku
-    img = _css_rule(".ac-detail .photo-box img")
-    assert "max-height: 300px;" in img and "max-width: min(640px, 100%);" in img and "object-fit" not in img
+    # 0.14.2 (issue #35): ramka 3:2 (450 x 300 px) na czarnym tle, zdjęcie w proporcjach pliku dopasowane do ramki
+    # (contain: bez przycinania, pionowe i bardzo szerokie z czarnymi pasami); linijka podpisu zawsze zajęta
+    frame = _css_rule(".ac-detail .photo-frame")
+    for decl in ("width: 100%;", "aspect-ratio: 3 / 2;", "background: #000;", "overflow: hidden;",
+                 "border: 1px solid var(--line);"):
+        assert decl in frame, decl
+    img = _css_rule(".ac-detail .photo-frame img")
+    assert "width: 100%;" in img and "height: 100%;" in img and "object-fit: contain;" in img
+    assert "max-height" not in img and "max-width" not in img
+    assert "min-height: 1.4em;" in _css_rule(".ac-detail .photo-credit")
+    assert ".photo-box img" not in text and ".photo-box p" not in text
     assert "ac-info" not in text and ".acb.id" not in text
 
 
@@ -454,25 +490,28 @@ def test_css_table():
     table = _css_rule("table.ac-table")
     assert "table-layout: fixed;" in table
     assert "nowrap" in _css_rule(".ac-table tr.ac-rec td.icao") and "nowrap" not in _css_rule(".ac-table td.name")
-    # 0.14.0 (issue #28): większa czcionka i wyższe wiersze (dawniej 13 px i padding 4 px), kolumny bliżej siebie:
-    # tabela najwyżej 760 px (dawniej 980), na nazwę zostaje najwyżej 280 px
+    # 0.14.2 (issue #35): "listy callsign i aircraft mają być praktycznie identyczne": tabela na całą szerokość listy
+    # (bez dawnego limitu 760 px), czcionka, odstępy i wysokość wierszy jak w CALLSIGN (20 px var(--mono), padding
+    # 4 px 8 px, wysokość linii normal ze skrótu font)
+    assert "width: 100%;" in table and "max-width" not in table
     rec = _css_rule(".ac-table tr.ac-rec td")
-    assert int(re.search(r"font-size: (\d+)px;", rec).group(1)) >= 16
-    assert int(re.search(r"padding: (\d+)px", rec).group(1)) >= 6
-    assert int(re.search(r"font-size: (\d+)px;", _css_rule(".ac-table tr.ac-rec td.icao")).group(1)) >= 17
-    ceiling = float(re.search(r"max-width: (\d+)px;", table).group(1))
-    # w wąskim panelu (tablet pionowo) kolumna nazwy nie znika: tabela co najmniej 640 px (lista przewija się w bok),
-    # na nazwę zostaje co najmniej 160 px poza stałymi kolumnami; nazwa łamana na spacjach, nie po jednej literze
+    assert "padding: 4px 8px;" in rec and "font: 20px var(--mono);" in rec and "line-height" not in rec
+    icao = _css_rule(".ac-table tr.ac-rec td.icao")
+    assert "font: 20px var(--mono);" in icao and "color: #fff;" in icao and "letter-spacing" not in icao
+    # w wąskim panelu (tablet pionowo) kolumna nazwy nie znika: tabela co najmniej 800 px (lista przewija się w bok),
+    # na nazwę zostaje co najmniej 200 px poza stałymi kolumnami; nazwa łamana na spacjach, nie po jednej literze
     floor = re.search(r"min-width: (\d+)px;", table)
     assert floor, "table.ac-table bez min-width"
     floor = float(floor.group(1))
     widths = {c: float(re.search(r"width: (\d+)px;", _css_rule(f".ac-table th.{c}")).group(1))
               for c in ("icao", "mk", "eng", "wtc", "recat")}
     fixed = sum(widths.values())
-    assert floor == 640 and fixed == 480 and floor - fixed >= 160
-    assert ceiling == 760 and ceiling - fixed <= 280
-    # kolumna silników mieści "2 Turboshaft" przy 16 px (ok. 89 px tekstu + 16 px paddingu), łamana tylko na spacji
-    assert widths["eng"] >= 108
+    assert widths == {"icao": 90, "mk": 220, "eng": 136, "wtc": 64, "recat": 80}
+    assert floor == 800 and fixed == 590 and floor - fixed >= 200
+    # kolumna ICAO jak w CALLSIGN (table.callsigns td.icao 90 px)
+    assert "width: 90px;" in (FRONTEND / "css" / "style.css").read_text("utf-8").split("table.callsigns td.icao {")[1].split("}")[0]
+    # kolumna silników mieści "2 Turboshaft" przy 20 px (ok. 112 px tekstu + 16 px paddingu), łamana tylko na spacji
+    assert widths["eng"] >= 128
     eng = _css_rule(".ac-table td.eng")
     assert "overflow-wrap: normal;" in eng and "nowrap" not in eng
     assert "overflow: auto;" in _css_rule(".ac-list")
@@ -481,8 +520,13 @@ def test_css_table():
     for k, color in (("A", "#ff6a5a"), ("B", "#ff6a5a"), ("C", "var(--yellow)"), ("D", "var(--yellow)"),
                      ("E", "var(--ok)"), ("F", "var(--ok)")):
         assert re.search(rf"table\.ac-table tr td\.recat-{k}[^{{]*\{{ color: {re.escape(color)}; \}}", text), k
-    # paski wierszy tylko po wierszach typów (rozwinięcie nie przestawia kolorów), rozwinięcie bez podświetlenia
-    assert "table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--row-alt); }" in text
+    # paski wierszy tylko po wierszach typów (rozwinięcie nie przestawia kolorów), rozwinięcie bez podświetlenia.
+    # 0.14.2 (issue #35): wyraźniejsze paski jak w CALLSIGN; pod myszą jaśniej, zaznaczony wiersz zostaje zielony
+    assert "table.ac-table tbody tr.ac-rec td { background: var(--list-row); }" in text
+    assert "table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--list-row-alt); }" in text
+    assert ("table.ac-table tbody tr.ac-rec:not(.selected):hover td { background: var(--list-row-hover) !important; }"
+            in text)
+    assert "var(--row)" not in text and "var(--row-alt)" not in text
     assert "background: var(--sel) !important;" in _css_rule("table.ac-table tbody tr.ac-detail-row td")
     assert "background: var(--head) !important;" in _css_rule("table.ac-table tbody tr.ac-gh td")
 

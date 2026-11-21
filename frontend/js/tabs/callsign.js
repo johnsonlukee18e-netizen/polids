@@ -14,7 +14,7 @@ export default {
     // 0.13.1: pole wyszukiwania u góry i klawiatura dotykowa na dole zostają na miejscu, przewija się tylko lista
     const pane = h(`<div class="pane cs-pane">
       <div class="toolbar">
-        <input type="search" class="q" placeholder="Search: ICAO code, callsign, operator, country…" size="46" autofocus>
+        <input type="search" class="q" placeholder="Search: ICAO code, callsign, operator, country\u2026" size="46" autofocus>
         <select class="cat"><option value="">All</option><option value="CARGO">CARGO only</option><option value="MIL">MILITARY only</option></select>
         <span class="hint count"></span>
       </div>
@@ -32,8 +32,8 @@ export default {
         const rows = await api(`/api/callsigns?q=${encodeURIComponent(q.value.trim())}&prefix=${prefix}&category=${pane.querySelector(".cat").value}&limit=${LIMIT}`);
         if (my !== seq) return;
         pane.querySelector(".count").textContent = `${rows.length} ${rows.length === 1 ? "result" : "results"}`
-          + (rows.length === LIMIT ? ` (first ${LIMIT} shown – pick a letter or type a code)` : "");
-        body.innerHTML = rows.map((r) => `<tr><td class="icao">${esc(r.icao)}</td><td class="tel">${esc(r.telephony || "–")}</td>
+          + (rows.length === LIMIT ? ` (first ${LIMIT} shown \u2013 pick a letter or type a code)` : "");
+        body.innerHTML = rows.map((r) => `<tr><td class="icao">${esc(r.icao)}</td><td class="tel">${esc(r.telephony || "\u2013")}</td>
           <td class="op">${esc(r.name)}</td><td class="ctry">${esc(r.country)}</td>
           <td>${r.category ? `<span class="tag ${r.category.toLowerCase()}">${CATEGORY[r.category] || esc(r.category)}</span>` : ""}</td></tr>`).join("");
       } catch (e) {
