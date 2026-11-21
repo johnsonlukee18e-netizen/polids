@@ -1,39 +1,44 @@
-# Aircraft type photos added by hand
+# Zdjęcia typów samolotów dodawane ręcznie
 
-Photos in this folder are shown in the AIRCRAFT tab instead of the automatic ones, with the author's name as a
-plain caption under the photo ("Photo: <author>") instead of a link.
+Zdjęcia z tego katalogu są pokazywane w zakładce AIRCRAFT zamiast zdjęć pobieranych automatycznie. Pod zdjęciem jest
+zwykły podpis z autorem (`Photo: <autor>`), bez odnośnika.
 
-## Files
+## Pliki
 
-- `<ICAO>.jpg`, `<ICAO>.jpeg`, `<ICAO>.png` or `<ICAO>.webp`: one photo per ICAO type code, for example
-  `B738.jpg` or `A20N.webp`. Upper or lower case does not matter (`b738.JPG` works too). If a type has more than
-  one photo here, the first in the order jpg, jpeg, png, webp is used.
-- `<ICAO>.txt` (optional): the author of the photo on the first line, for example `Firstname Lastname` or
-  `Firstname Lastname / Example Photo Group`. Save it as UTF-8. Only the first non-empty line is used, extra
-  spaces and a leading `Photo:` are dropped, and the caption is cut at 120 characters. Without this file the photo
-  is shown with no caption.
+- `<ICAO>.jpg`, `<ICAO>.jpeg`, `<ICAO>.png` albo `<ICAO>.webp`: jedno zdjęcie na kod ICAO typu, np. `B738.jpg` albo
+  `A20N.webp`. Wielkość liter w nazwie nie ma znaczenia (`b738.JPG` też zadziała). Gdy typ ma tu kilka zdjęć, brane jest
+  pierwsze w kolejności jpg, jpeg, png, webp.
+- `<ICAO>.txt` (opcjonalny): autor zdjęcia w pierwszej linijce, np. `Imię Nazwisko` albo
+  `Imię Nazwisko / Przykładowa Grupa Fotograficzna`. Zapisz go w UTF-8 (BOM nie przeszkadza). Liczy się tylko pierwsza
+  niepusta linijka: nadmiarowe spacje są zwijane, początkowe `Photo:` usuwane (aplikacja dopisuje je sama), a podpis
+  jest obcinany do 120 znaków. Bez tego pliku (albo z pustym plikiem) zdjęcie jest pokazywane bez podpisu.
 
-Example:
+Przykład:
 
 ```
 data/photos-manual/B738.jpg
-data/photos-manual/B738.txt    ->  Firstname Lastname
+data/photos-manual/B738.txt    ->  Imię Nazwisko
 ```
 
-## How it works
+## Jak to działa
 
-- A photo here always wins over everything in `data/photos/` (the automatic Wikipedia photos and older own
-  photos). The application never moves, replaces or deletes files in this folder, and it does not ask Wikipedia
-  for a type that has a photo here.
-- The photo is shown in a fixed 3:2 frame (up to 450 x 300 px), scaled to fit without cropping. A landscape photo
-  about 960 to 1280 px wide and under 500 KB looks best; small photos are enlarged and can look soft.
-- Remove the photo (and its `.txt`) to go back to the automatic photo.
+- Zdjęcie z tego katalogu zawsze ma pierwszeństwo przed wszystkim w `data/photos/` (zdjęciami pobranymi z Wikipedii
+  i starszymi własnymi). Aplikacja nie przenosi, nie podmienia ani nie usuwa plików z tego katalogu i nie pyta
+  Wikipedii o typ, który ma tu zdjęcie. Pobranych wcześniej plików tego typu w `data/photos/` też nie rusza.
+- Zdjęcie jest pokazywane w stałej ramce 3:2 (najwyżej 450 x 300 px), w całości, bez przycinania (pionowe i bardzo
+  szerokie z czarnymi pasami). Najlepiej wygląda poziome zdjęcie o szerokości ok. 960 do 1280 px i rozmiarze poniżej
+  500 KB; małe zdjęcia są powiększane i mogą być nieostre.
+- Podpis zajmuje zawsze jedną linijkę pod ramką, więc dane typu obok zdjęcia nie przesuwają się po jego wczytaniu.
+  W pełnej ramce (450 px) mieści się ok. 65 znaków autora, w węższym oknie mniej (w najwęższej ramce, 220 px, ok. 30).
+  Dłuższy podpis jest skracany wielokropkiem (`…`), a w całości widać go w dymku po najechaniu na niego myszą.
+  Najlepiej więc krótko: autor i ewentualnie licencja.
+- Usuń zdjęcie (i jego `.txt`), żeby wrócić do zdjęcia pobieranego automatycznie.
 
-## Adding photos on the server
+## Dodawanie zdjęć na serwerze
 
-This folder is part of the repository and of the Docker image (it is not in the `data/photos` volume). Add the
-files to the repository, for example on GitHub with "Add file" > "Upload files" into `data/photos-manual/`, and
-deploy as usual (`sh deploy/update.sh`). A file copied into a running container with `docker cp` is lost at the
-next rebuild.
+Ten katalog jest częścią repozytorium i obrazu dockera (nie leży w wolumenie `data/photos`). Dodaj pliki do
+repozytorium, np. na GitHubie przez „Add file” > „Upload files” do `data/photos-manual/`, i wdróż jak zwykle
+(`sh deploy/update.sh`). Plik skopiowany do działającego kontenera przez `docker cp` zniknie przy następnej
+przebudowie.
 
-Make sure you have the right to use each photo and name its author as the licence requires.
+Upewnij się, że masz prawo do użycia każdego zdjęcia, i podaj jego autora tak, jak wymaga licencja.
