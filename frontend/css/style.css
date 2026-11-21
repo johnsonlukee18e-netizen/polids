@@ -45,6 +45,12 @@
   --row-alt: #0f130f;
   --row-hover: #18221a;
   --sel: #1d4d15;
+  /* 0.14.2 (issue #35): listy CALLSIGN i AIRCRAFT – wiersze na przemian czarne i ciemnoszare jak w METAR (zdjęcie
+     PANDORY), wyraźniej niż --row / --row-alt pozostałych tabel; pod myszą jaśniej od obu pasków i inaczej niż
+     zielone zaznaczenie (--sel) */
+  --list-row: #000;
+  --list-row-alt: #2b2b2b;
+  --list-row-hover: #3d4a3d;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -574,6 +580,11 @@ table.callsigns td.tel { font: 20px var(--mono); color: var(--yellow); }
 table.callsigns td.op, table.callsigns td.ctry { font: 20px var(--mono); color: #fff; overflow-wrap: anywhere; }
 table.callsigns td.op { min-width: 9em; }
 table.callsigns td.ctry { min-width: 6em; }
+/* 0.14.2 (issue #35): paski wierszy wyraźniejsze (--list-row, --list-row-alt z :root) jak w AIRCRAFT; te same
+   selektory co table.data wyżej, wygrywają, bo są dalej w pliku (pod myszą mocniejszy selektor) */
+table.callsigns tbody tr:nth-child(odd) td { background: var(--list-row); }
+table.callsigns tbody tr:nth-child(even) td { background: var(--list-row-alt); }
+table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important; }
 .tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }
 .tag.cargo { color: #ffb020; border-color: #ffb020; }
 .tag.mil { color: #7fd0ff; border-color: #7fd0ff; }

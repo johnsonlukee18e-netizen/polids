@@ -148,7 +148,14 @@ def test_callsign_table_one_font():
     assert "table.callsigns td.op { min-width: 9em; }" in css and "table.callsigns td.ctry { min-width: 6em; }" in css
     assert "table.callsigns td { vertical-align: baseline; }" in css
     assert "td.minor" not in css
+    # 0.14.2 (issue #35): "popraw kolorowanie co drugiego wiersza, by było bardziej widoczne/kontrastujące": paski
+    # czarne i ciemnoszare jak w AIRCRAFT (zmienne z :root, test_lists_look.py), pod myszą jaśniej
+    assert "table.callsigns tbody tr:nth-child(odd) td { background: var(--list-row); }" in css
+    assert "table.callsigns tbody tr:nth-child(even) td { background: var(--list-row-alt); }" in css
+    assert "table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important; }" in css
+    # paski po regułach table.data (te same selektory wygrywają kolejnością w pliku)
+    assert css.index("table.callsigns tbody tr:nth-child(odd) td") > css.index("table.data tr:hover td")
     rules = [line for line in css.splitlines() if "callsigns" in line]
-    assert len(rules) == 6 and not any(re.search(r"bold|[6-9]00|shadow|radius|white-space", r) for r in rules)
+    assert len(rules) == 9 and not any(re.search(r"bold|[6-9]00|shadow|radius|white-space", r) for r in rules)
     # tag kategorii (Info) jak dotąd
     assert ".tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }" in css

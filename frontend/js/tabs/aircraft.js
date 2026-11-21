@@ -51,7 +51,7 @@ export function makerGroups(list, order = []) {
   const rank = (name) => { const i = order.indexOf(norm(name)); return i < 0 ? order.length : i; };
   return [...by.entries()].sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
 }
-// hasło do wyszukiwarek zdjęć jak photo_query w services/photos.py: nazwa ICAO wylicza wersje i nazwy wojskowe,
+// nazwa typu jak photo_query w services/photos.py (opis zdjęcia, alt): nazwa ICAO wylicza wersje i nazwy wojskowe,
 // "A-300(B4/C4/F4)-600" -> "A300-600" (0.13.3: Airbus bez łącznika po A), "737-800, BBJ2" -> "737-800"
 const searchName = (a) => {
   let name = (a.model || a.icao).replace(/\([^()]*\)/g, "").split(",")[0].split("/")[0].replace(/\s+/g, " ").trim();
@@ -159,26 +159,26 @@ const link = (href, text, cls) => `<a${cls ? ` class="${cls}"` : ""} href="${esc
 
 // Rozwinięcie (klik w wiersz, issue #25 "dodatkowy widok"): wiersz pod klikniętym na całą szerokość tabeli.
 // 0.14.0 (issue #28): zdjęcie po lewej, dane na prawo od zdjęcia (rozwinięcie niższe): trzy linijki kratek (lines),
-// pod nimi odnośniki (strona osiągów typu, kolejne zdjęcia, wyszukiwarka bazy osiągów dla typów bez własnej strony).
-// Pod zdjęcie dane schodzą tylko wtedy, gdy obok nich na zdjęcie zostaje mniej niż 220 px (aircraft.css, .ac-split
-// z zawijaniem)
+// pod nimi odnośnik do strony osiągów typu. Pod zdjęcie dane schodzą tylko wtedy, gdy obok nich na zdjęcie zostaje
+// mniej niż 220 px (aircraft.css, .ac-split z zawijaniem).
+// 0.14.2 (issue #35): zdjęcie w ramce o stałych proporcjach (.photo-frame), pod nią linijka podpisu (.photo-credit):
+// photo() zmienia tylko ich treść, więc dane obok się nie przesuwają; bez odnośników More photos, Image search
+// i Performance search (zostaje Performance)
 export function detail(a) {
-  const q = encodeURIComponent(searchName(a));
   return `<tr class="ac-detail-row"><td colspan="${COLUMNS.length}"><div class="ac-detail"><div class="ac-split">
-    <div class="photo-box"><span class="hint">Loading photo\u2026</span></div>
+    <div class="photo-box"><div class="photo-frame"><span class="hint">Loading photo\u2026</span></div><div class="photo-credit hint"></div></div>
     <div class="ac-data">
       <div class="ac-boxes">${lines(a).map(([cat, row]) => `<div class="ac-line ${cat}">${row.map(box).join("")}</div>`).join("")}</div>
-      <div class="ac-links">${link(perfUrl(a.icao), "Performance", "ac-perf")}
-        ${link(`https://www.jetphotos.com/photo/keyword/${q}`, "More photos")}
-        ${link(`https://www.google.com/search?tbm=isch&q=${q}`, "Image search")}
-        ${link(PERF, "Performance search")}</div>
+      <div class="ac-links">${link(perfUrl(a.icao), "Performance", "ac-perf")}</div>
     </div>
   </div></div></td></tr>`;
 }
 
-// Podpis pod zdjęciem: odnośnik do strony zdjęcia (autor i licencja) nazwany wg funkcji, bez nazwy serwisu;
-// sam tekst podpisu tylko przy własnym zdjęciu bez strony (np. autor)
+// Podpis pod zdjęciem. 0.14.2 (issue #35): zdjęcie dodane ręcznie (data/photos-manual/) z autorem jako zwykły tekst
+// "Photo: <autor>", bez odnośnika. Zdjęcie pobrane automatycznie: odnośnik do strony zdjęcia (autor i licencja)
+// nazwany wg funkcji, bez nazwy serwisu; sam tekst podpisu tylko przy własnym zdjęciu w data/photos/ bez strony
 export function photoCredit(p) {
+  if (p.author) return `Photo: ${esc(p.author)}`;
   if (p.page) return `<a href="${esc(p.page)}" target="_blank" rel="noopener">Photo page \u2197</a>`;
   return p.credit ? esc(p.credit) : "";
 }
@@ -193,7 +193,7 @@ export default {
     const pane = h(`<div class="pane ac-pane">
       <nav class="ac-makers">${MAKERS.map(([k, l, t]) => `<button class="gbtn" data-m="${k}" title="${t}">${l}</button>`).join("")}</nav>
       <div class="toolbar">
-        <input type="search" class="q" placeholder="ICAO type, model, manufacturer\u2026" size="32">
+        <input type="search" class="q" placeholder="Search: ICAO type, model, manufacturer\u2026" size="46">
         <select class="wtc"><option value="">WTC: all</option><option>L</option><option>M</option><option>H</option><option>J</option></select>
         <select class="recat"><option value="">RECAT-EU: all</option>${Object.entries(RECAT).map(([k, v]) => `<option value="${k}">${k} \u2013 ${v}</option>`).join("")}</select>
         <span class="hint count"></span>
@@ -259,19 +259,19 @@ export default {
         rec.scrollIntoView({ block: "start" });
       }
     };
-    // zdjęcie w rozwinięciu; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana
-    const photo = (rec, det, a) => {
-      const pb = det.querySelector(".photo-box");
+    // zdjęcie w rozwinięciu; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana. 0.14.2 (issue #35):
+    // zdjęcie albo komunikat w ramce, podpis w linijce pod nią; ramka ma stały rozmiar, więc rozwinięcie nie zmienia
+    // wysokości po wczytaniu zdjęcia (bez ponownego przewijania do widoku)
+    const photo = (det, a) => {
+      const frame = det.querySelector(".photo-frame");
+      const cap = det.querySelector(".photo-credit");
       api(`/api/aircraft/${a.id}/photo`).then((p) => {
         if (current !== a) return;
-        const credit = photoCredit(p);
-        pb.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">${credit ? `<div class="hint">${credit}</div>` : ""}`;
-        // zdjęcie wydłuża rozwinięcie dopiero po wczytaniu
-        pb.querySelector("img").addEventListener("load", () => { if (current === a) reveal(rec, det); }, { once: true });
+        frame.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">`;
+        cap.innerHTML = photoCredit(p);
       }).catch((e) => {
         if (current !== a) return;
-        pb.classList.add("none");
-        pb.innerHTML = `<p class="hint">${esc(e.message)}</p>`;
+        frame.innerHTML = `<span class="hint">${esc(e.message)}</span>`;
       });
     };
 
@@ -291,7 +291,7 @@ export default {
       rec.insertAdjacentHTML("afterend", detail(current));
       const det = rec.nextElementSibling;
       reveal(rec, det);
-      photo(rec, det, current);
+      photo(det, current);
     });
     pane.querySelector(".ac-makers").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-m]");

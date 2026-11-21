@@ -67,7 +67,10 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="ses
 
 settings.docs_dir.mkdir(parents=True, exist_ok=True)
 settings.photos_dir.mkdir(parents=True, exist_ok=True)
+settings.manual_photos_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/files/docs", StaticFiles(directory=settings.docs_dir), name="docs-files")
+# 0.14.2 (issue #35): zdjęcia dodane ręcznie (data/photos-manual/), osobno od pobranych (wolumen data/photos)
+app.mount("/files/photos-manual", StaticFiles(directory=settings.manual_photos_dir), name="photo-manual-files")
 app.mount("/files/photos", StaticFiles(directory=settings.photos_dir), name="photo-files")
 app.mount("/static", StaticFiles(directory=settings.frontend_dir), name="static")
 
