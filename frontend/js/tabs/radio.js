@@ -383,13 +383,15 @@ export function twrPlate(p, ctr, x) {
   return { at: p.at, kind: "twr", k: p.icao, id: x.nm(tw || nominal), fq: p.frequency || (tw ? x.freq(tw) : ""), state: "on", icao: p.icao, rt };
 }
 // ATZ (TWR/A, 0.14.2): stanowisko AFIS albo radio lotniska online (p z plates.atz: twr, nominal, frequency, zone) –
-// plakietka jak wieży (rodzaj twr: miejsce obok małego obszaru, kliknięcie i Enter: AERODROME); w dymku ATZ (bez
-// kształtu ATZ: lotnisko), stanowisko, kto
+// plakietka jak wieży (rodzaj twr: kliknięcie i Enter: AERODROME), atz: najniższy priorytet układania (labelOpts("atz"):
+// nigdy nie zasłania plakietki TWR, APP, ACC ani FIS). 0.14.2 (przegląd): na plakietce krótka nazwa stanowiska jak na
+// plakietkach wież (posName: "ML I TWR", "KM R TWR" – rozmiar kafelka), długa nazwa (x.dn, np. "EPML MIELEC INFO")
+// w pierwszej linii dymku; dalej ATZ (bez kształtu ATZ: lotnisko), stanowisko, kto
 export function atzPlate(p, x) {
   const st = arr(p.twr)[0] || p.nominal;
   const title = p.zone === false ? `Aerodrome ${p.icao}` : p.id;
-  const rt = groupTip({ nominal: p.nominal || st, owners: arr(p.twr), topdown: null }, title, x, ["Click: AERODROME"]);
-  return { at: p.at, kind: "twr", k: p.icao, id: x.nm(st), fq: p.frequency || x.freq(st), state: "on", icao: p.icao, rt };
+  const rt = groupTip({ nominal: p.nominal || st, owners: arr(p.twr), topdown: null }, `${x.dn(st)}\n${title}`, x, ["Click: AERODROME"]);
+  return { at: p.at, kind: "twr", atz: true, k: p.icao, id: posName(st), fq: p.frequency || x.freq(st), state: "on", icao: p.icao, rt };
 }
 // FIS: jedna plakietka na zalogowane stanowisko FIS (fis z /api/radio/board: obszary, które obsługuje)
 export function fisPlate(owner, at, x, fis = []) {
@@ -411,12 +413,13 @@ const unionOf = (key, shapes, border = null) => {
 // stanowiska online. Sektory ACC (groups z accGroups), gdy warstwa podglądu jest włączona; na LOW (bez względu na
 // LOW) warstwy APP (granica obsługiwanych części TMA: areas.app), TWR (CTR wieży online), TWR/A (0.14.2: TWR i ATZ –
 // to samo co TWR, a do tego ATZ stanowiska AFIS albo radio online: granica ATZ, geo.atz, i plakietka; bez kształtu
-// ATZ sama plakietka) i FIS (areas.fis). Plakietki w kolejności układania: APP, TWR (z ATZ), ACC, FIS. Granice APP,
-// TWR, ATZ i FIS tylko w granicy FIR EPWW (geo.border, inEpww; sektory ACC już w accGroups). Stara geometria bez
-// geo.atz (sprzed 0.14.2): plakietki ATZ bez granicy.
+// ATZ sama plakietka) i FIS (areas.fis). Plakietki w kolejności układania: APP, TWR, ACC, FIS, ATZ (0.14.2, przegląd:
+// ATZ na końcu, z najniższym priorytetem – wieże, APP, ACC i FIS leżą jak bez nich). Granice APP, TWR, ATZ i FIS tylko
+// w granicy FIR EPWW (geo.border, inEpww; sektory ACC już w accGroups). Stara geometria bez geo.atz (sprzed 0.14.2):
+// plakietki ATZ bez granicy.
 // bd = /api/radio/board, geo = jego geometria, x = jak w appPlate
 export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
-  const lines = [], app = [], twr = [], acc = [], fis = [], border = geo?.border;
+  const lines = [], app = [], twr = [], acc = [], fis = [], atz = [], border = geo?.border;
   if (layers.has(key.toLowerCase())) {
     arr(groups).forEach((g) => {
       lines.push({ kind: "acc", k: g.owner, geom: g.geom || null, shapes: g.geom ? [] : g.slices.map((sl) => sl.geometry) });
@@ -451,7 +454,8 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
         const u = p.zone === false ? null : unionOf(`rbatz|${ver}|${p.icao}`, arr(geo?.atz).filter((z) => z.atz === p.icao), border);
         if (u) lines.push({ kind: "atz", k: p.icao, geom: u.geom, shapes: u.geom ? [] : u.shapes });
         const at = p.at || u?.at;
-        if (at) twr.push(atzPlate({ ...p, at }, x));
+        // bare: bez granicy ATZ na podglądzie (lotnisko bez ATZ) – plakietka to jedyny ślad stanowiska
+        if (at) atz.push({ ...atzPlate({ ...p, at }, x), ...(u ? {} : { bare: true }) });
       });
     }
     if (layers.has("fis")) {
@@ -464,7 +468,7 @@ export function previewItems(bd, geo, key, layers, groups, x, ver = "") {
       });
     }
   }
-  return { lines, plates: [...app, ...twr, ...acc, ...fis] };
+  return { lines, plates: [...app, ...twr, ...acc, ...fis, ...atz] };
 }
 // warstwa SVG granic stanowisk online (granatowe, radio.css): jedna ścieżka na stanowisko; po błędzie sumy same
 // kształty. Dziury tylko w obszarze ACC (tam wewnętrzny pierścień to granica z innym stanowiskiem); APP, TWR i FIS
@@ -720,8 +724,8 @@ export default {
         + `<path class="rb-border" d="${bd}"/>`
         + flowSvg(flowAreas(d, m.key, accs, geo.tma, x, geoVer, geo.border), P)
         + linesSvg(lines, P);
-      // plakietki: wstawiamy, mierzymy, układamy (ważniejsze pierwsze: APP, TWR, ACC, FIS) bez nakładania się, każda
-      // w środku swojego obszaru, przy tłoku lekko odsunięta (bez linii prowadzących)
+      // plakietki: wstawiamy, mierzymy, układamy (ważniejsze pierwsze: APP, TWR, ACC, FIS, na końcu ATZ) bez nakładania
+      // się, każda w środku swojego obszaru, przy tłoku lekko odsunięta (bez linii prowadzących)
       m.lbls.innerHTML = plates.map(plateHtml).join("");
       const els = [...m.lbls.children], pts = plates.map((it) => P([it.at[1], it.at[0]]));
       const pr = p.getBoundingClientRect();
@@ -740,14 +744,28 @@ export default {
         const dd = own.get(`${it.kind}|${it.k}`), o = dd ? outShare(dd, it.kind === "app" ? 0.5 : 1) : null;
         return o && fir ? (r) => o(r) + fir(r) : o || fir;
       };
+      // 0.14.2 (przegląd): prostokąt tekstu plakietki (ID i częstotliwość) względem jej środka – plakietka ATZ pod innymi
+      // tylko z całym tekstem widocznym
+      const textOf = (e) => {
+        const sp = [...e.querySelectorAll(".rb-id, .rb-fq")].filter((t) => t.offsetWidth), w = e.offsetWidth / 2, h = e.offsetHeight / 2;
+        return sp.length ? { x0: Math.min(...sp.map((t) => t.offsetLeft)) - w, y0: Math.min(...sp.map((t) => t.offsetTop)) - h,
+          x1: Math.max(...sp.map((t) => t.offsetLeft + t.offsetWidth)) - w, y1: Math.max(...sp.map((t) => t.offsetTop + t.offsetHeight)) - h } : null;
+      };
       const moves = placeLabels(plates.map((it, i) => {
-        const out = it.kind !== "twr" ? outOf(it) : null;
-        return { x: pts[i][0], y: pts[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight, ...labelOpts(it.kind), ...(out ? { out } : {}) };
+        const out = it.kind !== "twr" ? outOf(it) : null, text = it.atz ? textOf(els[i]) : null;
+        return { x: pts[i][0], y: pts[i][1], w: els[i].offsetWidth, h: els[i].offsetHeight, ...labelOpts(it.atz ? "atz" : it.kind),
+          ...(it.bare ? { keep: true } : {}), ...(text ? { text } : {}), ...(out ? { out } : {}) };
       }), { x: 2, y: 2, w: W - 4, h: H - 4 }, { obstacles, cover, lines: false, clear: 3 });
+      // 0.14.2 (przegląd): plakietka ATZ bez wolnego miejsca (tłok na południu) nigdy nie zasłania wieży, APP, ACC ani FIS:
+      // pod plakietkami ułożonymi przed nią (under: ujemny z-index wg kolejności, radio.css), gdy cały jej tekst widać,
+      // inaczej ukryta (hide; granica ATZ zostaje, plakietka bez granicy ATZ zawsze pod innymi)
       els.forEach((e, i) => {
-        const { dx, dy } = moves[i], [x0, y0] = pts[i];
+        const { dx, dy, under, hide } = moves[i], [x0, y0] = pts[i];
         e.style.left = `${Math.round(x0 + dx - e.offsetWidth / 2)}px`;
         e.style.top = `${Math.round(y0 + dy - e.offsetHeight / 2)}px`;
+        e.style.zIndex = under ? String(-under) : "";
+        e.classList.toggle("under", !!under);
+        e.classList.toggle("hide", !!hide);
       });
     }
     // mały tytuł podglądu w górnym rogu (radio.css: HIGH w prawym, z dala od przycisków): warstwa i stały przekrój

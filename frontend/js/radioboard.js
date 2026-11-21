@@ -174,13 +174,17 @@ function distSeg(px, py, [x0, y0, x1, y1]) {
 }
 // Plakietki (0.13.2, właściciel projektu: "Usuń wszystkie leader line"): jedna odmiana jak kafelek, w środku swojego obszaru, bez
 // linii do punktu – przy tłoku tylko lekko odsunięta: krawędź plakietki najwyżej `max` px od jej punktu (w tłoku
-// × STRETCH). Parametry do placeLabels (wspólne dla strony i testu), kind acc / app / twr / fis: APP w środku
+// × STRETCH). Parametry do placeLabels (wspólne dla strony i testu), kind acc / app / twr / fis / atz: APP w środku
 // obsługiwanych części TMA; TWR obok swojego CTR, gdy CTR jest mniejszy niż plakietka (obrys CTR pod plakietką kosztuje:
-// wc, więc granica wieży zostaje widoczna); ACC i FIS – duże obszary, dalej od punktu, z dala od obrysów TMA i CTR
+// wc, więc granica wieży zostaje widoczna); ACC i FIS – duże obszary, dalej od punktu, z dala od obrysów TMA i CTR.
+// 0.14.2 (przegląd): ATZ (stanowisko AFIS albo radio na TWR/A) jak wieża, ale z najniższym priorytetem (lo): układana
+// po wszystkich innych i nigdy nie zasłania plakietki TWR, APP, ACC ani FIS (placeLabels: bez wolnego miejsca – pod nimi
+// z całym tekstem widocznym albo ukryta)
 export const PLATE_MAX = 20;
 export function labelOpts(kind) {
   if (kind === "app") return { max: PLATE_MAX, wc: 0.2 };
   if (kind === "twr") return { max: PLATE_MAX + 10, wc: 2 };
+  if (kind === "atz") return { max: PLATE_MAX + 10, wc: 2, lo: true };
   return { max: 3 * PLATE_MAX, wc: 0.4 };
 }
 
@@ -202,8 +206,16 @@ export function labelOpts(kind) {
 // lines = false (plakietki RADIO od 0.13.2: bez linii prowadzących): bez kar za linie, tylko odległość, obrysy
 // i nałożenia. Wynik: [{dx, dy, v, hit}] – przesunięcie środka, numer odmiany (0 = pełna) i czy coś zasłania.
 // 0.14.1 (RADIO): clear = margines (px) wokół etykiety, w którym obrys też się liczy (plakietka nie stoi tuż na granicy,
-// którą opisuje); it.out(r) = część etykiety poza jej własnym obszarem (0..1), waga WOUT
-const WC = 0.5, WV = [0, 25, 100], WX = 40, HIT = 500, ROUNDS = 4, STRETCH = 1.5, WOUT = 60;
+// którą opisuje); it.out(r) = część etykiety poza jej własnym obszarem (0..1), waga WOUT.
+// 0.14.2 (przegląd, ATZ na TWR/A): it.lo = najniższy priorytet – etykiety lo zawsze po wszystkich innych (także
+// w kolejnych rundach: przestawiane tylko między sobą), więc pozostałe leżą dokładnie tak jak bez nich; etykieta lo bez
+// wolnego miejsca nie zasłania żadnej innej: stoi tam, gdzie inne zasłaniają ją najmniej (przede wszystkim jej tekst:
+// it.text = prostokąt tekstu względem środka etykiety, domyślnie cała), i gdy jej tekst zostaje cały widoczny (albo
+// it.keep: nic innego jej nie pokazuje), jest rysowana pod wszystkimi ułożonymi przed nią (wynik under = numer
+// kolejny, im dalszy, tym niżej; hit: true) i zajmuje swoje miejsce; inaczej ukryta (hide: true, hit: true, bez
+// miejsca) – nigdy nie widać częstotliwości tylko w części. Wygrywa runda z najmniejszą liczbą zasłonięć i kosztem
+// pozostałych etykiet, dopiero potem etykiet lo (ukryta gorsza niż pod innymi)
+const WC = 0.5, WV = [0, 25, 100], WX = 40, HIT = 500, ROUNDS = 4, STRETCH = 1.5, WOUT = 60, WTXT = 4;
 export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26, far = 90, rings = 14, cover = null, lines = true, clear = 0 } = {}) {
   const pins = items.map((it, i) => (it.pin ? [it.x, it.y, i] : null)).filter(Boolean);
   const over = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
@@ -237,7 +249,11 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
   // jedna runda w kolejności order: wybór i koszt każdej etykiety
   function once(order) {
     const placed = obstacles.map((o) => ({ ...o })), leads = [], out = [];
-    let total = 0, hits = 0;
+    let total = 0, hits = 0, loTotal = 0, loHits = 0, unders = 0;
+    // prostokąt tekstu etykiety lo w miejscu (dx, dy) i jego pole pod ułożonymi etykietami i przeszkodami
+    const textAt = (it, s, dx, dy) => (it.text ? { x0: it.x + dx + it.text.x0, y0: it.y + dy + it.text.y0, x1: it.x + dx + it.text.x1,
+      y1: it.y + dy + it.text.y1 } : { x0: it.x + dx - s.w / 2, y0: it.y + dy - s.h / 2, x1: it.x + dx + s.w / 2, y1: it.y + dy + s.h / 2 });
+    const hidden = (t) => placed.reduce((acc, p) => acc + over(t, p), 0);
     order.forEach((idx) => {
       const it = items[idx], sizes = [{ w: it.w, h: it.h }, ...(it.alts || [])], wc = WC * (it.wc ?? 1);
       // najtańszy kandydat bez kolizji w zasięgu × k
@@ -270,32 +286,43 @@ export function placeLabels(items, bounds, { gap = 2, obstacles = [], near = 26,
       let { pick, best } = search(1);
       if (!pick) ({ pick, best } = search(STRETCH));
       if (!pick) {
-        // nic wolnego: najmniejsza odmiana tam, gdzie zasłania najmniej (także kropek)
+        // nic wolnego: najmniejsza odmiana tam, gdzie zasłania najmniej (także kropek); etykieta lo – pod innymi, tam,
+        // gdzie najmniej zasłonięty jest jej tekst
         const v = sizes.length - 1, s = sizes[v];
         for (const [dx, dy, d] of ring(s, it.max ?? far)) {
           const r = rectAt(it, s, dx, dy);
           const cost = placed.reduce((acc, p) => acc + over(r, p), 0) + outside(r) * s.h * 4 + dots(r).length * s.w * 2
-            + Math.hypot(dx, dy) * 0.05;
+            + Math.hypot(dx, dy) * 0.05 + (it.lo ? hidden(textAt(it, s, dx, dy)) * WTXT : 0);
           if (cost < best) { best = cost; pick = { dx, dy, v, r, d, hit: true }; }
         }
         best += HIT;
+        // etykieta lo: pod innymi, gdy cały jej tekst widać (albo keep), inaczej ukryta
+        if (it.lo) {
+          if (it.keep || !hidden(textAt(it, s, pick.dx, pick.dy))) pick.under = ++unders;
+          else { pick.hide = true; best += HIT; }
+        }
       }
-      placed.push(pick.r);
-      if (lines && pick.d > 0) leads.push(leadOf(it, pick.r));
-      out[idx] = { dx: pick.dx, dy: pick.dy, v: pick.v, hit: pick.hit };
-      total += best;
-      hits += pick.hit ? 1 : 0;
+      // ukryta nie zajmuje miejsca (następne etykiety lo mogą stanąć tam, gdzie była)
+      if (!pick.hide) placed.push(pick.r);
+      if (lines && pick.d > 0 && !pick.hide) leads.push(leadOf(it, pick.r));
+      out[idx] = { dx: pick.dx, dy: pick.dy, v: pick.v, hit: pick.hit, ...(pick.under ? { under: pick.under } : {}), ...(pick.hide ? { hide: true } : {}) };
+      if (it.lo) { loTotal += best; loHits += pick.hit ? 1 : 0; } else { total += best; hits += pick.hit ? 1 : 0; }
     });
-    return { out, total, hits };
+    return { out, total, hits, loTotal, loHits };
   }
-  let order = items.map((_, i) => i), front = [], win = null;
+  // lepsza runda: najpierw etykiety bez lo (zasłonięcia, koszt), dopiero przy remisie etykiety lo
+  const better = (a, b) => (a.hits !== b.hits ? a.hits < b.hits : a.total !== b.total ? a.total < b.total
+    : a.loHits !== b.loHits ? a.loHits < b.loHits : a.loTotal < b.loTotal);
+  // etykiety lo zawsze na końcu kolejności (bez zmiany kolejności pozostałych)
+  const loLast = (o) => [...o.filter((i) => !items[i].lo), ...o.filter((i) => items[i].lo)];
+  let order = loLast(items.map((_, i) => i)), front = [], win = null;
   for (let round = 0; round < ROUNDS; round++) {
     const res = once(order);
-    if (!win || res.hits < win.hits || (res.hits === win.hits && res.total < win.total)) win = res;
+    if (!win || better(res, win)) win = res;
     const bad = order.filter((i) => (res.out[i].hit || (res.out[i].v > 0 && (items[i].wv ?? 1) > 1)) && !front.includes(i));
     if (!bad.length) break;
     front = [...front, ...bad];
-    order = [...front, ...order.filter((i) => !front.includes(i))];
+    order = loLast([...front, ...order.filter((i) => !front.includes(i))]);
   }
   return win.out;
 }
