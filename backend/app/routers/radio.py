@@ -362,6 +362,8 @@ async def board(geo: bool = False, have: str = "", db: Session = Depends(get_db)
     # BERLIN (ATIS albo wiatr z METAR) i czerwone tło sektorów (vIFF): równolegle, błąd = bez dodatku; każdy błąd
     # przy liczeniu BERLIN to tylko BERLIN bez konfiguracji (kreska), nigdy błąd całej tablicy
     now = datetime.now(timezone.utc)
+    # 0.14.1: czas serwera – RADIO liczy wiek danych sieci (updated) względem niego, nie zegara przeglądarki
+    net["now"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     berlin = _berlin_atis(ctrls, net["ok"])
     need_metar = not berlin or berlin["source"] != "ATIS"
     metar, tvs = await asyncio.gather(_berlin_metar(need_metar), _flow_tvs(now))

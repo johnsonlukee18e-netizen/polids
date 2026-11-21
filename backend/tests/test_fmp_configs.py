@@ -305,6 +305,10 @@ o.slot = ["EP-BH", "EP-TL", "EP-JM", "EP-WATMA", "EP-ALLFIR", "EP-BHX", "ED-BH"]
 const sectors = data.sectors;
 const rows = (await import(process.argv[7])).fmpRows(sectors);
 o.grp = Object.fromEntries(["2N", "1S", "2U"].map((c) => [c, fmp.cfgGroupRows(rows, by[c]).map((g) => [g.p ? g.p.name : g.kind, g.rows.map((r) => r.id)])]));
+// 0.14.1: prawdziwe id vIFF (kombinacje) grupowane po wolumenach EPWW-<litera><warstwa>
+const realRows = (await import(process.argv[7])).fmpRows(data.real);
+o.slotsReal = data.real.sectors.map((t) => fmp.tvSlots(realRows.find((r) => r.id === t.id)).map((x) => x.letter + x.layer[0]).join(","));
+o.grpReal = Object.fromEntries(["2N", "1S"].map((c) => [c, fmp.cfgGroupRows(realRows, by[c]).map((g) => [g.p ? g.p.name : g.kind, g.rows.map((r) => r.id)])]));
 o.html = fmp.fmpHtml(sectors, "EP-BH");
 o.htmlNull = fmp.fmpHtml(sectors, "EP-BH", null);
 o.html2N = fmp.fmpHtml(sectors, "EP-BH", by["2N"]);
@@ -326,6 +330,18 @@ SECTORS = {"prefix": "EP", "now": "1210", "sectors": [
     _tv("EP-ALLFIR"), _tv("EP-CH"), _tv("EP-XH"), _tv("EP-BDH")]}
 
 
+def _rtv(tid, vols):
+    return {**_tv(tid), "volumes": vols}
+
+
+# prawdziwe id traffic volumes vIFF (lista z 21.11.2026) z wolumenami jak w /api/viff/sectors
+_V = lambda xs, ls: [f"EPWW-{x}{ly}" for x in xs for ly in ls]  # noqa: E731
+REAL = {"prefix": "EP", "now": "1210", "sectors": [
+    _rtv("EP-NE", _V("NE", "H")), _rtv("EP-JR", _V("JR", "H")), _rtv("EP-JRLMH", _V("JR", "HML")),
+    _rtv("EP-DTC3W", _V("DTC", "HML")), _rtv("EP-ALLFIR", _V("BCDEFGJNRT", "HML") + ["EPWA-TMA"]),
+    _rtv("EP-WATMA", ["EPWA-TMA"]), _rtv("EP-BL", []), _rtv("EP-FG", [])]}
+
+
 @pytest.fixture(scope="module")
 def js(client, tmp_path_factory):
     node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
@@ -339,7 +355,7 @@ def js(client, tmp_path_factory):
     pc.write_text((FRONTEND / "vendor" / "polygon-clipping" / "polygon-clipping.umd.min.js").read_text("utf-8"), "utf-8")
     cd = configs(client, ctl("EPWW_ALL_CTR"), ctl("EPWW_N_CTR", cid=2), query="?geo=1")
     data = d / "data.json"
-    data.write_text(json.dumps({"cd": cd, "sectors": SECTORS}), "utf-8")
+    data.write_text(json.dumps({"cd": cd, "sectors": SECTORS, "real": REAL}), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (jsd / "fmp.js").as_uri(), (jsd / "radioboard.js").as_uri(),
@@ -437,13 +453,21 @@ def test_js_grouped_table(js):
     assert js["grp"]["1S"] == [["SFIR", ["EP-JL", "EP-CH", "EP-TM"]], ["free", ["EP-BH", "EP-BL", "EP-NH"]],
                                ["other", ["EP-WATMA", "EP-XH", "EP-BDH", "EP-ALLFIR"]]]
     assert js["grp"]["2U"][0] == ["ALL", ["EP-JL", "EP-BL", "EP-TM"]] and js["grp"]["2U"][1] == ["ALH", ["EP-BH", "EP-CH", "EP-NH"]]
+    # 0.14.1: prawdziwe id vIFF to kombinacje; warstwy z wolumenów EPWW-<litera><warstwa>, bez wolumenów z id
+    assert js["slotsReal"] == ["NH,EH", "JH,RH", "JH,JM,JL,RH,RM,RL", "DH,DM,DL,TH,TM,TL,CH,CM,CL", "", "", "BL", ""]
+    # kombinacja w grupie stanowiska, które obsługuje wszystkie jej warstwy; kilku stanowisk, TMA i FIR w OTHER
+    assert js["grpReal"]["2N"] == [["ALL", ["EP-JR", "EP-JRLMH"]], ["NFIR", ["EP-BL", "EP-NE"]],
+                                   ["other", ["EP-DTC3W", "EP-FG", "EP-WATMA", "EP-ALLFIR"]]]
+    # 1S: NE częściowo SFIR, częściowo bez stanowiska = OTHER
+    assert js["grpReal"]["1S"] == [["SFIR", ["EP-JR", "EP-JRLMH"]], ["free", ["EP-BL"]],
+                                   ["other", ["EP-DTC3W", "EP-FG", "EP-NE", "EP-WATMA", "EP-ALLFIR"]]]
     # bez konfiguracji tabela jak dotąd
     assert js["html"] == js["htmlNull"] and '<table class="fmp-table">' in js["html"] and "fmp-grp" not in js["html"]
     g = js["html2N"]
     assert '<table class="fmp-table grouped">' in g and g.count('<tr class="fmp-grp') == 3
     assert ('<tr class="fmp-grp"><td colspan="3" title="ALL: EPWW_ALL_CTR 125.450"><i class="fmp-sw" style="background:#4fcc92"></i>'
             'ALL<span class="fmp-grp-sub">EPWW_ALL_CTR 125.450</span></td></tr>') in g
-    assert '<tr class="fmp-grp other"><td colspan="3" title="TMA, FIR-wide and combined traffic volumes">OTHER</td></tr>' in g
+    assert '<tr class="fmp-grp other"><td colspan="3" title="TMA, FIR-wide traffic volumes and combinations across positions">OTHER</td></tr>' in g
     # wiersze z tymi samymi klasami i wyborem co bez konfiguracji (klik w wiersz, wykresy ENTRY i OCC)
     assert g.count("<tr class=\"on sel\" data-tv=\"EP-BH\">") == 1 and g.count("data-tv=") == 10
     assert g.index(">ALL<") < g.index('data-tv="EP-JL"') < g.index(">NFIR<") < g.index('data-tv="EP-BH"') < g.index(">OTHER<")

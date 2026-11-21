@@ -170,17 +170,27 @@ export function cfgPreviewsHtml(geo, c, ver = "", layers = {}) {
 
 // sektor EP-<litera><L|M|H> → {letter, layer}; inne traffic volumes (TMA, części FIR, kombinacje) → null
 export const tvSlot = (id) => { const m = /^EP-([A-Z])([LMH])$/.exec(String(id ?? "")); return m ? { letter: m[1], layer: BAND_LAYER[m[2]] } : null; };
+// 0.14.1: warstwy sektorów, które obejmuje traffic volume: z jego wolumenów EPWW-<litera><L|M|H> (prawdziwe id vIFF to
+// kombinacje: EP-FG, EP-GBFLMH, EP-JRLM, EP-NFIR), bez wolumenów z id (tvSlot); TMA albo wolumen spoza sektorów EPWW = []
+export function tvSlots(r) {
+  const vols = Array.isArray(r?.volumes) ? r.volumes.filter(Boolean) : [];
+  if (!vols.length) { const s = tvSlot(r?.id); return s ? [s] : []; }
+  const ms = vols.map((v) => /^EPWW-([A-Z])([LMH])$/.exec(String(v)));
+  return ms.every(Boolean) ? ms.map((m) => ({ letter: m[1], layer: BAND_LAYER[m[2]] })) : [];
+}
 // Wiersze tabeli w grupach konfiguracji c: [{p: stanowisko, rows}, …] w kolejności stanowisk konfiguracji, potem
 // {kind: "free"} (warstwa sektora bez stanowiska konfiguracji; tylko niepusta) i {kind: "other"} (TMA, części FIR,
-// kombinacje, nieznane litery; tylko niepusta). Kolejność wierszy w grupie jak bez konfiguracji (fmpRows)
+// kombinacje kilku stanowisk, nieznane litery; tylko niepusta). Traffic volume trafia do stanowiska, które obsługuje
+// wszystkie jego warstwy sektorów (tvSlots). Kolejność wierszy w grupie jak bez konfiguracji (fmpRows)
 export function cfgGroupRows(rows, c) {
   const groups = (c?.positions || []).map((p) => ({ p, rows: [] }));
   const free = { kind: "free", rows: [] }, other = { kind: "other", rows: [] };
   (rows || []).forEach((r) => {
-    const s = tvSlot(r.id);
-    const g = s && groups.find((x) => x.p.sectors?.[s.layer]?.includes(s.letter));
+    const ss = tvSlots(r);
+    const covers = (sec) => ss.length > 0 && ss.every((s) => sec?.[s.layer]?.includes(s.letter));
+    const g = groups.find((x) => covers(x.p.sectors));
     if (g) g.rows.push(r);
-    else if (s && c?.free?.[s.layer]?.includes(s.letter)) free.rows.push(r);
+    else if (covers(c?.free)) free.rows.push(r);
     else other.rows.push(r);
   });
   return [...groups, ...[free, other].filter((g) => g.rows.length)];
@@ -193,7 +203,7 @@ function groupHead(g) {
   }
   return g.kind === "free"
     ? `<tr class="fmp-grp free"><td colspan="3" title="Sector layers with no position of this configuration">NOT COVERED</td></tr>`
-    : `<tr class="fmp-grp other"><td colspan="3" title="TMA, FIR-wide and combined traffic volumes">OTHER</td></tr>`;
+    : `<tr class="fmp-grp other"><td colspan="3" title="TMA, FIR-wide traffic volumes and combinations across positions">OTHER</td></tr>`;
 }
 
 // tabela dla odpowiedzi /api/viff/sectors; sel = id wybranego sektora (wiersz z klasą sel); czysta funkcja (testy w Node)

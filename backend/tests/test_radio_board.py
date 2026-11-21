@@ -84,7 +84,8 @@ def test_board_sectors_and_owners(board):
     # częstotliwości wszystkich stanowisk z kolejności są w pos
     assert all(cs in board["pos"] for s in board["sectors"] for cs in s["chain"])
     assert board["pos"]["EPWW_N_CTR"]["frequency"] == "130.675"
-    assert board["net"] == {"ok": True, "error": None, "updated": "2026-10-12T12:00:00Z"}
+    assert {k: v for k, v in board["net"].items() if k != "now"} == {"ok": True, "error": None, "updated": "2026-10-12T12:00:00Z"}
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", board["net"]["now"])
     assert "geo" not in board and "source" not in board  # bez opisu źródła kolejności (runda 15)
 
 
@@ -1907,7 +1908,7 @@ def test_layer_column_buttons_fit_label():
         assert re.search(rf"\.rb-bd\.{at} \{{[^}}]*{rule}", css), at
     # podglądy (0.13.2, właściciel projektu): czarne, kolory jako zmienne – granatowa granica stanowiska online, szare sektory bez
     # nikogo, cienkie granice FIR-ów
-    assert "--rb-navy: #2f45c8" in css and re.search(r"\.rb-own path \{[^}]*stroke: var\(--rb-navy\); stroke-width: 2", css)
+    assert "--rb-navy: #4a5ed8" in css and re.search(r"\.rb-own path \{[^}]*stroke: var\(--rb-navy\); stroke-width: 2", css)
     assert re.search(r"\.rb-free path \{[^}]*fill: var\(--rb-free\)", css) and ".rb-land { fill: #000; }" in css
     assert re.search(r"\.rb-firs path \{[^}]*stroke: var\(--rb-line\)", css) and re.search(r"\.rb-map \{[^}]*background: #000", css)
     # bez suwaka wysokości, linii prowadzących, kropek i sąsiadów na podglądach (do 0.13.1)

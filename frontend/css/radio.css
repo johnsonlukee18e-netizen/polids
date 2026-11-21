@@ -10,15 +10,20 @@
    Przyciski i kafelki jak na zdjęciach PANDORY: jasne prostokąty, szare wskaźniki pod żółtymi nazwami, ATIS jasnofioletowy.
    --rb-f: rozmiar częstotliwości (mniejszy na 1366×768, większy na 1920×1080); od niego kafelki (--rb-tw × --rb-th:
    ok. 70 × 29 px na 1600×900, ten sam obsadzony i nie), rzędy liczb między nimi (--rb-lv0..2), kolumna przycisków
-   (--rb-hw) i kolumna samych kodów FIR-ów z prawej (--rb-nw). */
+   (--rb-hw) i kolumna samych kodów FIR-ów z prawej (--rb-nw).
+   0.14.1 (właściciel projektu: "RADIO czytelniejsze"): drobny tekst danych (liczby wysokości, ID kafelków i plakietek, legenda,
+   tytuły podglądów) najmniej 10 px (--rb-lf); nazwa FIR-u i ADVISORY zostają na dawnym --rb-hf (ich miejsce w komórce
+   jest ograniczone). Granatowa granica o stopień jaśniejsza (jak jasnoniebieskie granice na zdjęciu PANDORY), szare pole
+   o stopień ciemniejsze: pierwsze w oczy rzuca się to, co obsadzone. Wyłączony przycisk warstwy ciemniejszy, więc
+   włączony i wyłączony różnią się wyraźniej; FMP (niczego nie włącza) czarny z szarą ramką. */
 .rb { --rb-f: clamp(11px, .8vw, 15px);
-  --rb-line: #6a6a6a; --rb-epww: #b4b4b4; --rb-free: #5a5a5a; --rb-navy: #2f45c8; --rb-navy-hi: #7d8cff;
+  --rb-line: #6a6a6a; --rb-epww: #b4b4b4; --rb-free: #4a4a4a; --rb-navy: #4a5ed8; --rb-navy-hi: #7d8cff;
   --rb-flow: #7a1414; --rb-flow-line: #ff5245;
   --rb-tile-off: #3b3b37; --rb-tile-off-line: #56564f; --rb-tile-off-tx: #c4c4ba;
-  --rb-box: #eeede6; --rb-box-tx: #55595d; --rb-box-id: #6c7075;
+  --rb-box: #eeede6; --rb-box-tx: #55595d; --rb-box-id: #5a5e63;
   --rb-grey: #595959; --rb-grey-line: #8a8a8a; --rb-name: var(--yellow); --rb-pref: #ff8a80;
-  --rb-btn-on: #ecebe2; --rb-btn-off: #7b7b74; --rb-atis: #aab2f0; --rb-atis-off: #5d6390;
-  --rb-lf: max(9px, calc(var(--rb-f) - 3px));
+  --rb-btn-on: #ecebe2; --rb-btn-off: #696963; --rb-atis: #aab2f0; --rb-atis-off: #6e74a6;
+  --rb-lf: max(10px, calc(var(--rb-f) - 3px)); --rb-hf: max(9px, calc(var(--rb-f) - 3px));
   --rb-tw: calc(var(--rb-f) * 4.7 + 10px); --rb-th: calc(var(--rb-f) * 1.75 + 7px);
   --rb-lv0: 2px; --rb-lv1: calc(var(--rb-lf) * 1.1 + 2px); --rb-lv2: calc(var(--rb-lf) * 2.2 + 6px);
   --rb-hw: clamp(200px, 15vw, 330px); --rb-nw: calc(var(--rb-f) * 4.6);
@@ -26,6 +31,8 @@
   padding: 3px 6px 6px; overflow: hidden; background: #000; font-family: var(--sans); font-weight: 400; }
 /* bez pogrubień w całej zakładce (właściciel projektu, 0.13.0): także w plakietkach i panelu LOA */
 .rb b, .rb strong, .rb h4, .rb th { font-weight: 400; }
+/* 0.14.1: fokus z klawiatury (ATIS, kontrolki panelu LOA) kwadratową ramką zamiast zaokrąglonej przeglądarki */
+.rb :focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
 
 /* --- rząd u góry (0.13.1): wskaźniki konfiguracji (dużo mniejsze niż w 0.13.0: pole ok. 60 × 20 px z małą żółtą
    nazwą nad nim), na prawo od nich ATIS-y w miejscu dawnego paska. Stała wysokość: przycisk ATIS chowa tylko treść
@@ -39,8 +46,13 @@
 .rb-indv { box-sizing: border-box; width: 60px; height: 20px; display: flex; align-items: center; justify-content: center;
   overflow: hidden; padding: 0 3px; background: var(--rb-grey); border: 1px solid var(--rb-grey-line); border-radius: 0; color: #f4f4f4;
   font: 400 12px/1 var(--sans); white-space: nowrap; }
-/* wartość dłuższa niż pole (ACC GAT: 4 i więcej stanowisk ACC): od początku, wielokropek na końcu, całość w dymku */
+/* wartość dłuższa niż pole: od początku, wielokropek na końcu, całość w dymku. 0.14.1: ta sama szerokość całego rzędu
+   (300 px), ale ACC GAT szerszy (96 px: każda konfiguracja do trzech stanowisk, np. S+DBF+ALL, wielokropek dopiero
+   przy czterech i więcej), APP GD, APP KK i APP PO węższe (jedna cyfra); 0 i – (nikogo, brak danych) przygaszone */
 .rb-indt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rb-indv.wide { width: 96px; }
+.rb-indv.narrow { width: 48px; }
+.rb-indv.nil { color: #b0b0b0; }
 /* ATIS-y: ICAO i częstotliwość jasnofioletowe jak w PANDORZE (offline przygaszone), online z literą informacji; jedna
    linia na wysokości pól wskaźników, nadmiar ucięty (nie zawija się) */
 .rb-atis { flex: 1 1 auto; min-width: 0; height: 20px; overflow: hidden; }
@@ -51,14 +63,15 @@
 .rb-atis-in.tight { justify-content: space-between; gap: 0 4px; }
 .rb-atis-in.tight .rb-at { gap: 2px; }
 .rb-at-more { flex: none; padding: 0 4px; border: 1px solid var(--rb-atis-off); color: var(--rb-atis);
-  font: 400 calc(var(--rb-f) * .8)/1.2 var(--sans); white-space: nowrap; cursor: help; }
+  font: 400 max(10px, calc(var(--rb-f) * .8))/1.2 var(--sans); white-space: nowrap; cursor: help; }
 .rb-at { flex: none; display: inline-flex; align-items: baseline; gap: 4px; padding: 0 1px; background: none; border: 0; border-radius: 0;
   cursor: pointer; font: 400 var(--rb-f)/1.2 var(--sans); color: var(--rb-atis-off); white-space: nowrap; }
 .rb-at .rb-ati { font-size: max(9px, calc(var(--rb-f) * .74)); color: inherit; }
 .rb-at .rb-fq { color: inherit; font: inherit; }
 .rb-at.on { color: var(--rb-atis); }
 .rb-at:hover .rb-ati { text-decoration: underline; }
-.rb-code { margin-left: 3px; padding: 0 3px; font: 400 calc(var(--rb-f) * .8)/1.2 var(--sans); color: #000; background: var(--yellow);
+/* 0.14.1: litera informacji ATIS tej samej wielkości co częstotliwość (była najmniejszym tekstem w rzędzie) */
+.rb-code { margin-left: 2px; padding: 0 2px; font: 400 var(--rb-f)/1.2 var(--sans); color: #000; background: var(--yellow);
   border-radius: 0; }
 
 
@@ -77,13 +90,16 @@
   column-gap: 6px; padding-left: 1px; white-space: nowrap; cursor: pointer; }
 .rb-fh.down { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: flex-start; }
 .rb-fc { font: 400 calc(var(--rb-f) + 1px)/1.15 var(--sans); color: var(--rb-name); }
-.rb-fn { font: 400 var(--rb-lf)/1.15 var(--sans); color: #8c8c8c; }
+.rb-fn { font: 400 var(--rb-hf)/1.15 var(--sans); color: #8c8c8c; }
 .rb-fh.nn .rb-fn { display: none; }
-.rb-fs { font: 400 var(--rb-lf)/1.15 var(--sans); color: #fff; }
+/* ADVISORY 122.800 (0.14.1): jasnoszare – stałe i takie samo w każdym FIR-ze, nie jaśniejsze niż żółty kod */
+.rb-fs { font: 400 var(--rb-hf)/1.15 var(--sans); color: #a6a6a6; }
 .rb-fh.down .rb-fs { white-space: normal; }
 .rb-fh:hover .rb-fc, .rb-fh.sel .rb-fc { text-decoration: underline; }
-.rb-fh.sel .rb-fn { color: #fff; }
-.rb-fh:focus-visible { outline: 1px solid #fff; outline-offset: -1px; }
+.rb-fh.sel .rb-fn, .rb-fh.sel .rb-fs { color: #fff; }
+/* fokus z klawiatury: ramka wokół samego kodu, nie całej komórki */
+.rb-fh:focus-visible { outline: none; }
+.rb-fh:focus-visible .rb-fc { outline: 1px solid #fff; outline-offset: 1px; text-decoration: underline; }
 
 /* wysokości między kafelkami (rząd liczb nad i pod kafelkiem): małe białe liczby od lewej krawędzi kolumny, przy swoim
    kafelku – górna granica kafelka pod spodem na dole rzędu (up), dolna kafelka nad nią na górze (dn), wspólna w środku */
@@ -106,8 +122,8 @@
 .rb-box .rb-fq, .rb-pl .rb-fq { font: 400 calc(var(--rb-f) + 1px)/1.1 var(--sans); color: var(--rb-box-tx); }
 .rb-box.on, .rb-pl.on { background: var(--rb-box); border-color: #fff; }
 .rb-box.on .rb-id, .rb-pl.on .rb-id { color: var(--rb-box-id); }
-.rb-box:hover, .rb-pl:hover { outline: 1px solid #fff; outline-offset: -1px; }
-.rb-box.on:hover, .rb-pl.on:hover { outline-color: #000; }
+/* najechanie (0.14.1): cienka biała ramka na zewnątrz z czarną szczeliną – widoczna także na jasnym, obsadzonym polu */
+.rb-box:hover, .rb-pl:hover { outline: 1px solid #fff; outline-offset: 1px; }
 
 /* BERLIN (szkic: kolumna A pod EDWW): żółty napis, pod nim szare pole WEST/EAST na dwie kolumny, wysokości kafelka */
 .rb-blbl { align-self: end; min-width: 0; padding: 0 1px; font: 400 var(--rb-lf)/1.3 var(--sans); color: var(--rb-name); white-space: nowrap; cursor: help; }
@@ -130,17 +146,26 @@
 .rb-btns button:hover { outline: 1px solid #fff; outline-offset: 0; }
 .rb-btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .rb-btns button.on { background: var(--rb-btn-on); color: #111; }
+/* FMP (0.14.1): przechodzi do OTHER › FMP i niczego nie włącza – czarny z szarą ramką, nie jak wyłączona warstwa */
+.rb-btns .rb-go button { background: #000; border: 1px solid var(--rb-btn-off); color: #f2f2ec; }
 /* stan danych pod przyciskami (cały tekst także w dymku), legenda w lewym dolnym rogu */
 .rb-status { min-width: 0; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;
   font: 400 11px/1.3 var(--sans); color: #9a9a9a; text-align: center; overflow-wrap: anywhere; }
-.rb-legend { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px;
-  padding: 0 0 2px 1px; font: 400 var(--rb-lf)/1.3 var(--sans); color: #9a9a9a; }
+/* 0.14.1: dane stare albo błąd przy wczytanych danych – czerwona linia pod rzędem u góry (widać ją z całej strony);
+   bez pierwszych danych komunikat większy (na pustej, czarnej stronie) */
+.rb-stale .rb-cfg { border-bottom-color: var(--bad); }
+.rb-page:not(.rb-on) .rb-status { font-size: 13px; }
+.rb-legend { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  padding: 0 0 2px 1px; font: 400 var(--rb-lf)/1.3 var(--sans); color: #ababab; }
 .rb-legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: help; }
 .rb-sw { flex: none; box-sizing: border-box; display: inline-block; width: 22px; height: 12px; background: var(--rb-free); }
 /* stanowisko online: czarny obszar z granatową granicą i plakietką (małe jasne pole) */
 .rb-sw.on { position: relative; background: #000; border: 2px solid var(--rb-navy); }
 .rb-sw.on::after { content: ""; position: absolute; left: 4px; top: 2px; width: 10px; height: 4px; background: var(--rb-box); }
 .rb-sw.flow { border: 1px solid var(--rb-flow-line); background: var(--rb-flow); }
+/* kafelki sąsiadów (0.14.1): obsadzony jasny, bez nikogo ciemny – jak prawdziwe kafelki */
+.rb-sw.box { background: var(--rb-box); border: 1px solid #fff; }
+.rb-sw.box-off { background: var(--rb-tile-off); border: 1px solid var(--rb-tile-off-line); }
 /* bez danych o ograniczeniach przepływu: legenda czerwonego tła przygaszona */
 .rb-legend .na { opacity: .45; }
 
@@ -149,6 +174,9 @@
 .rb-svg { position: absolute; inset: 0; display: block; }
 .rb-svg path { fill: none; stroke-linejoin: round; }
 .rb-firs path { stroke: var(--rb-line); stroke-width: .8; }
+/* 0.14.1: granice FIR-ów sąsiadów tylko krótkimi odcinkami od granicy FIR EPWW (jak na zdjęciu PANDORY) – maska: pas
+   wzdłuż granicy (szerokość w radio.js renderMap), bez rozmycia */
+.rb-svg .rb-near { fill: #fff; stroke: #fff; stroke-linejoin: round; }
 /* FIR EPWW czarny: kryje granice sąsiadów wzdłuż granicy i w środku */
 .rb-land { fill: #000; }
 /* sektory ACC warstwy bez nikogo: szare pole bez granic (suma wycinków z dziurami: evenodd; fb = po błędzie sumy) */
@@ -174,8 +202,8 @@
 .rb-pl.twr { cursor: pointer; }
 .rb-pl.twr:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .rb-title { position: absolute; z-index: 2; left: 2px; top: 1px; display: flex; align-items: baseline; gap: 5px; padding: 0 3px;
-  font: 400 10px/1.4 var(--sans); color: #9a9a9a; white-space: nowrap; background: #000; cursor: help; }
-.rb-tk { font-size: 12px; color: #fff; letter-spacing: 1px; }
+  font: 400 var(--rb-lf)/1.4 var(--sans); color: #9a9a9a; white-space: nowrap; background: #000; cursor: help; }
+.rb-tk { font-size: max(12px, var(--rb-f)); color: #fff; letter-spacing: 1px; }
 /* HIGH: tuż na prawo od przycisku HIGH – tytuł w prawym górnym rogu */
 .rb-high .rb-title { left: auto; right: 2px; }
 
@@ -231,22 +259,17 @@
    najwyżej okno bez dwóch odstępów (tipPos dosuwa go wtedy do krawędzi, nic nie wychodzi poza okno) */
 .rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px);
   max-height: calc(100vh - 24px); overflow: hidden; padding: 5px 8px;
-  background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
+  background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: #c9d0c9; font: 12px/1.35 var(--sans);
   white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
-
-/* --- dymek (jeden, przy kursorze; 0.13.0, właściciel projektu: okno ściśnięte przy prawej krawędzi): stała szerokość, która nie
-   maleje przy krawędzi okna (radio.js tipPos odwraca go na drugą stronę kursora, 12 px od brzegu), wysokość z treści,
-   najwyżej okno bez dwóch odstępów (tipPos dosuwa go wtedy do krawędzi, nic nie wychodzi poza okno) */
-.rb-tip { position: fixed; z-index: 3000; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px); overflow: hidden; padding: 5px 8px;
-  background: #0d110d; border: 1px solid var(--green); border-radius: 0; color: var(--text); font: 12px/1.35 var(--sans);
-  white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
+/* 0.14.1: pierwsza linia (co to jest: stanowisko, sektor, FIR) białą, szczegóły pod nią jaśniej szare */
+.rb-tip::first-line { color: #fff; }
 
 /* niskie okno (1366×768): niższe kafelki i rzędy liczb, żeby cała siatka szkicu zmieściła się bez przewijania; litera
    ATIS na plakietce TWR/A tej samej wysokości co ID (przegląd 0.13.2: częstotliwość siedziała na dolnej krawędzi) */
 @media (max-height: 820px) {
-  .rb { gap: 3px; padding: 2px 5px 4px; --rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: calc(var(--rb-lf) + 1px);
-    --rb-lv2: calc(var(--rb-lf) * 2 + 4px); }
-  .rb-id, .rb-box .rb-fq, .rb-pl .rb-fq, .rb-pl .rb-code, .rb-bd { line-height: 1; }
+  .rb { gap: 3px; padding: 2px 5px 4px; --rb-th: calc(var(--rb-f) * 1.6 + 5px); --rb-lv1: var(--rb-lf);
+    --rb-lv2: calc(var(--rb-lf) * 2 + 2px); }
+  .rb-box .rb-fq, .rb-pl .rb-fq, .rb-pl .rb-code, .rb-bd { line-height: 1; }
+  .rb-id { line-height: .9; }
   .rb-btns button { font-size: 12px; }
 }
