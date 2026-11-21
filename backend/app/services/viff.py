@@ -539,14 +539,32 @@ def _times(items) -> list[dict]:
     return out
 
 
+def _periods(items) -> list[dict]:
+    """0.14.2 (issue #35): activationPeriods (11.2026: [{"type": "date", "bookingFlag": 1, "start":
+    "2026-11-21T19:00:00.000Z", "end": "2026-11-21T21:00:00.000Z"}]) → [{"from": "1900", "to": "2100", "date":
+    "2026-11-21"}] jak _times; okres bez czasów (ani ISO z datą, ani "HHMM") pomijamy."""
+    out = []
+    for p in items if isinstance(items, list) else []:
+        if not isinstance(p, dict):
+            continue
+        a, b = iso_time(p.get("start")), iso_time(p.get("end"))
+        if a and b:
+            out.append({"from": a.strftime("%H%M"), "to": b.strftime("%H%M"), "date": a.date().isoformat()})
+        elif _hm(p.get("start")) and _hm(p.get("end")):
+            out.append({"from": p["start"], "to": p["end"], "date": None})
+    return out
+
+
 def scenario(s: dict) -> dict:
-    """trafficVolumes: [[tv, przepustowość zajętości, wejść na godzinę], ...]; 999 = bez limitu."""
+    """trafficVolumes: [[tv, przepustowość zajętości, wejść na godzinę], ...]; 999 = bez limitu. times: okna z times,
+    oneTimes i (0.14.2) activationPeriods."""
     tvs = [{"id": t[0], "occupancy_cap": _cap(t[1]) if len(t) > 1 else None, "entries_cap": _cap(t[2]) if len(t) > 2 else None}
            for t in s.get("trafficVolumes") or [] if isinstance(t, list) and t and isinstance(t[0], str)]
     return {"id": s.get("id"), "active": bool(s.get("isActive") or s.get("active")), "tvs": tvs,
             "positions": _list(s.get("positions")), "anypositions": _list(s.get("anypositions")),
             "nopositions": _list(s.get("nopositions")), "start": _hm(s.get("start")), "end": _hm(s.get("end")),
-            "times": _times(s.get("times")) + _times(s.get("oneTimes")), "description": s.get("description") or "",
+            "times": _times(s.get("times")) + _times(s.get("oneTimes")) + _periods(s.get("activationPeriods")),
+            "description": s.get("description") or "",
             "booked": bool(s.get("useBookedPositions"))}
 
 
@@ -580,10 +598,12 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
             nxt = await _get("/etfms/airspaces", {"filter": prefix, "date": tomorrow}, ttl=60) or {}
         except (UpstreamError, ValueError):
             nxt = {}
-    try:  # scenariusze też są dodatkiem: każdy błąd = pusta lista
-        scns = await scenarios(prefix)
+    # scenariusze też są dodatkiem: każdy błąd = pusta lista; 0.14.2 (issue #35): FMP odróżnia brak scenariuszy od
+    # błędu (scenarios_ok)
+    try:
+        scns, scns_ok = await scenarios(prefix), True
     except Exception:  # noqa: BLE001
-        scns = []
+        scns, scns_ok = [], False
     cur_h, next_h = now.hour, (now.hour + 1) % 24
     info = {d["id"]: d for d in (defs if isinstance(defs, list) else []) if isinstance(d, dict) and d.get("id")}
     in_scn = {}  # TV → scenariusze, w których występuje
@@ -617,7 +637,7 @@ async def sectors(prefix: str | None = None, now: datetime | None = None) -> dic
         item["active"] = item["status"] == 1 or any(s["active"] for s, _t in in_scn.get(tv, []))
         out.append(item)
     out.sort(key=lambda s: (not s["active"], s["id"]))
-    return {"prefix": prefix, "now": now.strftime("%H%M"), "sectors": out, "scenarios": scns}
+    return {"prefix": prefix, "now": now.strftime("%H%M"), "sectors": out, "scenarios": scns, "scenarios_ok": scns_ok}
 
 
 # --- jeden lot: plan, CDM, ATFCM, historia i wejścia w sektory (jak szczegóły lotu w NM UI)

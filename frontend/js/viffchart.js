@@ -20,7 +20,10 @@ export function tvLabel(id) {
 
 // Warunki aktywacji scenariusza vIFF (vIFF sam decyduje, czy jest aktywny; pokazujemy tylko warunki). html: wartości
 // w <b> i escapowane (wiersz scenariusza w MAP), bez html sam tekst (dymek, escapowany przy wstawianiu).
-export function scnCond(s, { html = false } = {}) {
+// 0.14.2 (issue #35): times = false bez okien czasu (lista scenariuszy w OTHER › FMP ma na nie osobną kolumnę TIME,
+// scnTimeText); bez warunków stanowisk wtedy "no position conditions". To samo okno podane dwa razy (start/end i times)
+// tylko raz.
+export function scnCond(s, { html = false, times = true } = {}) {
   const e = html ? esc : (t) => String(t);
   const v = (t) => (html ? `<b>${esc(t)}</b>` : String(t));
   const b = (xs, sep) => xs.map(v).join(sep);
@@ -29,9 +32,20 @@ export function scnCond(s, { html = false } = {}) {
   if (s.anypositions?.length) out.push(`when online: ${b(s.anypositions, " or ")}`);
   if (s.nopositions?.length) out.push(`and offline: ${b(s.nopositions, ", ")}`);
   if (s.booked) out.push("bookings count too");
-  if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`time ${v(`${s.start}\u2013${s.end}`)}`);
-  (s.times || []).forEach((t) => out.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}\u2013${t.to}`)}`));
-  return out.join(" \u00b7 ") || "no conditions";
+  const when = [];
+  if (times && s.start && s.end && !(s.start === "0000" && s.end === "2359")) when.push(`time ${v(`${s.start}\u2013${s.end}`)}`);
+  if (times) (s.times || []).forEach((t) => when.push(`${t.date ? e(t.date) + " " : ""}time ${v(`${t.from}\u2013${t.to}`)}`));
+  out.push(...new Set(when));
+  return out.join(" \u00b7 ") || (times ? "no conditions" : "no position conditions");
+}
+
+// 0.14.2 (issue #35): okna czasu scenariusza w jednej linii ("0600–1200, 2026-10-18 1800–2000"): start/end
+// (poza 0000-2359) i wpisy times (z times, oneTimes i activationPeriods) bez powtórek; bez okna "H24"
+export function scnTimeText(s) {
+  const out = [];
+  if (s?.start && s?.end && !(s.start === "0000" && s.end === "2359")) out.push(`${s.start}\u2013${s.end}`);
+  (s?.times || []).forEach((t) => { if (t?.from && t?.to) out.push(`${t.date ? `${t.date} ` : ""}${t.from}\u2013${t.to}`); });
+  return [...new Set(out)].join(", ") || "H24";
 }
 
 // Dymek wiersza scenariusza vIFF po angielsku, z danych scenariusza: id, traffic volumes (z opisem jak tvLabel)
@@ -204,8 +218,11 @@ export function fmpRows(data) {
     const active = !!(tv.active ?? tv.status === 1);
     const restr = Array.isArray(tv.restrictions) ? tv.restrictions.map(restrText).filter(Boolean) : [];
     const entriesMax = capOf(n.entriesCap, n.entriesReg), occupancyMax = capOf(n.occupancyCap, n.occupancyReg);
+    // 0.14.2 (issue #35): scenariusze, w których jest TV (lista i podgląd w OTHER › FMP, widok SCENARIOS)
+    const scns = Array.isArray(tv.scenarios) ? tv.scenarios.filter(Boolean) : [];
     const sectorTip = [`${tv.id}: ${tvLabel(tv.id)}`, active ? "active" : "inactive",
-      tv.restricted ? "regulated now" : "", restr.length ? `regulations: ${restr.join(", ")}` : ""].filter(Boolean).join(DOT);
+      tv.restricted ? "regulated now" : "", restr.length ? `regulations: ${restr.join(", ")}` : "",
+      scns.length ? `scenarios: ${scns.join(", ")}` : ""].filter(Boolean).join(DOT);
     const capacityTip = `${n.entries === null ? "No entry count this hour" : `${n.entries} ${n.entries === 1 ? "entry" : "entries"} this hour`}, `
       + capTip(n.entriesCap, n.entriesReg);
     const occupancyTip = `${n.occupancy === null ? "No occupancy data" : `${n.occupancy} aircraft in the sector now`}, `

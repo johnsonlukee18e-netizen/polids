@@ -170,6 +170,14 @@ step("fmp-cfg-tv", () => view.activate("fmp/2N/ep-bh"));
 step("fmp-cfg-pick", () => last("fmp").opts.onPick("3E/EP-BH"));
 step("fmp-cfg-fix", () => last("fmp").opts.onPick("EP-BH", true));
 step("fmp-cfg-away", () => { last("fmp").opts.onPick("5X"); sub.click("holding"); sub.click("fmp"); });
+// 0.14.2 (issue #35): widok SCENARIOS i scenariusz w adresie (#other/fmp/scenarios/EP_NFIR, z konfiguracją
+// #other/fmp/2N/scenarios/EP_NFIR/EP-BH), wybór na stronie, poprawka adresu i powrót z innej podzakładki
+step("fmp-scn", () => view.activate("fmp/scenarios/ep_nfir"));
+step("fmp-scn-cfg", () => view.activate("fmp/2n/scenarios/EP_NFIR/ep-bh"));
+step("fmp-scn-pick", () => last("fmp").opts.onPick("scenarios/EP_ALL"));
+step("fmp-scn-fix", () => last("fmp").opts.onPick("scenarios", true));
+step("fmp-scn-away", () => { last("fmp").opts.onPick("scenarios/EP_ALL"); sub.click("holding"); sub.click("fmp"); });
+step("fmp-scn-sectors", () => last("fmp").opts.onPick("EP-JH"));
 step("fp-return", () => sub.click("flight-plan"));
 step("regcause", () => view.activate("regcause"));
 step("vfr", () => view.activate("vfr-minima"));
@@ -284,8 +292,8 @@ def js(tmp_path_factory):
         (stubs / f"{mod}.mjs").write_text(PAGE_STUB % {"fn": fn, "kind": kind}, "utf-8")
     # OTHER czyści znak z adresu prawdziwą funkcją z flightplan.js, a id sektora FMP i konfigurację (0.14.0) prawdziwymi
     # funkcjami z fmp.js; konfiguracja z pamięci przeglądarki z atrapy (globalThis.__savedCfg)
-    for mod, fn in (("flightplan", "cleanCallsign"), ("fmp", "cleanTv"), ("fmp", "cleanCfg"), ("fmp", "parseFmpArg"),
-                    ("fmp", "fmpArg")):
+    for mod, fn in (("flightplan", "cleanCallsign"), ("fmp", "cleanTv"), ("fmp", "cleanCfg"), ("fmp", "cleanScn"),
+                    ("fmp", "parseFmpArg"), ("fmp", "fmpArg")):
         src = (FRONTEND / "js" / f"{mod}.js").read_text("utf-8")
         clean = next(line for line in src.splitlines() if line.startswith(f"export const {fn} = "))
         with open(stubs / f"{mod}.mjs", "a", encoding="utf-8") as f:
@@ -481,6 +489,23 @@ def test_other_flight_plan_and_fmp_addresses(js):
     assert len(away["fmp"]) == 4 and away["fmp"][3]["start"] == "5X"
     assert away["log"] == [["remember", "other", "fmp/5X", False], ["remember", "other", "holding", False],
                            ["remember", "other", "fmp/5X", False]]
+    # 0.14.2 (issue #35): widok SCENARIOS i scenariusz (wielkimi literami) do otwartej strony; konfiguracja przed widokiem
+    scn = _step(js, "fmp-scn")
+    assert len(scn["fmp"]) == 4 and scn["fmp"][3]["calls"][-1] == ["activate", "scenarios/EP_NFIR"]
+    assert scn["log"] == [["remember", "other", "fmp/scenarios/EP_NFIR", False]]
+    sc = _step(js, "fmp-scn-cfg")
+    assert sc["fmp"][3]["calls"][-1] == ["activate", "2N/scenarios/EP_NFIR/EP-BH"]
+    assert sc["log"] == [["remember", "other", "fmp/2N/scenarios/EP_NFIR/EP-BH", False]]
+    # wybór scenariusza = krok historii; poprawka (nieznany scenariusz) podmienia adres
+    assert _step(js, "fmp-scn-pick")["log"] == [["remember", "other", "fmp/scenarios/EP_ALL", False]]
+    assert _step(js, "fmp-scn-fix")["log"] == [["remember", "other", "fmp/scenarios", True]]
+    # przejście przez inną podzakładkę: FMP od nowa w widoku SCENARIOS z tym samym scenariuszem
+    away = _step(js, "fmp-scn-away")
+    assert len(away["fmp"]) == 5 and away["fmp"][4]["start"] == "scenarios/EP_ALL" and away["fmp"][3]["dead"] is True
+    assert away["log"] == [["remember", "other", "fmp/scenarios/EP_ALL", False], ["remember", "other", "holding", False],
+                           ["remember", "other", "fmp/scenarios/EP_ALL", False]]
+    # SECTORS z TV z podglądu: adres bez widoku i scenariusza
+    assert _step(js, "fmp-scn-sectors")["log"] == [["remember", "other", "fmp/EP-JH", False]]
     # nowy OTHER: konfiguracja z pamięci przeglądarki od początku (adres i strona)
     assert js["saved"] == {"log": [["remember", "other", "fmp/2N", False]], "start": "2N"}
     # powrót do FLIGHT PLAN: FMP zniszczone, ostatni znak

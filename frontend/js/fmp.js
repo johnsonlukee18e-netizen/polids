@@ -2,7 +2,7 @@ import { api, esc, h, lsGet, lsSet, ONLINE_EVENT } from "./api.js";
 import { colorFor } from "./airspace.js";
 import { dissolve, pointIn, ringStats } from "./dissolve.js";
 import { EPWW_BBOX, FMP_LS, LEVEL_FT, bboxOf, bboxOrDefault, flText, pathAll, pathOf, projection, ringsOf, sliceAt } from "./radioboard.js";
-import { capOf, fmpRows, loadClass, tvLabel } from "./viffchart.js";
+import { capOf, fmpRows, loadClass, scnCond, scnTimeText, scnTip, tvLabel } from "./viffchart.js";
 
 // OTHER › FMP (0.13.0, issue #23): sektory (traffic volumes) w tabeli SECTOR | CAPACITY | OCCUPANCY jak FMP PANDORY,
 // z tych samych danych co panel sektorów na MAP (GET /api/viff/sectors, jedno zapytanie zbiorcze z cache).
@@ -31,6 +31,19 @@ import { capOf, fmpRows, loadClass, tvLabel } from "./viffchart.js";
 // konfiguracji w grupie NOT COVERED, TMA, części FIR i kombinacje na końcu w OTHER. Bez konfiguracji tabela jak dotąd.
 // Adres: "#other/fmp/2N", "#other/fmp/2N/EP-BH", stare "#other/fmp/EP-BH" dalej działa (parseFmpArg, fmpArg); ostatnia
 // konfiguracja w pamięci przeglądarki (savedCfg / saveCfg: OTHER otwiera FMP z nią, przycisk FMP na RADIO też).
+// 0.14.2 (issue #35, "scenario preview oraz listę scenariuszy aktywnych i nieaktywnych"): w pasku nad tabelą przełącznik
+// SECTORS | SCENARIOS. SCENARIOS: po lewej lista scenariuszy z tej samej odpowiedzi /api/viff/sectors (bez nowych
+// zapytań) w grupach ACTIVE i INACTIVE: id, warunki stanowisk, okna czasu (TIME, bez okna H24), traffic volumes
+// (w dymku przepustowości ze scenariusza), a z wybraną konfiguracją kolumna z jej kodem: czy warunki stanowisk ACC
+// EPWW są spełnione (yes / no / ? = zależy od innych stanowisk; czasu i rezerwacji nie sprawdzamy). Klik w scenariusz
+// = po prawej SCENARIO PREVIEW: jego traffic volumes z przepustowością ze scenariusza wobec ruchu teraz (CAPACITY NOW =
+// przepustowość teraz), z konfiguracją w grupach stanowisk, trzy małe mapy LOW/MID/HIGH z obszarami tych traffic
+// volumes, a klik w traffic volume = wykresy ENTRY i OCC z liniami przepustowości ze scenariusza. Podgląd liczy
+// przeglądarka z danych do odczytu: nic nie jest włączane (napis "Preview only: nothing is activated."); endpointów
+// zapisujących aplikacja nie wywołuje. Opisu scenariusza (wolny tekst) nie pokazujemy, jak na MAP. Adres:
+// "#other/fmp/scenarios", "#other/fmp/scenarios/EP_NFIR", "#other/fmp/scenarios/EP_NFIR/EP-BH", z konfiguracją
+// "#other/fmp/2N/scenarios/EP_NFIR"; słowo "scenarios" w adresie, bo id scenariusza bywa też id traffic volume
+// (EP-WATMA). SECTORS po podglądzie zostawia wybrany traffic volume (wykresy z prawdziwą przepustowością).
 
 const REFRESH_MS = 60000;
 
@@ -40,10 +53,15 @@ const DASH = "\u2013", DOT = " \u00b7 ";
 export const cleanTv = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z]{2}-[A-Z0-9-]{1,20}$/.test(t) ? t : ""; };
 // 0.14.0 (właściciel projektu): kod konfiguracji sektorów z adresu albo z pamięci: cyfra i litera ("2n" → "2N"); inne napisy = ""
 export const cleanCfg = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
-// adres podzakładki → {cfg, tv}: "2N", "2N/EP-BH", stare "EP-BH" (sam sektor, bez konfiguracji); zły kod albo sektor = ""
-export const parseFmpArg = (s) => { const t = String(s ?? ""), [a = "", ...r] = t.split("/"), cfg = cleanCfg(a); return { cfg, tv: cleanTv(cfg ? r.join("/") : t) }; };
-// stan → adres podzakładki: "2N/EP-BH", "2N", "EP-BH" albo ""
-export const fmpArg = (cfg, tv) => [cleanCfg(cfg), cleanTv(tv)].filter(Boolean).join("/");
+// 0.14.2 (issue #35): id scenariusza z adresu albo z wiersza listy: wielkie litery ("ep_nfir" → "EP_NFIR"), cyfry, "_"
+// i "-", do 40 znaków; inne napisy = ""
+export const cleanScn = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{0,39}$/.test(t) ? t : ""; };
+// adres podzakładki → {cfg, tv, view, scn}: "2N", "2N/EP-BH", stare "EP-BH" (sam sektor, bez konfiguracji), 0.14.2:
+// "scenarios", "scenarios/EP_NFIR", "2N/scenarios/EP_NFIR/EP-BH" (view = "scenarios", traffic volume tylko przy
+// scenariuszu); zły kod, sektor albo scenariusz = ""
+export const parseFmpArg = (s) => { const p = String(s ?? "").split("/"), cfg = cleanCfg(p[0]), r = cfg ? p.slice(1) : p, v = String(r[0] ?? "").trim().toLowerCase() === "scenarios", scn = v ? cleanScn(r[1]) : ""; return { cfg, tv: v ? (scn ? cleanTv(r.slice(2).join("/")) : "") : cleanTv(r.join("/")), view: v ? "scenarios" : "", scn }; };
+// stan → adres podzakładki: "2N/EP-BH", "2N", "EP-BH", "" albo (0.14.2) "2N/scenarios/EP_NFIR/EP-BH", "scenarios"
+export const fmpArg = (cfg, tv, view = "", scn = "") => (view === "scenarios" ? [cleanCfg(cfg), "scenarios", cleanScn(scn), cleanScn(scn) ? cleanTv(tv) : ""] : [cleanCfg(cfg), cleanTv(tv)]).filter(Boolean).join("/");
 // ostatnio pokazana konfiguracja w pamięci przeglądarki (lsGet / lsSet: bez localStorage po prostu bez pamięci)
 export const LS_CFG = FMP_LS;
 export const savedCfg = () => cleanCfg(lsGet(LS_CFG));
@@ -55,11 +73,12 @@ function pairHtml(n, cap, reg) {
   const c = cap === null ? DASH : reg ? `<span class="fmp-regcap">${esc(cap)}</span>` : esc(cap);
   return `${n === null ? DASH : esc(n)} (${c})`;
 }
-function rowHtml(r, sel) {
+// extra = dodatkowe komórki na końcu wiersza (0.14.2: CAPACITY NOW w podglądzie scenariusza)
+function rowHtml(r, sel, extra = "") {
   return `<tr class="${r.active ? "on" : "off"}${r.id === sel ? " sel" : ""}" data-tv="${esc(r.id)}">
     <td class="fmp-sec${r.restricted ? " reg" : ""}" title="${esc(r.sectorTip)}">${esc(r.code)}</td>
     <td class="fmp-num${NUM_CLS[r.entriesCls] || ""}" title="${esc(r.capacityTip)}">${pairHtml(r.entries, r.entriesMax, r.capacityReg)}</td>
-    <td class="fmp-num${NUM_CLS[r.occupancyCls] || ""}" title="${esc(r.occupancyTip)}">${pairHtml(r.occupancy, r.occupancyMax, r.occupancyReg)}</td></tr>`;
+    <td class="fmp-num${NUM_CLS[r.occupancyCls] || ""}" title="${esc(r.occupancyTip)}">${pairHtml(r.occupancy, r.occupancyMax, r.occupancyReg)}</td>${extra}</tr>`;
 }
 
 // --- 0.14.0 (właściciel projektu): konfiguracje sektorów ACC (odpowiedź /api/radio/configs: configs, current, layers, geo)
@@ -195,15 +214,16 @@ export function cfgGroupRows(rows, c) {
   });
   return [...groups, ...[free, other].filter((g) => g.rows.length)];
 }
-// nagłówek grupy w tabeli (td, nie th: th w tabeli są przyklejone u góry)
-function groupHead(g) {
+// nagłówek grupy w tabeli (td, nie th: th w tabeli są przyklejone u góry); cols = liczba kolumn tabeli (0.14.2: podgląd
+// scenariusza ma 4)
+function groupHead(g, cols = 3) {
   if (g.p) {
-    return `<tr class="fmp-grp"><td colspan="3" title="${esc(`${g.p.name}: ${g.p.callsign} ${g.p.frequency || ""}`.trim())}">`
+    return `<tr class="fmp-grp"><td colspan="${cols}" title="${esc(`${g.p.name}: ${g.p.callsign} ${g.p.frequency || ""}`.trim())}">`
       + `${swatch(g.p.callsign)}${esc(g.p.name)}<span class="fmp-grp-sub">${esc(g.p.callsign)} ${esc(g.p.frequency || "")}</span></td></tr>`;
   }
   return g.kind === "free"
-    ? `<tr class="fmp-grp free"><td colspan="3" title="Sector layers with no position of this configuration">NOT COVERED</td></tr>`
-    : `<tr class="fmp-grp other"><td colspan="3" title="TMA, FIR-wide traffic volumes and combinations across positions">OTHER</td></tr>`;
+    ? `<tr class="fmp-grp free"><td colspan="${cols}" title="Sector layers with no position of this configuration">NOT COVERED</td></tr>`
+    : `<tr class="fmp-grp other"><td colspan="${cols}" title="TMA, FIR-wide traffic volumes and combinations across positions">OTHER</td></tr>`;
 }
 
 // tabela dla odpowiedzi /api/viff/sectors; sel = id wybranego sektora (wiersz z klasą sel); czysta funkcja (testy w Node)
@@ -350,12 +370,14 @@ const regList = (c) => [...new Set([...(c.entries_reg || []).map((r) => `entries
   ...(c.occupancy_reg || []).map((r) => `occupancy ${r.value} ${r.start}${DASH}${r.end}`)])];
 
 // panel z wykresami wybranego sektora; row = wiersz fmpRows (kod jak w tabeli) albo null; note = "Not refreshed: ..."
-export function fmpChartHtml(c, row = null, note = "") {
+// 0.14.2: opts.scenario = id scenariusza, z którego jest przepustowość (podgląd scenariusza, scnChart)
+export function fmpChartHtml(c, row = null, note = "", opts = {}) {
   const ec = num(c.entries_cap), oc = num(c.occupancy_cap), regs = regList(c);
   const quiet = !(c.occupancy || []).some((v) => v > 0) && !(c.entries || []).some((e) => e.count > 0);
   const peak = num(c.peak) ? `${DOT}peak ${c.peak} at ${esc(c.peak_at)}Z` : "";
+  const scn = opts.scenario ? `scenario ${esc(opts.scenario)} ` : "";
   return `<div class="fmc">${headHtml(c.id, row, c, note)}
-    <div class="fmc-meta">capacity: ${ec === null ? "no entry limit" : `${ec} entries/h`}${DOT}${oc === null ? "no occupancy limit" : `${oc} aircraft at once`}`
+    <div class="fmc-meta">${scn}capacity: ${ec === null ? "no entry limit" : `${ec} entries/h`}${DOT}${oc === null ? "no occupancy limit" : `${oc} aircraft at once`}`
     + `${regs.length ? `<span class="fmc-regtxt">${DOT}regulated: ${esc(regs.join(", "))}</span>` : ""}</div>
     ${quiet ? `<p class="hint fmc-empty">No traffic in this period.</p>` : ""}
     <div class="fmc-charts">
@@ -374,13 +396,207 @@ export const fmpPickHtml = () => `<p class="hint fmp-pick">Click a sector to see
 export const fmpWaitHtml = (id, row = null, err = "") => `<div class="fmc">${headHtml(id, row, null)}`
   + (err ? `<p class="error fmc-err">${esc(err)}</p>` : `<p class="hint fmc-wait">Loading\u2026</p>`) + "</div>";
 
-// start / activate(arg) / onPick(arg, fix): adres podzakładki (fmpArg: "2N/EP-BH", "2N", "EP-BH", ""); fix = poprawa
-// adresu bez nowego kroku historii (kod konfiguracji spoza tabeli)
+// --- 0.14.2 (issue #35): SCENARIOS i SCENARIO PREVIEW (scenariusze z odpowiedzi /api/viff/sectors: id, active, tvs
+// [{id, entries_cap, occupancy_cap}], positions, anypositions, nopositions, start, end, times, booked)
+
+// przełącznik widoku w pasku nad tabelą; view = "" (SECTORS) albo "scenarios"
+const VIEWS = [["sectors", "SECTORS", "Traffic volumes with traffic and capacity now"],
+  ["scenarios", "SCENARIOS", "Active and inactive scenarios: click one to preview its traffic volumes and capacities"]];
+export const viewBarHtml = (view = "") => VIEWS.map(([v, label, tip]) => {
+  const on = (view === "scenarios" ? "scenarios" : "sectors") === v;
+  return `<button type="button" class="fmp-cb fmp-vb${on ? " on" : ""}" data-view="${v}" aria-pressed="${on}" title="${esc(tip)}">${label}</button>`;
+}).join("");
+
+// scenariusze z odpowiedzi: aktywne na początku, potem po id (jak backend)
+const scnList = (data) => (Array.isArray(data?.scenarios) ? data.scenarios.filter((s) => s && s.id) : [])
+  .sort((a, b) => (!!a.active !== !!b.active ? (a.active ? -1 : 1) : String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0));
+// znak stanowiska ACC EPWW (też ze wzorcem jak "EPWW_D*_CTR"); tylko takie stanowiska ma konfiguracja
+const ACC_CS = /^EPWW(?:_[A-Z0-9*]+)?_CTR$/;
+// znak z gwiazdką ("EPWW_D*_CTR") jako wzorzec
+const csRe = (p) => {
+  const t = String(p).toUpperCase().replace(/[.+?^$|()[\]{}\\]/g, "\\$&").replace(/\*/g, "[A-Z0-9_]*");
+  return new RegExp(`^${t}$`);
+};
+const capWords = (v, unit, none) => (num(v) === null ? none : `${v} ${unit}`);
+
+// Warunki stanowisk scenariusza s przy konfiguracji cfg (stanowiska konfiguracji online, inne ACC EPWW offline):
+// {state: "yes" | "no" | "unknown", text}; bez konfiguracji null. "no": stanowisko z positions offline, z nopositions
+// online albo żadne z anypositions nie może być online; "unknown": warunek dotyczy stanowiska spoza ACC EPWW (APP,
+// TWR), którego konfiguracja nie opisuje. Okien czasu i rezerwacji nie sprawdzamy.
+export function scnMatch(s, cfg) {
+  if (!cfg) return null;
+  const on = (cfg.positions || []).map((p) => String(p.callsign || "").toUpperCase());
+  const state = (p) => (!ACC_CS.test(String(p).toUpperCase()) ? "unknown" : on.some((c) => csRe(p).test(c)) ? "online" : "offline");
+  const pos = s?.positions || [], any = s?.anypositions || [], no = s?.nopositions || [];
+  const why = [...pos.filter((p) => state(p) === "offline").map((p) => `${p} not open`),
+    ...no.filter((p) => state(p) === "online").map((p) => `${p} open`),
+    ...(any.length && any.every((p) => state(p) === "offline") ? [`none of ${any.join(", ")} open`] : [])];
+  const unk = [...new Set([...pos, ...any, ...no].filter((p) => state(p) === "unknown"))];
+  const head = `With ${cfg.code} (${spaced(cfg.label)})`;
+  if (why.length) return { state: "no", text: `${head}: not met (${why.join("; ")})` };
+  if (unk.length) return { state: "unknown", text: `${head}: depends on other positions (${unk.join(", ")})` };
+  return { state: "yes", text: `${head}: the position conditions are met` };
+}
+const MATCH_TEXT = { yes: "yes", no: "no", unknown: "?" };
+const NOT_CHECKED = "Time windows and bookings are not checked.";
+
+// lista scenariuszy (lewa strona widoku SCENARIOS): grupy ACTIVE i INACTIVE, wiersz = scenariusz (sel = id wybranego);
+// cfg = wybrana konfiguracja: kolumna z jej kodem (scnMatch). Czysta funkcja (testy w Node)
+export function scnListHtml(data, sel = "", cfg = null) {
+  if (data?.scenarios_ok === false) return `<p class="error fmp-empty">Scenarios unavailable.</p>`;
+  const all = scnList(data);
+  if (!all.length) return `<p class="hint fmp-empty">No scenarios.</p>`;
+  const cols = cfg ? 5 : 4, prefix = (data?.prefix || "EP") + "-";
+  const code = (id) => (String(id).startsWith(prefix) ? String(id).slice(prefix.length) : String(id));
+  const row = (s) => {
+    const id = cleanScn(s.id), tvs = (s.tvs || []).filter((t) => t?.id), m = scnMatch(s, cfg);
+    const tvTip = tvs.map((t) => `${t.id}: ${capWords(t.entries_cap, "entries/h", "no entry limit")}, `
+      + `${capWords(t.occupancy_cap, "aircraft at once", "no occupancy limit")}`).join("\n") || "No traffic volumes";
+    return `<tr class="${s.active ? "on" : "off"}${id && id === sel ? " sel" : ""}" data-scn="${esc(id)}">`
+      + `<td class="fmp-sec" title="${esc(scnTip(s))}">${esc(s.id)}</td>`
+      + `<td class="fmp-scn-cond">${esc(scnCond(s, { times: false }))}</td>`
+      + `<td class="fmp-scn-time">${esc(scnTimeText(s))}</td>`
+      + `<td class="fmp-scn-tvs" title="${esc(tvTip)}">${esc(tvs.map((t) => code(t.id)).join(" ") || DASH)}</td>`
+      + (m ? `<td class="fmp-scn-m ${m.state}" title="${esc(`${m.text}. ${NOT_CHECKED}`)}">${MATCH_TEXT[m.state]}</td>` : "") + "</tr>";
+  };
+  const group = (label, tip, list, none) => `<tr class="fmp-grp"><td colspan="${cols}" title="${tip}">${label}<span class="fmp-grp-sub">${list.length}</span></td></tr>`
+    + (list.length ? list.map(row).join("") : `<tr class="fmp-none"><td colspan="${cols}">${none}</td></tr>`);
+  const on = all.filter((s) => s.active), off = all.filter((s) => !s.active);
+  return `<table class="fmp-table fmp-scn-table">
+    <thead><tr><th title="Scenario: a set of traffic volumes with their own capacities">SCENARIO</th>
+      <th title="Positions that must be online (or offline) for the scenario">CONDITION</th>
+      <th title="Time windows of the scenario (UTC); H24 = no window">TIME</th>
+      <th title="Traffic volumes of the scenario (hover: their capacities in the scenario)">TV</th>`
+    + (cfg ? `<th title="${esc(`With configuration ${cfg.code} (${spaced(cfg.label)}) open: are the ACC position conditions met? `
+      + `yes, no or ? (depends on other positions). ${NOT_CHECKED}`)}">${esc(cfg.code)}</th>` : "") + `</tr></thead>
+    <tbody>${group("ACTIVE", "Scenarios active now (grey rows)", on, "No scenario is active now")}`
+    + (off.length ? group("INACTIVE", "Scenarios not active now", off, "") : "") + "</tbody></table>";
+}
+
+// linia nad listą: godzina danych i liczba aktywnych scenariuszy
+export function scnInfo(data) {
+  const all = data?.scenarios_ok === false ? [] : scnList(data), on = all.filter((s) => s.active).length;
+  const now = /^\d{4}$/.test(data?.now || "") ? `${data.now}Z${DOT}` : "";
+  return all.length ? `${now}${on} of ${all.length} scenario${all.length === 1 ? "" : "s"} active (grey rows)` : "";
+}
+
+// Wiersze podglądu scenariusza s w kolejności jego traffic volumes: wiersz fmpRows z przepustowością ze scenariusza
+// (także w godzinowych koszykach, bo tvNow bierze najpierw przepustowość godziny; regulacje TV zostają) i ruchem teraz,
+// a nowEntries / nowOccupancy = przepustowość teraz (z regulacją) z prawdziwego wiersza tabeli
+export function scnTvRows(data, s) {
+  const by = new Map((data?.sectors || []).filter((t) => t && t.id).map((t) => [t.id, t]));
+  const real = new Map(fmpRows(data).map((r) => [r.id, r]));
+  const tvs = (s?.tvs || []).filter((t) => t && typeof t.id === "string" && t.id);
+  const sectors = tvs.map((t) => {
+    const tv = by.get(t.id) || { id: t.id, hours: [], occupancy: [], volumes: [] };
+    const ec = num(t.entries_cap), oc = num(t.occupancy_cap);
+    return { ...tv, entries_cap: ec, occupancy_cap: oc, hours: (tv.hours || []).map((x) => ({ ...x, entries_cap: ec })) };
+  });
+  const rows = new Map(fmpRows({ ...data, sectors }).map((r) => [r.id, r]));
+  return tvs.map((t) => {
+    const n = real.get(t.id);
+    return { ...rows.get(t.id), nowKnown: !!n, nowEntries: n ? n.entriesMax : null, nowOccupancy: n ? n.occupancyMax : null };
+  });
+}
+
+// 0.14.1 tvSlots, ale bez "wszystko albo nic": warstwy sektorów z wolumenów EPWW-<litera><L|M|H>, inne wolumeny
+// (EPWA-TMA w EP-ALLFIR) pomijamy; bez wolumenów z id (tvSlot)
+export function tvCover(r) {
+  const vols = Array.isArray(r?.volumes) ? r.volumes.filter(Boolean) : [];
+  if (!vols.length) { const s = tvSlot(r?.id); return s ? [s] : []; }
+  return vols.map((v) => /^EPWW-([A-Z])([LMH])$/.exec(String(v))).filter(Boolean).map((m) => ({ letter: m[1], layer: BAND_LAYER[m[2]] }));
+}
+
+// Mała mapa warstwy (LOW/MID/HIGH) scenariusza jak cfgPreviewSvg: wycinki ACC na wysokości podglądu, obszar każdego
+// traffic volume scenariusza zielony (wycinki jednego TV jako jeden obszar; bez biblioteki same wycinki), z kodem TV;
+// reszta szara, granica FIR na wierzchu. rows = scnTvRows, sel = wybrany TV (jaśniej)
+export function scnPreviewSvg(geo, rows, layer, ver = "", id = "", sel = "") {
+  const { P } = projection(bboxOrDefault(bboxOf(geo?.border)) || EPWW_BBOX, { x: 0, y: 0, w: PV_W, h: PV_H }, 0.04);
+  const slices = sliceAt(geo?.acc, LEVEL_FT[layer]), used = new Set();
+  const lib = !!globalThis.polygonClipping?.union;
+  const xy = (at) => { const [x, y] = P([at[1], at[0]]); return `x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}"`; };
+  const areas = (rows || []).map((r) => {
+    const letters = new Set(tvCover(r).filter((x) => x.layer === layer).map((x) => x.letter));
+    const mine = slices.filter((sl) => letters.has(sl.letter));
+    if (!mine.length) return null;
+    mine.forEach((sl) => used.add(sl));
+    const key = `scn|${ver}|${layer}|${r.id}|${mine.map((x) => `${x.name}:${x.lo}`).sort().join(",")}`;
+    const u = lib ? dissolve(key, mine.map((x) => x.geometry)) : null;
+    const big = mine.reduce((a, x) => (areaOf(x.geometry) > areaOf(a.geometry) ? x : a));
+    const at = (u && (u.at ||= pointIn(u.geometry))) || pointIn(big.geometry);
+    const cls = `fmp-pv-on${r.id === sel ? " sel" : ""}`;
+    const shape = u ? `<path class="${cls}" d="${pathAll(u.geometry, P)}"/>`
+      : mine.map((x) => `<path class="fmp-pv-s ${cls}" d="${pathOf(x.geometry, P)}"/>`).join("");
+    return { shape, label: at ? `<text class="fmp-pv-l" ${xy(at)}>${esc(r.code)}</text>` : "" };
+  }).filter(Boolean);
+  return `<svg class="fmp-pv-svg" viewBox="0 0 ${PV_W} ${PV_H}" role="img" aria-label="${esc(`${layer} traffic volumes of scenario ${id}`)}">`
+    + slices.filter((sl) => !used.has(sl)).map((sl) => `<path class="fmp-pv-free" d="${pathOf(sl.geometry, P)}"/>`).join("")
+    + areas.map((a) => a.shape).join("") + `<path class="fmp-pv-b" d="${pathOf(geo?.border, P)}"/>`
+    + areas.map((a) => a.label).join("") + "</svg>";
+}
+// trzy mapy obok siebie jak cfgPreviewsHtml i pod nimi traffic volumes spoza sektorów ACC (TMA)
+export function scnPreviewsHtml(geo, rows, ver = "", layers = {}, id = "", sel = "") {
+  const off = (rows || []).filter((r) => !tvCover(r).length).map((r) => r.code);
+  const note = off.length ? `<p class="hint fmp-sp-off">Not on the maps: ${esc(off.join(", "))}</p>` : "";
+  if (!geo?.acc?.length) return `<p class="hint fmp-pv-none">No sector geometry.</p>${note}`;
+  return `<div class="fmp-pvs">` + LAYER_KEYS.map((ly) => `<figure class="fmp-pv"><figcaption title="${esc(`${ly}${layers?.[ly]?.label ? ` (${layers[ly].label})` : ""}: sectors at ${flText(LEVEL_FT[ly])}`)}">`
+    + `${ly} <span>${flText(LEVEL_FT[ly])}</span></figcaption>${scnPreviewSvg(geo, rows, ly, ver, id, sel)}</figure>`).join("") + `</div>${note}`;
+}
+
+// wykres TV z przepustowością ze scenariusza t ({entries_cap, occupancy_cap}): linie przepustowości i kolory słupków
+// wobec niej, regulacje TV zostają; c się nie zmienia
+export function scnChart(c, t) {
+  const ec = num(t?.entries_cap), oc = num(t?.occupancy_cap);
+  return { ...c, entries_cap: ec, occupancy_cap: oc, entries: (c?.entries || []).map((e) => ({ ...e, cap: ec })) };
+}
+
+// wiersz podglądu: jak wiersz tabeli FMP i CAPACITY NOW = przepustowość teraz "40 / 14"
+function spRowHtml(r, sel) {
+  const now = `${r.nowEntries ?? DASH} / ${r.nowOccupancy ?? DASH}`;
+  const tip = r.nowKnown ? `capacity now: ${capWords(r.nowEntries, "entries/h", "no entry limit")}, `
+    + `${capWords(r.nowOccupancy, "aircraft at once", "no occupancy limit")}` : "Not in the traffic volume list now";
+  return rowHtml(r, sel, `<td class="fmp-sp-now" title="${esc(tip)}">${esc(now)}</td>`);
+}
+
+// SCENARIO PREVIEW (prawa strona widoku SCENARIOS): nagłówek (id, ACTIVE / INACTIVE, ✕), warunki, z konfiguracją
+// linia scnMatch, zdanie, że to tylko podgląd, tabela traffic volumes z przepustowością ze scenariusza (z konfiguracją
+// w grupach stanowisk), pod nią wykresy wybranego TV (sel; chart = odpowiedź /api/viff/sectors/<TV>, note / err jak
+// w widoku SECTORS) i trzy mapy
+export function scnPreviewHtml(data, s, { cfg = null, geo = null, ver = "", layers = {}, sel = "", chart = null, note = "", err = "" } = {}) {
+  const rows = scnTvRows(data, s), m = scnMatch(s, cfg);
+  const none = `<tr class="fmp-none"><td colspan="4">No traffic volumes</td></tr>`;
+  const body = !rows.length ? none : cfg ? cfgGroupRows(rows, cfg).map((g) => groupHead(g, 4)
+    + (g.rows.length ? g.rows.map((r) => spRowHtml(r, sel)).join("") : none)).join("") : rows.map((r) => spRowHtml(r, sel)).join("");
+  let part = "";
+  if (sel) {
+    const row = rows.find((r) => r.id === sel) || null, t = (s.tvs || []).find((x) => x?.id === sel);
+    part = `<div class="fmp-sp-chart">${chart && chart.id === sel && t ? fmpChartHtml(scnChart(chart, t), row, note, { scenario: s.id })
+      : fmpWaitHtml(sel, row, err)}</div>`;
+  }
+  return `<div class="fmc fmp-sp"><div class="fmc-head"><span class="fmc-code" title="${esc(scnTip(s))}">${esc(s.id)}</span>`
+    + `<span class="fmc-desc">scenario preview</span><span class="fmc-chip${s.active ? " on" : ""}">${s.active ? "ACTIVE" : "INACTIVE"}</span>`
+    + `<button type="button" class="fmp-sp-close" title="Close the preview" aria-label="Close the preview">\u2715</button></div>`
+    + `<div class="fmc-meta">${esc(scnCond(s))}</div>`
+    + (m ? `<div class="fmp-sp-cfg ${m.state}" title="${NOT_CHECKED}">${esc(m.text)}</div>` : "")
+    + `<p class="hint fmp-sp-note">Preview only: nothing is activated. Capacities as set in the scenario, traffic now.</p>`
+    + `<table class="fmp-table fmp-sp-tab${cfg ? " grouped" : ""}"><thead><tr>`
+    + `<th title="Traffic volume of the scenario">SECTOR</th>`
+    + `<th title="Entries in the current hour (entry capacity per hour in the scenario)">CAPACITY (ENTRIES)</th>`
+    + `<th title="Aircraft in the sector now (capacity at one time in the scenario)">OCCUPANCY</th>`
+    + `<th title="Capacity in force now: entries per hour / aircraft at once">CAPACITY NOW</th></tr></thead><tbody>${body}</tbody></table>`
+    + `${part}${scnPreviewsHtml(geo, rows, ver, layers, s.id, sel)}</div>`;
+}
+// panel bez wybranego scenariusza
+export const scnPickHtml = () => `<p class="hint fmp-pick">Click a scenario to preview its traffic volumes and capacities.</p>`;
+
+// start / activate(arg) / onPick(arg, fix): adres podzakładki (fmpArg: "2N/EP-BH", "2N", "EP-BH", "", 0.14.2 także
+// "2N/scenarios/EP_NFIR/EP-BH"); fix = poprawa adresu bez nowego kroku historii (kod konfiguracji spoza tabeli,
+// nieznany scenariusz albo traffic volume spoza scenariusza)
 export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   const root = h(`<div class="fmp">
     <div class="fmp-cfg" role="group" aria-label="Sector configuration"></div>
     <div class="fmp-cp" hidden></div>
-    <div class="fmp-bar"><span class="fmp-info hint"></span><span class="fmp-msg error"></span></div>
+    <div class="fmp-bar"><span class="fmp-vw" role="group" aria-label="FMP view"></span><span class="fmp-info hint"></span><span class="fmp-msg error"></span></div>
     <div class="fmp-main">
       <div class="fmp-scroll"><p class="hint">Loading\u2026</p></div>
       <aside class="fmp-side"></aside>
@@ -389,12 +605,16 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   pane.append(root);
   const info = root.querySelector(".fmp-info"), msg = root.querySelector(".fmp-msg"), box = root.querySelector(".fmp-scroll");
   const main = root.querySelector(".fmp-main"), side = root.querySelector(".fmp-side");
-  const bar = root.querySelector(".fmp-cfg"), panel = root.querySelector(".fmp-cp");
+  const bar = root.querySelector(".fmp-cfg"), panel = root.querySelector(".fmp-cp"), vw = root.querySelector(".fmp-vw");
   let data = null, loadedAt = 0, seq = 0, dead = false;
   // sel: wybrany sektor ("" = żaden), chart: ostatni wykres (c.id = sektor), reveal: przewinąć tabelę do wiersza sel
   // (wybór z adresu, nie z kliknięcia)
   const first = parseFmpArg(start);
-  let sel = first.tv, chart = null, chartAt = 0, cseq = 0, reveal = !!sel;
+  // 0.14.2 (issue #35): view = "" (SECTORS) albo "scenarios", scnSel = wybrany scenariusz ("" = żaden; sel = jego
+  // traffic volume z wykresami), chartNote / chartErr = błąd odświeżenia / wczytania wykresu w podglądzie, drawnScn =
+  // scenariusz, którego podgląd jest w panelu (inny = panel przewinięty na początek)
+  let view = first.view, scnSel = first.scn, chartNote = "", chartErr = "", drawnScn = "";
+  let sel = first.tv, chart = null, chartAt = 0, cseq = 0, reveal = view ? !!scnSel : !!sel;
   // 0.14.0 (właściciel projektu): cfgSel = wybrana konfiguracja ("" = żadna), cd = ostatnia odpowiedź /api/radio/configs (cdErr: błąd
   // ostatniego odświeżenia), geo = geometria podglądów (geoVer: jej wersja), grouped = konfiguracja, wg której jest
   // pogrupowana tabela na ekranie
@@ -403,12 +623,15 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   const visible = () => root.isConnected && root.offsetParent !== null;
   const rowOf = (id) => (data ? fmpRows(data).find((r) => r.id === id) || null : null);
   const cfgOf = () => (cfgSel && Array.isArray(cd?.configs) ? cd.configs.find((c) => c.code === cfgSel) || null : null);
+  const scnOf = () => (scnSel && Array.isArray(data?.scenarios) ? data.scenarios.find((s) => cleanScn(s?.id) === scnSel) || null : null);
   const keepRow = () => box.querySelector("tr.sel")?.scrollIntoView?.({ block: "nearest" });
   const showRow = () => { reveal = false; keepRow(); };
-  // zaznaczenie wiersza bez rysowania tabeli od nowa (dymki i przewinięcie zostają)
+  const here = () => fmpArg(cfgSel, sel, view, scnSel);
+  // zaznaczenie wiersza bez rysowania tabeli od nowa (dymki i przewinięcie zostają); w widoku SCENARIOS wiersz scenariusza
   const mark = () => {
-    box.querySelectorAll("tr[data-tv]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.tv === sel));
-    main.classList.toggle("open", !!sel);
+    if (view) box.querySelectorAll("tr[data-scn]").forEach((tr) => tr.classList.toggle("sel", cleanScn(tr.dataset.scn) === scnSel));
+    else box.querySelectorAll("tr[data-tv]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.tv === sel));
+    main.classList.toggle("open", view ? !!scnSel : !!sel);
   };
   // kod spoza tabeli (stary albo wpisany adres), gdy konfiguracje są już wczytane: bez konfiguracji, adres poprawiony
   // bez nowego kroku historii
@@ -416,16 +639,52 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     if (!cfgSel || !Array.isArray(cd?.configs) || cfgOf()) return;
     cfgSel = "";
     saveCfg("");
-    onPick(fmpArg(cfgSel, sel), true);
+    onPick(here(), true);
+  };
+  // 0.14.2: scenariusz spoza listy albo traffic volume spoza scenariusza (stary albo wpisany adres), gdy lista jest już
+  // wczytana: bez nich, adres poprawiony bez nowego kroku historii (lista niedostępna: adres zostaje)
+  const fixScn = () => {
+    if (!view || !data || data.scenarios_ok === false) return;
+    let fix = false;
+    if (scnSel && !scnOf()) { scnSel = ""; fix = true; }
+    if (sel && !(scnOf()?.tvs || []).some((t) => t?.id === sel)) { sel = ""; ++cseq; chart = null; chartAt = 0; fix = true; }
+    if (fix) { mark(); onPick(here(), true); }
   };
   const draw = (html) => { const top = side.scrollTop; side.innerHTML = html; side.scrollTop = top; };
-  // tabela (z grupami wybranej konfiguracji); przewinięcie zostaje
+  // tabela (z grupami wybranej konfiguracji) albo lista scenariuszy; przewinięcie zostaje
   const drawTable = () => {
     if (!data) return;
     const c = cfgOf(), top = box.scrollTop;
     grouped = c ? c.code : "";
-    box.innerHTML = fmpHtml(data, sel, c);
+    box.innerHTML = view ? scnListHtml(data, scnSel, c) : fmpHtml(data, sel, c);
     box.scrollTop = top;
+  };
+  // przełącznik SECTORS | SCENARIOS; fokus z klawiatury wraca na przycisk tego samego widoku (jak w pasku CONFIGURATION)
+  const drawView = () => {
+    const a = globalThis.document?.activeElement, had = a && vw.contains?.(a) ? a.dataset?.view : "";
+    vw.innerHTML = viewBarHtml(view);
+    if (had === "sectors" || had === "scenarios") vw.querySelector?.(`button[data-view="${had}"]`)?.focus?.({ preventScroll: true });
+  };
+  // panel bez zapytania: SECTORS = wykres wybranego sektora (ostatni wczytany), "Loading" albo podpowiedź; SCENARIOS =
+  // podgląd wybranego scenariusza (przewinięcie zostaje, nowy scenariusz od początku), "Loading" przed listą albo podpowiedź
+  const drawSide = () => {
+    if (!view) {
+      drawnScn = "";
+      side.innerHTML = !sel ? fmpPickHtml() : chart?.id === sel ? fmpChartHtml(chart, rowOf(sel)) : fmpWaitHtml(sel, rowOf(sel));
+      return;
+    }
+    const s = scnOf();
+    if (!s) {
+      drawnScn = "";
+      side.innerHTML = scnSel && !data ? `<p class="hint fmp-pick">Loading\u2026</p>`
+        : scnSel && data?.scenarios_ok === false ? `<p class="error fmp-pick">Scenarios unavailable.</p>` : scnPickHtml();
+      return;
+    }
+    const html = scnPreviewHtml(data, s, { cfg: cfgOf(), geo, ver: geoVer, layers: cd?.layers || {}, sel,
+      chart: chart?.id === sel ? chart : null, note: chartNote, err: chartErr });
+    if (drawnScn === scnSel) draw(html);
+    else { side.innerHTML = html; side.scrollTop = 0; }
+    drawnScn = scnSel;
   };
   // pasek CONFIGURATION i panel wybranej konfiguracji (stanowiska i podglądy); przegląd 0.14.0: fokus z klawiatury
   // na przycisku konfiguracji wraca na przycisk tego samego kodu (pasek rysowany od nowa po wyborze i co 60 s)
@@ -446,15 +705,20 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
       const d = await api("/api/viff/sectors");
       if (dead || my !== seq) return;
       data = d; loadedAt = Date.now();
+      fixScn();
       drawTable();
-      info.textContent = fmpInfo(d);
+      if (view) drawSide();
+      info.textContent = view ? scnInfo(d) : fmpInfo(d);
       msg.textContent = "";
       if (reveal) showRow();
     } catch (e) {
       if (dead || my !== seq) return;
       loadedAt = Date.now();
       if (data) msg.textContent = `Not refreshed: ${e.message}`;
-      else { box.innerHTML = `<p class="error fmp-err">${esc(e.message)}</p>`; info.textContent = ""; }
+      else {
+        box.innerHTML = `<p class="error fmp-err">${esc(e.message)}</p>`; info.textContent = "";
+        if (view) side.innerHTML = "";
+      }
     }
   };
   // konfiguracje i kto jest online (co 60 s z tabelą); geometria podglądów raz, potem tylko po zmianie wersji danych
@@ -474,17 +738,26 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     }
     drawCfg();
     if (grouped !== (cfgOf()?.code || "")) drawTable();
+    // 0.14.2: podgląd scenariusza z konfiguracją (grupy, linia warunków) i z geometrią map
+    if (view) drawSide();
   };
   // wykres wybranego sektora; spóźniona odpowiedź dla poprzedniego wyboru nic nie rysuje (cseq); błąd odświeżenia
-  // zostawia ostatni wykres z komunikatem w nagłówku
+  // zostawia ostatni wykres z komunikatem w nagłówku. 0.14.2: w widoku SCENARIOS wykres w podglądzie scenariusza
+  // (drawSide, przepustowość ze scenariusza), to samo zapytanie
   const loadChart = async () => {
     const my = ++cseq, id = sel, fresh = chart?.id !== id;
-    if (!id) { chart = null; chartAt = 0; side.innerHTML = fmpPickHtml(); return; }
-    if (chart?.id !== id) side.innerHTML = fmpWaitHtml(id, rowOf(id));
+    if (view) {
+      if (!id || fresh) { chart = null; chartAt = 0; chartNote = chartErr = ""; drawSide(); }
+      if (!id) return;
+    } else {
+      if (!id) { chart = null; chartAt = 0; side.innerHTML = fmpPickHtml(); return; }
+      if (chart?.id !== id) side.innerHTML = fmpWaitHtml(id, rowOf(id));
+    }
     try {
       const c = await api(`/api/viff/sectors/${encodeURIComponent(id)}`);
       if (dead || my !== cseq) return;
       chart = c; chartAt = Date.now();
+      if (view) { chartNote = chartErr = ""; drawSide(); return; }
       draw(fmpChartHtml(c, rowOf(id)));
       // w wąskim oknie wykresy stoją pod tabelą i ją skracają: nowo wybrany wiersz zostaje widoczny (odświeżenie co
       // minutę nie przewija)
@@ -492,6 +765,12 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
     } catch (e) {
       if (dead || my !== cseq) return;
       chartAt = Date.now();
+      if (view) {
+        if (chart?.id === id) chartNote = `Not refreshed: ${e.message}`;
+        else { chart = null; chartErr = e.message; }
+        drawSide();
+        return;
+      }
       if (chart?.id === id) draw(fmpChartHtml(chart, rowOf(id), `Not refreshed: ${e.message}`));
       else { chart = null; side.innerHTML = fmpWaitHtml(id, rowOf(id), e.message); }
     }
@@ -500,35 +779,87 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   const pick = (id, user = false) => {
     sel = id;
     mark();
-    if (!user && sel && data) showRow();
+    if (!user && sel && data && !view) showRow();
     loadChart();
-    if (user) onPick(fmpArg(cfgSel, sel));
+    if (user) onPick(here());
+  };
+  // 0.14.2: scenariusz z kliknięcia (krok historii) albo z adresu; podgląd bez wybranego traffic volume
+  const pickScn = (id, user = false) => {
+    scnSel = id;
+    sel = "";
+    mark();
+    if (!user && scnSel && data) showRow();
+    loadChart();
+    if (user) onPick(here());
   };
   // 0.14.0: konfiguracja z kliknięcia (krok historii) albo z adresu; zapamiętana w przeglądarce; tabela od nowa w grupach
-  // (wybrany sektor zostaje zaznaczony i widoczny)
+  // (wybrany sektor zostaje zaznaczony i widoczny); 0.14.2: lista scenariuszy z kolumną konfiguracji i podgląd od nowa
   const pickCfg = (code, user = false) => {
     cfgSel = code;
     saveCfg(cfgSel);
     fixCfg();
     drawCfg();
     drawTable();
+    if (view) drawSide();
     // wybrany wiersz widoczny w tabeli; w niskim oknie cały obszar FMP zostaje, gdzie był (pasek pod kursorem)
-    if (sel) { const top = root.scrollTop; keepRow(); root.scrollTop = top; }
-    if (user) onPick(fmpArg(cfgSel, sel));
+    if (view ? scnSel : sel) { const top = root.scrollTop; keepRow(); root.scrollTop = top; }
+    if (user) onPick(here());
+  };
+  // 0.14.2: widok z przełącznika (krok historii) albo z adresu (activate ustawia stan sam). SCENARIOS zaczyna bez wyboru;
+  // SECTORS zostawia traffic volume wybrany w podglądzie (jego wykres z prawdziwą przepustowością)
+  const setView = (v, user = false) => {
+    if (v === view) return;
+    view = v;
+    scnSel = "";
+    if (view) sel = "";
+    showView();
+    if (user) onPick(here());
+  };
+  // nowy widok na ekranie: przełącznik, tabela albo lista od początku (z wybranym wierszem), linia nad tabelą i panel
+  const showView = () => {
+    ++cseq;
+    chartNote = chartErr = "";
+    drawView();
+    drawTable();
+    box.scrollTop = 0;
+    side.scrollTop = 0;
+    info.textContent = data ? (view ? scnInfo(data) : fmpInfo(data)) : "";
+    mark();
+    keepRow();
+    drawSide();
+    loadChart();
   };
   box.addEventListener("click", (e) => {
+    if (view) {
+      const id = cleanScn(e.target.closest?.("tr[data-scn]")?.dataset.scn);
+      if (id) pickScn(id === scnSel ? "" : id, true);
+      return;
+    }
     const id = cleanTv(e.target.closest?.("tr[data-tv]")?.dataset.tv);
     if (id) pick(id === sel ? "" : id, true);
   });
-  side.addEventListener("click", (e) => { if (e.target.closest?.(".fmc-close")) pick("", true); });
+  side.addEventListener("click", (e) => {
+    if (e.target.closest?.(".fmp-sp-close")) pickScn("", true);
+    else if (e.target.closest?.(".fmc-close")) pick("", true);
+    else if (view) {
+      // 0.14.2: klik w traffic volume podglądu = jego wykresy pod tabelą (drugi klik zamyka)
+      const id = cleanTv(e.target.closest?.("tr[data-tv]")?.dataset.tv);
+      if (id) pick(id === sel ? "" : id, true);
+    }
+  });
   bar.addEventListener("click", (e) => {
     const code = cleanCfg(e.target.closest?.("button[data-cfg]")?.dataset.cfg);
     if (code) pickCfg(code === cfgSel ? "" : code, true);
+  });
+  vw.addEventListener("click", (e) => {
+    const v = e.target.closest?.("button[data-view]")?.dataset.view;
+    if (v === "sectors" || v === "scenarios") setView(v === "scenarios" ? "scenarios" : "", true);
   });
 
   const refresh = () => { load(); loadCfg(); if (sel) loadChart(); };
   const timer = setInterval(() => { if (visible()) refresh(); }, REFRESH_MS);
   window.addEventListener(ONLINE_EVENT, refresh);
+  drawView();
   mark();
   drawCfg();
   load();
@@ -536,14 +867,41 @@ export function mountFmp(pane, { start = "", onPick = () => {} } = {}) {
   loadChart();
   return {
     // arg undefined (przycisk menu, powrót do podzakładki po dłuższej przerwie; w tle nie odświeżamy): dane starsze niż
-    // 60 s od razu; arg = adres podzakładki ("" = bez konfiguracji i bez wykresów; "EP-BH" = sektor bez konfiguracji)
+    // 60 s od razu; arg = adres podzakładki ("" = bez konfiguracji i bez wykresów; "EP-BH" = sektor bez konfiguracji;
+    // 0.14.2: "scenarios/EP_NFIR/EP-BH" = podgląd scenariusza z wykresami jego traffic volume)
     activate(arg) {
       if (arg !== undefined) {
-        // nowy sektor od razu w sel: tabela w grupach konfiguracji i poprawiony adres (fixCfg) już z nim
-        const a = parseFmpArg(arg), tvNew = a.tv !== sel;
-        if (tvNew) sel = a.tv;
+        // nowy stan od razu (widok, scenariusz, sektor): tabela w grupach konfiguracji i poprawiony adres (fixCfg,
+        // fixScn) już z nim; kolejność: widok, konfiguracja, scenariusz, sektor
+        const a = parseFmpArg(arg), viewNew = a.view !== view, scnNew = a.scn !== scnSel, tvNew = a.tv !== sel;
+        view = a.view;
+        scnSel = a.scn;
+        sel = a.tv;
         if (a.cfg !== cfgSel) pickCfg(a.cfg);
-        if (tvNew) { reveal = !!a.tv; pick(a.tv); return; }
+        if (viewNew) {
+          fixScn();
+          reveal = view ? !!scnSel : !!sel;
+          showView();
+          if (reveal && data) showRow();
+          return;
+        }
+        if (view && scnNew) {
+          drawTable();
+          fixScn();
+          reveal = !!scnSel;
+          mark();
+          if (reveal && data) showRow();
+          // nowy scenariusz w panelu od razu (także z tym samym traffic volume, którego wykres już jest)
+          drawSide();
+          loadChart();
+          return;
+        }
+        if (tvNew) {
+          if (view) { fixScn(); loadChart(); return; }
+          reveal = !!a.tv;
+          pick(a.tv);
+          return;
+        }
       }
       const now = Date.now();
       if (loadedAt && now - loadedAt > REFRESH_MS) load();

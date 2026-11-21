@@ -29,7 +29,8 @@ async def departures(icao: str):
 
 @router.get("/sectors")
 async def sectors(prefix: str = Query("", pattern="^[A-Za-z]{0,2}$")):
-    """Sektory (traffic volumes) vIFF: przepustowość i ruch od teraz do +60 min, oraz scenariusze (aktywne na początku)."""
+    """Sektory (traffic volumes) vIFF: przepustowość i ruch od teraz do +60 min, oraz scenariusze (aktywne na początku);
+    scenarios_ok = false, gdy listy scenariuszy nie udało się pobrać (0.14.2: OTHER › FMP pisze wtedy, że jej nie ma)."""
     return await _call(viff.sectors(prefix or None))
 
 

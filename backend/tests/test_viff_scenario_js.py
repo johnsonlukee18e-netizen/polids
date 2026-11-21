@@ -23,12 +23,21 @@ const full = { id: "EP-<X>", active: true, description: "opis", tvs: [{ id: "EP-
   times: [{ from: "1800", to: "2000", date: "2026-10-18" }, { from: "0100", to: "0200", date: null }], booked: true };
 const bare = { id: "EP-EMPTY", active: false, description: "", tvs: [], positions: [], anypositions: [], nopositions: [],
   start: null, end: null, times: [], booked: false };
+// 0.14.2: to samo okno w start/end i w times (atrapa EP_NFIR do zrzutów) i okno z activationPeriods (żywe dane EP-KKTMA)
+const nfir = { id: "EP_NFIR", active: false, description: "NFIR open", tvs: [{ id: "EP-BH" }], positions: ["EPWW_N_CTR"],
+  anypositions: [], nopositions: [], start: "1600", end: "2200", times: [{ from: "1600", to: "2200", date: null }], booked: true };
+const kk = { id: "EP-KKTMA", active: true, tvs: [], positions: [], anypositions: ["EPKK_APP"], nopositions: [], start: null,
+  end: null, times: [{ from: "1900", to: "2100", date: "2026-11-21" }], booked: true };
 console.log(JSON.stringify({
   tips: [nsfir, full, bare].map(v.scnTip),
   cond: [nsfir, full, bare].map((s) => v.scnCond(s)),
   condHtml: [nsfir, full, bare].map((s) => v.scnCond(s, { html: true })),
   // pola, których starszy backend nie podaje
   partial: v.scnTip({ id: "EP-OLD", tvs: [{ id: "EP-KTTMA" }] }),
+  // 0.14.2 (issue #35): warunki bez okien czasu (lista scenariuszy w FMP) i okna w jednej linii (kolumna TIME)
+  condNoTime: [nsfir, full, bare, nfir, { ...bare, booked: true }].map((s) => v.scnCond(s, { times: false })),
+  condNfir: [v.scnCond(nfir), v.scnCond(nfir, { html: true })],
+  time: [nsfir, full, bare, nfir, kk, { id: "EP-OLD" }, null].map(v.scnTimeText),
 }));
 """
 
@@ -74,3 +83,22 @@ def test_map_row_uses_tooltip_not_description():
     assert "s.description" not in src and "description" not in src.split("const scnHtml")[1].split("\n")[0]
     assert 'const scnHtml = (s, byId) => `<div class="vs-scn ${s.active ? "on" : ""}" title="${esc(scnTip(s))}">' in src
     assert '<div class="vs-cond">${scnCond(s, { html: true })}</div>' in src
+
+
+def test_scenario_conditions_and_time_for_fmp_list(js):
+    """0.14.2 (issue #35): lista scenariuszy w OTHER › FMP ma osobną kolumnę TIME, więc warunki bez okien czasu;
+    domyślne scnCond (MAP, dymki) bez zmian, tylko to samo okno podane dwa razy pokazane raz."""
+    assert js["condNoTime"] == [
+        "when online: EPWW_N_CTR + EPWW_S_CTR",
+        "when online: EPWA_APP or EPWA_W_APP · and offline: EPWW_CTR · bookings count too",
+        "no position conditions",
+        "when online: EPWW_N_CTR · bookings count too",
+        "bookings count too",
+    ]
+    assert js["condNfir"] == ["when online: EPWW_N_CTR · bookings count too · time 1600–2200",
+                              "when online: <b>EPWW_N_CTR</b> · bookings count too · time <b>1600–2200</b>"]
+    # bez okna (albo 0000-2359) H24; okna bez powtórek, z datą przed godzinami
+    assert js["time"] == ["H24", "0600–1200, 2026-10-18 1800–2000, 0100–0200", "H24", "1600–2200", "2026-11-21 1900–2100",
+                          "H24", "H24"]
+    for t in js["time"] + js["condNoTime"]:
+        assert not POLISH.search(t)

@@ -205,6 +205,7 @@ def test_sectors_with_scenarios(client):
     viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": SCENARIOS})
     d = client.get("/api/viff/sectors").json()
     assert [s["id"] for s in d["scenarios"]] == ["EP-WATMA", "EP-ALLFIR", "EP-KKTMA"]  # aktywne na początku
+    assert d["scenarios_ok"] is True  # 0.14.2: lista scenariuszy pobrana (OTHER › FMP, widok SCENARIOS)
     by_id = {s["id"]: s for s in d["sectors"]}
     # TV ze scenariuszy są na liście, nawet bez definicji i ruchu
     assert {"EP-ALLFIR", "EP-KKTMA", "EP-KKTMAD", "EP-WATMAD"} <= set(by_id)
@@ -212,7 +213,9 @@ def test_sectors_with_scenarios(client):
     assert not by_id["EP-KKTMA"]["active"] and by_id["EP-KKTMA"]["scenarios"] == ["EP-KKTMA"]
     assert (by_id["EP-ALLFIR"]["entries_cap"], by_id["EP-ALLFIR"]["occupancy_cap"]) == (52, 20)  # przepustowość ze scenariusza
     assert [s["id"] for s in d["sectors"]][:4] == ["EP-BH", "EP-WATMA", "EP-WATMAD", "EP-ALLFIR"]
-    # awaria /etfms/scenarios: sektory nadal działają
-    viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": UpstreamError("timeout")})
-    d = client.get("/api/viff/sectors").json()
-    assert d["scenarios"] == [] and len(d["sectors"]) == 2
+    # awaria /etfms/scenarios (także odpowiedź, która nie jest JSON-em): sektory nadal działają; 0.14.2: scenarios_ok =
+    # false, więc FMP pisze "Scenarios unavailable." zamiast "No scenarios."
+    for err in (UpstreamError("timeout"), ValueError("Expecting value")):
+        viff._get = fake({"/etfms/trafficVolumes": tvs, "/etfms/airspaces": {}, "/etfms/scenarios": err})
+        d = client.get("/api/viff/sectors").json()
+        assert d["scenarios"] == [] and d["scenarios_ok"] is False and len(d["sectors"]) == 2, err

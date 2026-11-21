@@ -59,9 +59,9 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
 .fmc-chip { padding: 0 5px; border: 1px solid #5a5a5a; color: var(--muted); font-size: 11px; letter-spacing: .6px; }
 .fmc-chip.on { background: #484848; border-color: #8a8a8a; color: #fff; }
 .fmc-msg { font-size: 12px; }
-.fmc-close { margin-left: auto; align-self: center; padding: 0 7px; background: transparent; border: 1px solid #5a5a5a; border-radius: 0;
-  color: var(--muted); font: 400 13px/20px var(--ui); cursor: pointer; }
-.fmc-close:hover { color: #fff; border-color: #fff; }
+.fmc-close, .fmp-sp-close { margin-left: auto; align-self: center; padding: 0 7px; background: transparent; border: 1px solid #5a5a5a;
+  border-radius: 0; color: var(--muted); font: 400 13px/20px var(--ui); cursor: pointer; }
+.fmc-close:hover, .fmp-sp-close:hover { color: #fff; border-color: #fff; }
 .fmc-meta { margin: 4px 0 2px; color: var(--muted); font-size: 12px; }
 .fmc-regtxt { color: #ff5a4a; }
 .fmc-empty, .fmc-wait, .fmc-err { margin: 6px 0 0; font-size: 13px; }
@@ -170,3 +170,27 @@ table.fmp-table tr.fmp-none td { padding: 2px 12px 2px 28px; background: #000; c
    i panel odjeżdżają w górę); w większym oknie bez zmian (przewija się tylko tabela) */
 .pane.fill > .fmp { overflow-y: auto; }
 .pane.fill > .fmp > .fmp-main { min-height: 300px; }
+
+/* --- 0.14.2 (issue #35): widok SCENARIOS. Przełącznik SECTORS | SCENARIOS w pasku nad tabelą (przyciski jak w pasku
+   CONFIGURATION), lista scenariuszy (warunki i traffic volumes zawijane w kolumnie), kolumna wybranej konfiguracji
+   (yes zielone, no szare, ? żółte) i SCENARIO PREVIEW w panelu po prawej: tabela traffic volumes z kolumną
+   CAPACITY NOW, wykresy wybranego traffic volume i trzy mapy z obszarami traffic volumes scenariusza w jednej zieleni
+   (nie w kolorach stanowisk: te znaczą konfigurację). Zwykła grubość pisma, ostre krawędzie, bez cieni */
+.fmp-vw { display: inline-flex; gap: 3px; }
+table.fmp-scn-table td.fmp-scn-cond, table.fmp-scn-table td.fmp-scn-tvs { white-space: normal; color: var(--text);
+  font: 400 13px/1.3 var(--ui); }
+table.fmp-scn-table td.fmp-scn-time { font-size: 14px; }
+table.fmp-scn-table td.fmp-scn-m { text-align: center; font-size: 14px; }
+table.fmp-scn-table td.fmp-scn-m.yes, .fmp-sp-cfg.yes { color: var(--green-hi); }
+table.fmp-scn-table td.fmp-scn-m.no, .fmp-sp-cfg.no { color: var(--muted); }
+table.fmp-scn-table td.fmp-scn-m.unknown, .fmp-sp-cfg.unknown { color: var(--yellow); }
+.fmp-sp-cfg { margin: 2px 0 0; font-size: 12px; cursor: help; }
+.fmp-sp-note { margin: 4px 0; font-size: 12px; }
+table.fmp-sp-tab { margin-top: 4px; font-size: 15px; }
+table.fmp-sp-tab td.fmp-sp-now { color: var(--muted); font-size: 13px; }
+.fmp-sp-chart { margin-top: 10px; padding-top: 6px; border-top: 1px solid #3a3a3a; }
+.fmp-sp .fmp-pvs, .fmp-sp .fmp-pv-none { margin-top: 10px; }
+.fmp-sp-off { margin: 4px 0 0; font-size: 12px; }
+.fmp-pv-svg .fmp-pv-on { fill: #5fd23a; fill-opacity: .35; fill-rule: evenodd; stroke: #5fd23a; stroke-width: 1; }
+.fmp-pv-svg .fmp-pv-s.fmp-pv-on { stroke: none; }
+.fmp-pv-svg .fmp-pv-on.sel { fill-opacity: .7; stroke: #fff; }
