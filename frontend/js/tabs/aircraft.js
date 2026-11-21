@@ -182,6 +182,13 @@ export function photoCredit(p) {
   if (p.page) return `<a href="${esc(p.page)}" target="_blank" rel="noopener">Photo page \u2197</a>`;
   return p.credit ? esc(p.credit) : "";
 }
+// Cały podpis jako czysty tekst do dymku (title, właściwość DOM, bez escapowania): linijka podpisu jest jedna,
+// a dłuższy podpis skracany wielokropkiem (aircraft.css), np. autor zdjęcia dodanego ręcznie (do 120 znaków)
+// w wąskiej ramce. Odnośnik do strony zdjęcia jest krótki, bez dymku
+export function photoCreditTitle(p) {
+  if (p.author) return `Photo: ${p.author}`;
+  return p.page ? "" : p.credit || "";
+}
 
 export default {
   mount(root, ctx) {
@@ -260,8 +267,9 @@ export default {
       }
     };
     // zdjęcie w rozwinięciu; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana. 0.14.2 (issue #35):
-    // zdjęcie albo komunikat w ramce, podpis w linijce pod nią; ramka ma stały rozmiar, więc rozwinięcie nie zmienia
-    // wysokości po wczytaniu zdjęcia (bez ponownego przewijania do widoku)
+    // zdjęcie albo komunikat w ramce, podpis w jednej linijce pod nią (dłuższy skracany wielokropkiem, cały w dymku);
+    // ramka i linijka mają stały rozmiar, więc rozwinięcie nie zmienia wysokości po wczytaniu zdjęcia (bez ponownego
+    // przewijania do widoku)
     const photo = (det, a) => {
       const frame = det.querySelector(".photo-frame");
       const cap = det.querySelector(".photo-credit");
@@ -269,6 +277,7 @@ export default {
         if (current !== a) return;
         frame.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">`;
         cap.innerHTML = photoCredit(p);
+        cap.title = photoCreditTitle(p);
       }).catch((e) => {
         if (current !== a) return;
         frame.innerHTML = `<span class="hint">${esc(e.message)}</span>`;

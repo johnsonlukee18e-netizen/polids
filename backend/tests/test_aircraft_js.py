@@ -12,7 +12,10 @@ i wyższe wiersze, kolumny bliżej siebie (tabela najwyżej 760 px); dane na pra
 opis słownie) nie jest pokazywana w rozwinięciu, ale zostaje w bazie i w API.
 0.14.2 (issue #35): lista "praktycznie identyczna" z CALLSIGN (cała szerokość, 20 px, wiersze 32 px), wyraźniejsze
 paski wierszy, zdjęcie w ramce o stałym rozmiarze (dane obok się nie przesuwają), podpis "Photo: <autor>" przy
-zdjęciu dodanym ręcznie, bez odnośników More photos, Image search i Performance search."""
+zdjęciu dodanym ręcznie, bez odnośników More photos, Image search i Performance search. Poprawki po przeglądzie:
+w liście węższej niż 800 px (okno 1024 px) węższe kolumny producenta, WTC i RECAT zamiast przewijania w bok; podpis
+zdjęcia zawsze w jednej linijce (dłuższy skracany wielokropkiem, cały w dymku), więc rozwinięcie nie rośnie po
+wczytaniu zdjęcia."""
 import json
 import os
 import re
@@ -108,6 +111,10 @@ console.log(JSON.stringify({
   credit: [{ credit: "Wikipedia: ATR 72", page: "https://en.wikipedia.org/wiki/ATR_72" },
     { credit: "J. Kowalski <own>", page: null }, { credit: "", page: null },
     { credit: "", page: "https://x", author: "Test Author <x>" }, { credit: "", page: null, author: "" }].map(ac.photoCredit),
+  creditTitle: [{ credit: "Wikipedia: ATR 72", page: "https://en.wikipedia.org/wiki/ATR_72" },
+    { credit: "Own credit <x>", page: null }, { credit: "", page: null },
+    { credit: "", page: "https://x", author: "Test Author <x> / Example Photo Group" },
+    { credit: "", page: null, author: "" }].map(ac.photoCreditTitle),
 }));
 """
 
@@ -346,6 +353,12 @@ def test_photo_credit_names_no_source(js):
     # 0.14.2 (issue #35): zdjęcie dodane ręcznie: autor jako zwykły tekst (escapowany), bez odnośnika, także gdy
     # odpowiedź ma stronę; bez autora pusty podpis
     assert manual == "Photo: Test Author &lt;x&gt;" and "<a" not in manual and manual_no_author == ""
+    # 0.14.2 po przeglądzie: cały podpis jako czysty tekst do dymku (title to właściwość DOM, bez escapowania), bo
+    # w linijce pod ramką dłuższy podpis jest skracany wielokropkiem; krótki odnośnik do strony zdjęcia bez dymku
+    page_t, own_t, empty_t, manual_t, manual_no_author_t = js["creditTitle"]
+    assert page_t == "" and empty_t == "" and manual_no_author_t == ""
+    assert own_t == "Own credit <x>"
+    assert manual_t == "Photo: Test Author <x> / Example Photo Group"
 
 
 # --- mount(): zachowanie z kodu źródłowego ---------------------------------------------------------------------------
@@ -358,7 +371,7 @@ def test_photo_fills_fixed_frame():
     assert 'const frame = det.querySelector(".photo-frame");' in body
     assert 'const cap = det.querySelector(".photo-credit");' in body
     assert 'frame.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">`;' in body
-    assert "cap.innerHTML = photoCredit(p);" in body
+    assert "cap.innerHTML = photoCredit(p);\n        cap.title = photoCreditTitle(p);" in body
     assert 'frame.innerHTML = `<span class="hint">${esc(e.message)}</span>`;' in body
     assert body.count("if (current !== a) return;") == 2
     assert "photo-box" not in body and "pb." not in body and "classList" not in body
@@ -461,7 +474,13 @@ def test_css_three_lines_right_of_photo():
     assert "position: sticky;" in detail and "width: min(100%, calc(100cqi - 22px));" in detail
     assert "min-width: min-content;" in detail and "container" not in detail
     assert "container-type: inline-size;" in _css_rule(".ac-list")
-    assert "@container" not in text
+    # 0.14.2 po przeglądzie: jedyne zapytanie o kontener to węższe kolumny tabeli w wąskiej liście (test_css_table);
+    # żadne nie dotyczy rozwinięcia (dane schodzą pod zdjęcie wg szerokości kratek, nie przy stałym progu)
+    queries = re.findall(r"@container\s*([^{]*)\{((?:[^{}]*\{[^}]*\})*)\s*\}", text)
+    assert [q.strip() for q, _ in queries] == ["ac-list (max-width: 799px)"]
+    assert text.count("@container") == 1
+    for sel in re.findall(r"([^{}]+)\{", queries[0][1]):
+        assert sel.strip().startswith(".ac-table th."), sel
     # 0.14.2 (issue #35): ramka 3:2 (450 x 300 px) na czarnym tle, zdjęcie w proporcjach pliku dopasowane do ramki
     # (contain: bez przycinania, pionowe i bardzo szerokie z czarnymi pasami); linijka podpisu zawsze zajęta
     frame = _css_rule(".ac-detail .photo-frame")
@@ -471,7 +490,15 @@ def test_css_three_lines_right_of_photo():
     img = _css_rule(".ac-detail .photo-frame img")
     assert "width: 100%;" in img and "height: 100%;" in img and "object-fit: contain;" in img
     assert "max-height" not in img and "max-width" not in img
-    assert "min-height: 1.4em;" in _css_rule(".ac-detail .photo-credit")
+    # podpis zawsze w jednej linijce (po przeglądzie 0.14.2): autor do 120 znaków zawijał się po wczytaniu zdjęcia
+    # i rozwinięcie rosło o 17-34 px (wiersze pod nim zjeżdżały, w wąskim panelu dane pod zdjęciem też); dłuższy
+    # skracany wielokropkiem. contain: inline-size: tekst w jednej linijce nie poszerza rozwinięcia (min-content
+    # .ac-detail), bo bez tego w wąskim panelu (okno 600 px) ramka rosła z 272 do 450 px, a dane zjeżdżały o 119 px
+    cap = _css_rule(".ac-detail .photo-credit")
+    for decl in ("min-height: 1.4em;", "white-space: nowrap;", "overflow: hidden;", "text-overflow: ellipsis;",
+                 "contain: inline-size;"):
+        assert decl in cap, decl
+    assert "overflow-wrap" not in cap and "line-clamp" not in cap
     assert ".photo-box img" not in text and ".photo-box p" not in text
     assert "ac-info" not in text and ".acb.id" not in text
 
@@ -498,23 +525,45 @@ def test_css_table():
     assert "padding: 4px 8px;" in rec and "font: 20px var(--mono);" in rec and "line-height" not in rec
     icao = _css_rule(".ac-table tr.ac-rec td.icao")
     assert "font: 20px var(--mono);" in icao and "color: #fff;" in icao and "letter-spacing" not in icao
-    # w wąskim panelu (tablet pionowo) kolumna nazwy nie znika: tabela co najmniej 800 px (lista przewija się w bok),
-    # na nazwę zostaje co najmniej 200 px poza stałymi kolumnami; nazwa łamana na spacjach, nie po jednej literze
-    floor = re.search(r"min-width: (\d+)px;", table)
-    assert floor, "table.ac-table bez min-width"
-    floor = float(floor.group(1))
+    # szeroka lista (od 800 px): stałe kolumny 590 px, na nazwę co najmniej 210 px
     widths = {c: float(re.search(r"width: (\d+)px;", _css_rule(f".ac-table th.{c}")).group(1))
               for c in ("icao", "mk", "eng", "wtc", "recat")}
     fixed = sum(widths.values())
-    assert widths == {"icao": 90, "mk": 220, "eng": 136, "wtc": 64, "recat": 80}
-    assert floor == 800 and fixed == 590 and floor - fixed >= 200
+    assert widths == {"icao": 90, "mk": 220, "eng": 136, "wtc": 64, "recat": 80} and fixed == 590
+    query = re.search(r"@container ac-list \(max-width: (\d+)px\) \{((?:[^{}]*\{[^}]*\})*)\s*\}", text)
+    assert query, "brak węższych kolumn w wąskiej liście"
+    wide_from = int(query.group(1)) + 1
+    assert wide_from - fixed >= 210
+    assert "container-name: ac-list;" in _css_rule(".ac-list")
+    # 0.14.2 po przeglądzie: w oknie 1024 px (tablet poziomo, mały laptop) lista ma 692 px (bez dwóch kolumn menu
+    # i paddingu panelu), z klasycznym paskiem przewijania (do 17 px) 675 px. Tabela co najmniej 800 px przewijała
+    # się tam w bok i ucinała WTC i RECAT, a CALLSIGN obok mieścił się cały. W liście węższej niż 800 px producent,
+    # WTC i RECAT węższe (jak do 0.14.1), więc tabela mieści się w 675 px, a w jeszcze węższym panelu (tablet
+    # pionowo) lista przewija się w bok i kolumna nazwy nie znika (co najmniej 160 px)
+    narrow = dict(widths)
+    for c, w in re.findall(r"\.ac-table th\.(\w+) \{ width: (\d+)px; \}", query.group(2)):
+        narrow[c] = float(w)
+    assert narrow == {"icao": 90, "mk": 160, "eng": 136, "wtc": 56, "recat": 70}
+    style = (FRONTEND / "css" / "style.css").read_text("utf-8")
+    var = {k: float(re.search(rf"--{k}: ([\d.]+)px;", style).group(1)) for k in ("btn-w", "btn-m", "col-pad")}
+    col_w = var["btn-w"] + 2 * var["btn-m"] + 2 * var["col-pad"] + 1
+    pane_pad = float(re.search(r"^\.pane \{[^}]*padding: \d+px (\d+)px;", style, re.M).group(1))
+    list_1024 = 1024 - 2 * col_w - 2 * pane_pad
+    assert list_1024 == 692
+    floor = re.search(r"min-width: (\d+)px;", table)
+    assert floor, "table.ac-table bez min-width"
+    floor = float(floor.group(1))
+    assert floor <= list_1024 - 17 and floor - sum(narrow.values()) >= 160
     # kolumna ICAO jak w CALLSIGN (table.callsigns td.icao 90 px)
     assert "width: 90px;" in (FRONTEND / "css" / "style.css").read_text("utf-8").split("table.callsigns td.icao {")[1].split("}")[0]
-    # kolumna silników mieści "2 Turboshaft" przy 20 px (ok. 112 px tekstu + 16 px paddingu), łamana tylko na spacji
-    assert widths["eng"] >= 128
+    # kolumna silników mieści "2 Turboshaft" przy 20 px (ok. 112 px tekstu + 16 px paddingu), łamana tylko na spacji,
+    # także w wąskiej liście; producent w wąskiej liście mieści BOMBARDIER i EUROCOPTER w jednej linijce (najszerszy
+    # ok. 141 px tekstu + 16 px paddingu)
+    assert widths["eng"] >= 128 and narrow["eng"] >= 128 and narrow["mk"] >= 157
     eng = _css_rule(".ac-table td.eng")
     assert "overflow-wrap: normal;" in eng and "nowrap" not in eng
     assert "overflow: auto;" in _css_rule(".ac-list")
+    # nazwa łamana na spacjach, nie po jednej literze
     assert "overflow-wrap: break-word;" in _css_rule(".ac-table td.name")
     # RECAT-EU w kolorze kategorii, także w zaznaczonym wierszu
     for k, color in (("A", "#ff6a5a"), ("B", "#ff6a5a"), ("C", "var(--yellow)"), ("D", "var(--yellow)"),
