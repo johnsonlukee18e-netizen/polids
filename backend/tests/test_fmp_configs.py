@@ -39,7 +39,8 @@ DATA = json.loads((SEED / "fmp_configs.json").read_text("utf-8"))
 TABLE = [("1X", "ALL"), ("1S", "SFIR"), ("1N", "NFIR"), ("1E", "EFIR"), ("1D", "DTC"),
          ("2X", "NFIR+SFIR"), ("2N", "ALL+NFIR"), ("2S", "ALL+SFIR"), ("2E", "ALL+EFIR"), ("2D", "ALL+DTC"),
          ("2G", "ALL+DBFG"), ("2J", "ALL+JR"), ("2U", "ALL+ALH"),
-         ("3E", "NFIR+SFIR+EFIR"), ("3W", "NFIR+SFIR+DTC"), ("3G", "ALL+DTC+DBFG"), ("3F", "ALL+FG+DBT"),
+         ("3E", "NFIR+SFIR+EFIR"), ("3WX", "NFIR+SFIR+DTC"), ("3WN", "NFIR+ALL+DTC"), ("3G", "ALL+DTC+DBFG"),
+         ("3F", "ALL+FG+DBT"),
          ("3T", "EFIR+DBFG+TCJ"), ("4X", "NFIR+DTC+JR+NE"), ("5X", "DBT+FG+NE+JR+TCJ")]
 NAMES = {"ALL": "EPWW_ALL_CTR", "SFIR": "EPWW_S_CTR", "NFIR": "EPWW_N_CTR", "EFIR": "EPWW_E_CTR", "DTC": "EPWW_DTC_CTR",
          "DBFG": "EPWW_DBF_CTR", "JR": "EPWW_JR_CTR", "ALH": "EPWW_ALH_CTR", "FG": "EPWW_FG_CTR", "DBT": "EPWW_DBT_CTR",
@@ -191,7 +192,7 @@ def test_configs_network_error(client):
         d = r.json()
         assert d["current"] == {"ok": False, "error": "Network data unavailable", "updated": None, "positions": None,
                                 "names": None, "code": None}
-        assert len(d["configs"]) == 20
+        assert len(d["configs"]) == 21
     # zepsuty feed (lista zamiast obiektu) to też brak danych, nie błąd 500
     STATE["feed"] = []
     assert client.get("/api/radio/configs").json()["current"]["ok"] is False
@@ -301,7 +302,7 @@ const fmp = await import(process.argv[2]);
 const rb = await import(process.argv[3]);
 const data = JSON.parse(fs.readFileSync(process.argv[5], "utf-8"));
 const o = {};
-o.clean = ["2n", " 5X ", "2NN", "22", "0X", "", null, "EP-BH"].map(fmp.cleanCfg);
+o.clean = ["2n", " 5X ", "2NNN", "22", "0X", "", null, "EP-BH", "3wn", "3W", " 3wx"].map(fmp.cleanCfg);
 o.parse = ["2N", "2n/ep-bh", "EP-BH", "ep-watmad", "x y", "", "2N/", "2N/x y", "9z/EP-BH/X", "ED-EDWW-ALR", undefined].map(fmp.parseFmpArg);
 o.arg = [["2N", "EP-BH"], ["2n", ""], ["", "ep-bh"], ["", ""], ["xx", "x y"]].map(([c, t]) => fmp.fmpArg(c, t));
 o.saved0 = fmp.savedCfg();
@@ -400,6 +401,24 @@ o.scnPvs = fmp.scnPreviewsHtml(cd.geo, scnRows(SCN_TVS), "v1", cd.layers, "EP-X"
 o.scnPvsNone = fmp.scnPreviewsHtml(null, scnRows(["EP-WATMA", "EP-NE"]));
 // podglądy konfiguracji bez zmian po dodaniu map scenariusza
 o.pvAfter = fmp.cfgPreviewSvg(cd.geo, by["2U"], "LOW", "v1");
+// 0.14.4: prawdziwe wolumeny vIFF z dolnymi pasmami (EPWW-BL95, EPWW-BL285)
+const live = data.live, L = Object.fromEntries(live.scenarios.map((x) => [x.id, x])), liveRows = vc.fmpRows(live);
+o.volSlot = ["EPWW-BH", "EPWW-BL95", "EPWW-GL285", "EPWW-TM", "EPWW-BL", "EPWW-BL5", "EPWW-BL2850", "EPWA-TMA", "EPWW-BX95", null].map(fmp.volSlot);
+o.slotsLive = live.sectors.map((t) => fmp.tvSlots(liveRows.find((r) => r.id === t.id)).map((x) => x.letter + x.layer[0]));
+o.coverLive = live.sectors.map((t) => fmp.tvCover(liveRows.find((r) => r.id === t.id)).length);
+const bandsLive = fmp.volBands(live.sectors);
+o.bands = Object.fromEntries([...bandsLive].sort());
+o.bandsNone = [fmp.volBands(null).size, fmp.volBands([{ volumes: null }, null, { volumes: ["EPWW-BH", "EPWA-TMA"] }]).size];
+o.atLevel = [[{ letter: "B", layer: "LOW", fl: 285 }, 330], [{ letter: "B", layer: "LOW", fl: 95 }, 330], [{ letter: "B", layer: "LOW", fl: 95 }, 200],
+  [{ letter: "B", layer: "HIGH", fl: null }, 400], [{ letter: "B", layer: "LOW", fl: 335 }, 330], [{ letter: "N", layer: "LOW", fl: 95 }, 330],
+  [{ letter: "X", layer: "LOW", fl: 95 }, 330]].map(([x, fl]) => fmp.volAtLevel(x, bandsLive, fl));
+o.grpLive = Object.fromEntries(["3WX", "3WN"].map((c) => [c, fmp.cfgGroupRows(liveRows, by[c]).map((g) => [g.p ? g.p.name : g.kind, g.rows.map((r) => r.id)])]));
+o.matchLive = [["EP-3WX", "3WX"], ["EP-3WX", "3WN"], ["EP-3WN", "3WN"], ["EP-3WN", "3WX"]].map(([id, c]) => fmp.scnMatch(L[id], by[c]).state);
+o.pv3WX = fmp.scnPreviewHtml(live, L["EP-3WX"], { cfg: by["3WX"], geo: cd.geo, ver: "v1", layers: cd.layers });
+o.pv3WN = fmp.scnPreviewHtml(live, L["EP-3WN"], { cfg: by["3WN"], geo: cd.geo, ver: "v1", layers: cd.layers });
+o.pvBC = fmp.scnPreviewHtml(live, L["EP-BCLOW"], { geo: cd.geo, ver: "v1", layers: cd.layers });
+// pasma tylko z wierszy scenariusza (bez listy wszystkich TV): BCLOW sam nie zna BL285, więc BL95 obowiązuje na FL330
+o.pvBCRows = fmp.scnPreviewSvg(cd.geo, fmp.scnTvRows(live, L["EP-BCLOW"]), "LOW", "v1", "EP-BCLOW");
 console.log(JSON.stringify(o));
 """
 
@@ -461,6 +480,27 @@ SCN = {"prefix": "EP", "now": "1210", "scenarios_ok": True, "sectors": [
     ]}
 
 
+# 0.14.4 (właściciel projektu 22.11.2026: "why is LOW not shown?"): prawdziwe wolumeny vIFF z 22.11.2026 traffic volumes
+# scenariuszy EP-3WX i EP-3WN – dolne pasma mają w nazwie dolny poziom (EPWW-BL95, EPWW-BL285), czego 0.14.3 nie czytało;
+# EP-BCLOW sztuczny: same niższe pasma B i C (na FL330 obowiązują BL285 i CL285)
+_L = lambda s: [f"EPWW-{v}" for v in s.split()]  # noqa: E731
+LIVE = {"prefix": "EP", "now": "1230", "scenarios_ok": True, "sectors": [
+    _rtv("EP-NFIR3WX", _L("NH NL95 GH GL245 GL285 GL95 GM FH FL285 FL95 FM BH BL285 BL95 BM NM")),
+    _rtv("EP-SFIR3WX", _L("JH JL245 JL285 JL95 JM RH RL285 RM RL95 EH EL245 EL95 EM")),
+    _rtv("EP-NFIR3WN", _L("NH NL95 NM EH EL245 EL95 EM FL285 FL95 FH FM GH GL285 GL95 GM GL245 BM BL95 BL285 BH")),
+    _rtv("EP-SFIR3WN", _L("JH JM JL95 JL285 JL245 RM RL95 RL285 RH")),
+    _rtv("EP-DTC", _L("DH DL195 DL95 DM TH TL195 TL285 TM CH CL195 CL245 CL285 CL95 CM")),
+    _rtv("EP-BCLOW", _L("BL95 CL95 CL195 CL245"))],
+    "scenarios": [
+        _scn("EP-3WX", False, [("EP-DTC", 21, 42), ("EP-NFIR3WX", 21, 42), ("EP-SFIR3WX", 21, 42)],
+             positions=["EPWW_S_CTR", "EPWW_DTC_CTR"], anypositions=["EPWW_N_CTR", "EPWW_ALL_CTR"],
+             nopositions=["EPWW_DB*_CTR", "EPWW_F*_CTR", "EPWW_E_CTR", "EPWW_TCJ_CTR"], booked=True),
+        _scn("EP-3WN", False, [("EP-DTC", 21, 42), ("EP-NFIR3WN", 21, 42), ("EP-SFIR3WN", 21, 42)],
+             positions=["EPWW_ALL_CTR", "EPWW_N_CTR", "EPWW_DTC_CTR"],
+             nopositions=["EPWW_DB*_CTR", "EPWW_TCJ_CTR", "EPWW_E_CTR", "EPWW_F*_CTR", "EPWW_J*_CTR"], booked=True),
+        _scn("EP-BCLOW", False, [("EP-BCLOW", 5, 10)])]}
+
+
 @pytest.fixture(scope="module")
 def js(client, tmp_path_factory):
     node = shutil.which("node") or shutil.which("node", path="/opt/node22/bin")
@@ -474,7 +514,7 @@ def js(client, tmp_path_factory):
     pc.write_text((FRONTEND / "vendor" / "polygon-clipping" / "polygon-clipping.umd.min.js").read_text("utf-8"), "utf-8")
     cd = configs(client, ctl("EPWW_ALL_CTR"), ctl("EPWW_N_CTR", cid=2), query="?geo=1")
     data = d / "data.json"
-    data.write_text(json.dumps({"cd": cd, "sectors": SECTORS, "real": REAL, "scn": SCN}), "utf-8")
+    data.write_text(json.dumps({"cd": cd, "sectors": SECTORS, "real": REAL, "scn": SCN, "live": LIVE}), "utf-8")
     script = d / "run.mjs"
     script.write_text(NODE_SCRIPT, "utf-8")
     r = subprocess.run([node, str(script), (jsd / "fmp.js").as_uri(), (jsd / "radioboard.js").as_uri(),
@@ -485,7 +525,8 @@ def js(client, tmp_path_factory):
 
 
 def test_js_address_and_memory(js):
-    assert js["clean"] == ["2N", "5X", "", "", "", "", "", ""]
+    # 0.14.4: kody z dwiema literami (3WX, 3WN); stare 3W z adresu albo pamięci = 3WX
+    assert js["clean"] == ["2N", "5X", "", "", "", "", "", "", "3WN", "3WX", "3WX"]
     p = [(x["cfg"], x["tv"]) for x in js["parse"]]
     # "#other/fmp/EP-BH" (do 0.13.6) dalej: sam sektor bez konfiguracji
     assert p == [("2N", ""), ("2N", "EP-BH"), ("", "EP-BH"), ("", "EP-WATMAD"), ("", ""), ("", ""), ("2N", ""), ("2N", ""),
@@ -498,7 +539,7 @@ def test_js_address_and_memory(js):
 
 def test_js_configuration_bar(js):
     assert js["groups"] == [[1, ["1X", "1S", "1N", "1E", "1D"]], [2, ["2X", "2N", "2S", "2E", "2D", "2G", "2J", "2U"]],
-                            [3, ["3E", "3W", "3G", "3F", "3T"]], [4, ["4X"]], [5, ["5X"]]]
+                            [3, ["3E", "3WX", "3WN", "3G", "3F", "3T"]], [4, ["4X"]], [5, ["5X"]]]
     assert js["tip"] == "2N: ALL + NFIR\nALL EPWW_ALL_CTR 125.450\nNFIR EPWW_N_CTR 130.675"
     assert js["tipNow"].endswith("\nControllers online now")
     # online ALL + N = 2N: znak NOW na przycisku, bez linii; inaczej linia z tym, co jest otwarte
@@ -506,7 +547,7 @@ def test_js_configuration_bar(js):
                          "Now: unknown (Network data unavailable)", ""]
     bar = js["bar"]
     assert bar.startswith('<span class="fmp-cfg-t"') and ">CONFIGURATION</span>" in bar
-    assert bar.count('<button type="button" class="fmp-cb') == 20 and bar.count('class="fmp-cfg-g"') == 5
+    assert bar.count('<button type="button" class="fmp-cb') == 21 and bar.count('class="fmp-cfg-g"') == 5
     assert '<button type="button" class="fmp-cb now" data-cfg="2N" aria-pressed="false" title="2N: ALL + NFIR' in bar
     assert '2N<span class="fmp-cb-now">NOW</span></button>' in bar and bar.count("fmp-cb-now") == 1
     assert '<button type="button" class="fmp-cb on" data-cfg="3E" aria-pressed="true"' in bar
@@ -825,3 +866,52 @@ def test_scenario_list_and_preview_css():
     assert f"table.fmp-sp-tab th {{ top: -{side_pad_top}px; }}" in css
     narrow = re.search(r"@container fmp \(max-width: (\d+)px\) \{ table\.fmp-sp-tab th \{ top: 0; \} \}", css)
     assert narrow and narrow.group(1) == re.search(r"@container fmp \(max-width: (\d+)px\) \{\n", css).group(1)
+
+
+def test_js_low_volume_bands(js):
+    """0.14.4 (właściciel projektu 22.11.2026, zrzut EP-3WX: "why is LOW not shown?"): vIFF nazywa dolne wolumeny
+    z poziomem dolnym pasma (EPWW-BL95, EPWW-BL285); do 0.14.3 wzorzec EPWW-<litera><L|M|H> ich nie czytał, więc mapa LOW
+    podglądu była pusta, a NFIR3WX, SFIR3WX i DTC lądowały w OTHER zamiast pod NFIR, SFIR i DTC."""
+    B = lambda letter, layer, fl: {"letter": letter, "layer": layer, "fl": fl}  # noqa: E731
+    assert js["volSlot"] == [B("B", "HIGH", None), B("B", "LOW", 95), B("G", "LOW", 285), B("T", "MID", None), B("B", "LOW", None),
+                             None, None, None, None, None]
+    # warstwy TV: każda litera i warstwa raz, niezależnie od liczby pasm
+    slots = js["slotsLive"]
+    assert all(len(s) == len(set(s)) for s in slots)
+    assert sorted(slots[0]) == sorted(f"{x}{ly}" for x in "BFGN" for ly in "LMH")
+    assert sorted(slots[1]) == sorted(f"{x}{ly}" for x in "EJR" for ly in "LMH")
+    assert sorted(slots[3]) == sorted(f"{x}{ly}" for x in "JR" for ly in "LMH")
+    assert sorted(slots[4]) == sorted(f"{x}{ly}" for x in "CDT" for ly in "LMH") and sorted(slots[5]) == ["BL", "CL"]
+    assert js["coverLive"] == [16, 13, 20, 9, 14, 4]
+    assert js["bands"] == {"BLOW": [95, 285], "CLOW": [95, 195, 245, 285], "DLOW": [95, 195], "ELOW": [95, 245],
+                           "FLOW": [95, 285], "GLOW": [95, 245, 285], "JLOW": [95, 245, 285], "NLOW": [95],
+                           "RLOW": [95, 285], "TLOW": [195, 285]}
+    assert js["bandsNone"] == [0, 0]
+    # FL330: BL285 tak, BL95 nie (B ma pasmo od FL285); na FL200 BL95 tak; bez liczby zawsze; pasmo od FL335 nie;
+    # N ma tylko NL95; nieznana litera bez pasm
+    assert js["atLevel"] == [True, False, True, True, False, True, True]
+    # grupy: 3WX = NFIR + SFIR + DTC jak w vIFF; 3WN = NFIR (B E F G N) + ALL (J R) + DTC, też jak w vIFF
+    g = js["grpLive"]
+    assert g["3WX"] == [["NFIR", ["EP-NFIR3WX"]], ["SFIR", ["EP-SFIR3WN", "EP-SFIR3WX"]], ["DTC", ["EP-DTC"]],
+                        ["other", ["EP-BCLOW", "EP-NFIR3WN"]]]
+    assert g["3WN"] == [["NFIR", ["EP-NFIR3WN", "EP-NFIR3WX"]], ["ALL", ["EP-SFIR3WN"]], ["DTC", ["EP-DTC"]],
+                        ["other", ["EP-BCLOW", "EP-SFIR3WX"]]]
+    assert js["matchLive"] == ["yes", "no", "yes", "no"]
+
+
+def test_js_low_map_of_real_scenarios(js):
+    lab = lambda svg: sorted(re.findall(r'<text class="fmp-pv-l" x="[\d.]+" y="[\d.]+">([^<]+)</text>', svg))  # noqa: E731
+    for key, tvs in (("pv3WX", ["DTC", "NFIR3WX", "SFIR3WX"]), ("pv3WN", ["DTC", "NFIR3WN", "SFIR3WN"])):
+        p = js[key]
+        svgs = re.findall(r"<svg .*?</svg>", p)
+        # LOW jak MID i HIGH: trzy obszary, cały FIR pokryty (bez szarych wycinków)
+        assert [lab(x) for x in svgs] == [tvs, tvs, tvs], key
+        assert all("fmp-pv-free" not in x and x.count('<path class="fmp-pv-on') == 3 for x in svgs), key
+        # każdy TV w grupie swojego stanowiska, bez OTHER i bez notki "Not on the maps"
+        assert "fmp-grp other" not in p and "No traffic volumes" not in p and "fmp-sp-off" not in p, key
+    bc = js["pvBC"]
+    svgs = re.findall(r"<svg .*?</svg>", bc)
+    # same niższe pasma B i C: na FL330 ich nie ma, więc żadnej mapy i notka pod mapami
+    assert all("fmp-pv-on" not in x for x in svgs) and '<p class="hint fmp-sp-off">Not on the maps: BCLOW</p>' in bc
+    # bez listy wszystkich TV pasma z samego scenariusza: BL95 i CL245 to najwyższe znane, więc B i C na LOW
+    assert lab(js["pvBCRows"]) == ["BCLOW"]

@@ -23,7 +23,8 @@ export const DEFAULT_LAYERS = ["atis", "low", "mid", "high"];
 // inaczej z ostatnio wybraną w FMP (saved: lsGet(FMP_LS), ten sam klucz co fmp.js), bez obu samo "#other/fmp"
 export const FMP_LS = "fmp.config";
 export const FMP_TIP = "OTHER \u203a FMP: sector configurations and capacity";
-const cfgCode = (v) => { const t = String(v ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
+// kod konfiguracji: cyfra i jedna albo dwie litery (2N, 3WX); stary kod 3W zamienia fmp.js (cleanCfg)
+const cfgCode = (v) => { const t = String(v ?? "").trim().toUpperCase(); return /^[1-9][A-Z]{1,2}$/.test(t) ? t : ""; };
 export function fmpTarget(fmp, saved = "") {
   const c = cfgCode(fmp?.code) || cfgCode(saved);
   return c ? `fmp/${c}` : "fmp";

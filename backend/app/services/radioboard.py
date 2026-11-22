@@ -917,7 +917,8 @@ OCC_ALERT = 0.8
 TV_FIR_WIDE = re.compile(r"^EP-(?:ALLFIR|NFIR|SFIR)")
 TV_SECTOR = re.compile(r"^EP-([A-Z])([HML])$")
 TV_TMA = re.compile(r"^EP-([A-Z]{2})TMAD?$")
-VOL_SECTOR = re.compile(r"^EPWW-([A-Z])([HML])$")
+# 0.14.4: dolne wolumeny vIFF mają w nazwie dolny poziom pasma (EPWW-BL95, EPWW-BL285) – to warstwa LOW litery
+VOL_SECTOR = re.compile(r"^EPWW-([A-Z])([HML])(?:\d{2,3})?$")
 VOL_TMA = re.compile(r"^EP([A-Z]{2})-TMA[A-Z]*$")
 
 

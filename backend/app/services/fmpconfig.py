@@ -1,7 +1,7 @@
 """OTHER › FMP: konfiguracje sektorów ACC EPWW (0.14.0, właściciel projektu: "Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane
 konfiguracje"; GET /api/radio/configs).
 
-Tabela konfiguracji jest w data/seed/fmp_configs.json: kod (1X … 5X), napis jak w tabeli właściciela projektu ("ALL+NFIR") i otwarte
+Tabela konfiguracji jest w data/seed/fmp_configs.json: kod (1X … 5X, też dwuliterowe jak 3WX), napis jak w tabeli właściciela projektu ("ALL+NFIR") i otwarte
 stanowiska pod nazwami z tabeli (ALL, SFIR, NFIR, EFIR, DTC, DBFG, JR, ALH, FG, DBT, TCJ, NE → stanowiska ACC
 z ownership.json). Warstwa sektora (LOW, MID, HIGH) należy w konfiguracji do pierwszego stanowiska swojej kolejności
 przejmowania (ownership.json sectors), które jest w tej konfiguracji otwarte – ta sama zasada, którą RADIO stosuje do
@@ -16,8 +16,8 @@ import re
 from .radioboard import LAYERS, acc_sectors, first_online, is_on
 
 log = logging.getLogger("polids.fmp")
-# kod konfiguracji: cyfra (liczba stanowisk) i litera, np. 2N
-CODE = re.compile(r"^[1-9][A-Z]$")
+# kod konfiguracji: cyfra (liczba stanowisk) i jedna albo dwie litery, np. 2N, 3WX (0.14.4)
+CODE = re.compile(r"^[1-9][A-Z]{1,2}$")
 
 
 def table_names(data: dict, own: dict) -> dict[str, str]:
