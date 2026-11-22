@@ -1,8 +1,7 @@
 {
- "source": "om",
- "source_label": "om.plvacc.pl › Sector ownerships and top-down rules (AIRAC 2610)",
- "note": "Tabele pierwszeństwa z om.plvacc.pl/docs/2610/ownerships (wklejone przez właściciela projektu 06.10.2026). Poprawione literówki: ACC G LOW nr 3: EPWW_N_cTR -> EPWW_N_CTR; ACC J MID nr 4: EPWW_E_FIR -> EPWW_E_CTR. B, C, D HIGH i T MID od 0.13.5 (właściciel projektu 14.11.2026) też wprost z tabeli om, jak w ACC Ownership Manager (plvacc.pl/acc-sectors: D HIGH obsługuje DB+T przed DBF+G); kolejność z pliku .ese w ese_differences.",
- "url": "https://om.plvacc.pl/docs/2610/ownerships",
+ "source": "ese",
+ "source_label": "EPWW-Sector.ese › OWNER (AIRAC 2610/1); D HIGH per the owner 14.11.2026",
+ "note": "Kolejność przejmowania sektorów ACC (sectors) i część ACC kolejności TMA (tma_topdown) z list OWNER pliku data/import/EPWW-Sector.ese (AIRAC 2610/1). Od 0.14.3 (właściciel projektu 21.11.2026: \"rób to wszystko według sct a nie tabelki\") wszystko według pliku sektorowego, a nie tabeli om.plvacc.pl/docs/2610/ownerships (wklejonej 06.10.2026, używanej do 0.14.2). Jedyny wyjątek to D HIGH z poprawki właściciela projektu z 14.11.2026 (\"jedynie to DBT które poprawiałem 14.11 zostaw\"): DBT przed DBF, jak w ACC Ownership Manager (plvacc.pl/acc-sectors); kolejność z pliku w ese_differences. Testy w backend/tests/test_ownership_ese.py (test_acc_chains_follow_ese, test_tma_topdown_follows_ese) pilnują zgodności z plikiem: przy nowym AIRAC wystarczy podmienić .ese i poprawić ten plik.",
  "layers": {
   "LOW": {
    "lower_ft": 9500,
@@ -37,10 +36,10 @@
     "EPWW_ALL_CTR"
    ],
    "HIGH": [
-    "EPWW_DBT_CTR",
-    "EPWW_DBF_CTR",
     "EPWW_N_CTR",
     "EPWW_ALH_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
     "EPWW_ALL_CTR"
    ]
   },
@@ -66,12 +65,12 @@
     "EPWW_ALL_CTR"
    ],
    "HIGH": [
-    "EPWW_TCJ_CTR",
     "EPWW_DTC_CTR",
     "EPWW_S_CTR",
     "EPWW_E_CTR",
     "EPWW_N_CTR",
     "EPWW_ALH_CTR",
+    "EPWW_TCJ_CTR",
     "EPWW_C_CTR",
     "EPWW_ALL_CTR"
    ]
@@ -279,6 +278,7 @@
     "EPWW_DTC_CTR",
     "EPWW_DBT_CTR",
     "EPWW_S_CTR",
+    "EPWW_ALH_CTR",
     "EPWW_ALL_CTR"
    ],
    "HIGH": [
@@ -430,8 +430,8 @@
     "EPWW_DT_CTR",
     "EPWW_DTC_CTR",
     "EPWW_DBF_CTR",
-    "EPWW_ALL_CTR",
     "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
     "EPWW_ALH_CTR"
    ],
    "ese_prefixes": [
@@ -521,10 +521,7 @@
   }
  },
  "ese_differences": [
-  "B HIGH: om DBT DBF N ALH ALL | .ese N ALH DBT DBF ALL",
-  "C HIGH: om TCJ DTC S E N ALH C ALL | .ese DTC S E N ALH TCJ C ALL",
-  "D HIGH: om DBT DT DTC DBF N ALH D ALL | .ese DTC N DBF ALH DT DBT D ALL",
-  "T MID: om TM DT TCJ DTC DBT S ALL | .ese TM DT TCJ DTC DBT S ALH ALL"
+  "D HIGH: tu DBT DT DTC DBF N ALH D ALL (właściciel projektu 14.11.2026) | .ese DTC N DBF ALH DT DBT D ALL"
  ],
  "corrections": []
 }

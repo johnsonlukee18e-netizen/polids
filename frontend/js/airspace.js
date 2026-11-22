@@ -26,7 +26,7 @@ export const fl = (ft) => "FL" + String(Math.round((ft || 0) / 100)).padStart(3,
 // --- Kolejność przejmowania sektorów EPWW w warstwach LOW/MID/HIGH (dawniej łańcuchy VACS, CC BY-NC-SA 4.0).
 // Wczytywane raz przy starcie modułu, żeby sliceOwner() miało je od razu.
 let vacsPromise = null, vacsData = null;
-// Od rundy 8 kolejność przejmowania z /api/nav/ownership (tymczasowo .ese, docelowo tabela z om.plvacc.pl); kształt jak w VACS.
+// Od rundy 8 kolejność przejmowania z /api/nav/ownership (od 0.14.3 wg list OWNER pliku .ese); kształt jak w VACS.
 export const loadVacs = () => (vacsPromise ||= api("/api/nav/ownership").then((d) => (vacsData = d))
   .catch((e) => { vacsPromise = null; throw e; }));
 loadVacs().catch(() => { /* bez VACS: właściciele z listy OWNER pliku .ese */ });

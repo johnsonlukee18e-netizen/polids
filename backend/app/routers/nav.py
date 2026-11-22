@@ -183,8 +183,8 @@ def _ownership() -> dict:
 
 @router.get("/ownership")
 def ownership():
-    """Kolejność przejmowania sektorów ACC EPWW w warstwach LOW/MID/HIGH (pole `source` mówi, skąd jest:
-    tymczasowo listy OWNER z pliku .ese, docelowo tabela z om.plvacc.pl/docs/2610/ownerships)."""
+    """Kolejność przejmowania sektorów ACC EPWW w warstwach LOW/MID/HIGH (pole `source` mówi, skąd jest: od 0.14.3
+    "ese" – listy OWNER pliku EPWW-Sector.ese, z wyjątkami w ese_differences; do 0.14.2 tabela om.plvacc.pl)."""
     return _ownership()
 
 
@@ -298,8 +298,8 @@ def slices(level_ft: int | None = None, db: Session = Depends(get_db)):
     do warstw MAP.
 
     kind: acc | tma | ctr | fis | cta | atz | nb (FIR sąsiedni) | oth; group: litera sektora ACC, ICAO lotniska,
-    rejon FIS, numer CTA albo FIR; group_label: nazwa przestrzeni (TMA Poznań N i S osobno, jak w tabeli om).
-    Z level_ft tylko wycinki, których granice obejmują ten poziom (dolna <= poziom < górna).
+    rejon FIS, numer CTA albo FIR; group_label: nazwa przestrzeni (TMA Poznań N i S osobno, jak klucze tma_topdown
+    w ownership.json). Z level_ft tylko wycinki, których granice obejmują ten poziom (dolna <= poziom < górna).
     Bez sektorów (brak pliku sectors.geojson) pusta lista z `note`."""
     stmt = select(Sector).order_by(Sector.id)
     if level_ft is not None:

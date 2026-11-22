@@ -69,7 +69,8 @@ def tma_topdown(name: str, own: dict) -> dict | None:
 
 def air_chain(name: str, owners: list[str], own: dict) -> list[str]:
     """Kolejność dla wycinka spoza sektorów ACC: stanowiska z listy OWNER przed pierwszym ACC, potem ACC – dla TMA
-    z tabeli top-down om.plvacc.pl (tma_topdown), gdy prefiks wycinka pasuje – i to, co plik stawia za ACC."""
+    z tma_topdown w ownership.json (od 0.14.3 te same ACC co w pliku .ese), gdy prefiks wycinka pasuje – i to, co plik
+    stawia za ACC."""
     lst = [o for o in owners if o]
     first = next((i for i, cs in enumerate(lst) if ACC_CS.match(cs)), len(lst))
     local, rest = lst[:first], lst[first:]
