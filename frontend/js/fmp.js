@@ -58,7 +58,8 @@ const DASH = "\u2013", DOT = " \u00b7 ";
 // id sektora z adresu albo z wiersza tabeli: wielkie litery ("ep-bh" → "EP-BH", też "ED-EDWW-ALR"); inne napisy = "" (nic)
 export const cleanTv = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[A-Z]{2}-[A-Z0-9-]{1,20}$/.test(t) ? t : ""; };
 // 0.14.0 (właściciel projektu): kod konfiguracji sektorów z adresu albo z pamięci: cyfra i litera ("2n" → "2N"); inne napisy = ""
-export const cleanCfg = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[1-9][A-Z]$/.test(t) ? t : ""; };
+// 0.14.4: kody mają jedną albo dwie litery (3WX, 3WN); 3W z adresu albo pamięci przeglądarki sprzed 0.14.4 = 3WX
+export const cleanCfg = (s) => { const t = String(s ?? "").trim().toUpperCase(); return /^[1-9][A-Z]{1,2}$/.test(t) ? ({ "3W": "3WX" })[t] || t : ""; };
 // 0.14.2 (issue #35): id scenariusza z adresu albo z wiersza listy wielkimi literami ("ep_nfir" → "EP_NFIR"); przegląd
 // 0.14.2: id scenariusza w vIFF to wolny tekst ("EP-KK.TMA", "EP WAA1"), więc każdy napis do 64 znaków bez "/" (dzieli
 // adres) i bez znaków sterujących; adres koduje i odkodowuje router (hashOf, parseHash); inne napisy = ""
@@ -194,15 +195,24 @@ export function cfgPreviewsHtml(geo, c, ver = "", layers = {}) {
     + `${ly} <span>${flText(LEVEL_FT[ly])}</span></figcaption>${cfgPreviewSvg(geo, c, ly, ver)}</figure>`).join("");
 }
 
+// 0.14.4 (właściciel projektu 22.11.2026: "why is LOW not shown?"): wolumen sektora EPWW z vIFF → {letter, layer, fl}.
+// Górne i środkowe to EPWW-BH, EPWW-BM, a dolne mają w nazwie dolny poziom pasma (EPWW-BL95 = B LOW od FL095,
+// EPWW-BL285 = B LOW od FL285; prawdziwe dane vIFF 22.11.2026), więc fl = ten poziom albo null bez liczby.
+// Inne wolumeny (TMA, EPWA-TMA) → null
+const VOL_RE = /^EPWW-([A-Z])([LMH])(\d{2,3})?$/;
+export const volSlot = (v) => { const m = VOL_RE.exec(String(v ?? "")); return m ? { letter: m[1], layer: BAND_LAYER[m[2]], fl: m[3] ? Number(m[3]) : null } : null; };
 // sektor EP-<litera><L|M|H> → {letter, layer}; inne traffic volumes (TMA, części FIR, kombinacje) → null
 export const tvSlot = (id) => { const m = /^EP-([A-Z])([LMH])$/.exec(String(id ?? "")); return m ? { letter: m[1], layer: BAND_LAYER[m[2]] } : null; };
 // 0.14.1: warstwy sektorów, które obejmuje traffic volume: z jego wolumenów EPWW-<litera><L|M|H> (prawdziwe id vIFF to
 // kombinacje: EP-FG, EP-GBFLMH, EP-JRLM, EP-NFIR), bez wolumenów z id (tvSlot); TMA albo wolumen spoza sektorów EPWW = []
+// 0.14.4: dolne pasma (EPWW-BL95, EPWW-BL285) to warstwa LOW litery; kilka pasm jednej warstwy = jedna warstwa
 export function tvSlots(r) {
   const vols = Array.isArray(r?.volumes) ? r.volumes.filter(Boolean) : [];
   if (!vols.length) { const s = tvSlot(r?.id); return s ? [s] : []; }
-  const ms = vols.map((v) => /^EPWW-([A-Z])([LMH])$/.exec(String(v)));
-  return ms.every(Boolean) ? ms.map((m) => ({ letter: m[1], layer: BAND_LAYER[m[2]] })) : [];
+  const ms = vols.map(volSlot);
+  if (!ms.every(Boolean)) return [];
+  const seen = new Set();
+  return ms.filter((x) => !seen.has(x.letter + x.layer) && seen.add(x.letter + x.layer)).map(({ letter, layer }) => ({ letter, layer }));
 }
 // Wiersze tabeli w grupach konfiguracji c: [{p: stanowisko, rows}, …] w kolejności stanowisk konfiguracji, potem
 // {kind: "free"} (warstwa sektora bez stanowiska konfiguracji; tylko niepusta) i {kind: "other"} (TMA, części FIR,
@@ -514,24 +524,41 @@ export function scnTvRows(data, s) {
   });
 }
 
-// 0.14.1 tvSlots, ale bez "wszystko albo nic": warstwy sektorów z wolumenów EPWW-<litera><L|M|H>, inne wolumeny
-// (EPWA-TMA w EP-ALLFIR) pomijamy; bez wolumenów z id (tvSlot)
+// 0.14.1 tvSlots, ale bez "wszystko albo nic": wolumeny sektorów EPWW (volSlot, z poziomem dolnego pasma fl), inne
+// wolumeny (EPWA-TMA w EP-ALLFIR) pomijamy; bez wolumenów z id (tvSlot, fl = null)
 export function tvCover(r) {
   const vols = Array.isArray(r?.volumes) ? r.volumes.filter(Boolean) : [];
-  if (!vols.length) { const s = tvSlot(r?.id); return s ? [s] : []; }
-  return vols.map((v) => /^EPWW-([A-Z])([LMH])$/.exec(String(v))).filter(Boolean).map((m) => ({ letter: m[1], layer: BAND_LAYER[m[2]] }));
+  if (!vols.length) { const s = tvSlot(r?.id); return s ? [{ ...s, fl: null }] : []; }
+  return vols.map(volSlot).filter(Boolean);
 }
+// 0.14.4: znane dolne poziomy pasm każdej litery i warstwy ze wszystkich traffic volumes (Map "BLOW" → [95, 285])
+export function volBands(tvs) {
+  const out = new Map();
+  (tvs || []).forEach((r) => (Array.isArray(r?.volumes) ? r.volumes : []).map(volSlot).forEach((x) => {
+    if (!x || x.fl === null) return;
+    const k = x.letter + x.layer, a = out.get(k) || [];
+    if (!a.includes(x.fl)) out.set(k, [...a, x.fl].sort((p, q) => p - q));
+  }));
+  return out;
+}
+// czy wolumen x jest na poziomie podglądu (fl = setki stóp): bez liczby tak; pasmo – gdy zaczyna się nie wyżej
+// niż podgląd i żadne wyższe znane pasmo tej litery nie zaczyna się do poziomu podglądu (EPWW-BL285 na FL330 tak,
+// EPWW-BL95 nie, bo B ma pasmo od FL285)
+export const volAtLevel = (x, bands, fl) => x.fl === null
+  || (x.fl <= fl && !(bands?.get(x.letter + x.layer) || []).some((b) => b > x.fl && b <= fl));
 
 // Mała mapa warstwy (LOW/MID/HIGH) scenariusza jak cfgPreviewSvg: wycinki ACC na wysokości podglądu, obszar każdego
 // traffic volume scenariusza zielony (wycinki jednego TV jako jeden obszar; bez biblioteki same wycinki), z kodem TV;
-// reszta szara, granica FIR na wierzchu. rows = scnTvRows, sel = wybrany TV (jaśniej)
-export function scnPreviewSvg(geo, rows, layer, ver = "", id = "", sel = "") {
+// reszta szara, granica FIR na wierzchu. rows = scnTvRows, sel = wybrany TV (jaśniej); bands = volBands (domyślnie
+// z rows): na mapie LOW tylko pasmo dolne obejmujące poziom podglądu (FL330)
+export function scnPreviewSvg(geo, rows, layer, ver = "", id = "", sel = "", bands = null) {
+  const bs = bands || volBands(rows), fl = LEVEL_FT[layer] / 100;
   const { P } = projection(bboxOrDefault(bboxOf(geo?.border)) || EPWW_BBOX, { x: 0, y: 0, w: PV_W, h: PV_H }, 0.04);
   const slices = sliceAt(geo?.acc, LEVEL_FT[layer]), used = new Set();
   const lib = !!globalThis.polygonClipping?.union;
   const xy = (at) => { const [x, y] = P([at[1], at[0]]); return `x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}"`; };
   const areas = (rows || []).map((r) => {
-    const letters = new Set(tvCover(r).filter((x) => x.layer === layer).map((x) => x.letter));
+    const letters = new Set(tvCover(r).filter((x) => x.layer === layer && volAtLevel(x, bs, fl)).map((x) => x.letter));
     const mine = slices.filter((sl) => letters.has(sl.letter));
     if (!mine.length) return null;
     mine.forEach((sl) => used.add(sl));
@@ -549,13 +576,16 @@ export function scnPreviewSvg(geo, rows, layer, ver = "", id = "", sel = "") {
     + areas.map((a) => a.shape).join("") + `<path class="fmp-pv-b" d="${pathOf(geo?.border, P)}"/>`
     + areas.map((a) => a.label).join("") + "</svg>";
 }
-// trzy mapy obok siebie jak cfgPreviewsHtml i pod nimi traffic volumes spoza sektorów ACC (TMA)
-export function scnPreviewsHtml(geo, rows, ver = "", layers = {}, id = "", sel = "") {
-  const off = (rows || []).filter((r) => !tvCover(r).length).map((r) => r.code);
+// trzy mapy obok siebie jak cfgPreviewsHtml i pod nimi traffic volumes, których nie ma na żadnej z nich (TMA, same
+// niższe pasma LOW); bands jak w scnPreviewSvg
+export function scnPreviewsHtml(geo, rows, ver = "", layers = {}, id = "", sel = "", bands = null) {
+  const bs = bands || volBands(rows);
+  const onMap = (r) => tvCover(r).some((x) => LAYER_KEYS.includes(x.layer) && volAtLevel(x, bs, LEVEL_FT[x.layer] / 100));
+  const off = (rows || []).filter((r) => !onMap(r)).map((r) => r.code);
   const note = off.length ? `<p class="hint fmp-sp-off">Not on the maps: ${esc(off.join(", "))}</p>` : "";
   if (!geo?.acc?.length) return `<p class="hint fmp-pv-none">No sector geometry.</p>${note}`;
   return `<div class="fmp-pvs">` + LAYER_KEYS.map((ly) => `<figure class="fmp-pv"><figcaption title="${esc(`${ly}${layers?.[ly]?.label ? ` (${layers[ly].label})` : ""}: sectors at ${flText(LEVEL_FT[ly])}`)}">`
-    + `${ly} <span>${flText(LEVEL_FT[ly])}</span></figcaption>${scnPreviewSvg(geo, rows, ly, ver, id, sel)}</figure>`).join("") + `</div>${note}`;
+    + `${ly} <span>${flText(LEVEL_FT[ly])}</span></figcaption>${scnPreviewSvg(geo, rows, ly, ver, id, sel, bs)}</figure>`).join("") + `</div>${note}`;
 }
 
 // wykres TV z przepustowością ze scenariusza t ({entries_cap, occupancy_cap}): linie przepustowości i kolory słupków
@@ -602,7 +632,7 @@ export function scnPreviewHtml(data, s, { cfg = null, geo = null, ver = "", laye
     + `<th title="Entries in the current hour (entry capacity per hour in the scenario)">CAPACITY (ENTRIES)</th>`
     + `<th title="Aircraft in the sector now (capacity at one time in the scenario)">OCCUPANCY</th>`
     + `<th title="Capacity in force now: entries per hour / aircraft at once">CAPACITY NOW</th></tr></thead><tbody>${body}</tbody></table>`
-    + `${part}${scnPreviewsHtml(geo, rows, ver, layers, s.id, sel)}</div>`;
+    + `${part}${scnPreviewsHtml(geo, rows, ver, layers, s.id, sel, volBands([...(Array.isArray(data?.sectors) ? data.sectors : []), ...rows]))}</div>`;
 }
 // panel bez wybranego scenariusza
 export const scnPickHtml = () => `<p class="hint fmp-pick">Click a scenario to preview its traffic volumes and capacities.</p>`;

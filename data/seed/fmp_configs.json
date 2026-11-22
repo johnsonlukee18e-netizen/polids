@@ -1,5 +1,5 @@
 {
-  "note": "Konfiguracje sektorów ACC EPWW do OTHER › FMP (0.14.0, właściciel projektu 20.11.2026: \"Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane konfiguracje\"). code = kod konfiguracji (cyfra = liczba otwartych stanowisk), label = otwarte stanowiska jak w tabeli właściciela projektu, positions = te same nazwy po kolei. Nazwy z tabeli → stanowiska ACC z ownership.json (acc_positions): positions na górze pliku (DBFG = EPWW_DBF_CTR, ese_id DBFG). Która warstwa sektora należy do którego stanowiska konfiguracji, liczy serwer z kolejności przejmowania w ownership.json (sectors): pierwsze stanowisko kolejności, które jest w konfiguracji – ta sama zasada co RADIO dla zalogowanych.",
+  "note": "Konfiguracje sektorów ACC EPWW do OTHER › FMP (0.14.0, właściciel projektu 20.11.2026: \"Zedytuj zakładkę FMP aby użytkownik mógł wybrać dane konfiguracje\"). code = kod konfiguracji (cyfra = liczba otwartych stanowisk, potem jedna albo dwie litery; 0.14.4, właściciel projektu 22.11.2026: 3W to teraz 3WX i nowa 3WN, jak scenariusze EP-3WX i EP-3WN w vIFF), label = otwarte stanowiska jak w tabeli właściciela projektu, positions = te same nazwy po kolei. Nazwy z tabeli → stanowiska ACC z ownership.json (acc_positions): positions na górze pliku (DBFG = EPWW_DBF_CTR, ese_id DBFG). Która warstwa sektora należy do którego stanowiska konfiguracji, liczy serwer z kolejności przejmowania w ownership.json (sectors): pierwsze stanowisko kolejności, które jest w konfiguracji – ta sama zasada co RADIO dla zalogowanych.",
   "positions": {
     "ALL": "EPWW_ALL_CTR",
     "SFIR": "EPWW_S_CTR",
@@ -29,7 +29,8 @@
     {"code": "2J", "label": "ALL+JR", "positions": ["ALL", "JR"]},
     {"code": "2U", "label": "ALL+ALH", "positions": ["ALL", "ALH"]},
     {"code": "3E", "label": "NFIR+SFIR+EFIR", "positions": ["NFIR", "SFIR", "EFIR"]},
-    {"code": "3W", "label": "NFIR+SFIR+DTC", "positions": ["NFIR", "SFIR", "DTC"]},
+    {"code": "3WX", "label": "NFIR+SFIR+DTC", "positions": ["NFIR", "SFIR", "DTC"]},
+    {"code": "3WN", "label": "NFIR+ALL+DTC", "positions": ["NFIR", "ALL", "DTC"]},
     {"code": "3G", "label": "ALL+DTC+DBFG", "positions": ["ALL", "DTC", "DBFG"]},
     {"code": "3F", "label": "ALL+FG+DBT", "positions": ["ALL", "FG", "DBT"]},
     {"code": "3T", "label": "EFIR+DBFG+TCJ", "positions": ["EFIR", "DBFG", "TCJ"]},

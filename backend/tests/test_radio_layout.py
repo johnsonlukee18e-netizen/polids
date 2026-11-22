@@ -757,3 +757,20 @@ def test_plates_atz(client):
     # lotnisko bez CTR i bez ATZ: sama plakietka w punkcie lotniska
     (p,) = get(client, [ctl("EPSD_R_TWR", "125.335")])["plates"]["atz"]
     assert (p["icao"], p["zone"], p["twr"], p["frequency"]) == ("EPSD", False, ["EPSD_R_TWR"], "125.335") and p["at"]
+
+
+def test_flow_alerts_low_bands():
+    """0.14.4: dolne wolumeny vIFF z poziomem pasma (EPWW-DL95, EPWW-CL285; prawdziwe EP-DTC z 22.11.2026) to warstwa LOW
+    litery; do 0.14.3 taki TV był "niejednoznaczny" i RADIO go pomijało."""
+    out = rb.flow_alerts([
+        tv("EP-DTC", active=True, occ=20, cap=21, volumes=["EPWW-DL195", "EPWW-DL95", "EPWW-CH", "EPWW-CL285"]),
+        # id spoza wzorców sektora, TMA i FIR, więc liczą się wolumeny: 4 cyfry = wolumen niejednoznaczny, cały TV pomijamy
+        tv("EP-QX", active=True, occ=9, cap=10, volumes=["EPWW-BL95", "EPWW-BL2850"]),
+    ], NOW, SECTORS, TMAS)
+    # pasma D LOW razem jako LD, C górny i dolny; EP-QX bez LB (gdyby 4 cyfry przeszły, LB byłoby czerwone)
+    assert set(out["sectors"]) == {"HC", "LC", "LD"}
+    assert [a["tv"] for a in out["sectors"]["LD"]] == ["EP-DTC"] and len(out["sectors"]["LD"]) == 1
+    assert out["sectors"]["LC"][0]["tip"] == ["EP-DTC: Occupancy 20 of 21"]
+    assert rb.tv_targets({"id": "EP-DTC", "volumes": ["EPWW-DL95", "EPWW-DL195"]}, {"LD"}, {}) == (["LD"], [], True)
+    assert rb.tv_targets({"id": "EP-QX", "volumes": ["EPWW-BL95", "EPWW-BL2850"]}, {"LB"}, {}) == ([], [], True)
+    assert rb.tv_targets({"id": "EP-QX", "volumes": ["EPWW-BL95", "EPWW-BL285"]}, {"LB"}, {}) == (["LB"], [], True)
