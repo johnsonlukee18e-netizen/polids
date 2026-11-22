@@ -184,9 +184,12 @@ zapamiętanego stanu.
   w godzinie) odczytana z dokumentacji i odpowiedzi API. NOTAM-y wg okresu B)-C), bez harmonogramu D). ECFMP/vIFF zawsze dla całego FIR.
 - LOA w RADIO i COORDINATION to ręczny wyciąg z PDF-ów (obowiązuje PDF); LOA z Lwowem jest z 2022 r. Nazwy niemieckie z Knowledgebase (08.10.2026);
   CTR bez nazwy w żadnym źródle dostaje callsign wspólny dla FIR-u (szarszy, „przyjęty”).
-- Kolejność przejmowania sektorów ACC z tabel om.plvacc.pl/docs/2610/ownerships (`data/seed/ownership.json`, wklejone 06.10.2026,
-  przy nowym AIRAC trzeba wkleić ponownie); od 0.13.5 wszystkie kolumny wprost z tabeli, jak w ACC Ownership Manager
-  (plvacc.pl/acc-sectors; do 0.13.4 B, C, D HIGH i T MID wg pliku `.ese`). TMA/CTR: najpierw APP/TWR z `.ese`, potem ACC.
+- Kolejność przejmowania sektorów ACC i część ACC kolejności TMA (`data/seed/ownership.json`) od 0.14.3 wg list OWNER
+  pliku `data/import/EPWW-Sector.ese` (AIRAC 2610/1), a nie tabeli om.plvacc.pl/docs/2610/ownerships (wklejonej 06.10.2026, używanej
+  do 0.14.2: gubiła ALH w T MID, więc w konfiguracji 2U T MID dostawało ALL). Jedyny wyjątek: D HIGH z DBT przed DBF (poprawka
+  właściciela projektu z 14.11.2026, jak w ACC Ownership Manager, plvacc.pl/acc-sectors). Zgodność z plikiem sprawdza
+  `backend/tests/test_ownership_ese.py`: przy nowym AIRAC wystarczy podmienić `.ese` i poprawić `ownership.json`.
+  TMA/CTR: najpierw APP/TWR z `.ese`, potem ACC.
 - Zalogowany kontroler obsługuje stanowisko z częstotliwości, na której pracuje (od 0.13.5, jak w EuroScope: prefiks, typ
   i częstotliwość z pliku `.ese`), nie ze znaku – EPWW_DBF_CTR na 127.025 to DBT. Od 0.13.6 sam znak nie liczy się
   wcale: kontroler albo ATIS na 199.998 albo na częstotliwości, której nie ma żadne stanowisko z danych (plik `.ese` EPWW,

@@ -4,7 +4,7 @@
 - coordination.json: rejestr dokumentów (nazwa wyświetlana, PDF, FIR-y, sektory, AIRAC, wersja) i tabela etykiet
   polskich sektorów z LOA (ep_sectors); LOP i uzupełnienia mają przekazania wpisane w dokumencie (agreements),
 - loa.json: przekazania z LOA z sąsiadami (wyciąg z PDF-ów, ten sam plik co panel LOA w RADIO),
-- ownership.json: kolejność przejmowania sektorów ACC i TMA (om.plvacc.pl) – kto „ma” sektor z LOA.
+- ownership.json: kolejność przejmowania sektorów ACC i TMA (listy OWNER pliku .ese) – kto „ma” sektor z LOA.
 
 Każde przekazanie zamieniamy na wiersz jak w ATCISS: lotniska z pola traffic (ARR/DEP), FL i kierunek zmiany
 poziomu z pola level (↑ = C, ↓ = D), strona polska (ep) i sąsiada (nb). Stanowisko obsługuje etykietę, gdy jest

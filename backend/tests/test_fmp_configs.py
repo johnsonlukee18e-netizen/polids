@@ -108,9 +108,10 @@ def test_configs_layers_from_takeover_order():
     all3 = lambda s: {"LOW": s, "MID": s, "HIGH": s}  # noqa: E731
     assert sec("1X") == {"ALL": all3("BCDEFGJNRT")}
     assert sec("2N") == {"ALL": all3("JRT"), "NFIR": all3("BCDEFGN")}
-    # ALH obsługuje górę: w 2U ALL zostaje cały LOW i T MID (w kolejności T MID nie ma ALH)
-    assert sec("2U") == {"ALL": {"LOW": "BCDEFGJNRT", "MID": "T", "HIGH": ""}, "ALH": {"LOW": "", "MID": "BCDEFGJNR", "HIGH": "BCDEFGJNRT"}}
-    assert sec("3T")["TCJ"] == {"LOW": "CJT", "MID": "CJT", "HIGH": "CT"} and sec("3T")["EFIR"]["HIGH"] == "EJNR"
+    # ALH obsługuje górę: w 2U ALL zostaje cały LOW, ALH cały MID i HIGH (0.14.3: T MID wg .ese ma ALH przed ALL)
+    assert sec("2U") == {"ALL": {"LOW": "BCDEFGJNRT", "MID": "", "HIGH": ""}, "ALH": {"LOW": "", "MID": "BCDEFGJNRT", "HIGH": "BCDEFGJNRT"}}
+    # 0.14.3: C HIGH wg .ese (DTC S E N ALH TCJ C ALL) – w 3T bierze je EFIR przed TCJ
+    assert sec("3T")["TCJ"] == {"LOW": "CJT", "MID": "CJT", "HIGH": "T"} and sec("3T")["EFIR"]["HIGH"] == "CEJNR"
     assert sec("5X") == {"DBT": all3("BD"), "FG": all3("FG"), "NE": all3("EN"), "JR": all3("JR"), "TCJ": all3("CT")}
     # pojedyncze stanowisko nie zawsze obejmuje cały FIR: reszta to "free" (warstwy bez nikogo w tej konfiguracji)
     assert {ly: "".join(v) for ly, v in by["1S"]["free"].items()} == all3("BDFGN")
@@ -539,13 +540,12 @@ def test_js_configuration_panel(js):
 def test_js_previews(js):
     import re
     labels = lambda svg: re.findall(r'<text class="fmp-pv-l" x="[\d.]+" y="[\d.]+">([^<]+)</text>', svg)  # noqa: E731
-    # 2U: na LOW tylko ALL, na MID ALH i ALL (T), na HIGH tylko ALH; kolory stanowisk, granica FIR na wierzchu
-    assert [labels(s) for s in js["pv"]] == [["ALL"], ["ALL", "ALH"], ["ALH"]] or \
-        [sorted(labels(s)) for s in js["pv"]] == [["ALL"], ["ALH", "ALL"], ["ALH"]]
+    # 2U: na LOW tylko ALL, na MID i HIGH tylko ALH (0.14.3: T MID wg .ese); kolory stanowisk, granica FIR na wierzchu
+    assert [labels(s) for s in js["pv"]] == [["ALL"], ["ALH"], ["ALH"]]
     low, mid, high = js["pv"]
     assert low.count('class="fmp-pv-a"') == 1 and 'fill="#4fcc92" stroke="#4fcc92"' in low and "fmp-pv-free" not in low
     assert high.count('class="fmp-pv-a"') == 1 and 'fill="#4ed227"' in high
-    assert mid.count('class="fmp-pv-a"') == 2 and low.count('class="fmp-pv-b"') == 1
+    assert mid.count('class="fmp-pv-a"') == 1 and 'fill="#4ed227"' in mid and low.count('class="fmp-pv-b"') == 1
     assert low.startswith('<svg class="fmp-pv-svg" viewBox="0 0 160 150" role="img" aria-label="LOW sectors of configuration 2U">')
     assert low.index("fmp-pv-a") < low.index("fmp-pv-b") < low.index("fmp-pv-l")
     # bez biblioteki: każdy wycinek osobno (bez konturów), etykiety te same
@@ -570,7 +570,7 @@ def test_js_grouped_table(js):
     # 1S: warstwy bez stanowiska konfiguracji w NOT COVERED
     assert js["grp"]["1S"] == [["SFIR", ["EP-JL", "EP-CH", "EP-TM"]], ["free", ["EP-BH", "EP-BL", "EP-NH"]],
                                ["other", ["EP-WATMA", "EP-XH", "EP-BDH", "EP-ALLFIR"]]]
-    assert js["grp"]["2U"][0] == ["ALL", ["EP-JL", "EP-BL", "EP-TM"]] and js["grp"]["2U"][1] == ["ALH", ["EP-BH", "EP-CH", "EP-NH"]]
+    assert js["grp"]["2U"][0] == ["ALL", ["EP-JL", "EP-BL"]] and js["grp"]["2U"][1] == ["ALH", ["EP-BH", "EP-CH", "EP-NH", "EP-TM"]]
     # 0.14.1: prawdziwe id vIFF to kombinacje; warstwy z wolumenów EPWW-<litera><warstwa>, bez wolumenów z id
     assert js["slotsReal"] == ["NH,EH", "JH,RH", "JH,JM,JL,RH,RM,RL", "DH,DM,DL,TH,TM,TL,CH,CM,CL", "", "", "BL", ""]
     # kombinacja w grupie stanowiska, które obsługuje wszystkie jej warstwy; kilku stanowisk, TMA i FIR w OTHER
