@@ -177,7 +177,8 @@ export default {
   mount(root, ctx) {
     const user = ctx.me?.user || null;
     const rating = ratingText(user);
-    const foot = [ctx.config?.version, airacText(ctx.config?.airac)].filter(Boolean);
+    // cykl nieznany (brak /api/config): "AIRAC –" jak w menu, nie pusta stopka
+    const foot = [ctx.config?.version, airacText(ctx.config?.airac) || "AIRAC –"].filter(Boolean);
     // 0.14.0 (issue #28): krok 1 (.home-main) i krok 2 (.home-checkin, SELF CHECK-IN) w jednym panelu, widoczny jeden;
     // stopka z wersją i AIRAC pod oboma
     root.append(h(`<div class="pane home-pane">

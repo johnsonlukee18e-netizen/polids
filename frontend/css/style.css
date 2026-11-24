@@ -6,28 +6,41 @@
    Ostre krawędzie jak w oryginale PAŻP: przyciski, kafelki, karty, pola, plakietki i dymki bez zaokrągleń (border-radius: 0);
    50% tylko dla prawdziwych kółek (kropki, okrągłe znaczniki na mapie). */
 :root {
+  /* unslop (TasteCode, 2026-11): neutralne czernie i szarości zamiast zielonkawych, płaska zieleń klawiszy #207a11
+     (biały napis 5.45:1, limonkowy SYT OP 4.69:1), --muted #a3a3a3 (5.6:1 na pasku #2b2b2b), czerwony tekst #ff6a5a
+     (5.0:1 na pasku); pełna czerwień #e0302a zostaje dla ramki EMERGENCY i aktywnego klawisza (--em-hi) */
+  color-scheme: dark;
   --bg: #000;
-  --panel: #0d0f0d;
-  --panel-2: #161a16;
-  --line: #2a2f2a;
+  --panel: #0d0d0d;
+  --panel-2: #141414;
+  --line: #2a2a2a;
+  --rule: #1a1a1a;
+  --control: #5a5a5a;
   --text: #e8e8e8;
-  --muted: #8c948c;
-  --green: #3a9a2a;
+  --muted: #a3a3a3;
+  --green: #207a11;
   --green-hi: #5fd23a;
-  --green-dark: #23601a;
-  --green-text: #5fbf4a;
+  --green-dark: #1f5a16;
+  --green-text: #5fd23a;
+  --key-ink-on: #0b2a06;   /* napis na aktywnym / wciśniętym klawiszu (#5fd23a), 8.0:1 */
   --yellow: #f2d21b;
   --accent: #5fd23a;
   --ok: #5fd23a;
   --warn: #f2d21b;
-  --bad: #e0302a;
+  --bad: #ff6a5a;
+  --em: #b3261e;           /* klawisz EMERGENCY */
+  --em-hi: #e0302a;        /* aktywny EMERGENCY, ramka zakładki EMERGENCY */
+  --paper: #fff;
+  --paper-ink: #1b1c20;
   --cyan: #3ec7e0;
+  /* ruch tylko jako odpowiedź na dotyk (krawędź pod myszą, puszczenie klawisza); widoki i dane bez animacji */
+  --t: 120ms cubic-bezier(.2, 0, 0, 1);
   /* 0.13.0 (decyzja właściciela, issue #23): cały program czcionką bezszeryfową jak PANDORA. Trzy nazwy zostają (--mono:
      dane, METAR, kody, czasy; --ui: etykiety i przyciski; --sans: treść NM UI), ale to ta sama czcionka, więc żaden układ
      nie może zakładać stałej szerokości znaków (cyfry w Arialu mają równą szerokość, litery nie) */
-  --mono: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
-  --ui: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
-  --sans: Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif;
+  --mono: Arial, sans-serif;
+  --ui: Arial, sans-serif;
+  --sans: Arial, sans-serif;
   --menu-lime: #ccff66;   /* napis SYT OP w menu (jasnozielony jak w PANDORZE) */
   --topbar-h: 18px;       /* pasek Reload | Brighter | Darker u góry ekranu */
   /* 0.13.1 (issue #25): każdy przycisk menu i podmenu 137 x 28 px z marginesem 1,5 px z każdej strony (3 px między
@@ -39,19 +52,21 @@
   --col-pad: 4.5px;
   --col-w: calc(var(--btn-w) + 2 * var(--btn-m) + 2 * var(--col-pad) + 1px);
   --menu-rows: 21;        /* ← i 20 zakładek z ADMIN (index.html) */
-  --head: #111611;        /* pasek tytułu panelu */
-  --head-line: #243024;
-  --row: #0a0c0a;
-  --row-alt: #0f130f;
-  --row-hover: #18221a;
-  --sel: #1d4d15;
+  /* unslop: bez wypełnionego paska tytułu (--head = tło, przykrywa przewijane wiersze pod przyklejonym nagłówkiem),
+     wiersze w pasach #000 / #2b2b2b jak METAR (bez linii), pod myszą zielona krawędź 1 px zamiast jaśniejszego tła,
+     wybrany rekord pełnym czerwonym pasem jak na zdjęciu PANDORY (lista lotnisk) */
+  --head: #000;
+  --head-line: #2a2a2a;
+  --row: #000;
+  --row-alt: #2b2b2b;
+  --sel: #a51d16;
   /* 0.14.2 (issue #35): listy CALLSIGN i AIRCRAFT – wiersze na przemian czarne i ciemnoszare jak w METAR (zdjęcie
-     PANDORY), wyraźniej niż --row / --row-alt pozostałych tabel; pod myszą jaśniej od obu pasków i inaczej niż
-     zielone zaznaczenie (--sel) */
+     PANDORY); od unslop te same pasy we wszystkich tabelach (--row / --row-alt) */
   --list-row: #000;
   --list-row-alt: #2b2b2b;
-  --list-row-hover: #3d4a3d;
 }
+/* każde przejście czyta --t: przy ograniczonym ruchu wszystko od razu, te same stany końcowe */
+@media (prefers-reduced-motion: reduce) { :root { --t: 0s; } }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 /* pasek u góry na całą szerokość, pod nim menu (lewa kolumna) i zakładki (main); pasek offline (.srv-off) jest fixed */
@@ -59,16 +74,16 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); ov
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--topbar-h) minmax(0, 1fr); }
 /* wysokość przycisku menu i podmenu: 28 px, a w niskim oknie mniej, po równo w obu kolumnach (rzędy dalej na jednej
    wysokości), tak żeby 21 przycisków menu, zegar, logo i użytkownik zmieściły się bez przewijania; najmniej 16 px.
-   --foot-h: zegar 46 + logo 34 (+ użytkownik 66). --btn-h na body, tak jak zmiana --foot-h dla zalogowanego.
+   --foot-h: zegar 46 + logo 44 (+ użytkownik 66). --btn-h na body, tak jak zmiana --foot-h dla zalogowanego.
    --view-h: widoczna wysokość okna, ta sama co html, body { height: 100% }. Samo 100vh w przeglądarkach na tabletach
    i telefonach z paskiem adresu to wysokość bez paska (większa niż widoczna, a strona się nie przewija, więc pasek
    zostaje): przyciski wychodziły za wysokie i EMERGENCY / ADMIN chowały się pod zegarem. 100svh to wysokość z paskiem;
    100vh zostaje dla przeglądarek bez svh (osobna zmienna: drugie --btn-h z svh wygrywałoby zawsze, także tam, gdzie
    svh jest nieznane, i przyciski traciłyby wysokość) */
-body { --view-h: 100vh; --foot-h: 80px;
+body { --view-h: 100vh; --foot-h: 90px;
   --btn-h: clamp(16px, calc((var(--view-h) - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows) - 2 * var(--btn-m)), var(--btn-h-max)); }
 @supports (height: 100svh) { body { --view-h: 100svh; } }
-body:has(#userbox:not([hidden])) { --foot-h: 146px; }
+body:has(#userbox:not([hidden])) { --foot-h: 156px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 /* bez pogrubień także tam, gdzie przeglądarka pogrubia sama (b, strong, nagłówki tabel i stron, grupy w listach
    wyboru: optgroup w polach Position na HOME, w OVERVIEW i COORDINATION) */
@@ -78,23 +93,34 @@ a { color: var(--green-text); }
 /* --- pasek u góry (jak w PANDORZE: Reload | Brighter | Darker): trzy równe zielone pola na całą szerokość ekranu,
    rozdzielone czarną kreską; napisy małe, zwykłej grubości, jak w oryginale wielką literą tylko na początku (index.html) --- */
 .topbar { grid-column: 1 / -1; display: flex; gap: 2px; min-width: 0; background: #000; }
-.topbar button { flex: 1 1 0; min-width: 0; height: var(--topbar-h); padding: 0 6px; background: linear-gradient(#45a832, #2f8a22);
-  border: 0; border-radius: 0; color: #f4fff0; font: 12px/18px var(--ui); letter-spacing: .3px; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar button:hover:not(:disabled) { background: linear-gradient(#52bd3c, #36992a); }
+.topbar button { flex: 1 1 0; min-width: 0; height: var(--topbar-h); padding: 0 6px; background: var(--green);
+  border: 0; border-radius: 0; color: #fff; font: 12px/18px var(--ui); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color var(--t), color var(--t); }
+.topbar button:active:not(:disabled) { background: var(--green-hi); color: var(--key-ink-on); transition-duration: 0s; }
+.topbar button:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
 .topbar button:disabled { opacity: .45; cursor: default; }
 
-/* --- zielone przyciski (kwadratowe, jak menu PANDORY): wielkie litery zwykłej grubości, bez kapitalików --- */
+/* --- zielone klawisze (kwadratowe, jak menu PANDORY): wielkie litery zwykłej grubości, bez kapitalików.
+   unslop: płaska zieleń zamiast gradientu (najwyraźniejsze zdjęcie PANDORY, nr 10), biały napis 5.45:1; pod myszą
+   tylko krawędź (jaśniejsza zieleń pod białym napisem spadałaby poniżej 4.5:1), wciśnięty i aktywny jasnozielony
+   z ciemnym napisem; wciśnięcie od razu, powrót 120 ms --- */
 .gbtn, .menu nav button, .submenu button {
   display: block; width: 100%; margin: 0 0 3px; padding: 7px 6px;
-  background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 0;
-  color: #f4fff0; font: 14px/1.35 var(--ui); text-transform: uppercase; letter-spacing: .3px; text-align: center;
+  background: var(--green); border: 1px solid var(--green-dark); border-radius: 0;
+  color: #fff; font: 14px/1.35 var(--ui); text-transform: uppercase; text-align: center;
   cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background-color var(--t), border-color var(--t), color var(--t);
 }
-.menu nav button:hover, .submenu button:hover { background: linear-gradient(#52bd3c, #36992a); }
+@media (hover: hover) {
+  .gbtn:hover, .menu nav button:hover:not(:disabled), .submenu button:hover { border-color: var(--green-hi); }
+  .topbar button:hover:not(:disabled) { outline: 1px solid var(--green-hi); outline-offset: -1px; }
+}
+.gbtn:active, .menu nav button:active:not(:disabled), .submenu button:active {
+  background: var(--green-hi); color: var(--key-ink-on); transition-duration: 0s; }
 .menu nav button.active, .submenu button.active {
-  background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06;
+  background: var(--green-hi); color: var(--key-ink-on);
 }
+.gbtn:focus-visible, .menu nav button:focus-visible, .submenu button:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
 /* 0.13.1 (issue #25): menu i każde podmenu z przyciskami jednej wielkości: 137 x 28 px, margines 1,5 px z każdej
    strony (3 px między przyciskami), kolumny po 150 px z tym samym paddingiem u góry, więc pierwszy przycisk podmenu
    stoi na wysokości pierwszego przycisku menu, a każdy następny na wysokości następnego. Jedyny wyjątek: litery
@@ -109,20 +135,24 @@ a { color: var(--green-text); }
 /* display:block wyżej przykrywa [hidden] przeglądarki: ADMIN (hidden dla nie-administratorów) zajmował miejsce w menu */
 .menu nav button[hidden] { display: none; }
 .menu nav button.back { font-size: 22px; }
-.menu nav button.back:disabled { opacity: .35; cursor: default; background: linear-gradient(#45a832, #2f8a22); }
-.menu nav button.red { background: linear-gradient(#c8372d, #9c241c); border-color: #5c120d; }
-.menu nav button.red.active { background: linear-gradient(#ff5a4a, #e0302a); color: #fff; }
+.menu nav button.back:disabled { opacity: .35; cursor: default; background: var(--green); }
+.menu nav button.red { background: var(--em); border-color: #5c120d; }
+.menu nav button.red.active, .menu nav button.red:active { background: var(--em-hi); color: #fff; }
 
 /* lewe menu: przyciski od góry (← na wysokości pierwszego przycisku podmenu), na dole zegar z AIRAC, pod nim logo
    (0.13.1, issue #25: logo na samym dole, nad informacjami o użytkowniku) i zalogowany użytkownik; bez użytkownika
    logo jest ostatnie. Zegar, logo i użytkownik mają stałą wysokość (--foot-h), bo z niej liczona jest --btn-h */
-.menu { width: var(--col-w); flex: none; background: #050605; border-right: 1px solid var(--line); padding: var(--col-pad);
+.menu { width: var(--col-w); flex: none; background: var(--bg); border-right: 1px solid var(--line); padding: var(--col-pad);
   display: flex; flex-direction: column; }
+/* unslop: obie kolumny klawiszy stoją na czerni bez kreski między sobą (jak PANDORA); kreska zostaje tylko przed
+   treścią zakładki: przy podmenu rysuje ją podmenu, a ramka menu (1 px z --col-w) jest wtedy czarna */
+body:has(.view.active > .submenu) .menu { border-right-color: var(--bg); }
 .menu nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .clockbox { flex: none; height: 46px; margin: 0 var(--btn-m); text-align: center; padding: 3px 0 0; border-top: 1px solid var(--line); overflow: hidden; }
 .clock { font: 20px/24px var(--mono); color: #fff; }
 .clockbox .hint { line-height: 16px; }
-.menu .brand { flex: none; display: block; height: 34px; margin: 0 var(--btn-m); padding: 4px 0 3px; border-top: 1px solid var(--line); }
+/* logo to link do HOME: pole do dotknięcia 44 px (logo 26 px na środku), --foot-h liczy te 44 px */
+.menu .brand { flex: none; display: block; height: 44px; margin: 0 var(--btn-m); padding: 8px 0 9px; border-top: 1px solid var(--line); }
 .menu .brand img { display: block; width: 100%; height: 26px; object-fit: contain; }
 .userbox { flex: none; height: 66px; margin: 0 var(--btn-m); text-align: center; padding: 4px 0 0; border-top: 1px solid var(--line);
   font-size: 12px; line-height: 16px; overflow: hidden; }
@@ -139,7 +169,7 @@ main { flex: 1; min-width: 0; position: relative; }
 /* podmenu tej samej szerokości co menu (150 px) i z tym samym paddingiem: rzędy podmenu na wysokości rzędów menu.
    Kolumna flex: pionowe marginesy przycisków się nie łączą w jeden (3 px między przyciskami jak w menu). Odstęp (.sep)
    to jeden pusty rząd, żeby przyciski pod nim dalej stały na wysokości przycisków menu */
-.submenu { width: var(--col-w); flex: none; padding: var(--col-pad); background: #050605; border-right: 1px solid var(--line);
+.submenu { width: var(--col-w); flex: none; padding: var(--col-pad); background: var(--bg); border-right: 1px solid var(--line);
   overflow-y: auto; display: flex; flex-direction: column; }
 /* AIRCRAFT / CALLSIGN: ALL i pod nim "()" (klawiatura dotykowa, do 0.13.2 KEYBOARD) na całą szerokość jak każdy
    przycisk podmenu, pod nimi 26 liter w 13 rzędach po dwie (A B … Y Z): litera to połowa przycisku (2 x 67 px + 3 px
@@ -174,7 +204,7 @@ main { flex: 1; min-width: 0; position: relative; }
 /* w marginesie nad pierwszym i pod ostatnim całym rzędem kolumna wygląda jak każde podmenu (tło i kreska z prawej
    od góry do dołu okna): rysuje je zakładka */
 .view:has(> .submenu:not(.letters) > :nth-child(22)) {
-  background: linear-gradient(to right, #050605 calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), transparent 0); }
+  background: linear-gradient(to right, var(--bg) calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), transparent 0); }
 
 .pane { flex: 1; min-width: 0; overflow: auto; padding: 12px 16px; }
 .pane.fill { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -186,57 +216,72 @@ iframe.embed { flex: 1; border: 0; width: 100%; background: #fff; }
 .embed-bar > .btn { flex: none; }
 
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-/* pola i przyciski jak w NM UI: płaskie, ciemne, zielone obramowanie po zaznaczeniu */
+/* pola i przyciski jak w NM UI: płaskie, ciemne, zielone obramowanie po zaznaczeniu (unslop: neutralne szarości,
+   obramowanie pola #5a5a5a 3:1 na czerni, podpowiedź #a3a3a3) */
 .toolbar input, .toolbar select, input.field, textarea.field, select.field {
-  background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; padding: 4px 8px; border-radius: 0; outline: none; }
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--control); padding: 4px 8px; border-radius: 0; outline: none;
+  transition: border-color var(--t); }
 .toolbar input:focus, .toolbar select:focus, input.field:focus, textarea.field:focus, select.field:focus { border-color: var(--green-hi); }
-select option { background: #0d110d; color: var(--text); }
+::placeholder { color: var(--muted); opacity: 1; }
+/* lista wyboru bez strzałki przeglądarki (cienka, zaokrąglona, jedyny systemowy znak wśród płaskich kwadratowych
+   kontrolek): szara strzałka o ostrych rogach jako obrazek SVG, miejsce na nią z prawej. Bez appearance przeglądarka
+   nie przygasza wyłączonej listy (HOME przed wczytaniem stanowisk), więc 35 % jak wyłączony klawisz */
+.toolbar select, select.field { appearance: none; -webkit-appearance: none; padding-right: 26px;
+  background: var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a3a3a3' stroke-width='1.5' stroke-linecap='square'/%3E%3C/svg%3E") no-repeat right 9px center; }
+.toolbar select:disabled, select.field:disabled { opacity: .35; cursor: default; }
+select option { background: var(--panel); color: var(--text); }
 .toolbar input[type=checkbox], .toolbar input[type=radio] { padding: 0; accent-color: var(--green); }
 .toolbar label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.btn { background: #143a10; border: 1px solid #2f7a22; color: #e6ffdc; padding: 4px 12px; cursor: pointer; border-radius: 0;
-  font: 12px/1.4 var(--sans); letter-spacing: .3px; }
-.btn:hover { background: #1d5216; border-color: var(--green-hi); }
-.btn.primary { background: var(--green); border-color: var(--green-hi); color: #fff; }
-.btn.primary:hover { background: #45b032; }
-.btn.danger { background: #2a0d0b; border-color: #7a2a22; color: #ffb3ad; }
-.btn.danger:hover { background: #3d1410; border-color: var(--bad); }
+/* przycisk drugorzędny: ciemne pole z szarą ramką; główny (Show, Search) jak klawisz PANDORY; pod myszą krawędź */
+.btn { background: var(--panel-2); border: 1px solid var(--control); color: var(--text); padding: 4px 12px; cursor: pointer; border-radius: 0;
+  font: 12px/1.4 var(--sans); transition: background-color var(--t), border-color var(--t), color var(--t); }
+.btn:active { background: var(--row-alt); transition-duration: 0s; }
+.btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.btn.primary { background: var(--green); border-color: var(--green-dark); color: #fff; }
+.btn.primary:active { background: var(--green-hi); color: var(--key-ink-on); }
+.btn.danger { background: #2a0d0b; border-color: #7a2a22; color: var(--bad); }
+@media (hover: hover) {
+  .btn:hover { border-color: var(--green-hi); }
+  .btn.danger:hover { border-color: var(--bad); }
+}
 .muted { color: var(--muted); }
 .error { color: var(--bad); }
 .hint { color: var(--muted); font-size: 12px; }
 .sc { font-variant: small-caps; }
-h2.title { margin: 0 0 12px; padding-left: 8px; border-left: 3px solid var(--green-hi); font: 15px/1.3 var(--sans);
-  text-transform: uppercase; letter-spacing: 1px; color: #fff; }
+/* tytuł zakładki jak nagłówki PANDORY (procedury awaryjne, O PROGRAMIE): biały, kapitaliki, bez paska z lewej */
+h2.title { margin: 0 0 12px; font: 16px/1.3 var(--sans); font-variant: small-caps; color: #fff; }
 
 .grid { display: grid; gap: 10px; }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
-/* panel NM UI: cienka ramka, tytuł w pasku na całą szerokość */
-.card { --cy: 10px; --cx: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 0; padding: var(--cy) var(--cx); }
-.card h3 { margin: 0 0 8px; font: 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
-.card > h3:first-child { margin: calc(-1 * var(--cy)) calc(-1 * var(--cx)) 6px; padding: 5px var(--cx); background: var(--head);
-  border-bottom: 1px solid var(--head-line); border-radius: 0; }
+/* panel NM UI uproszczony: cienka ramka bez wypełnienia, tytuł kapitalikami nad cienką kreską (bez paska w kolorze) */
+.card { --cy: 10px; --cx: 12px; background: none; border: 1px solid var(--line); border-radius: 0; padding: var(--cy) var(--cx); }
+.card h3 { margin: 0 0 8px; font: 13px/1.3 var(--sans); font-variant: small-caps; color: #fff; }
+.card > h3:first-child { margin: calc(-1 * var(--cy)) calc(-1 * var(--cx)) 6px; padding: 5px var(--cx);
+  border-bottom: 1px solid var(--rule); border-radius: 0; }
 .mono, pre { font-family: var(--mono); }
 pre { white-space: pre-wrap; margin: 0; }
 
-/* tabele jak lista lotów NM UI: nagłówek w pasku, cienkie linie między wierszami, delikatne pasy */
+/* tabele: nagłówek szarymi kapitalikami nad kreską (tło czarne, bo przyklejony), wiersze w pasach #000 / #2b2b2b jak
+   METAR w PANDORZE, bez linii między wierszami; pod myszą zielona krawędź wiersza, wybrany wiersz czerwonym pasem */
 table.data { width: 100%; border-collapse: collapse; }
 table.data th, table.data td { padding: 4px 8px; text-align: left; }
-table.data th { position: sticky; top: 0; z-index: 1; background: var(--head); color: var(--green-text); font: 11px/1.3 var(--sans);
-  letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--head-line); white-space: nowrap; }
-table.data td { border-bottom: 1px solid #161b16; }
+table.data th { position: sticky; top: 0; z-index: 1; background: var(--head); color: var(--muted); font: 13px/1.3 var(--sans);
+  font-variant: small-caps; border-bottom: 1px solid var(--head-line); white-space: nowrap; }
 table.data tbody tr:nth-child(odd) td { background: var(--row); }
 table.data tbody tr:nth-child(even) td { background: var(--row-alt); }
-table.data tr:hover td { background: var(--row-hover) !important; }
+@media (hover: hover) {
+  table.data tbody tr:hover { outline: 1px solid var(--green-hi); outline-offset: -1px; }
+}
 table.data tr.selected td { background: var(--sel) !important; color: #fff; }
-table.data tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--green-hi); }
 table.data td.num { text-align: right; font-family: var(--mono); }
 
-/* METAR kolorowany jak w PANDORZE */
+/* METAR kolorowany jak w PANDORZE: czas, chmury i RMK przygaszoną zielenią (5.0:1 także na pasku #2b2b2b) */
 .wx { font: 15px/1.6 var(--mono); }
 .wx .st { color: #fff; display: inline-block; width: 52px; }
-.wx .tm { color: #7a7a7a; }
+.wx .tm { color: #4cae3a; }
 .wx .wind { color: #fff; }
 .wx .cavok { color: var(--yellow); }
-.wx .cld, .wx .rmk { color: var(--green-text); }
+.wx .cld, .wx .rmk { color: #4cae3a; }
 .wx .q { color: #fff; }
 .wx .wxph { color: var(--cyan); }
 .wx .nil { color: var(--bad); }
@@ -248,7 +293,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .split > .list { flex: 3; min-width: 0; overflow: auto; }
 .split > .detail { flex: 2; min-width: 320px; overflow: auto; }
 
-.badge { display: inline-block; padding: 1px 7px; font-family: var(--mono); background: #111; border: 1px solid var(--line); }
+.badge { display: inline-block; padding: 1px 7px; font-family: var(--mono); background: var(--panel); border: 1px solid var(--line); }
 .cat-VFR { color: var(--ok); } .cat-MVFR { color: var(--cyan); } .cat-IFR { color: var(--bad); } .cat-LIFR { color: #d65cff; }
 .recat-A, .recat-B { color: #ff6a5a; } .recat-C, .recat-D { color: var(--yellow); } .recat-E, .recat-F { color: var(--ok); }
 
@@ -283,7 +328,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 /* dymek po najechaniu (data-tip): kto jest zalogowany / zarezerwował */
 [data-tip] { cursor: help; }
 [data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; top: 100%; z-index: 1000; white-space: pre;
-  background: #111; color: #fff; border: 1px solid var(--green-hi); padding: 6px 8px; font: 12px/1.45 var(--mono); }
+  background: var(--panel); color: #fff; border: 1px solid var(--control); padding: 6px 8px; font: 12px/1.45 var(--mono); }
 /* w przewijanym panelu częstotliwości dymek najwyżej na szerokość wiersza (zawija się), nie rozpycha panelu w poziomie */
 .freqs [data-tip]:hover::after { white-space: pre-wrap; }
 
@@ -316,9 +361,9 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .aero-col > .card.aero-taf-card { min-height: 110px; }
 .aero-wind { text-align: center; flex: none !important; }
 .aero-wind .windrose { width: 200px; height: 200px; }
-.aero-wind .big { font: 26px var(--mono); color: #fff; }
+.aero-wind .big { font: 28px var(--mono); color: #fff; }
 .aero-wind .rwy-use { margin-top: 6px; padding: 4px; }
-.aero-wind .rwy-use .pair b { font-size: 32px; }
+.aero-wind .rwy-use .pair b { font-size: 28px; }
 .aero-col .notam { margin-bottom: 6px; padding: 4px 8px; }
 .aero-col .notam pre { font-size: 12px; margin: 2px 0 0; white-space: pre-wrap; }
 .aero-col .checklist { font-size: 13px; }
@@ -333,7 +378,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .aero-col table.data.rwy-table td.rwy { font-size: 17px; }
 .values.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; flex: none; }
 .values.compact .card { --cy: 3px; --cx: 8px; }
-.values .label { color: var(--green-text); font: 10px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .8px; }
+.values .label { color: var(--muted); font: 12px/1.4 var(--sans); font-variant: small-caps; }
 .values .val { font: 20px var(--mono); color: #fff; line-height: 1.25; }
 .values .val .sm { font-size: 14px; }
 .values .hint { font-size: 11px; display: block; }
@@ -348,10 +393,10 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .aero-ruch:hover .ruch-go { color: var(--green-hi); }
 .aero-ruch:hover { border-color: var(--green); }
 .lg { display: inline-block; width: 18px; height: 11px; border-radius: 0; border: 1px solid; }
-.lg.dep { background: linear-gradient(#e8f3ff, #6db3f2); border-color: #2f74c0; }
-.lg.arr { background: linear-gradient(#fffbe0, #f5c400); border-color: #c79a00; }
-.lg.loc { background: linear-gradient(#fff3f7, #f5aec4); border-color: #c97e95; }
-.lg.plan { background: linear-gradient(#eef1f4, #a3b2c0); border-color: #6a7d90; }
+.lg.dep { background: #6db3f2; border-color: #2f74c0; }
+.lg.arr { background: #f5c400; border-color: #c79a00; }
+.lg.loc { background: #f5aec4; border-color: #c97e95; }
+.lg.plan { background: #a3b2c0; border-color: #6a7d90; }
 @media (max-width: 1250px), (max-height: 640px) {
   .aero-pane { overflow: auto; }
   .aero-grid { grid-template-columns: 232px minmax(0, 1fr); }
@@ -395,19 +440,19 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .wr-legend .sw-arr { background: #5fd23a; border-color: #5fd23a; } .wr-legend .sw-dep { background: #3ec7e0; border-color: #3ec7e0; }
 .wr-legend .sw-solid { background: #9aa4af; }
 .wr-legend .sw-hatch { background: repeating-linear-gradient(45deg, #9aa4af 0 2px, #151a1f 2px 4px); border-style: dashed; }
-.eq { display: inline-block; margin-right: 4px; padding: 0 4px; font: 12px var(--mono); color: var(--muted); border: 1px solid #3a423a; }
+.eq { display: inline-block; margin-right: 4px; padding: 0 4px; font: 12px var(--mono); color: var(--muted); border: 1px solid #3a3a3a; }
 .eq.ils { color: #fff; border-color: var(--cyan); }
 .rwy-use { margin-top: 10px; padding: 8px; border: 2px solid var(--line); text-align: center; }
 .rwy-use.atis { border-color: var(--ok); }
 .rwy-use.pref { border-color: var(--cyan); border-style: dashed; }
-.rwy-use .label { font-variant: small-caps; letter-spacing: 1px; font-size: 13px; color: var(--green-text); }
+.rwy-use .label { font-variant: small-caps; font-size: 13px; color: var(--muted); }
 .rwy-use .pair { display: flex; justify-content: center; align-items: baseline; gap: 6px; }
 .rwy-use .pair b { font: 40px var(--mono); color: #fff; }
 .rwy-use .pair span { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .atis-text { font-size: 13px; color: #dfe8ff; }
 .notam-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .notam-bar .btn { padding: 2px 10px; }
-.notam-bar .btn:not(.primary) { background: #111; color: var(--muted); border-color: var(--line); }
+.notam-bar .btn:not(.primary) { background: var(--panel-2); color: var(--muted); border-color: var(--line); }
 .notam .nhead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; margin-bottom: 2px; }
 .notam .valid { font: 13px var(--mono); color: var(--yellow); }
 .notam.active { border-left-color: var(--ok); }
@@ -417,7 +462,7 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .notam.expired { opacity: 0.55; }
 .windrose { width: 260px; height: 260px; }
 .checklist input { margin-right: 8px; }
-.notam { border-left: 3px solid var(--yellow); padding: 6px 10px; margin-bottom: 8px; background: #111; }
+.notam { border-left: 3px solid var(--yellow); padding: 6px 10px; margin-bottom: 8px; background: var(--panel); }
 
 /* MAP */
 .mapwrap { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -444,7 +489,7 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .acicon.sel svg { fill: #ff9f1a; }
 
 /* MAP: panel boczny */
-.mapside { width: 310px; flex: none; background: #050705; border-right: 1px solid var(--line); padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.mapside { width: 310px; flex: none; background: var(--bg); border-right: 1px solid var(--line); padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .mapwrap.collapsed .mapside { display: none; }
 /* » nad kontrolkami Leaflet (z-index 1000), a kontrolki z lewego dolnego rogu (wykres vIFF) przesunięte w prawo:
    przycisk nie chowa się pod wykresem i nic go nie zasłania */
@@ -452,11 +497,11 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .mapwrap.collapsed .ms-show { display: block; }
 .mapwrap.collapsed .leaflet-bottom.leaflet-left { left: 40px; }
 .ms-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
-.ms-head b { font: 14px var(--sans); letter-spacing: 2px; color: #fff; }
+.ms-head b { font: 14px var(--sans); color: #fff; }
 .ms-head .ms-hide { margin-left: auto; padding: 1px 9px; }
 .ms-card { background: var(--panel); border: 1px solid var(--line); border-radius: 0; padding: 0 10px 8px; }
-.ms-card h4 { margin: 0 -10px 6px; padding: 5px 10px; background: var(--head); border-bottom: 1px solid var(--head-line); border-radius: 0;
-  font: 11px/1.3 var(--sans); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px; }
+.ms-card h4 { margin: 0 -10px 6px; padding: 5px 10px; border-bottom: 1px solid var(--rule); border-radius: 0;
+  font: 13px/1.3 var(--sans); font-variant: small-caps; color: #fff; }
 .ms-card textarea { width: 100%; box-sizing: border-box; resize: vertical; font: 12px var(--mono); }
 .ms-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .flbox { display: inline-flex; align-items: center; gap: 4px; font: 13px var(--mono); color: var(--yellow); }
@@ -466,7 +511,7 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
    częściowo zaznaczone (grupa w MAP): kreska. Rozmiar i odstępy mogą nadpisać reguły komponentów (.pk, .pt-i …);
    przełącznik .sw (niżej, ta sama waga selektora) ma własny wygląd i zeruje obramowanie i ptaszek */
 input[type=checkbox] { appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center; width: 13px;
-  height: 13px; padding: 0; border: 1px solid #5a6a5a; border-radius: 0; background: #0d110d; vertical-align: middle; cursor: pointer; }
+  height: 13px; padding: 0; border: 1px solid var(--control); border-radius: 0; background: var(--panel-2); vertical-align: middle; cursor: pointer; }
 input[type=checkbox]::after { content: ""; width: 3px; height: 7px; margin-top: -2px; border: solid transparent;
   border-width: 0 2px 2px 0; transform: rotate(45deg); }
 input[type=checkbox]:hover { border-color: var(--green-hi); }
@@ -477,8 +522,8 @@ input[type=checkbox]:focus-visible { outline: 1px solid #fff; outline-offset: 1p
 input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .sw { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 13px; color: #dbe3db; }
 .sw small { color: var(--muted); }
-.sw input { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 16px; margin: 0; border: 0; border-radius: 0; background: #2b332b; position: relative; cursor: pointer; transition: background .15s; }
-.sw input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; margin: 0; border: 0; border-radius: 0; background: #9aa6b1; transform: none; transition: left .15s, background .15s; }
+.sw input { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 16px; margin: 0; border: 0; border-radius: 0; background: var(--row-alt); position: relative; cursor: pointer; transition: background var(--t); }
+.sw input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; margin: 0; border: 0; border-radius: 0; background: #9aa6b1; transform: none; transition: left var(--t), background var(--t); }
 .sw input:checked { background: var(--green); }
 .sw input:checked::after { left: 16px; background: #fff; }
 .sw-sym { flex: none; width: 20px; display: inline-flex; justify-content: center; }
@@ -493,8 +538,8 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .swatch.awy { height: 0; border-top: 1px solid #5f6b78; border-radius: 0; }
 .swatch.tma { background: rgba(127,149,255,.18); border: 1.5px solid #7f95ff; }
 .swatch.ctr { background: rgba(255,107,107,.22); border: 1.5px dashed #ff6b6b; }
-.seg { display: flex; border: 1px solid #2f3a2f; border-radius: 0; overflow: hidden; margin-bottom: 6px; }
-.seg button { flex: 1; background: #0d110d; color: #c3cdc3; border: 0; border-right: 1px solid #2f3a2f; padding: 4px 0; cursor: pointer; font: 12px var(--sans); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 0; overflow: hidden; margin-bottom: 6px; }
+.seg button { flex: 1; background: var(--panel-2); color: var(--text); border: 0; border-right: 1px solid var(--line); padding: 4px 0; cursor: pointer; font: 12px var(--sans); }
 .seg button:last-child { border-right: 0; }
 .seg button.on { background: var(--green); color: #fff; }
 .lg-line { flex: none; width: 26px; height: 4px; border-radius: 0; box-shadow: 0 0 0 2px #000; }
@@ -503,7 +548,7 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .lg-freq { flex: none; background: #8cff5a; color: #000; font: 10px var(--mono); padding: 0 3px; border: 1px solid #5fd23a; }
 
 /* EMERGENCY */
-.emergency { border: 3px solid var(--bad); }
+.emergency { border: 3px solid var(--em-hi); }
 .emergency h2 { font-variant: small-caps; color: #fff; margin: 0 0 10px; }
 .emergency h3 { font-variant: small-caps; color: #fff; margin: 14px 0 6px; }
 .emergency li { margin: 3px 0; font-size: 15px; }
@@ -514,19 +559,19 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .em-sections { max-width: 980px; }
 .em-sections section { margin-bottom: 6px; }
 .assist { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
-.assist span { padding: 4px 10px; border: 1px solid var(--bad); background: #2a0d0d; color: #f3d0d0; font-variant: small-caps; font-size: 15px; }
+.assist span { padding: 4px 10px; border: 1px solid var(--em-hi); background: #2a0d0d; color: #f3d0d0; font-variant: small-caps; font-size: 15px; }
 .assist b { color: #fff; font-size: 18px; }
 
 /* CHECKLIST (format vatiris) */
 .chk-page { max-width: 860px; }
-.chk-section { margin: 14px 0 4px; padding-bottom: 2px; color: var(--yellow); font: 12px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--head-line); }
+.chk-section { margin: 14px 0 4px; padding-bottom: 2px; color: var(--yellow); font: 13px/1.4 var(--sans); font-variant: small-caps; border-bottom: 1px solid var(--line); }
 .chk-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; cursor: pointer; }
 .chk-row > input { flex: none; }
 .chk-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.chk-row:hover { background: var(--row-hover); }
-.chk-row.done .chk-what, .chk-row.done .chk-action { color: #5f6b5f; text-decoration: line-through; }
+@media (hover: hover) { .chk-row:hover { outline: 1px solid var(--green-hi); outline-offset: -1px; } }
+.chk-row.done .chk-what, .chk-row.done .chk-action { color: #7a7a7a; text-decoration: line-through; }
 .chk-what { flex: 0 1 auto; min-width: 0; }
-.chk-dots { flex: 1 1 12px; border-bottom: 1px dotted #4a524a; min-width: 12px; }
+.chk-dots { flex: 1 1 12px; border-bottom: 1px dotted #4a4a4a; min-width: 12px; }
 .chk-action { flex: 0 0 auto; margin-left: auto; color: var(--cyan); font-family: var(--mono); }
 .chk-note { flex: 0 0 auto; margin-left: auto; width: 150px; padding: 2px 6px; }
 .chk-pre { color: #e8e2c8; border-left: 3px solid var(--warn); padding: 4px 10px; margin: 0 0 8px; }
@@ -543,21 +588,22 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .about-info dl.props dd { font-family: var(--sans); }
 .logo { padding-top: 6px; }
 .logo img { display: block; height: 96px; width: auto; }
-.logo small { display: block; font: 12px var(--ui); letter-spacing: 1.5px; font-style: normal; color: var(--muted); margin-top: 8px; }
+.logo small { display: block; font: 12px var(--ui); font-style: normal; color: var(--muted); margin-top: 8px; }
 .about-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-bottom: 18px; }
 .about-tile { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text);
-  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 0; font: 12px/1.4 var(--sans); }
-.about-tile b { font: 14px var(--ui); font-variant: small-caps; letter-spacing: .5px; color: var(--green-hi); }
+  background: none; border: 1px solid var(--line); border-radius: 0; font: 12px/1.4 var(--sans); transition: border-color var(--t); }
+.about-tile b { font: 14px var(--ui); font-variant: small-caps; color: #fff; }
 .about-tile span { color: var(--muted); }
-.about-tile:hover { border-color: var(--green-hi); background: #0f160f; }
-.about-tile.red { border-left-color: var(--bad); }
+@media (hover: hover) { .about-tile:hover { border-color: var(--green-hi); } }
+.about-tile:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+.about-tile.red { border-color: var(--em-hi); }
 .about-tile.red b { color: #ff6a5a; }
 .about-changes { max-width: 1200px; }
 .about-changes td.mono { width: 1%; white-space: nowrap; color: var(--muted); }
 
 .photo { width: 100%; height: 340px; border: 1px solid var(--line); background: #000; }
 dl.props { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; }
-dl.props dt { color: var(--green-text); font: 11px/1.75 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
+dl.props dt { color: var(--muted); font: 13px/1.5 var(--sans); font-variant: small-caps; }
 dl.props dd { margin: 0; font-family: var(--mono); }
 
 /* METEO: TAF w liniach, mapa QNH jak w PANDORZE */
@@ -584,7 +630,6 @@ table.callsigns td.ctry { min-width: 6em; }
    selektory co table.data wyżej, wygrywają, bo są dalej w pliku (pod myszą mocniejszy selektor) */
 table.callsigns tbody tr:nth-child(odd) td { background: var(--list-row); }
 table.callsigns tbody tr:nth-child(even) td { background: var(--list-row-alt); }
-table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important; }
 .tag { display: inline-block; padding: 1px 8px; font: 12px var(--mono); border: 1px solid; }
 .tag.cargo { color: #ffb020; border-color: #ffb020; }
 .tag.mil { color: #7fd0ff; border-color: #7fd0ff; }
@@ -632,7 +677,7 @@ table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important
 .aero-tip .aeroc-h { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; margin-bottom: 6px; }
 .aero-tip .aeroc-h b { font: 22px var(--mono); color: #7ab8d9; }
 .aero-tip .aeroc-h span { font: 15px var(--mono); color: #1d2329; }
-.aero-tip .aeroc-sec { margin: 8px 0 3px; font: 12px var(--mono); text-transform: uppercase; letter-spacing: .5px; color: #1d2329; }
+.aero-tip .aeroc-sec { margin: 8px 0 3px; font: 12px var(--mono); text-transform: uppercase; color: #1d2329; }
 .aero-tip .aeroc-metar { white-space: normal; font: 13px/1.45 var(--mono); color: #1d2329; }
 .aero-tip .aeroc-atis { white-space: normal; font: 12px/1.45 var(--mono); color: #3d4650; }
 .aero-tip table td { padding: 1px 6px 1px 0; color: #1d2329; }
@@ -675,15 +720,15 @@ table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important
 a.btn { text-decoration: none; display: inline-block; }
 
 /* OTHER › DOCS: lista dokumentów jak lista w NM UI */
-.doc-list .doc-cat { margin: 8px 0 2px; font: 10px var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.doc-list .doc-cat { margin: 8px 0 2px; font: 12px var(--sans); font-variant: small-caps; color: var(--muted); }
 .doc-list .doc-cat:first-child { margin-top: 0; }
-.doc-list a { display: block; padding: 4px 8px; margin: 0 -10px; color: var(--text); text-decoration: none; border-left: 3px solid transparent; }
-.doc-list a:hover { background: var(--row-hover); }
-.doc-list a.on { background: var(--sel); border-left-color: var(--green-hi); color: #fff; }
+.doc-list a { display: block; padding: 4px 8px; margin: 0 -10px; color: var(--text); text-decoration: none; }
+@media (hover: hover) { .doc-list a:hover { outline: 1px solid var(--green-hi); outline-offset: -1px; } }
+.doc-list a.on { background: var(--sel); color: #fff; }
 
 /* AERODROME: wschód / zachód słońca w nagłówku z METAR */
-.sunbox { padding: 2px 10px; border: 1px solid var(--line); background: #0b0d0b; font: 12px/1.35 var(--sans); white-space: nowrap; }
-.sunbox .label { color: var(--green-text); font: 10px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .8px; }
+.sunbox { padding: 2px 10px; border: 1px solid var(--line); background: none; font: 12px/1.35 var(--sans); white-space: nowrap; }
+.sunbox .label { color: var(--muted); font: 12px/1.4 var(--sans); font-variant: small-caps; }
 .sunbox span { color: var(--muted); margin-right: 4px; }
 .sunbox b { font: 15px var(--mono); color: #fff; margin-right: 12px; }
 .sunbox b:last-child { margin-right: 0; }
@@ -691,8 +736,8 @@ a.btn { text-decoration: none; display: inline-block; }
 .sunbox .hint { font: 11px var(--mono); }
 
 /* ADMIN */
-.menu nav button.admin { background: linear-gradient(#3a3f3a, #262a26); border-color: #1a1d1a; }
-.menu nav button.admin.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+.menu nav button.admin { background: #3a3a3a; border-color: #1a1a1a; }
+.menu nav button.admin.active, .menu nav button.admin:active { background: var(--green-hi); color: var(--key-ink-on); }
 .admin .card { margin-bottom: 12px; max-width: 1100px; }
 .admin .actions { text-align: right; white-space: nowrap; width: 1%; }
 .admin input.note-edit { width: 100%; min-width: 180px; padding: 2px 6px; }
@@ -702,5 +747,39 @@ a.btn { text-decoration: none; display: inline-block; }
 .srv-off { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5000; max-width: calc(100vw - 24px);
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 14px; background: #1a0605; color: var(--text);
   border: 1px solid var(--bad); border-left-width: 4px; font: 13px/1.35 var(--mono); }
-.srv-off b { color: #ff6a5e; letter-spacing: .3px; }
+.srv-off b { color: var(--bad); }
 .srv-off span { color: #e8c8c4; }
+
+/* --- dotyk i telefon (przegląd: pola do dotknięcia 44 px tam, gdzie układ na to pozwala) ---
+   Ekran dotykowy: pasek u góry ma wysokość klawisza. --btn-h liczy --topbar-h, więc w niskim oknie klawisze menu
+   zmniejszają się po równo jak dotąd. Klawisze 137 x 28 (issue #25) zostają: 21 rzędów po 44 px nie mieści się
+   w oknie 1366 x 768 obok zegara i logo */
+@media (pointer: coarse) { :root { --topbar-h: 28px; } }
+/* Telefon (do 640 px): klawisze nie stoją kolumną obok treści. Pod paskiem najpierw zegar z AIRAC i logo PolIDS
+   (i użytkownik), pod nimi klawisze menu w jednym rzędzie przewijanym w poziomie, pod nim tak samo podmenu zakładki,
+   niżej panel na całą szerokość. Nazwa programu i czas są więc na pierwszym ekranie, nie za 20. klawiszem.
+   Menu to wtedy jeden rząd (--menu-rows: 1), więc ta sama formuła --btn-h daje --btn-h-max: klawisze 137 x 44,
+   litery 67 x 44, pasek u góry 44 px. Od 641 px bez zmian */
+@media (max-width: 640px) {
+  :root { --topbar-h: 44px; --btn-h-max: 44px; --menu-rows: 1; }
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) auto minmax(0, 1fr); }
+  .menu { width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    border-right: 0; border-bottom: 1px solid var(--line); }
+  .menu nav { flex: 1 0 100%; flex-direction: row; overflow-x: auto; scroll-snap-type: x proximity; }
+  .menu nav button, .submenu button { scroll-snap-align: start; }
+  .clockbox, .menu .brand { order: -1; width: var(--btn-w); border-top: 0; }
+  .userbox:not([hidden]) { order: -1; display: flex; align-items: center; gap: 8px; height: auto; padding: 0 8px;
+    border-top: 0; text-align: left; }
+  .userbox .who { max-width: 160px; }
+  .userbox form { margin: 0; }
+  .userbox button { width: auto; min-height: 44px; }
+  .view.active { flex-direction: column; }
+  .submenu { width: auto; flex-direction: row; overflow-x: auto; scroll-snap-type: x proximity;
+    border-right: 0; border-bottom: 1px solid var(--line); }
+  .submenu.letters { display: flex; }
+  .submenu.letters button { width: calc((var(--btn-w) - 2 * var(--btn-m)) / 2); }
+  .submenu .sep { display: none; }
+  .submenu:not(.letters):has(> :nth-child(22)) { max-height: none; margin-block: 0; padding-block: var(--col-pad);
+    scroll-snap-type: x proximity; }
+  .view:has(> .submenu:not(.letters) > :nth-child(22)) { background: none; }
+}

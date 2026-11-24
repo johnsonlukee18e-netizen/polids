@@ -1,0 +1,50 @@
+{
+  "originalRequest": "Check this design and unslop it. Here are some refference pictures how it should look",
+  "subject": "POLIDS, an existing web-based ATC information display for VATSIM Poland (EPWW FIR) modeled on the PANDORA system: tabs RADIO, METEO, AERODROME, AD CIV/MIL/VFR, CALLSIGN, AIRCRAFT, REGISTRATION, MAP, COORDINATION, CONVERSION, SYT OP, AUP, AWALON, INOP, EMERGENCY, OTHER, ABOUT, ADMIN.",
+  "pageType": "dashboard",
+  "scope": "Visual cleanup of the existing app shell and shared tab content styles (frontend/css/style.css plus per-tab CSS) so it matches the PANDORA references more closely. No new features, tabs or data; keep layouts, data and behavior.",
+  "primaryGoal": "Remove generic, AI-looking styling and make every screen read like the real PANDORA console: dense, flat, legible, black-and-green, data first.",
+  "audience": "VATSIM controllers working Polish positions (ACC/APP/TWR/FIS), often on a second monitor at 1366x768 or 1920x1080, touch or mouse.",
+  "offer": "Fast one-touch access to all operational reference data (meteo, frequencies, aerodromes, aircraft, procedures) in a familiar PANDORA-style layout.",
+  "primaryAction": "Select a menu tab, then a submenu item, to view the data instantly.",
+  "creativeControl": "Low: follow the PANDORA references and existing project decisions closely; refine, do not reinvent.",
+  "requiredContent": [
+    "Left menu column: full-width green rectangular buttons, uppercase labels, brighter green for active item, red EMERGENCY button, as in references 1, 2, 10, 11",
+    "Submenu column: second green button column (METAR PL ... MF, A-Z letter grid for AIRCRAFT/CALLSIGN) as in references 3, 7, 10",
+    "Top strip: thin Reload | Brighter | Darker bar (existing)",
+    "METEO content: dense METAR/TAF rows on black, white text with yellow CAVOK/highlights and dim green RMK/time groups, alternating faint row bands (reference 3); raw GAMET/TAF text blocks (reference 11)",
+    "QNH and map views: black or paper-white map panels with thin lines and yellow/white values (references 4, 10); satellite image panel with caption below (reference 5)",
+    "RADIO board: frequency boxes as white rectangles with dark text, cyan unit labels, yellow sector tags on black (reference 6)",
+    "AIRCRAFT view: white performance sheet with photo and spec table next to the letter grid (reference 7)",
+    "AERODROME list: wide uppercase list with red full-row highlight for selection, search field and on-screen keyboard (reference 8)",
+    "EMERGENCY procedures: heading, uppercase bullet lists, red screen frame (reference 9)",
+    "ABOUT: plain text version/credits block on black (reference 2)",
+    "Interaction transitions: only instant or very short state changes on tab/submenu switches, row hover/selection; no decorative motion"
+  ],
+  "constraints": [
+    "Keep Arial/sans-serif regular weight everywhere, no bold emphasis, color for emphasis (owner decision, issue #23)",
+    "Sharp corners: border-radius 0 except true circles",
+    "No glow, text shadows, gradients-for-decoration or card shadows",
+    "Fixed button metrics: 137x28 px buttons, 1.5 px margins, 150 px columns (issue #25)",
+    "Must work at 1366x768 and 1920x1080 and on touch",
+    "Do not change data, APIs, tab structure or JS behavior",
+    "Original PANDORA logo/branding must not be copied; use POLIDS identity"
+  ],
+  "brandInputs": [
+    "Colors from frontend/css/style.css: --bg #000, --panel #0d0f0d, --line #2a2f2a, --text #e8e8e8, --green #3a9a2a, --green-hi #5fd23a, --green-dark #23601a, --yellow #f2d21b, --bad #e0302a, --cyan #3ec7e0, --menu-lime #ccff66",
+    "Typography: Arial / Liberation Sans regular via --mono, --ui, --sans (style.css)",
+    "Visual style: PANDORA (PAŻP) green-on-black buttons plus EUROCONTROL NM UI dense panels (style.css header comment)",
+    "Reference screenshots 1-11 supplied by user (PANDORA promo video)"
+  ],
+  "assumptions": [
+    "'This design' means the current POLIDS frontend in this repo, so pageType is dashboard",
+    "'Unslop' means remove generic web-app styling (rounded cards, soft shadows, NM-UI panel chrome where PANDORA is flatter, inconsistent spacing) and align with the reference screens",
+    "Existing owner decisions (Arial, no bold, sharp corners, button sizes) take precedence over anything in the references that differs",
+    "References come from a 2016 promo video; perspective, blur and video subtitles are ignored",
+    "Motion limited to quick functional state changes, since operational console use favors instant response"
+  ],
+  "unresolved": [
+    "Whether EUROCONTROL NM UI panel title bars should stay or be flattened fully to PANDORA style; default: keep but simplify"
+  ],
+  "explicitAnswers": []
+}

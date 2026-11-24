@@ -8,11 +8,11 @@
 .dm-note.err > span { color: var(--bad); border-color: #5a2020; }
 
 /* pasek przycisków u góry (jak @RMS / Reload; jasność całego ekranu od 0.13.0 w pasku u góry aplikacji, topbar.js) */
-.dm-top { flex: none; display: flex; height: 20px; background: linear-gradient(#3fa22d, #2b8420); border: 1px solid #1f5a16; }
+.dm-top { flex: none; display: flex; height: 20px; background: var(--green); border: 1px solid var(--green-dark); }
 .dm-top button { flex: 1 1 0; min-width: 0; padding: 0 6px; background: none; border: 0; border-right: 1px solid #1f5a16; color: #f4fff0;
-  font: 11px/18px var(--mono); letter-spacing: .4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  font: 11px/18px var(--mono); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dm-top button:hover { background: rgba(255, 255, 255, .12); }
-.dm-top button.on { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+.dm-top button.on { background: var(--green-hi); color: var(--key-ink-on); }
 .dm-msg { flex: 2.5 1 0; min-width: 0; padding: 0 8px; background: #000; color: #9aa59a; font: 11px/18px var(--mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .dm-msg.err { color: var(--bad); }
@@ -103,7 +103,7 @@
 .dm-info tr.est td { color: #8fb0c8; }   /* wartość przyjęta albo wyliczona z TOBT/EOBT */
 .dm-info td.dm-hint { background: none; color: #8a8a8a; white-space: normal; padding: 6px 4px; }
 .dm-acts { flex: none; display: flex; gap: 3px; }
-.dm-acts button, .dm-spans button { flex: 1; height: 22px; padding: 0; border: 1px solid #222; background: linear-gradient(#5c5c5c, #444); color: #eee;
+.dm-acts button, .dm-spans button { flex: 1; height: 22px; padding: 0; border: 1px solid #222; background: #444; color: #eee;
   font: 11px var(--mono); cursor: pointer; }
 .dm-acts button:disabled { opacity: .4; cursor: default; }
 .dm-acts button:not(:disabled):hover, .dm-spans button:hover { filter: brightness(1.2); }
@@ -111,7 +111,7 @@
 .dm-spans .sp { display: flex; gap: 3px; }
 .dm-spans .sp.l { margin-right: 18px; }
 .dm-spans .sp.r { margin-left: 18px; }
-.dm-spans button.on { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; border-color: #1f5a16; }
+.dm-spans button.on { background: var(--green-hi); color: var(--key-ink-on); border-color: var(--green-dark); }
 .dm-rwys { flex: none; display: flex; flex-wrap: wrap; gap: 4px; }
 .dm-rwy { flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 3px 4px; color: #fff; border-radius: 0; }
 .dm-rwy i { font-style: normal; font-size: 15px; }

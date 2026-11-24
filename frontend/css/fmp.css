@@ -27,7 +27,7 @@
 table.fmp-table { width: 100%; max-width: 680px; border-collapse: collapse; font: 400 17px/1.3 var(--sans);
   font-variant-numeric: tabular-nums; color: #fff; }
 table.fmp-table th { position: sticky; top: 0; z-index: 1; padding: 4px 12px; background: #000; color: #fff; text-align: left;
-  font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; border-bottom: 1px solid #3a3a3a; cursor: help;
+  font: 400 14px/1.3 var(--ui); font-variant: small-caps; border-bottom: 1px solid #3a3a3a; cursor: help;
   white-space: nowrap; }
 table.fmp-table td { padding: 2px 12px; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
 table.fmp-table th + th, table.fmp-table td + td { border-left: 1px solid #262626; }
@@ -35,13 +35,11 @@ table.fmp-table th:first-child, table.fmp-table td.fmp-sec { width: 130px; }
 /* aktywny: szare tło całego wiersza; nieaktywny: czarne */
 table.fmp-table tr.on td { background: #484848; }
 table.fmp-table tr.off td { background: #000; }
-table.fmp-table tr.on:hover td { background: #575757; }
-table.fmp-table tr.off:hover td { background: var(--row-hover); }
-table.fmp-table td.fmp-sec { letter-spacing: .4px; }
-/* 0.13.1: klik w wiersz otwiera wykresy; wybrany wiersz zielony (wewnętrzne linie, bez cienia na zewnątrz) */
+@media (hover: hover) { table.fmp-table tbody tr:hover { outline: 1px solid var(--green-hi); outline-offset: -1px; } }
+/* 0.13.1: klik w wiersz otwiera wykresy; wybrany wiersz pełnym czerwonym pasem (unslop, jak lista PANDORY), napisy białe */
 table.fmp-table tbody tr { cursor: pointer; }
-table.fmp-table tr.sel td, table.fmp-table tr.sel:hover td { background: #1d4d15; box-shadow: inset 0 1px 0 #5fd23a, inset 0 -1px 0 #5fd23a; }
-table.fmp-table tr.sel td:first-child { box-shadow: inset 3px 0 0 #5fd23a, inset 0 1px 0 #5fd23a, inset 0 -1px 0 #5fd23a; }
+table.fmp-table tr.sel td, table.fmp-table tr.sel:hover td { background: var(--sel); }
+table.fmp-table tr.sel td, table.fmp-table tr.sel td * { color: #fff; }
 /* obciążenie: żółte od 90 % przepustowości, czerwone powyżej; regulacja teraz: id sektora czerwone */
 table.fmp-table td.fmp-num.near { color: var(--yellow); }
 table.fmp-table td.fmp-num.over, table.fmp-table td.fmp-sec.reg { color: #ff5a4a; }
@@ -53,10 +51,10 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
    (zielony < 90 %, żółty 90–100 %, czerwony powyżej, niebieski bez limitu), przepustowość przerywana różowa,
    regulacja czerwona ciągła, "teraz" biała kropkowana */
 .fmc-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; padding-bottom: 4px; border-bottom: 1px solid #3a3a3a; }
-.fmc-code { font: 400 20px/1.2 var(--ui); letter-spacing: .4px; color: #fff; }
+.fmc-code { font: 400 20px/1.2 var(--ui); color: #fff; }
 .fmc-code.reg { color: #ff5a4a; }
 .fmc-desc { color: var(--text); font-size: 14px; }
-.fmc-chip { padding: 0 5px; border: 1px solid #5a5a5a; color: var(--muted); font-size: 11px; letter-spacing: .6px; }
+.fmc-chip { padding: 0 5px; border: 1px solid #5a5a5a; color: var(--muted); font-size: 11px; }
 .fmc-chip.on { background: #484848; border-color: #8a8a8a; color: #fff; }
 .fmc-msg { font-size: 12px; }
 .fmc-close, .fmp-sp-close { margin-left: auto; align-self: center; padding: 0 7px; background: transparent; border: 1px solid #5a5a5a;
@@ -66,7 +64,7 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
 .fmc-regtxt { color: #ff5a4a; }
 .fmc-empty, .fmc-wait, .fmc-err { margin: 6px 0 0; font-size: 13px; }
 .fmc-charts { display: grid; gap: 0 16px; }
-.fmc-title { margin: 8px 0 0; color: #fff; font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; }
+.fmc-title { margin: 8px 0 0; color: #fff; font: 400 14px/1.3 var(--ui); font-variant: small-caps; }
 .fmc-title span { margin-left: 6px; color: var(--muted); font-size: 12px; font-variant: normal; letter-spacing: 0; }
 .fmc-svg { display: block; width: 100%; height: auto; margin-top: 4px; }
 .fmc-svg text { font: 400 11px var(--ui); fill: #bdbdbd; text-anchor: middle; }
@@ -111,17 +109,17 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
    (konfiguracja zalogowanych teraz) jasnozielony z czarnym napisem. Zwykła grubość pisma, ostre krawędzie, bez cieni
    na zewnątrz i bez poświaty */
 .fmp-cfg { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 26px; }
-.fmp-cfg-t { color: #fff; font: 400 14px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; cursor: help; }
+.fmp-cfg-t { color: #fff; font: 400 14px/1.3 var(--ui); font-variant: small-caps; cursor: help; }
 .fmp-cfg-g { display: inline-flex; align-items: center; gap: 3px; }
 .fmp-cfg-n { min-width: 10px; margin-right: 1px; color: var(--muted); font: 400 12px/1 var(--ui); cursor: help; }
 .fmp-cb { box-sizing: border-box; height: 24px; min-width: 34px; padding: 0 6px; display: inline-flex; align-items: center;
   justify-content: center; gap: 4px; background: #000; border: 1px solid #5a5a5a; border-radius: 0; color: #fff;
-  font: 400 13px/1 var(--ui); letter-spacing: .3px; white-space: nowrap; cursor: pointer; }
+  font: 400 13px/1 var(--ui); white-space: nowrap; cursor: pointer; }
 .fmp-cb:hover { border-color: #fff; }
 .fmp-cb:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
-.fmp-cb.on { background: #1d4d15; border-color: #5fd23a; }
+.fmp-cb.on { background: #14240f; border-color: #5fd23a; }
 .fmp-cb.now { border-color: #5fd23a; }
-.fmp-cb-now { padding: 1px 3px; background: #5fd23a; color: #000; font: 400 9px/1 var(--ui); letter-spacing: .4px; }
+.fmp-cb-now { padding: 1px 3px; background: #5fd23a; color: #000; font: 400 9px/1 var(--ui); }
 .fmp-cfg-now { color: var(--text); font-size: 13px; }
 .fmp-cfg-msg { font-size: 13px; }
 
@@ -132,12 +130,12 @@ table.fmp-table .fmp-regcap { color: #ff5a4a; }
 /* wąskie okno (przegląd 0.14.0): tabela stanowisk przewija się w poziomie w panelu, zamiast ucinać kolumny MID i HIGH */
 .fmp-cp-list { min-width: 0; max-width: 100%; overflow-x: auto; }
 .fmp-cp-h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 3px; }
-.fmp-cp-code { font: 400 20px/1.2 var(--ui); letter-spacing: .4px; }
+.fmp-cp-code { font: 400 20px/1.2 var(--ui); }
 .fmp-cp-lbl { color: var(--text); font-size: 14px; }
-.fmp-cp-now { padding: 1px 4px; background: #5fd23a; color: #000; font-size: 11px; letter-spacing: .5px; cursor: help; }
+.fmp-cp-now { padding: 1px 4px; background: #5fd23a; color: #000; font-size: 11px; cursor: help; }
 table.fmp-cp-tab { border-collapse: collapse; font-variant-numeric: tabular-nums; }
 table.fmp-cp-tab th { padding: 2px 10px 2px 0; color: #fff; text-align: left; font: 400 13px/1.3 var(--ui); font-variant: small-caps;
-  letter-spacing: .8px; border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
+  border-bottom: 1px solid #3a3a3a; white-space: nowrap; }
 table.fmp-cp-tab th[title] { cursor: help; }
 table.fmp-cp-tab td { padding: 2px 10px 2px 0; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
 table.fmp-cp-tab td.fmp-cp-st.online { color: var(--green-hi); }
@@ -147,7 +145,7 @@ table.fmp-cp-tab tr.fmp-cp-free td { color: var(--yellow); cursor: help; }
 .fmp-sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
 .fmp-pvs { display: flex; flex-wrap: wrap; gap: 8px 12px; }
 .fmp-pv { margin: 0; width: 150px; }
-.fmp-pv figcaption { color: #fff; font: 400 13px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .8px; cursor: help; }
+.fmp-pv figcaption { color: #fff; font: 400 13px/1.3 var(--ui); font-variant: small-caps; cursor: help; }
 .fmp-pv figcaption span { margin-left: 4px; color: var(--muted); font-size: 11px; font-variant: normal; letter-spacing: 0; }
 .fmp-pv-none { margin: 0; font-size: 13px; }
 .fmp-pv-svg { display: block; width: 100%; height: auto; margin-top: 2px; }
@@ -159,7 +157,7 @@ table.fmp-cp-tab tr.fmp-cp-free td { color: var(--yellow); cursor: help; }
 
 /* tabela z wybraną konfiguracją: nagłówek grupy (stanowisko ze znakiem i częstotliwością, NOT COVERED, OTHER) */
 table.fmp-table tr.fmp-grp td { padding: 7px 12px 2px; background: #000; color: #fff; font: 400 14px/1.3 var(--ui);
-  letter-spacing: .5px; border-bottom: 1px solid #3a3a3a; cursor: default; }
+  border-bottom: 1px solid #3a3a3a; cursor: default; }
 table.fmp-table tr.fmp-grp.free td { color: var(--yellow); }
 table.fmp-table tr.fmp-grp.other td { color: var(--text); }
 .fmp-grp-sub { margin-left: 10px; color: var(--muted); font-size: 12px; letter-spacing: 0; }

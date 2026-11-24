@@ -96,7 +96,7 @@ def test_other_files_in_english():
 def test_offline_page_cache_bumped():
     """Nowa treść strony offline: nowa nazwa pamięci podręcznej, żeby przeglądarki nie pokazywały starej."""
     sw = (FRONTEND / "sw.js").read_text("utf-8")
-    assert 'const CACHE = "offline-v4";' in sw   # 0.13.0: strona offline w Arialu bez pogrubień
+    assert 'const CACHE = "offline-v5";' in sw   # 0.13.0: strona offline w Arialu bez pogrubień; unslop: płaski klawisz
     assert "(weather, traffic and flow data are live)" in (FRONTEND / "offline.html").read_text("utf-8")
 
 

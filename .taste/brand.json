@@ -1,0 +1,424 @@
+{
+  "version": 1,
+  "foundation": {
+    "strategy": "preserve",
+    "existingAssets": [
+      "frontend/icons/polids-logo-bez-podpisu.svg",
+      "frontend/icons/polids-logo.svg",
+      "frontend/icons/polids-znak.svg",
+      "frontend/icons/icon.svg",
+      "frontend/icons/icon-192.png",
+      "frontend/icons/icon-512.png",
+      "frontend/icons/icon-maskable-512.png",
+      "frontend/icons/apple-touch-icon.png",
+      "frontend/icons/favicon.ico",
+      "frontend/css/style.css",
+      "frontend/css/metar.css",
+      "frontend/css/radio.css",
+      "frontend/css/qnh.css",
+      "frontend/css/awalon.css",
+      "frontend/css/keyboard.css",
+      "frontend/css/aerolist.css",
+      "user-reference-1 to user-reference-11 (PANDORA promo video frames)",
+      ".taste/app-kit/app.css",
+      ".taste/app-kit/charts.js"
+    ],
+    "assetActions": [
+      {
+        "asset": "frontend/icons/polids-logo-bez-podpisu.svg",
+        "action": "protect",
+        "reason": "This is the PolIDS mark at the foot of the menu column: a map of Poland in white #f4f4f4 and red #dc1e35/#e8283f. It is the product's own identity, so it stays as drawn and is not recoloured to the accent."
+      },
+      {
+        "asset": "frontend/icons/polids-logo.svg, polids-znak.svg",
+        "action": "preserve",
+        "reason": "These are the full logo and the mark alone. They are verified brand files and none of the reviewed screens need a change to them."
+      },
+      {
+        "asset": "frontend/icons app icons (icon.svg, png sizes, favicon)",
+        "action": "protect",
+        "reason": "The PWA and browser identity on a black tile already matches the black ground."
+      },
+      {
+        "asset": "frontend/css/style.css :root tokens",
+        "action": "evolve",
+        "reason": "Keep the structure and metrics. Replace the green-tinted near-blacks (#050605, #0d0f0d, #111611, #0a0c0a, #0f130f) with neutral greys. Make the key fill a flat #207a11 so white labels and the SYT OP lime label reach 4.5:1. Lift muted to #a3a3a3, set negative text to #ff6a5a, and fold --green-text into the accent."
+      },
+      {
+        "asset": "linear-gradient fills on keys, top bar and bars (style, aerolist, aircraft, awos, dman, home, keyboard, other, overview, coordination css)",
+        "action": "retire",
+        "reason": "The 2-stop gradients are a web finish that the clearest straight-on reference (10) does not show. Keys become flat fills with a 1px edge."
+      },
+      {
+        "asset": "Filled title bands on .card h3 and table.data th, the h2.title 3px left bar, 3-4px left bars on selected rows, 0.3-1px letter-spacing on uppercase labels",
+        "action": "retire",
+        "reason": "These are template devices that PANDORA never had. They are replaced by the small-caps label style, a 1px rule, and the red selection band."
+      },
+      {
+        "asset": "frontend/css/metar.css --mt-cov #24802a",
+        "action": "evolve",
+        "reason": "It measures 4.2:1 on black and 2.8:1 on the #2b2b2b band. It moves to data-dim #4cae3a, which gives 5.0:1 on the band and 7.4:1 on black."
+      },
+      {
+        "asset": "frontend/css/keyboard.css",
+        "action": "evolve",
+        "reason": "References 1 and 8 show paper-white square keys with dark labels on a light tray. That replaces the green gradient keys."
+      },
+      {
+        "asset": "frontend/css/radio.css, qnh.css, awalon.css domain palettes",
+        "action": "preserve",
+        "reason": "These colours copy their source tools (the PANDORA radio board, the PAŻP QNH map, the AWALON speed scale). Only shared chrome around them changes."
+      },
+      {
+        "asset": ".taste/app-kit/app.css and charts.js",
+        "action": "preserve",
+        "reason": "Keep as a reference only and do not link them. The light framed-sheet tokens contradict the locked black system, and no new chart types are in scope."
+      }
+    ],
+    "lockedDecisions": [
+      "Product name PolIDS (Polish Integrated Display System) with the red and white Poland map mark at the foot of the menu. No new monogram, and no PANDORA logo, wordmark or names.",
+      "One typeface: Arial with Liberation Sans, Helvetica Neue and Helvetica fallbacks through --mono, --ui and --sans. Weight 400 only, no bold anywhere; emphasis is colour (issue #23).",
+      "Sharp corners: border-radius 0 on every key, tile, panel, field, tag and tooltip. 50% only for true circles such as dots and round map markers.",
+      "Key metrics: 137x28 px keys with 1.5 px margins in 150 px columns, rows on a 31 px pitch aligned between menu and submenu. Letter keys are half width in pairs. Key height shrinks evenly down to 16 px in short windows (issue #25).",
+      "Black ground with green keys carrying white uppercase labels. Red EMERGENCY key, lime #ccff66 label on SYT OP, grey ADMIN key, and a back key on top.",
+      "Top bar: Reload | Brighter | Darker as three equal fields across the full width, 18 px tall.",
+      "PANDORA list rows alternate #000 and #2b2b2b (issue #35).",
+      "No glow, no text shadow, no card shadow.",
+      "METAR colour coding: white values, yellow CAVOK and trend, green cloud and remark groups, cyan weather, red NIL.",
+      "Frequency boxes are white rectangles with black figures. Online fills bright green and a booking gets a dashed orange edge.",
+      "Data, APIs, tab structure, JS behaviour and layouts stay unchanged; this is a finish and token pass."
+    ],
+    "assumptions": [
+      "The dealt light framed-sheet style is outranked by the user's references and the project's locked black PANDORA system. Only its principles carry over: flat surfaces, three line steps, one gap value, aligned figures, honest empty states, motion as feedback only.",
+      "The sheet's IBM Plex Sans and Mono are replaced by the locked Arial, so Assets acquires no font files. Arial is a system face with no FontFace entry, so Build checks the computed font-family and document.fonts.check('13px Arial'). Arial's digits are already equal width, so tabular-nums is declared but changes nothing.",
+      "The sheet's 48 px rows, 32 px controls, 24 px pad and gap, and 22/16/28/14/12 sizes give way to the existing dense metrics: 28 px keys and controls, 22-26 px data rows, 12 px pane padding, 8 px gap, 13 px body. The brief requires density at 1366x768 and layouts must not move. The h1 drops to the sheet's 22 px, which retires the 44 px home greeting.",
+      "Colour budget: the two key columns make roughly 20% of a 1366 px screen green. That is the PANDORA identity in every reference. Inside the content pane, colour stays on data and states.",
+      "The key green is darkened to a flat #207a11 because white labels on the old gradient measured 3.0-4.3:1. Key hover therefore lights the 1px edge instead of brightening the fill.",
+      "Reference 8's red full-row selection becomes the one selection mark in every list and table. Green stays for active keys and online state.",
+      "The unresolved question about panel title bars is settled this way: keep the 1px panel frame, drop the filled #111611 band, and set the title in the label style.",
+      "Small-caps captions and headings come from references 2, 4, 5, 9 and 10. Arial has no true small caps, so the browser synthesises them, which matches how the references render.",
+      "Perspective, blur, the pause icon and subtitles in the references are video artefacts and are ignored."
+    ]
+  },
+  "creativeDirection": {
+    "summary": "Face: the PANDORA console, cleaned up. The brand's own green lives only on the keys: two columns of flat green keys with white uppercase labels on pure black. Everything to the right is data on black: white values, yellow highlights, cyan station labels, dim green remark groups, and white paper boxes for frequencies, maps and the keyboard. Unslopping removes what the web added (gradients on every key, tracked uppercase headers, green-tinted near-blacks, filled title bands, coloured left bars, a 44 px greeting) and restores what the console had (flat keys, small-caps captions, zebra rows, a red selection band, paper keys).",
+    "traits": [
+      {
+        "quality": "Console-literal: every view reads as the display Polish controllers know, key for key",
+        "boundary": "not a replica: no PANDORA logo, wordmark or credits; PolIDS name and mark only"
+      },
+      {
+        "quality": "Dense and instant: one tap shows the data on the first frame",
+        "boundary": "not cramped: 28 px keys, 13 px body, 4.5:1 on every word"
+      },
+      {
+        "quality": "Colour carries meaning: green for keys and online, yellow for highlight and caution, red for emergency, selection and NIL, cyan for stations",
+        "boundary": "not decorative: no gradients, glows, tinted blacks or coloured accent bars"
+      },
+      {
+        "quality": "Flat and square",
+        "boundary": "not boxed in: a panel is a 1px line or nothing, never a fill plus a border plus a band"
+      }
+    ],
+    "productiveTension": "A 2016 touch console's look against today's legibility floor. Keep PANDORA's vivid green keys, uppercase and red selection band, but darken the key green and lift the greys until every label clears 4.5:1, and drop every effect the original never had.",
+    "signatureDevice": {
+      "description": "The PolIDS key panel. The menu and submenu are two 150 px columns of flat green keys standing directly on black, with rows locked across both columns. Letter keys come in half-width pairs (A B to Y Z) under ALL and the () keyboard key. A back key sits on top, a red EMERGENCY key and a grey ADMIN key near the end, and SYT OP has its lime label. The UTC clock with AIRAC and the PolIDS Poland mark close the first column. It is the first thing on every screen and only this product has it.",
+      "status": "candidate",
+      "invariants": [
+        "Keys 137x28 px, 1.5 px margins, 31 px row pitch, rows aligned between menu and submenu",
+        "Flat #207a11 fill, 1px #1f5a16 edge, white 14px uppercase label at 400, tracking 0, square corners",
+        "Active key fills #5fd23a with a #0b2a06 label; exactly one active key per column",
+        "Hover lights the 1px edge #5fd23a; the fill never lightens",
+        "EMERGENCY #b3261e (active #e0302a), ADMIN #3a3a3a, SYT OP label #ccff66",
+        "Columns stand on #000 with no rule between them; no gradient, shadow or glow",
+        "Clock, AIRAC line and PolIDS mark stay at the foot of the first column"
+      ]
+    },
+    "restraint": "Colour inside the content pane stays on data and states; the pane's own chrome is black and grey. One selection mark (red band), one active mark (accent key), one hover language (an accent edge). No new components, tabs, illustrations or effects; this pass changes tokens and finishes, not layouts.",
+    "avoid": [
+      "Gradients on keys, the top bar or section bars",
+      "Tracked uppercase labels and filled header bands on tables and panels",
+      "Green-tinted near-blacks (#050605, #0d0f0d, #111611, #0f130f)",
+      "3-4 px coloured left bars on titles or selected rows",
+      "A display-size greeting or any type over 28px",
+      "Rounded corners, shadows, glows, text shadows, bold",
+      "PANDORA's logo or naming",
+      "A second typeface",
+      "Icons in tinted circles, sparklines, emoji"
+    ]
+  },
+  "colorPalette": [
+    {
+      "name": "ground",
+      "value": "#000000",
+      "usage": "Window, both key columns and every content pane. Pure PANDORA black (references 2, 3, 9) replaces the sheet's #f9fbfc and the old #050605 column tint."
+    },
+    {
+      "name": "surface",
+      "value": "#0d0d0d",
+      "usage": "Fill for tooltips, dropdown lists and other floating pieces only; panels have no fill. Neutral, replacing the green-tinted #0d0f0d."
+    },
+    {
+      "name": "raised",
+      "value": "#141414",
+      "usage": "Fill of inputs, selects, secondary buttons and off toggles."
+    },
+    {
+      "name": "active",
+      "value": "#2b2b2b",
+      "usage": "The alternate row band in METAR, TAF, CALLSIGN, AIRCRAFT, AERODROME lists and every data table (issue #35 value). Also the pressed secondary button and the neutral tag fill."
+    },
+    {
+      "name": "border",
+      "value": "#2a2a2a",
+      "usage": "1px panel frames, the rule between the last key column and the pane, and the rule under sticky table headers."
+    },
+    {
+      "name": "rule",
+      "value": "#1a1a1a",
+      "usage": "1px rule under a panel title and between rows only where a list has no bands."
+    },
+    {
+      "name": "control",
+      "value": "#5a5a5a",
+      "usage": "1px outline of inputs, selects and secondary buttons; 3.0:1 against black so a field reads as interactive."
+    },
+    {
+      "name": "text",
+      "value": "#e8e8e8",
+      "usage": "Body text, table cells and the user box. 11.5:1 on the band, 6.1:1 on the red selection band."
+    },
+    {
+      "name": "muted",
+      "value": "#a3a3a3",
+      "usage": "Labels, hints, column headers and time stamps. Lifted from #8c948c so it holds 5.6:1 on the #2b2b2b band and 8.3:1 on black."
+    },
+    {
+      "name": "accent",
+      "value": "#5fd23a",
+      "usage": "The one active state: active key fill, key and row hover edge, field focus border, underlined links (10.8:1 on black). Absorbs the old #5fbf4a link green so there are not two near-identical greens."
+    },
+    {
+      "name": "positive",
+      "value": "#5fd23a",
+      "usage": "Online, VFR, OK and in-use states. The accent is green, so positive is the accent, as the dark-screen rule requires."
+    },
+    {
+      "name": "negative",
+      "value": "#ff6a5a",
+      "usage": "Red text on dark: NIL, IFR, closed, errors (5.0:1 on the band, 7.5:1 on black). The old #e0302a fails on the band (3.1:1) and moves to emergency-hi for fills and the frame."
+    },
+    {
+      "name": "warning",
+      "value": "#f2d21b",
+      "usage": "Caution text and marks: booked, expiring, LVP. Same PANDORA yellow as the data highlight, as in the existing --warn. 9.4:1 on the band."
+    },
+    {
+      "name": "chart-1",
+      "value": "#f2d21b",
+      "usage": "The main data element. QNH figures, CAVOK and trend, sector tags (2, 2H, 5VA in reference 6), and the main series in wind, VIFF and DMAN charts. PANDORA's data voice; brand green stays on the keys."
+    },
+    {
+      "name": "chart-2",
+      "value": "#3ec7e0",
+      "usage": "Station and unit labels (APP, FIC, callsigns, reference 6), weather groups in METAR, and the second series. 7.0:1 on the band."
+    },
+    {
+      "name": "chart-3",
+      "value": "#7f9df2",
+      "usage": "Third series and sector or route boundary lines (the blue lines in reference 6). Existing METAR trend blue; 5.4:1 on the band; blue, not violet."
+    },
+    {
+      "name": "pill-positive-bg",
+      "value": "#14240f",
+      "usage": "Fill of online and OK tags; a dark tint of the accent."
+    },
+    {
+      "name": "pill-positive-ink",
+      "value": "#5fd23a",
+      "usage": "Label of online and OK tags, 8.4:1 on #14240f."
+    },
+    {
+      "name": "pill-negative-bg",
+      "value": "#2a0d0b",
+      "usage": "Fill of NIL, closed and error tags."
+    },
+    {
+      "name": "pill-negative-ink",
+      "value": "#ff6a5a",
+      "usage": "Label of NIL, closed and error tags, 6.4:1 on #2a0d0b."
+    },
+    {
+      "name": "pill-warning-bg",
+      "value": "#2a2405",
+      "usage": "Fill of caution and booked tags."
+    },
+    {
+      "name": "pill-warning-ink",
+      "value": "#f2d21b",
+      "usage": "Label of caution and booked tags, 10.4:1 on #2a2405."
+    },
+    {
+      "name": "pill-neutral-bg",
+      "value": "#2b2b2b",
+      "usage": "Fill of neutral tags (category, AIRAC, type)."
+    },
+    {
+      "name": "pill-neutral-ink",
+      "value": "#e8e8e8",
+      "usage": "Label of neutral tags, 11.5:1 on #2b2b2b."
+    },
+    {
+      "name": "key",
+      "value": "#207a11",
+      "usage": "Flat fill of every menu, submenu and letter key, the top bar fields and green section bars. Darkened from the #45a832 to #2f8a22 gradient so white labels reach 5.45:1 and the SYT OP lime 4.69:1."
+    },
+    {
+      "name": "key-edge",
+      "value": "#1f5a16",
+      "usage": "1px edge of every green key at rest. It turns accent on hover."
+    },
+    {
+      "name": "key-ink",
+      "value": "#ffffff",
+      "usage": "Key labels: 14px uppercase, weight 400, tracking 0."
+    },
+    {
+      "name": "key-active-ink",
+      "value": "#0b2a06",
+      "usage": "Label on an active or pressed key (accent fill), 8.0:1."
+    },
+    {
+      "name": "key-lime",
+      "value": "#ccff66",
+      "usage": "SYT OP label only (owner decision), 4.69:1 on the key green."
+    },
+    {
+      "name": "emergency",
+      "value": "#b3261e",
+      "usage": "EMERGENCY key at rest with a white label, 6.5:1."
+    },
+    {
+      "name": "emergency-hi",
+      "value": "#e0302a",
+      "usage": "Active EMERGENCY key (white label 4.54:1) and the 3px red frame around the pane on the EMERGENCY tab (reference 9)."
+    },
+    {
+      "name": "select",
+      "value": "#a51d16",
+      "usage": "Full-width band on the selected record in any list or table (reference 8). All text on it turns white (7.5:1); no left bar."
+    },
+    {
+      "name": "paper",
+      "value": "#ffffff",
+      "usage": "Frequency boxes (reference 6), on-screen keyboard keys (references 1, 8), QNH and phenomena map paper (reference 10), and the AIRCRAFT performance sheet (reference 7)."
+    },
+    {
+      "name": "paper-ink",
+      "value": "#1b1c20",
+      "usage": "Text and figures on paper, 17:1."
+    },
+    {
+      "name": "data",
+      "value": "#ffffff",
+      "usage": "Values in METAR and TAF rows, readouts, the clock and pane headings: white on black as in references 3 and 4."
+    },
+    {
+      "name": "data-dim",
+      "value": "#4cae3a",
+      "usage": "De-emphasised data groups in METAR and TAF: time, cloud, RMK (reference 3). Replaces the failing #24802a; 5.0:1 on the band, 7.4:1 on black."
+    }
+  ],
+  "typefaces": [
+    {
+      "family": "Arial",
+      "source": "System font (existing project stack: Arial, Liberation Sans, Helvetica Neue, Helvetica, sans-serif)",
+      "roles": [
+        "interface",
+        "keys",
+        "data",
+        "labels"
+      ],
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "interfaceDirection": "Shell (kept as it is). An 18px top bar of three equal key-green fields, Reload | Brighter | Darker, with 2px black gaps and 12px white labels. Under it, the 150px menu column (back key plus 20 tab keys, 21 rows on a 31px pitch), then the 150px submenu column whose keys sit row for row beside the menu, then the content pane on black with 12px 16px padding. Both key columns stand directly on #000 with no rule between them; one 1px #2a2a2a rule separates the last key column from the pane. The menu foot holds the UTC clock (20px white), the AIRAC line, the PolIDS map mark and the signed-in controller.\n\nNavigation. Keys are flat #207a11 with white 14px uppercase labels. The active key fills #5fd23a with a #0b2a06 label. EMERGENCY is a red key (#b3261e, active #e0302a); opening it draws a 3px #e0302a frame around the pane, as in reference 9. ADMIN is a grey #3a3a3a key, and SYT OP keeps its lime label.\n\nDensity is high. Data rows sit on a 22-26px pitch (METAR, TAF and list text 15px/1.45; the METAR table 18px). Table cells are 4px 8px at 13px. Panels sit 8px apart. Rows alternate #000 and #2b2b2b with no row rules and no header band. Headers use the label style on #000 above a 1px #2a2a2a rule and stay sticky. Numbers are right-aligned and frequencies sit in fixed boxes. One control height, 28px, for keys, inputs, selects and buttons.\n\nOne label style: 13px small caps (sentence-case source with font-variant small-caps), tracking 0, #a3a3a3. Panel titles and pane headings use the same style in #ffffff (h1 22px, h2 16px). Panels are a 1px #2a2a2a frame with no fill and no title band.\n\nStatus tags are square, 11-12px, with 1px 6px padding:\n- online/OK: #5fd23a on #14240f\n- NIL/closed/error: #ff6a5a on #2a0d0b\n- caution/booked: #f2d21b on #2a2405\n- neutral: #e8e8e8 on #2b2b2b\n\nFrequency boxes are white rectangles with black 15px figures and a 2px #9cdc84 edge; online fills #8cff5a, a booking gets a dashed #ffb020 edge. The on-screen keyboard uses square paper keys (#ffffff, #1b1c20 labels, 1px #9a9a9a edges) on a #d9d9d9 tray, as in references 1 and 8.\n\nControl states:\n- hover: a 1px #5fd23a edge on keys, rows and buttons, for hover-capable pointers only\n- pressed or selected: #5fd23a fill with #0b2a06 ink\n- selected record row: full-width #a51d16 band with white text\n- focus-visible: a 2px #ffffff outline inset 2px on keys, a #5fd23a border on fields\n- disabled: 35% opacity\n\nText links are #5fd23a and underlined. The only danger button is in ADMIN: a #2a0d0b fill with a #ff6a5a label.",
+  "designTokens": {
+    "typeScale": {
+      "display": "22px",
+      "h1": "22px",
+      "h2": "16px",
+      "h3": "28px",
+      "body": "13px",
+      "small": "12px",
+      "label": "13px"
+    },
+    "radius": {
+      "scale": [
+        "0px"
+      ],
+      "pill": "999px"
+    },
+    "spacing": {
+      "section": "12px",
+      "gutter": "8px",
+      "stack": "8px"
+    },
+    "buttons": {
+      "primary": "The PANDORA key, used for menu and submenu keys and the one action in a pane (Search, Show): flat #207a11 fill, 1px #1f5a16 edge, square, 28px tall, 14px uppercase white label at 400, tracking 0. Hover lights the edge #5fd23a. Pressed and selected fill #5fd23a with a #0b2a06 label. Disabled sits at 35% opacity.",
+      "secondary": "Flat #141414 fill, 1px #5a5a5a edge, square, 28px tall, 12-13px #e8e8e8 label in sentence case. Hover lights the edge #5fd23a and pressed fills #2b2b2b."
+    },
+    "surfaces": "The ground is #000 under everything; the green keys and the data carry the colour. Panels are a 1px #2a2a2a frame on the ground with no fill and no title band. Floating pieces (tooltips, dropdowns) use #0d0d0d with a 1px edge, and the keyboard tray is #d9d9d9 paper. Paper-white rectangles (frequency boxes, QNH map, aircraft sheet) sit flat on black. Lines come in three steps: #1a1a1a rule, #2a2a2a border, #5a5a5a control. A border or a fill step, never both. Nothing casts a shadow and nothing glows. Radius is 0 everywhere; 999px is only for true circles such as status dots and round map markers, and status tags stay square."
+  },
+  "imageDirection": {
+    "summary": "Only the operational imagery the system already shows: weather imagery, maps, aircraft type photos, and charts drawn from data. No decorative imagery.",
+    "subjects": [
+      "Satellite IR and visible frames over Europe and Poland (SAT EUR, SAT PL)",
+      "Radar composites (CAPPI, EHT)",
+      "QNH regions map and current phenomena map of Poland on paper white",
+      "Leaflet airspace, sector and ATC maps on black",
+      "Aircraft type photos from the local photo set inside the AIRCRAFT sheet",
+      "Wind roses, AWALON, VIFF and DMAN charts drawn from live data"
+    ],
+    "treatment": "Shown flat on black at full pane width with square corners and no shadow, overlay or vignette. Captions sit below the image in the small-caps label style with UTC times ending in Z (reference 5). Paper-white maps and the aircraft performance sheet are plain white rectangles. The aircraft photo sits top left in the sheet with its spec table under it (reference 7). Charts use chart-1 yellow on the main series, chart-2 cyan, then chart-3 blue, with 3-5 faint gridlines at most.",
+    "avoid": [
+      "Stock photography or illustration",
+      "Decorative backgrounds or textures",
+      "PANDORA screenshots or its logo",
+      "Rounded or shadowed thumbnails",
+      "Blurred or upscaled placeholders"
+    ]
+  },
+  "motionDirection": {
+    "summary": "Motion is feedback only and never slows a controller down. Views appear on the first frame. One shared pair, 120ms with cubic-bezier(0.2, 0, 0, 1), is used wherever anything moves, and everything is 0ms under reduced motion.",
+    "principles": [
+      "Confirm a press: pointerdown on a key or button; the key and its label; the fill turns #5fd23a at 0ms and returns to rest over 120ms on release unless the key stays selected; strong ease-out cubic-bezier(0.2, 0, 0, 1).",
+      "Open a tab without delay: activating a menu or submenu key; the active key, the submenu column and the pane; a 0ms swap with no crossfade, slide or shimmer, so data is readable on the first frame; no easing.",
+      "Show what the pointer is on: hover over keys, rows and buttons on hover-capable pointers; the hovered element's 1px edge; 120ms in and out; strong ease-out.",
+      "Open and close the on-screen keyboard tray and dropdowns: the () key, a field gaining focus, or Escape; the tray and the field it types into; 120ms, a 6px rise plus opacity in and opacity out, focus returns to the field on close; strong ease-out.",
+      "Move the selection: a tap or arrow keys in a list; the red band moves to the new row at 0ms, the detail pane updates in place, and row order and scroll position stay put; no easing.",
+      "Refresh data quietly: METAR, ATIS and online lists update on their timers; changed values replace in place with no flash, count-up or re-entrance; 0ms.",
+      "Respect reduced motion: prefers-reduced-motion sets every transition to 0ms with identical final states and the same operation."
+    ],
+    "avoid": [
+      "Entrance or scroll animations",
+      "Fades or slides on tab changes",
+      "Pulsing or blinking dots, frames or alerts",
+      "Count-ups on figures",
+      "Skeleton shimmer where a 'Loading…' line already exists",
+      "Animated map flights or auto-zoom"
+    ]
+  },
+  "voice": {
+    "summary": "ATC working English and ICAO abbreviations, as the app already speaks. Uppercase on keys (METAR PL, AD CIV, SYT OP). Captions are sentence case, rendered in small caps. Times are UTC with Z, and every figure carries its unit (hPa, kt, ft, FL, MHz). Absences are stated plainly: NIL, 'No ATIS online now.', 'No airborne arrivals', 'No LVP at this aerodrome'. Short, factual, no greeting beyond the controller's name and rating.",
+    "avoid": [
+      "Welcome back or a waving greeting",
+      "Generic nouns such as Dashboard, Items, Records or Status",
+      "Exclamation marks, emoji, 'Oops'",
+      "Marketing adjectives",
+      "Any wording that implies PolIDS is the official PAŻP PANDORA or affiliated with PAŻP"
+    ]
+  }
+}

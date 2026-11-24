@@ -1,4 +1,4 @@
-import { api, clearNavPath, esc, hashOf, navPath, parseHash, presetNavPath, selectNavPath, setRouter } from "./api.js";
+import { api, clearNavPath, esc, hashOf, markActive, navPath, parseHash, presetNavPath, selectNavPath, setRouter } from "./api.js";
 import { reloadTarget, takeReload } from "./topbar.js";
 import home from "./tabs/home.js";
 import meteo from "./tabs/meteo.js";
@@ -69,7 +69,7 @@ function open(tab, arg, push = false) {
   if (activating) push = activating.push;
   if (Object.hasOwn(MOVED, tab)) [tab, arg] = MOVED[tab](arg);   // adres zapisuje już nowa zakładka (bez martwego ekranu)
   if (!TABS[tab]) { tab = "home"; arg = undefined; }
-  document.querySelectorAll("#tabs button[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll("#tabs button[data-tab]").forEach((b) => markActive(b, b.dataset.tab === tab, "page"));
   views.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   current = tab;
   const me = { tab, push };
@@ -164,6 +164,7 @@ tickLoop();
     document.getElementById("airac").title = `effective ${ctx.config.airac.effective}, next ${ctx.config.airac.next}`;
   } catch (e) {
     ctx.config = { links: {}, default_aerodrome: "EPWA", airac: {} };
+    document.getElementById("airac").textContent = "AIRAC –";   // cykl nieznany: kreska, nie pusta linijka pod zegarem
     console.error(e);
   }
   await showUser();

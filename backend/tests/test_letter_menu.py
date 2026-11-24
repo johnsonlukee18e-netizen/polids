@@ -63,10 +63,18 @@ def test_two_symmetric_columns(js):
     assert len(letters) == 26 and len(letters) % 2 == 0
     # żadna inna reguła nie zmienia siatki menu liter ani miejsca przycisków (np. grid-column dla liter); reguły
     # z .letters tylko w :not(.letters) (niskie okno w 0.13.0: inne podmenu w kolumnie flex) liter nie dotyczą
-    rules = [r for r in re.findall(r"^([^{}\n]*\.letters[^{}]*)\{", CSS, re.M)
-             if ".letters" in r.replace(":not(.letters)", "")]
-    assert [r.strip() for r in rules] == [".submenu.letters", ".submenu.letters button",
-                                          ".submenu.letters button.all, .submenu.letters button.kbd"]
+    # Wyjątek: telefon (do 640 px, przegląd TasteCode) – litery w jednym rzędzie przewijanym jak reszta podmenu,
+    # po 67 px (połowa klawisza), tylko w tym jednym bloku na końcu arkusza
+    desk, phone = CSS.split("@media (max-width: 640px) {")
+
+    def letter_rules(css):
+        return [r.strip() for r in re.findall(r"^([^{}\n]*\.letters[^{}]*)\{", css, re.M)
+                if ".letters" in r.replace(":not(.letters)", "")]
+    assert letter_rules(desk) == [".submenu.letters", ".submenu.letters button",
+                                  ".submenu.letters button.all, .submenu.letters button.kbd"]
+    assert letter_rules(phone) == [".submenu.letters", ".submenu.letters button"]
+    assert ".submenu.letters { display: flex; }" in phone
+    assert ".submenu.letters button { width: calc((var(--btn-w) - 2 * var(--btn-m)) / 2); }" in phone
 
 
 def test_letter_menu_contract():

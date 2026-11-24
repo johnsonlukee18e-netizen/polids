@@ -10,14 +10,14 @@
 .cr-side { width: 280px; flex: none; background: #050705; border-left: 1px solid var(--line); padding: 8px; overflow: auto;
   display: flex; flex-direction: column; gap: 8px; }
 .cr-side .hint { margin: 6px 0 0; }
-.cr-q { width: 100%; font: 16px var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+.cr-q { width: 100%; font: 16px var(--mono); text-transform: uppercase; }
 .cr-q::placeholder { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .cr-pos { width: 100%; font-family: var(--mono); }
 /* przełączniki FIR i rodzaju: włączony = zielony przycisk PANDORY, wyłączony przygaszony */
 .cr-tgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding-bottom: 2px; }
 .cr-tgs .gbtn { margin: 0; padding: 4px 3px; font-size: 13px; }
 .cr-tgs .gbtn small { font-weight: 400; font-size: 11px; }
-.cr-tgs .gbtn:not(.on) { background: linear-gradient(#262a26, #181b18); border-color: #2a2f2a; color: var(--muted); }
+.cr-tgs .gbtn:not(.on) { background: var(--panel-2); border-color: var(--control); color: var(--muted); }
 .cr-tgs .gbtn:not(.on):hover { color: var(--text); }
 .cr-tgs .cr-all { grid-column: 1 / -1; margin-top: 3px; }
 .cr-types { grid-template-columns: 1fr 1fr; }
@@ -28,7 +28,7 @@
 .cr-off b { color: var(--yellow); }
 .cr-block { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 0; background: var(--panel); }
 .cr-bh { margin: 0; padding: 5px 10px; background: var(--head); border-bottom: 1px solid var(--head-line); border-radius: 0;
-  font: 12px/1.3 var(--sans); letter-spacing: .8px; color: var(--green-text); }
+  font: 13px/1.3 var(--sans); font-variant: small-caps; color: #fff; }
 .cr-bh small { margin-left: 8px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
 table.cr-tab td { vertical-align: top; }
 table.cr-tab th:nth-child(1) { width: 72px; }
@@ -54,26 +54,26 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .cr-nb { white-space: nowrap; }
 .cr-by { display: block; color: var(--green-hi); font-size: 11px; }
 .cr-unk { color: var(--muted); font-size: 11px; border-bottom: 1px dotted var(--muted); cursor: help; }
-.cr-doc { background: none; border: 1px solid #2f3a2f; border-radius: 0; color: var(--green-text); font: 11px var(--mono);
+.cr-doc { background: none; border: 1px solid var(--control); border-radius: 0; color: var(--green-text); font: 11px var(--mono);
   padding: 1px 6px; cursor: pointer; white-space: nowrap; }
 .cr-doc:hover { border-color: var(--green-hi); color: #fff; }
 .cr-notes { border: 1px solid var(--line); border-radius: 0; background: var(--panel); }
-.cr-notes summary { padding: 5px 10px; background: var(--head); cursor: pointer; font: 12px/1.3 var(--sans); color: var(--green-text);
-  letter-spacing: .5px; }
+.cr-notes summary { padding: 5px 10px; background: var(--head); cursor: pointer; font: 13px/1.3 var(--sans); font-variant: small-caps; color: #fff; }
 .cr-notes-b { padding: 4px 12px 8px; columns: 2 420px; column-gap: 24px; }
 .cr-note { break-inside: avoid; margin-bottom: 10px; }
 .cr-note h4 { margin: 6px 0 2px; font: 12px var(--sans); color: #fff; }
-.cr-note h5 { margin: 4px 0 2px; font: 10px var(--sans); color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+.cr-note h5 { margin: 4px 0 2px; font: 12px var(--sans); font-variant: small-caps; color: var(--muted); }
 .cr-note ul { margin: 0; padding-left: 16px; font-size: 12px; }
 
 /* DOKUMENTY: karty z samą nazwą i przyciskami (PDF, LoA), PDF obok */
 .cd-wrap .mapside { width: 400px; }
 .cd-wrap .ms-row select { flex: 1; min-width: 0; }
 .cd-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.cd-card { padding: 6px 8px; background: #0a0c0a; border: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer; }
-.cd-card:hover { background: var(--row-hover); }
+/* karta dokumentu: ramka bez wypełnienia, pod myszą zielona krawędź, wybrana pełnym czerwonym pasem (bez paska z lewej) */
+.cd-card { padding: 6px 8px; background: none; border: 1px solid var(--line); cursor: pointer; transition: border-color var(--t); }
+@media (hover: hover) { .cd-card:hover { border-color: var(--green-hi); } }
 .cd-card:focus { outline: 1px solid var(--green-hi); }
-.cd-card.on { background: var(--sel); border-left-color: var(--green-hi); }
+.cd-card.on { background: var(--sel); }
 .cd-name { margin-bottom: 4px; font: 13px/1.3 var(--sans); color: #fff; }
 .cd-act { display: flex; gap: 6px; align-items: center; margin-top: 5px; }
 .cd-act .btn { padding: 1px 8px; font-size: 11px; }
@@ -88,15 +88,16 @@ table.cr-tab th:nth-child(7) { width: 84px; }
 .chl-kinds:empty { display: none; }
 .chl-kinds .gbtn { margin: 0; padding: 3px 3px; font-size: 13px; }
 .chl-kinds .gbtn small { font-weight: 400; font-size: 11px; }
-.chl-kinds .gbtn:not(.on) { background: linear-gradient(#262a26, #181b18); border-color: #2a2f2a; color: var(--muted); }
+.chl-kinds .gbtn:not(.on) { background: var(--panel-2); border-color: var(--control); color: var(--muted); }
 .chl-kinds .gbtn:not(.on):hover { color: var(--text); }
 .chl-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
 .chl-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 6px; align-items: start; padding: 3px 6px;
-  background: #0a0c0a; border: 1px solid var(--line); border-left: 3px solid transparent; cursor: pointer; font-size: 12px; line-height: 1.35; }
-.chl-row:hover { background: var(--row-hover); }
+  background: none; border: 1px solid var(--line); cursor: pointer; font-size: 12px; line-height: 1.35; transition: border-color var(--t); }
+@media (hover: hover) { .chl-row:hover { border-color: var(--green-hi); } }
 .chl-row:focus { outline: 1px solid var(--green-hi); }
-.chl-row.on { background: var(--sel); border-left-color: var(--green-hi); color: #fff; }
-.chl-kd { justify-self: start; padding: 0 4px; border: 1px solid #24606b; color: var(--cyan); font: 10px/1.5 var(--mono); }
+.chl-row.on { background: var(--sel); color: #fff; }
+.chl-row.on .chl-kd { color: #fff; border-color: currentColor; }
+.chl-kd { justify-self: start; padding: 0 4px; border: 1px solid #24606b; color: var(--cyan); font: 11px/1.4 var(--mono); }
 .chl-tt { overflow-wrap: anywhere; }
 .chl-pdf { font: 11px/1.6 var(--mono); white-space: nowrap; text-decoration: none; }
 .chl-pdf:hover { text-decoration: underline; }

@@ -1,22 +1,22 @@
-/* HOME ("?" w menu): powitanie z ratingiem, VATSIM i wybór stanowiska w jednym bloku na środku ekranu;
-   na dole wersja aplikacji i AIRAC */
-.home-pane { display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: 24px 24px 10px; }
-.home-main { align-self: center; width: min(780px, 100%); display: flex; flex-direction: column; gap: 12px; }
-.home-hello { margin: 0; max-width: 100%; color: var(--text); font: 44px/1.25 var(--ui); text-align: center; overflow-wrap: anywhere; }
-.home-rating { margin: -6px 0 6px; color: var(--green-text); font: 18px/1.3 var(--ui); font-variant: small-caps; letter-spacing: .5px; text-align: center; }
+/* HOME ("?" w menu): powitanie z ratingiem, VATSIM i wybór stanowiska w jednym bloku; na dole wersja aplikacji i AIRAC.
+   unslop (przegląd): blok u góry z lewej, tuż obok klawiszy, jak treść w PANDORZE (zdjęcia 2, 9, 11), a nie wyspa
+   na środku pustego panelu */
+.home-pane { display: grid; grid-template-rows: 1fr auto; justify-items: start; padding: 24px 24px 10px; }
+.home-main { align-self: start; width: min(780px, 100%); display: flex; flex-direction: column; gap: 12px; }
+/* unslop: powitanie jak tytuł zakładki (22 px, białe), nie nagłówek strony reklamowej; rating szarymi kapitalikami */
+.home-hello { margin: 0; max-width: 100%; color: #fff; font: 22px/1.3 var(--ui); overflow-wrap: anywhere; }
+.home-rating { margin: -6px 0 6px; color: var(--muted); font: 13px/1.3 var(--ui); font-variant: small-caps; }
 .home-card { --cy: 10px; --cx: 14px; }
 .home-line { font: 14px/1.6 var(--mono); }
 .home-line.home-on { color: var(--green-hi); }
 .home-line.error { font-size: 12px; }
-.home-pos { display: block; width: 100%; padding: 6px 8px; font: 14px var(--mono); }
+/* oba elementy HOME do dotknięcia (wybór stanowiska, SELF CHECK-IN) co najmniej 44 px wysokości: miejsca tu nie brakuje */
+.home-pos { display: block; width: 100%; min-height: 44px; padding: 6px 8px; font: 14px var(--mono); }
 .home-pos-note { min-height: 1.4em; margin: 6px 0 10px; font-family: var(--mono); }
 .home-pos-note b { color: var(--text); font-weight: 400; }
 .home-ok { color: var(--green-text); }
-.home-go { margin: 0; padding: 9px 10px; font-size: 15px; }
-.home-go:hover { background: linear-gradient(#52bd3c, #36992a); }
+.home-go { min-height: 44px; margin: 0; padding: 9px 10px; font-size: 15px; }
 .home-foot { display: flex; gap: 28px; justify-content: center; padding-top: 10px; color: var(--muted); font: 12px var(--mono); }
-@media (max-width: 900px) { .home-hello { font-size: 30px; } }
-@media (max-height: 700px) { .home-hello { font-size: 32px; } }
 /* 0.14.0 (issue #28): krok 2 HOME (#home/checkin) – SELF CHECK-IN (dawne AERODROME › OVERVIEW, overview.css) na całej
    szerokości i wysokości panelu w miejscu kroku 1, stopka z wersją i AIRAC zostaje pod nim. Każdy panel check-inu
    przewija się w sobie; w niskim albo wąskim oknie panele mają naturalną wysokość i przewija się cały panel HOME
@@ -32,5 +32,5 @@
 
 /* AUP: krótka informacja na środku ekranu */
 .soon-pane { display: flex; align-items: center; justify-content: center; padding: 24px; }
-.soon-note { margin: 0; color: var(--muted); font: 20px/1.4 var(--ui); text-align: center; }
-.soon-note b { color: var(--green-hi); font-variant: small-caps; letter-spacing: .5px; }
+.soon-note { margin: 0; color: var(--text); font: 14px/1.4 var(--ui); text-align: center; }
+.soon-note b { color: #fff; font-variant: small-caps; }

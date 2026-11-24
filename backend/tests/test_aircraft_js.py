@@ -565,18 +565,21 @@ def test_css_table():
     assert "overflow: auto;" in _css_rule(".ac-list")
     # nazwa łamana na spacjach, nie po jednej literze
     assert "overflow-wrap: break-word;" in _css_rule(".ac-table td.name")
-    # RECAT-EU w kolorze kategorii, także w zaznaczonym wierszu
+    # RECAT-EU w kolorze kategorii; na czerwonym pasie wybranego typu białe (unslop: kolor ginąłby na pasie)
     for k, color in (("A", "#ff6a5a"), ("B", "#ff6a5a"), ("C", "var(--yellow)"), ("D", "var(--yellow)"),
                      ("E", "var(--ok)"), ("F", "var(--ok)")):
         assert re.search(rf"table\.ac-table tr td\.recat-{k}[^{{]*\{{ color: {re.escape(color)}; \}}", text), k
-    # paski wierszy tylko po wierszach typów (rozwinięcie nie przestawia kolorów), rozwinięcie bez podświetlenia.
-    # 0.14.2 (issue #35): wyraźniejsze paski jak w CALLSIGN; pod myszą jaśniej, zaznaczony wiersz zostaje zielony
+    assert "table.ac-table tr.selected td.recat { color: #fff; }" in text
+    # paski wierszy tylko po wierszach typów (rozwinięcie nie przestawia kolorów). 0.14.2 (issue #35): wyraźniejsze
+    # paski jak w CALLSIGN. unslop: pod myszą zielona krawędź (wspólna reguła table.data), bez niej nagłówek grupy,
+    # rozwinięcie i komunikat; rozwinięcie to biały arkusz (zdjęcie PANDORY nr 7)
     assert "table.ac-table tbody tr.ac-rec td { background: var(--list-row); }" in text
     assert "table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--list-row-alt); }" in text
-    assert ("table.ac-table tbody tr.ac-rec:not(.selected):hover td { background: var(--list-row-hover) !important; }"
-            in text)
+    assert "table.ac-table tbody tr:is(.ac-gh, .ac-detail-row, .ac-msg):hover { outline: none; }" in text
+    assert "list-row-hover" not in text
     assert "var(--row)" not in text and "var(--row-alt)" not in text
-    assert "background: var(--sel) !important;" in _css_rule("table.ac-table tbody tr.ac-detail-row td")
+    detail = _css_rule("table.ac-table tbody tr.ac-detail-row td")
+    assert "background: var(--paper) !important;" in detail and "color: var(--paper-ink);" in detail
     assert "background: var(--head) !important;" in _css_rule("table.ac-table tbody tr.ac-gh td")
 
 

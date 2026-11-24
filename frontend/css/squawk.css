@@ -20,7 +20,7 @@
 .sq-answer .sq-bad { color: var(--warn); }
 .sq-big { font: 400 18px var(--ui); color: #fff; margin-right: 4px; }
 .sq-big.emerg { color: var(--bad); }
-.sq-label { color: var(--green-text); letter-spacing: .3px; }
+.sq-label { color: var(--green-text); }
 .sq-hit { overflow-wrap: anywhere; }
 .sq-count { flex: none; margin-left: auto; white-space: nowrap; }
 

@@ -1,12 +1,14 @@
 """0.14.2 (issue #35): listy CALLSIGN i AIRCRAFT. Właściciel projektu: "do list callsign i aircraft popraw kolorowanie co
 drugiego wiersza, by było bardziej widoczne/kontrastujące" i "listy callsign i aircraft mają być praktycznie
-identyczne". Paski wierszy z jednych zmiennych w :root (style.css), czarne i ciemnoszare jak w METAR; pozostałe tabele
-(table.data) bez zmian. Ta sama czcionka komórek i to samo pole wyszukiwania w obu zakładkach."""
+identyczne". Paski wierszy z jednych zmiennych w :root (style.css), czarne i ciemnoszare jak w METAR; od unslop te same
+pasy we wszystkich tabelach (table.data), pod myszą zielona krawędź zamiast jaśniejszego tła. Ta sama czcionka komórek
+i to samo pole wyszukiwania w obu zakładkach."""
 import re
 
 from backend.app.config import ROOT_DIR
 
 FRONTEND = ROOT_DIR / "frontend"
+HOVER = "table.data tbody tr:hover { outline: 1px solid var(--green-hi); outline-offset: -1px; }"
 STYLE = (FRONTEND / "css" / "style.css").read_text("utf-8")
 AIRCRAFT_CSS = (FRONTEND / "css" / "aircraft.css").read_text("utf-8")
 AIRCRAFT_JS = (FRONTEND / "js" / "tabs" / "aircraft.js").read_text("utf-8")
@@ -47,24 +49,28 @@ def _ratio(a, b):
 
 
 def test_list_stripes_contrast():
-    """Paski wyraźnie różne (dawniej --row / --row-alt: stosunek luminancji ok. 1,04, praktycznie niewidoczne); pod
-    myszą jaśniej od obu pasków i inaczej niż zielone zaznaczenie; napisy obu list czytelne na obu paskach."""
-    row, alt, hover = (_root_var(f"--list-row{s}") for s in ("", "-alt", "-hover"))
+    """Paski wyraźnie różne (dawniej --row / --row-alt: stosunek luminancji ok. 1,04, praktycznie niewidoczne); wybrany
+    wiersz czerwonym pasem (unslop, jak lista lotnisk PANDORY) innym niż oba paski; napisy obu list czytelne na obu
+    paskach, biały napis na pasie zaznaczenia."""
+    row, alt = (_root_var(f"--list-row{s}") for s in ("", "-alt"))
     assert (row, alt) == ("#000", "#2b2b2b")  # jak paski METAR (metar.css --mt-alt), zdjęcie PANDORY
     assert _ratio(row, alt) >= 1.3
-    assert _ratio(_root_var("--row"), _root_var("--row-alt")) < 1.1  # dla porównania: paski pozostałych tabel
-    assert len({row, alt, hover, _root_var("--sel")}) == 4
-    assert _lum(hover) > _lum(alt) > _lum(row)
+    assert len({row, alt, _root_var("--sel")}) == 3 and _lum(_root_var("--sel")) > _lum(row)
     for text in ("#fff", _root_var("--yellow"), _root_var("--text"), "#c9d1c9", "#ff6a5a", _root_var("--ok")):
         assert min(_ratio(text, row), _ratio(text, alt)) >= 4.5, text
+    assert _ratio("#fff", _root_var("--sel")) >= 4.5
 
 
-def test_other_tables_keep_their_stripes():
-    """Zmienne pasków table.data (AD, INOP, OVERVIEW i inne) bez zmian; nowe paski tylko w CALLSIGN i AIRCRAFT."""
-    assert (_root_var("--row"), _root_var("--row-alt"), _root_var("--row-hover")) == ("#0a0c0a", "#0f130f", "#18221a")
+def test_all_tables_share_the_stripes():
+    """unslop: pasy PANDORY we wszystkich tabelach (table.data: AD, INOP, OVERVIEW i inne) jak w CALLSIGN i AIRCRAFT;
+    pod myszą nigdzie jaśniejsze tło, tylko zielona krawędź wiersza (przy myszy)."""
+    assert (_root_var("--row"), _root_var("--row-alt")) == (_root_var("--list-row"), _root_var("--list-row-alt"))
     css = _plain(STYLE)
     assert "table.data tbody tr:nth-child(odd) td { background: var(--row); }" in css
     assert "table.data tbody tr:nth-child(even) td { background: var(--row-alt); }" in css
+    assert HOVER in css and css.rindex("@media (hover: hover) {", 0, css.index(HOVER)) >= 0
+    for f in (FRONTEND / "css").glob("*.css"):
+        assert not re.search(r"--(list-)?row-hover", _plain(f.read_text("utf-8"))), f.name
     users = {f.name for f in (FRONTEND / "css").glob("*.css") if "--list-row" in _plain(f.read_text("utf-8"))}
     assert users == {"style.css", "aircraft.css"}
     for line in css.splitlines():
@@ -76,11 +82,10 @@ def test_both_lists_use_the_same_stripes_and_font():
     style, aircraft = _plain(STYLE), _plain(AIRCRAFT_CSS)
     assert "table.callsigns tbody tr:nth-child(odd) td { background: var(--list-row); }" in style
     assert "table.callsigns tbody tr:nth-child(even) td { background: var(--list-row-alt); }" in style
-    assert "table.callsigns tbody tr:hover td { background: var(--list-row-hover) !important; }" in style
+    assert HOVER in style and "table.callsigns tbody tr:hover" not in style  # wspólna krawędź z table.data
     assert "table.ac-table tbody tr.ac-rec td { background: var(--list-row); }" in aircraft
     assert "table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--list-row-alt); }" in aircraft
-    assert ("table.ac-table tbody tr.ac-rec:not(.selected):hover td { background: var(--list-row-hover) !important; }"
-            in aircraft)
+    assert "table.ac-table tbody tr:is(.ac-gh, .ac-detail-row, .ac-msg):hover { outline: none; }" in aircraft
     # jedna czcionka komórek: 20 px var(--mono), odstępy komórek jak table.data (4 px 8 px)
     assert "table.callsigns td.icao { font: 20px var(--mono); color: #fff; width: 90px; }" in style
     assert "table.data th, table.data td { padding: 4px 8px; text-align: left; }" in style

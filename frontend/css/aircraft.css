@@ -25,8 +25,7 @@
 .ac-makers { flex: none; display: flex; flex-wrap: wrap; margin: 0 calc(-1 * var(--btn-m)); }
 .ac-makers .gbtn { flex: none; width: var(--btn-w); height: var(--btn-h); margin: var(--btn-m); padding: 0 4px;
   line-height: calc(var(--btn-h) - 2px); }
-.ac-makers .gbtn:hover { background: linear-gradient(#52bd3c, #36992a); }
-.ac-makers .gbtn.active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+.ac-makers .gbtn.active { background: var(--green-hi); color: var(--key-ink-on); }
 
 /* tabela typów: stałe szerokości kolumn (table-layout: fixed), więc nie skacze przy pisaniu w polu wyszukiwania;
    pełna nazwa ICAO się zawija. 0.14.2 (issue #35): "popraw rozmiar listy aircraft, żeby była podobna do callsign,
@@ -76,29 +75,31 @@ table.ac-table tr td.recat-C, table.ac-table tr td.recat-D { color: var(--yellow
 table.ac-table tr td.recat-E, table.ac-table tr td.recat-F { color: var(--ok); }
 /* paski wierszy liczone tylko po wierszach typów: otwarte rozwinięcie i nagłówki grup nie przestawiają kolorów.
    0.14.2 (issue #35): "popraw kolorowanie co drugiego wiersza, by było bardziej widoczne": na przemian czarne
-   i ciemnoszare jak CALLSIGN (--list-row, --list-row-alt w style.css); pod myszą jaśniej, ale nie w zaznaczonym
-   wierszu (zielone tło zaznaczenia zostaje) */
+   i ciemnoszare jak CALLSIGN (--list-row, --list-row-alt w style.css). Pod myszą zielona krawędź wiersza typu
+   (wspólna reguła table.data w style.css); nagłówek grupy, rozwinięcie i komunikat bez niej */
 table.ac-table tbody tr.ac-rec td { background: var(--list-row); }
 table.ac-table tbody tr.ac-rec:nth-child(even of .ac-rec) td { background: var(--list-row-alt); }
-table.ac-table tbody tr.ac-rec:not(.selected):hover td { background: var(--list-row-hover) !important; }
+table.ac-table tbody tr:is(.ac-gh, .ac-detail-row, .ac-msg):hover { outline: none; }
 
 /* widok producenta: wiersz z nazwą producenta w bazie przed każdą grupą (bez podświetlenia pod myszą) */
 table.ac-table tbody tr.ac-gh td { padding: 7px 8px 3px; background: var(--head) !important; border-bottom: 1px solid var(--head-line);
-  font: 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); cursor: default; }
-.ac-table tr.ac-gh span { margin-left: 10px; color: var(--muted); letter-spacing: 0; text-transform: none; }
+  font: 13px/1.3 var(--sans); font-variant: small-caps; color: #fff; cursor: default; }
+.ac-table tr.ac-gh span { margin-left: 10px; color: var(--muted); font-variant: normal; }
 /* komunikat (brak typów, błąd) */
 table.ac-table tbody tr.ac-msg td { padding: 8px; background: none !important; border-bottom: 0; }
 
-/* rozwinięcie: tło zaznaczenia jak kliknięty wiersz nad nim (razem jeden blok), pasek zaznaczenia po lewej, bez
-   podświetlenia pod myszą (table.data tr:hover td w style.css ma !important) */
-table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; background: var(--sel) !important;
-  box-shadow: inset 3px 0 0 var(--green-hi); cursor: default; }
+/* rozwinięcie jak arkusz osiągów PANDORY (zdjęcie nr 7): biały papier i ciemny tekst pod czerwonym pasem
+   wybranego typu; szarości w arkuszu ciemniejsze (--muted na papierze 6.9:1) */
+table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; background: var(--paper) !important;
+  color: var(--paper-ink); cursor: default; }
+/* RECAT-EU na czerwonym pasie wybranego typu białe: kolor kategorii (czerwony, zielony) ginąłby na pasie */
+table.ac-table tr.selected td.recat { color: #fff; }
 /* 0.14.0 (issue #28): rozwinięcie najwyżej na widoczną szerokość listy (100cqi = .ac-list bez paddingu komórki
    22 px) i przyklejone do jej lewej krawędzi, więc przy liście przewiniętej w bok (wąski panel) dane nie uciekają
    poza widok. Co najmniej na szerokość kratek (min-content): w liście węższej od kratek rozwinięcie jest szersze od
    widoku, przy przewijaniu w bok dochodzi do prawej krawędzi komórki i odkleja się, więc resztę kratek widać po
    przewinięciu (bez tego przyklejone rozwinięcie ucinało prawe kratki na stałe) */
-.ac-detail { position: sticky; left: 12px; width: min(100%, calc(100cqi - 22px)); min-width: min-content; }
+.ac-detail { position: sticky; left: 12px; width: min(100%, calc(100cqi - 22px)); min-width: min-content; --muted: #5a5a5a; }
 /* zdjęcie po lewej, dane na prawo od niego. Dane schodzą pod zdjęcie (zawinięcie) dopiero wtedy, gdy obok nich na
    zdjęcie zostaje mniej niż 220 px: próg wg szerokości kratek danego typu, nie stała szerokość panelu.
    0.14.2 (issue #35): "dane samolotu przesuwają się po wczytaniu jego zdjęcia. ustaw blok który będzie ramką na
@@ -121,14 +122,14 @@ table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; backgrou
    rozwinięcie (min-content w .ac-detail) w wąskim panelu, ramka rosła do 450 px, a dane pod nią zjeżdżały w dół */
 .ac-detail .photo-credit { min-height: 1.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   contain: inline-size; }
-/* tekst pomocniczy i podpis zdjęcia czytelne na zielonym tle zaznaczenia */
-.ac-detail .hint { color: #c9d1c9; }
-.ac-detail .photo-box a { color: var(--cyan); text-decoration: none; }
+/* tekst pomocniczy i podpis zdjęcia czytelne na papierze; odnośniki zielenią klawiszy (5.45:1 na bieli) */
+.ac-detail .hint { color: var(--muted); }
+.ac-detail .photo-box a { color: var(--green); text-decoration: underline; }
 .ac-detail .photo-box a:hover { text-decoration: underline; }
 /* odnośnik do strony osiągów typu pod kratkami (0.14.2, issue #35: bez More photos, Image search i Performance
    search) */
 .ac-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.ac-links a { color: var(--cyan); text-decoration: none; }
+.ac-links a { color: var(--green); text-decoration: underline; }
 .ac-links a:hover { text-decoration: underline; }
 
 /* kratki: trzy linijki po trzy (0.14.0, issue #28), kolumny równej szerokości w linijkach (siatka; linijka sama nie
@@ -137,13 +138,14 @@ table.ac-table tbody tr.ac-detail-row td { padding: 8px 10px 10px 12px; backgrou
 .ac-boxes { display: grid; grid-template-columns: repeat(3, max-content); justify-content: start; gap: 4px; }
 .ac-line { display: contents; }
 .acb { display: flex; flex-direction: column; align-items: center; min-width: 88px; padding: 2px 8px 3px; border: 1px solid; border-radius: 0; }
-.acb > .lbl { font: 10px/1.25 var(--mono); letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; }
-.acb > .val { font: 18px/1.25 var(--mono); color: #fff; white-space: nowrap; }
+.acb > .lbl { font: 11px/1.25 var(--mono); text-transform: uppercase; white-space: nowrap; }
+.acb > .val { font: 18px/1.25 var(--mono); color: var(--paper-ink); white-space: nowrap; }
 /* brak wartości jako szara półpauza */
 .acb.none > .val { color: var(--muted); }
-.acb.perf { background: #11181d; border-color: #36474f; }
-.acb.perf > .lbl { color: #a0b4bf; }
-.acb.wake { background: #1f1607; border-color: #6b4a13; }
-.acb.wake > .lbl { color: #e3a64b; }
-.acb.dim { background: #161328; border-color: #473c7d; }
-.acb.dim > .lbl { color: #ad9ff1; }
+/* kratki na papierze: jasne tło w kolorze kategorii, etykieta tym kolorem przyciemnionym (6.5-7.5:1) */
+.acb.perf { background: #eef3f6; border-color: #9fb3bf; }
+.acb.perf > .lbl { color: #3d5866; }
+.acb.wake { background: #fbf3e6; border-color: #d1a75e; }
+.acb.wake > .lbl { color: #7a4f0e; }
+.acb.dim { background: #f1effb; border-color: #a89ee0; }
+.acb.dim > .lbl { color: #4b3f9a; }

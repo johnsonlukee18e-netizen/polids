@@ -549,5 +549,7 @@ def test_home_shares_position_with_overview(js):
     # kasowałby zapisany); HOME importuje statycznie tylko api.js (test powłoki wczytuje go w Node)
     assert re.search(r'if \(listLoaded\) save\(\);\s*const t = sessionTarget\(current\(\)\);\s*navigate\(t\.tab, t\.arg\);', home)
     assert re.findall(r'^import .* from "([^"]+)";$', home, re.M) == ["../api.js"]
-    # stopka: sama wersja i AIRAC
-    assert "[ctx.config?.version, airacText(ctx.config?.airac)]" in home
+    # stopka: sama wersja i AIRAC; nieznany cykl (brak /api/config) jako kreska, jak pod zegarem w menu (app.js)
+    assert '[ctx.config?.version, airacText(ctx.config?.airac) || "AIRAC –"]' in home
+    app = (FRONTEND / "js" / "app.js").read_text("utf-8")
+    assert 'document.getElementById("airac").textContent = "AIRAC –";' in app

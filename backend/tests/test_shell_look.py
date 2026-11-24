@@ -17,7 +17,7 @@ INDEX = (FRONTEND / "index.html").read_text("utf-8")
 APP = (FRONTEND / "js" / "app.js").read_text("utf-8")
 TOPBAR = (FRONTEND / "js" / "topbar.js").read_text("utf-8")
 STYLE = (FRONTEND / "css" / "style.css").read_text("utf-8")
-SANS = 'Arial, "Liberation Sans", "Helvetica Neue", Helvetica, sans-serif'
+SANS = 'Arial, sans-serif'
 POLISH = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
 
 
@@ -83,7 +83,7 @@ def test_topbar_layout_css():
     assert "grid-column: 1 / -1;" in bar and "display: flex;" in bar and "gap: 2px;" in bar
     btn = _rule(STYLE, ".topbar button")
     assert "flex: 1 1 0;" in btn and "height: var(--topbar-h);" in btn and "border-radius: 0;" in btn
-    assert re.search(r"font: 12px/18px var\(--ui\);", btn) and "linear-gradient(#45a832, #2f8a22)" in btn
+    assert re.search(r"font: 12px/18px var\(--ui\);", btn) and "background: var(--green);" in btn  # unslop: płasko
     assert ".topbar button:disabled { opacity: .45; cursor: default; }" in STYLE
 
 
@@ -525,9 +525,9 @@ def test_long_submenu_scrolls_whole_rows():
     assert f"{LONG} > button {{ scroll-margin-top: var(--btn-m); }}" in css
     # kolumna pod ostatnim rzędem jak .submenu: to samo tło i ta sama kreska z prawej (1 px z --col-w)
     sub = _rule(STYLE, ".submenu")
-    assert "background: #050605;" in sub and "border-right: 1px solid var(--line);" in sub
+    assert "background: var(--bg);" in sub and "border-right: 1px solid var(--line);" in sub
     view = _rule(STYLE, ".view:has(> .submenu:not(.letters) > :nth-child(22))")
-    assert ("background: linear-gradient(to right, #050605 calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), "
+    assert ("background: linear-gradient(to right, var(--bg) calc(var(--col-w) - 1px), var(--line) 0 var(--col-w), "
             "transparent 0);") in view
     # widać całe rzędy: R x 31 px przy 28 px; w oknie 1366x657 (rząd 26,1875 px) do ostatniego całego rzędu
     for view_h, pitch_px in ((900, 31), (768, 31), (657, 26.1875)):
@@ -535,3 +535,32 @@ def test_long_submenu_scrolls_whole_rows():
         visible = col - col % pitch_px
         assert abs(visible / pitch_px - round(visible / pitch_px)) < 1e-9 and col - visible < pitch_px
 
+
+
+def test_touch_targets_and_phone_fold():
+    """Przegląd TasteCode: pola do dotknięcia 44 px tam, gdzie układ na to pozwala. Ekran dotykowy: pasek u góry
+    wysokości klawisza. Telefon (do 640 px): pod paskiem pierwsza linia z zegarem, AIRAC i logo PolIDS (nazwa i czas
+    na pierwszym ekranie, drugi przegląd), pod nią klawisze menu i podmenu w rzędach przewijanych w poziomie nad
+    panelem na całą szerokość, klawisze i pasek 44 px (ta sama formuła --btn-h przy --menu-rows: 1). Od 641 px kolumny
+    137 x 28 bez zmian (issue #25). Lista wyboru z kwadratową strzałką zamiast strzałki przeglądarki. HOME: blok
+    u góry z lewej, lista stanowisk i SELF CHECK-IN po 44 px."""
+    css = _nocomments(STYLE)
+    assert "@media (pointer: coarse) { :root { --topbar-h: 28px; } }" in css
+    phone = css[css.index("@media (max-width: 640px) {"):]
+    for decl in (":root { --topbar-h: 44px; --btn-h-max: 44px; --menu-rows: 1; }",
+                 "body { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) auto minmax(0, 1fr); }",
+                 ".menu { width: auto; flex-direction: row; flex-wrap: wrap;",
+                 ".menu nav { flex: 1 0 100%; flex-direction: row; overflow-x: auto; scroll-snap-type: x proximity; }",
+                 ".clockbox, .menu .brand { order: -1; width: var(--btn-w); border-top: 0; }",
+                 ".userbox:not([hidden]) { order: -1;",
+                 ".view.active { flex-direction: column; }", ".submenu .sep { display: none; }",
+                 ".userbox button { width: auto; min-height: 44px; }"):
+        assert decl in phone, decl
+    # menu na telefonie samo się nie przewija (przewija się rząd klawiszy), więc zegar i logo stoją na miejscu
+    assert "overflow-x" not in _rule(phone.replace("\n  ", "\n"), ".menu")
+    sel = _rule(STYLE, ".toolbar select, select.field")
+    assert "appearance: none;" in sel and 'url("data:image/svg+xml,' in sel and "padding-right: 26px;" in sel
+    assert ".toolbar select:disabled, select.field:disabled { opacity: .35; cursor: default; }" in css
+    home = _nocomments((FRONTEND / "css" / "home.css").read_text("utf-8"))
+    assert "justify-items: start;" in _rule(home, ".home-pane") and "align-self: start;" in _rule(home, ".home-main")
+    assert "min-height: 44px;" in _rule(home, ".home-pos") and "min-height: 44px;" in _rule(home, ".home-go")

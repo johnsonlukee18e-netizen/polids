@@ -400,7 +400,7 @@ def test_menu_fits_low_windows():
     assert ("--btn-h: clamp(16px, calc((var(--view-h) - var(--topbar-h) - 2 * var(--col-pad) - var(--foot-h)) / var(--menu-rows)"
             " - 2 * var(--btn-m)), var(--btn-h-max)); }") in css
     # --btn-h na body, tam gdzie zalogowany użytkownik zmienia --foot-h (na :root byłaby liczona ze stałą --foot-h)
-    assert re.search(r"(?m)^body \{ --view-h: 100vh; --foot-h: 80px;\s+--btn-h: clamp", css)
+    assert re.search(r"(?m)^body \{ --view-h: 100vh; --foot-h: 90px;\s+--btn-h: clamp", css)
     # runda 17 (przegląd): wysokość z widocznej części okna, nie z samego 100vh. W Chrome na Androidzie (i innych
     # przeglądarkach z paskiem adresu) 100vh to okno bez paska, a strona się nie przewija, więc pasek zostaje: 1280x800
     # z paskiem (widać 744 px) dawało 26,84 px zamiast 24,19 i EMERGENCY / ADMIN wychodziły pod zegar. Osobna zmienna:
@@ -409,13 +409,14 @@ def test_menu_fits_low_windows():
     assert "@supports (height: 100svh) { body { --view-h: 100svh; } }" in css
     assert css.count("--btn-h:") == 1 and "100vh" not in css.replace("--view-h: 100vh;", "", 1)
     assert "html, body { height: 100%; margin: 0; }" in css
-    assert "body:has(#userbox:not([hidden])) { --foot-h: 146px; }" in css
+    assert "body:has(#userbox:not([hidden])) { --foot-h: 156px; }" in css
     assert ".menu nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }" in css
     # stałe wysokości dołu menu: zegar z AIRAC + logo = --foot-h bez użytkownika, + użytkownik = z użytkownikiem
     clock = px(r"(?m)^\.clockbox \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
     brand = px(r"(?m)^\.menu \.brand \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
     user = px(r"(?m)^\.userbox \{[^}]*?(?<![-\w])height: ([\d.]+)px;")
-    assert (clock, brand, user) == (46, 34, 66) and clock + brand == 80 and clock + brand + user == 146
+    # unslop (przegląd TasteCode): logo jest linkiem do HOME, więc ma pole do dotknięcia 44 px (było 34)
+    assert (clock, brand, user) == (46, 44, 66) and clock + brand == 90 and clock + brand + user == 156
     # treść mieści się w tych wysokościach: ramka + padding 3 + zegar 24 + AIRAC 16; ramka + 4 + logo 26 + 3
     assert ".clock { font: 20px/24px var(--mono); color: #fff; }" in css and ".clockbox .hint { line-height: 16px; }" in css
     assert 1 + 3 + 24 + 16 <= clock and 1 + 4 + 26 + 3 <= brand
@@ -430,17 +431,17 @@ def test_menu_fits_low_windows():
         return topbar + 2 * pad + rows * (h + 2 * m) + foot <= view + 1e-9
 
     for vh in (560, 600, 657, 768, 900):
-        for foot in (80, 146):
+        for foot in (90, 156):
             h = btn_h(vh, foot)
             assert h >= h_min
             if h > h_min:   # mieści się bez przewijania
                 assert fits(vh, foot, h), (vh, foot, h)
-    assert btn_h(900, 80) == btn_h(900, 146) == btn_h(768, 80) == 28
-    assert 25 < btn_h(768, 146) < 26 and btn_h(600, 146) >= 16 and btn_h(657, 146) > 20
+    assert btn_h(900, 90) == btn_h(900, 156) == btn_h(768, 90) == 28
+    assert 24 < btn_h(768, 156) < 25 and btn_h(600, 156) >= 16 and btn_h(657, 156) > 19
     # tablet 1280x800 z paskiem adresu: widać 744 px (svh), 100vh = 800. Z widocznej wysokości menu się mieści, z 100vh
-    # nie (26,84 px, 56 px za dużo)
-    assert 24.1 < btn_h(744, 146) < 24.2 and fits(744, 146, btn_h(744, 146))
-    assert 26.8 < btn_h(800, 146) < 26.9 and not fits(744, 146, btn_h(800, 146))
+    # nie (26,38 px, 56 px za dużo)
+    assert 23.7 < btn_h(744, 156) < 23.8 and fits(744, 156, btn_h(744, 156))
+    assert 26.3 < btn_h(800, 156) < 26.4 and not fits(744, 156, btn_h(800, 156))
 
 
 def test_logo_at_bottom_above_user():

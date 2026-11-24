@@ -123,6 +123,14 @@ export function selectNavPath(view, arg) {
 export function presetNavPath(view, arg) { if (arg) WANT.set(view, String(arg).split("/")); }
 export function clearNavPath(view) { WANT.delete(view); }
 
+// Aktywny klawisz menu i podmenu: klasa active (wygląd) i aria-current (czytnik ekranu wie, który klawisz jest wybrany);
+// menu podaje "page", podmenu zostaje przy "true". ?.: lekkie atrapy przycisków w testach Node mają samo classList
+export function markActive(b, on, current = "true") {
+  b.classList.toggle("active", on);
+  if (on) b.setAttribute?.("aria-current", current);
+  else b.removeAttribute?.("aria-current");
+}
+
 // Podmenu PANDORY: kolumna zielonych przycisków obok menu głównego.
 // tabs: [{id, label, render(pane), fill?}] albo {sep: true} jako odstęp.
 // Kliknięcie podzakładki to krok do cofnięcia (remember z kluczem zakładki i ścieżką id podmenu);
@@ -138,7 +146,7 @@ export function subtabs(root, tabs, opts = {}) {
     current?.destroy?.();
     const t = tabs.find((x) => !x.sep && x.id === id) || tabs.find((x) => x.id === first);
     currentId = t.id;
-    nav.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("active", b.dataset.id === t.id));
+    nav.querySelectorAll("button[data-id]").forEach((b) => markActive(b, b.dataset.id === t.id));
     pane.className = "pane" + (t.fill ? " fill" : "");
     pane.innerHTML = "";
     current = t.render(pane) || null;
@@ -178,7 +186,7 @@ export const letterButtons = () => `<button class="all" data-l="" title="All rec
 export function letterMenu(root, onPick, opts = {}) {
   const nav = h(`<nav class="submenu letters">${letterButtons()}</nav>`);
   root.append(nav);
-  const set = (l) => nav.querySelectorAll("button[data-l]").forEach((b) => b.classList.toggle("active", b.dataset.l === (l || "")));
+  const set = (l) => nav.querySelectorAll("button[data-l]").forEach((b) => markActive(b, b.dataset.l === (l || "")));
   nav.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-l]");
     if (!b) return;

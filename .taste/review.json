@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "verdict": "repair",
+  "summary": "Repair. This is the final review, of both HOME captures after repair 2. They still come from the backend-less preview in local mode, so the VATSIM and booking lines, the rating, the positions, the version and the AIRAC values remain unknown. The red line 'no PolIDS server in this preview' is the preview server's own message.\n\nVerified in the captures:\n- The phone finding is fixed. At 390, line 1 under the top bar shows 19:15:26Z with 'AIRAC –' on the left and the PolIDS mark on the right, and line 2 is the 44 px key row (←, ?, RADIO…) above a full-width pane. The product name and the time are now on the first phone screen.\n- The 390 DOM audit is clean.\n- The earlier fixes hold: HOME starts at the top left, the select draws a square chevron, the PolIDS link and SELF CHECK-IN are 44 px tall, and a missing cycle reads 'AIRAC –'.\n\nThe seven questions:\n1. At both widths, the Position panel with SELF CHECK-IN is the biggest block and is read first.\n2. There is no ragged row, orphan or stretched card. The empty pane to the right of the 780 px launcher column at 1440 is defended, as before: it matches the top-left text block of reference 2, and a 1242 px select would read worse.\n3. Colour sits only on the one primary key and the error status, and the key-panel face shows on the first screen at both widths.\n4. The two clocks agree (19:15:26Z at both widths), and 'AIRAC –' agrees in the menu foot and the HOME foot.\n5. The missing cycle shows as a dash.\n6. There are no charts or legends.\n7. On the phone, the navigation is folded into rows above the content, and every block still answers its question.\n\nHouse rules and tells: none of the banned items are visible. That covers gradients, glows, shadows, rounded corners, emoji, placeholder people, tracked capitals, zebra headers, violet, oversized figures and marketing sections.\n\nKept on purpose, because the user's references and the owner's issues #23 and #25 outrank the dealt sheet (brand.json): the framed-sheet move is not applied, every key carries the brand fill, and green exceeds the 3% budget.\n\nOnly the automated desktop target audit remains. It is blocking, and only the owner can decide it. TasteCode DOM audit found 1 blocking accessibility group. TasteCode DOM audit found 1 blocking accessibility group.",
+  "findings": [
+    {
+      "id": "interactive_target_size",
+      "severity": "blocking",
+      "area": "Interaction targets",
+      "evidenceType": "automated",
+      "confidence": "high",
+      "evidence": "22 visible interactive targets below 44x44 CSS px. 1440px #topbar > button:nth-of-type(1) (Reload): 478.65625x18; 1440px #topbar > button:nth-of-type(2) (Brighter): 478.671875x18; 1440px #topbar > button:nth-of-type(3) (Darker): 478.671875x18; 1440px #tabs > button:nth-of-type(2) (?): 137x28; 1440px #tabs > button:nth-of-type(3) (RADIO): 137x28",
+      "repair": "Make every visible interactive target at every reviewed viewport at least 44x44 CSS px."
+    }
+  ]
+}

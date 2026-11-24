@@ -1,0 +1,1564 @@
+{
+  "version": 1,
+  "page": {
+    "title": "Home",
+    "route": "/#home",
+    "description": "PolIDS (Polish Integrated Display System) is the VATSIM PL vACC controller display for FIR EPWW. This pass restyles the shell and every existing view to match the user's PANDORA references; routes, data and behaviour are unchanged. The default view is HOME (the ? key). Its one h1 is the controller's personal greeting, followed by the VATSIM connection and bookings, the position choice and the SELF CHECK-IN key. Step 2 holds the check-in panels."
+  },
+  "architecture": {
+    "contract": "This screen answers: which position am I opening, and is anything booked or in force that I must know before I plug in? Face: the PolIDS key panel, flat green keys on black with rows locked across both columns (brand signatureDevice). The finding is read first, in the VATSIM lines under the greeting (for example 'Booking: EPWA_APP 16:00–18:00Z' while not yet connected), directly above the Position panel and its SELF CHECK-IN key.",
+    "mode": "operate_monitor",
+    "novelty": "low",
+    "grid": "Shell at 1440: menu column 150 (137 key + 2 x 1.5 margin + 2 x 4.5 padding + 1 rule) + submenu column 150 + pane 1140 = 1440. Views without a submenu have a 1290 pane. Default pane padding 12/16 leaves 1108 of content.\n\nPer view at 1440:\n- AERODROME INFO (padding 8/12): 232 + 8 + 506.3 (1.4fr) + 8 + 361.7 (1fr) = 1116.\n- HOME (padding 24): step 1 is a 780 column centred, 231 + 780 + 231 = 1242. SELF CHECK-IN is 272 + 8 + 556.5 + 8 + 397.5 = 1242.\n\nAt 1366: 150 + 150 + 1066. AERODROME 232 + 8 + 463.2 + 8 + 330.8 = 1042; SELF CHECK-IN 272 + 8 + 513.3 + 8 + 366.7 = 1168.\n\nAt 1920: 150 + 150 + 1620.\n\nVertical at 1366x768: 18 top bar + 9 column padding + 21 rows x 31 + 80 foot = 758 <= 768. With a signed-in controller the foot is 146 and keys shrink evenly to about 25.3 px.\n\nOne 8 px gap everywhere.",
+    "signatureRule": "The PANDORA key panel is the move. Menu and submenu are two columns of flat #207a11 keys standing on pure black, rows aligned across both, exactly one #5fd23a active key per column. Right of the keys there is only data on black, plus paper-white boxes for frequencies, maps, the aircraft sheet and the touch keyboard. The dealt framed-sheet move (tinted L-frame, inset white sheet, 16 px corners) is not applied, because user references 1-11 and the locked brand outrank it.",
+    "rhythm": "High density, three settings moved together:\n- keys: 28 px on a 31 px pitch at 14 px uppercase\n- data rows: 22-26 px at 15 px (TAF, GAMET, NOTAM text); METAR table at 18px/1.45 (26 px rows); AERODROME list rows 38 px at 20 px\n- table cells: 4px 8px at a 13 px body\n- padding: pane 12px 16px (AERODROME 8px 12px, HOME 24px), one 8 px gap"
+  },
+  "navigation": [
+    {
+      "label": "? (HOME)",
+      "target": "#home"
+    },
+    {
+      "label": "RADIO",
+      "target": "#radio"
+    },
+    {
+      "label": "METEO",
+      "target": "#meteo"
+    },
+    {
+      "label": "AWALON",
+      "target": "#awalon"
+    },
+    {
+      "label": "AERODROME",
+      "target": "#aerodrome"
+    },
+    {
+      "label": "AD CIV",
+      "target": "#adciv"
+    },
+    {
+      "label": "AD MIL",
+      "target": "#admil"
+    },
+    {
+      "label": "AD VFR",
+      "target": "#advfr"
+    },
+    {
+      "label": "INOP",
+      "target": "#inop"
+    },
+    {
+      "label": "CALLSIGN",
+      "target": "#callsign"
+    },
+    {
+      "label": "AIRCRAFT",
+      "target": "#aircraft"
+    },
+    {
+      "label": "MAP",
+      "target": "#map"
+    },
+    {
+      "label": "COORDINATION",
+      "target": "#coordination"
+    },
+    {
+      "label": "CONVERSION",
+      "target": "#conversion"
+    },
+    {
+      "label": "SYT OP",
+      "target": "#sytop"
+    },
+    {
+      "label": "AUP",
+      "target": "#aup"
+    },
+    {
+      "label": "OTHER",
+      "target": "#other"
+    },
+    {
+      "label": "ABOUT",
+      "target": "#about"
+    },
+    {
+      "label": "EMERGENCY",
+      "target": "#emergency"
+    },
+    {
+      "label": "ADMIN",
+      "target": "#admin"
+    }
+  ],
+  "navigationDesign": {
+    "layoutCase": "app-shell",
+    "layout": "An 18 px top bar spans the window (Reload | Brighter | Darker). Under it, the 150 px menu column holds 21 key rows on a 31 px pitch: ←, then the 20 tabs. At its foot sit the UTC clock with the AIRAC line, the PolIDS Poland mark and the user box. Each view adds its own 150 px submenu column, keys row for row beside the menu (letter pairs on CALLSIGN and AIRCRAFT), then the pane. Keys are the only navigation: no icons, no labelled sidebar, no anchors into a view.",
+    "behavior": [
+      "One tap on a menu key opens its view at #<tab>. That key fills #5fd23a and the pane swaps at 0 ms.",
+      "A submenu key opens its page at #<tab>/<id> and becomes its column's one active key.",
+      "← and browser Back step through this session's screens (Alt+←). ← is disabled at 35% opacity on the first screen.",
+      "Reload returns to the same screen; F5 opens HOME.",
+      "Brighter and Darker step brightness by 12% from -2 to +2 and are remembered.",
+      "ADMIN is present only for administrators.",
+      "Long submenus (AD VFR with 69 aerodromes) scroll by whole rows with snap and no visible scrollbar.",
+      "In short windows keys shrink evenly to a 16 px minimum, so all 21 rows fit beside the foot."
+    ],
+    "transformation": {
+      "compact": "Below 641 px is out of scope: controllers use 1366-1920 px monitors and tablets. The desktop shell stays as today; no phone fold is added.",
+      "medium": "641-1100 px: both key columns keep 150 px. Panes use their existing breakpoints (1250, 1240, 1150 and 1100 px) to drop to two columns or stack. Touch works with 28 px keys and 40-44 px keyboard keys.",
+      "expanded": "1101 px and up: as laid out. At 1920x1080 the panes widen and RADIO scales its board."
+    }
+  },
+  "sections": [
+    {
+      "id": "shell",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-10",
+      "purpose": "Name the product and keep every view one tap away, beside the UTC time, the AIRAC cycle and the signed-in controller.",
+      "userQuestion": "Where is the data I need, and what time and AIRAC cycle am I working in?",
+      "stage": "orient",
+      "dependencies": [],
+      "evidence": [
+        "user-reference-10: two columns of flat green keys on black, active key brighter, EMERGENCY red",
+        "user-reference-2: menu keys with white uppercase labels on black",
+        "frontend/index.html menu order; style.css key metrics (issue #25); brand signatureDevice"
+      ],
+      "copy": {
+        "heading": "PolIDS",
+        "body": [
+          "Top bar: Reload, Brighter, Darker.",
+          "Menu keys: ←, ?, RADIO, METEO, AWALON, AERODROME, AD CIV, AD MIL, AD VFR, INOP, CALLSIGN, AIRCRAFT, MAP, COORDINATION, CONVERSION, SYT OP, AUP, OTHER, ABOUT, EMERGENCY, and ADMIN for administrators.",
+          "Sample data: the menu foot reads 14:32:07Z and AIRAC 2611 · 2026-10-29 – 2026-11-25, then the PolIDS Poland mark, then the signed-in controller with '1458203 · C1' and Log out."
+        ],
+        "callsToAction": [
+          {
+            "label": "?",
+            "target": "#home"
+          },
+          {
+            "label": "Reload",
+            "target": "action:reload-same-screen"
+          },
+          {
+            "label": "Brighter",
+            "target": "action:brightness-step-up"
+          },
+          {
+            "label": "Darker",
+            "target": "action:brightness-step-down"
+          },
+          {
+            "label": "Log out",
+            "target": "/auth/logout"
+          }
+        ]
+      },
+      "layout": "Body grid auto | 1fr under the 18 px top bar (unchanged).\n\nTop bar: three equal flat #207a11 fields 2 px apart, 12px/18px white labels, tracking 0, no gradient.\n\nMenu column: 150 px on #000 (retire #050605). 21 key rows at 137x28 with 1.5 px margins on a 31 px pitch. Keys are flat #207a11 with a 1px #1f5a16 edge and 14px uppercase white labels at 400, tracking 0 (retire .3px). Variants:\n- active: #5fd23a fill with a #0b2a06 label\n- SYT OP: label #ccff66\n- EMERGENCY: #b3261e, active #e0302a with a white label\n- ADMIN: flat #3a3a3a\n- ←: 22px glyph, 35% when disabled\n\nFoot: 80 px. Clock box 46 px (20px white UTC, 12px #a3a3a3 AIRAC line), then the 34 px mark. With a signed-in controller add the 66 px user box: name #e8e8e8, 'CID · rating' #a3a3a3, DEV #f2d21b, Log out as a secondary button. Foot rules are 1px #2a2a2a.\n\nSubmenu column: 150 px on #000, keys row for row with the menu, gap rows where the code puts them. The long-submenu column drawing is recoloured to #000 and #2a2a2a.\n\nRules: none between the key columns. One 1px #2a2a2a rule stands before the pane. Keep both 1px borders for the width sums: the menu's border is #000 when a submenu follows and #2a2a2a when none does.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "Pointerdown fills the key #5fd23a with a #0b2a06 label at 0 ms. Release returns it over 120 ms unless it stays selected. Hover on hover-capable pointers lights the 1px edge #5fd23a over 120 ms. The view swap is instant.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Every transition at 0 ms; identical final states and operation."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [
+        "polids-logo-bez-podpisu"
+      ],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Both columns keep 150 px. Keys shrink evenly to 16 px in short tablet windows.",
+        "expanded": "As laid out at 1366, 1440 and 1920."
+      }
+    },
+    {
+      "id": "home-session",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Show who is signed in, whether they are connected and what is booked, and put the check-in for the right position one tap away.",
+      "userQuestion": "Am I connected, what is booked for me, and which position am I opening?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/home.js greeting, onlineText, bookingText, sessionTarget",
+        "frontend/css/home.css (44px greeting to retire)"
+      ],
+      "copy": {
+        "heading": "Welcome, Anna Nowak (1458203)",
+        "body": [
+          "Sample data: rating line 'C1 · Enroute Controller'.",
+          "VATSIM, the finding read first: 'You are not connected to VATSIM as a controller.' above 'Booking: EPWA_APP 16:00–18:00Z'. With nothing booked it reads 'No bookings in the next 24 h.' Bookings refresh every minute.",
+          "Position: EPWA_APP taken from the booking, with the note 'Warszawa Approach · 128.800 · aerodromes: EPWA, EPMO · booking 16:00–18:00Z' and the SELF CHECK-IN key under it. A tower position turns the key into 'SELF CHECK-IN → AERODROME EPWA'.",
+          "Foot: the version and 'AIRAC 2611 · 2026-10-29 – 2026-11-25'."
+        ],
+        "callsToAction": [
+          {
+            "label": "SELF CHECK-IN",
+            "target": "#home/checkin"
+          },
+          {
+            "label": "SELF CHECK-IN → AERODROME EPWA",
+            "target": "#aerodrome/EPWA"
+          }
+        ]
+      },
+      "layout": "HOME pane (no submenu): 1290 px at 1440 with 24 px padding. One 780 px column, centred horizontally (231 + 780 + 231 = 1242) and vertically, items 12 px apart.\n\nGreeting: the h1 at 22px #ffffff, weight 400 (from 44px; the 30px and 32px media overrides go). Rating: 13px small caps #a3a3a3 (from green with .5px tracking).\n\nVATSIM and Position are panels: 1px #2a2a2a frame, no fill, title in the label style over a 1px #1a1a1a rule (retire the #111611 band). VATSIM lines are 14px: online and booking in #5fd23a, 'not connected' and 'No bookings…' in #a3a3a3, errors #ff6a5a.\n\nPosition select: full width, 28px or taller, #141414 fill with a 1px #5a5a5a edge. Note: 12px #a3a3a3 with the booking in #5fd23a. SELF CHECK-IN: a full-width primary key.\n\nFoot: version and AIRAC at 12px #a3a3a3, centred at the pane bottom.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "The select's focus edge turns #5fd23a. SELF CHECK-IN gives press feedback and then swaps to step 2 at 0 ms. VATSIM lines update in place on refresh.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The column narrows to the pane width minus padding; panels stack as today.",
+        "expanded": "780 px column centred in the pane at every desktop width."
+      }
+    },
+    {
+      "id": "home-checkin",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Give the controller everything to check before opening the position, in one screen.",
+      "userQuestion": "What is in force at my aerodromes right now: transition level, weather, LVP, NOTAMs and flow restrictions?",
+      "stage": "de_risk",
+      "dependencies": [
+        "home-session"
+      ],
+      "evidence": [
+        "frontend/js/overview.js panels: Transition level, METAR · TAF · LVP, NOTAMs in force now, Flow restrictions, Airport monitor, Position opening checklist",
+        "frontend/css/overview.css grid 272px | 1.4fr | 1fr"
+      ],
+      "copy": {
+        "heading": "SELF CHECK-IN",
+        "body": [
+          "Sample data: Transition level FL080 as the one large figure. It becomes FL090 only when an aerodrome reports QNH 995 hPa or lower; TA 6500 ft.",
+          "METAR · TAF · LVP per aerodrome of the position. Each shows the ATIS runway with its letter, or the preferred runway in a dashed PREF frame, with ARR and DEP apart when they differ.",
+          "NOTAMs in force now; Flow restrictions (ECFMP and vIFF); Airport monitor (vIFF); and the Position opening checklist for APP or ACC. MINE or ALL, with 'N hidden'.",
+          "Empty lines as written today: 'No NOTAMs in force now for the aerodromes shown.' and 'No flow measures for FIR EPWW and Polish aerodromes.'"
+        ],
+        "callsToAction": [
+          {
+            "label": "← CHANGE POSITION",
+            "target": "#home"
+          },
+          {
+            "label": "MINE",
+            "target": "in-place:scope-mine"
+          },
+          {
+            "label": "ALL",
+            "target": "in-place:scope-all"
+          }
+        ]
+      },
+      "layout": "Same HOME pane. First a bar: '← CHANGE POSITION' as a secondary button, the position, then MINE/ALL with 'N hidden' in #a3a3a3.\n\nGrid: 272 + 8 + 556.5 + 8 + 397.5 = 1242 at 1440; 272 + 8 + 513.3 + 8 + 366.7 = 1168 at 1366. At <=1240 px wide or <=640 px tall it becomes 272 + 1.4fr and the HOME pane scrolls.\n\nPanels: 1px #2a2a2a frame, no fill, label-style titles. Transition level is the one large figure: 28px #ffffff at 400. PREF uses a 1px dashed #a3a3a3 frame. Restrictions use the square tag pairs. NOTAM and METAR rows are banded #000/#2b2b2b. Checklist rows are 13px.\n\nMINE/ALL: square segments; on is a #14240f fill with #5fd23a text, off is #a3a3a3.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "MINE and ALL: the on fill moves to the chosen segment over 120 ms while the rows filter at once and keep their order. The module-load error shows its message and TRY AGAIN inside the pane.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "The segment changes at 0 ms; rows and final states are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Two columns (272 + 1.4fr) with the pane scrolling, as today at <=1240 px.",
+        "expanded": "Three columns summing to the pane width, as above."
+      }
+    },
+    {
+      "id": "radio-board",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-6",
+      "purpose": "Show who is on which frequency across EPWW and its neighbours on one board.",
+      "userQuestion": "Who is online on which frequency, in which sector configuration, and where is nobody staffing?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-6: white frequency boxes, cyan unit labels, yellow sector tags on black",
+        "frontend/css/radio.css owner-tuned board palette (preserve)"
+      ],
+      "copy": {
+        "heading": "RADIO",
+        "body": [
+          "Sample data: the top row shows ACC GAT '2N', APP GD '1', APP WA 'H+L', APP KK '1' and APP PO '0'. The Polish ATIS boxes follow, such as 'EPWA ATIS DEP 123.430', with '+2' when they overflow.",
+          "Neighbour tiles with yellow FIR codes EDWW, EDUU, EDMM, ESAA, LKAA, LZBB, UMKK, EYVL, UMMV and UKLV. Staffed sectors appear as white frequency boxes, 'ADVISORY 122.800' marks an unstaffed FIR, and 'BERLIN: EAST' sits under EDWW. Level bands are 660, 365 and 0.",
+          "Black EPWW previews LOW FL330, MID FL350 and HIGH FL400 with labels such as 'B LOW' and 'I FIS'. A red sector means a vIFF restriction or more than 80 % of capacity.",
+          "'Data from 14:28Z (4 min old)' once data ages past 3 min. 'retrying every 30 s' appears after a failed first load."
+        ],
+        "callsToAction": [
+          {
+            "label": "FMP",
+            "target": "#other/fmp"
+          },
+          {
+            "label": "ATIS",
+            "target": "in-place:layer-atis"
+          },
+          {
+            "label": "LOW",
+            "target": "in-place:layer-low"
+          },
+          {
+            "label": "MID",
+            "target": "in-place:layer-mid"
+          },
+          {
+            "label": "HIGH",
+            "target": "in-place:layer-high"
+          },
+          {
+            "label": "APP",
+            "target": "in-place:layer-app"
+          },
+          {
+            "label": "TWR",
+            "target": "in-place:layer-twr"
+          },
+          {
+            "label": "TWR/A",
+            "target": "in-place:layer-twr-a"
+          },
+          {
+            "label": "FIS",
+            "target": "in-place:layer-fis"
+          }
+        ]
+      },
+      "layout": "No submenu. The board keeps its owner-tuned 13-column grid (radioboard.js pageGrid, --rb-f 11-15 px by window) across the 1290 px pane, unchanged.\n\nOnly shared finishes change:\n- column H layer keys are flat (#207a11 with white labels when on, the existing off grey when off)\n- FMP stays black with a grey edge\n- no gradients\n\nPreserved from radio.css: white frequency boxes with dark figures, #f2d21b FIR codes and sector tags, #3ec7e0 unit labels, the navy outlines and the red capacity fills.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "A layer key's on or off fill changes over 120 ms while its layer shows or hides at once. A FIR code opens its LoA panel at once. Data refresh replaces values in place without a flash.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Key fills change at 0 ms; layers and values are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "--rb-f drops to 11 px and the 820 px height rule compacts rows, as today.",
+        "expanded": "--rb-f up to 15 px at 1920x1080. The whole grid fits windows 821-1000 px tall."
+      }
+    },
+    {
+      "id": "meteo-metar",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-3",
+      "purpose": "Show the current METAR of every aerodrome in a list, colour-coded the way PANDORA does.",
+      "userQuestion": "What is the weather at each aerodrome right now, and which report is missing?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-3: METAR rows on black, white values, yellow CAVOK, dim green time and RMK groups, alternating bands",
+        "frontend/css/metar.css, frontend/js/metarfmt.js"
+      ],
+      "copy": {
+        "heading": "METAR PL",
+        "body": [
+          "Sample data: the 15 AD 2 IFR aerodromes in a fixed order, one per row, for example 'EPWA 231030Z 27012KT CAVOK 08/02 Q1017 NOSIG' and 'EPKK 231030Z 24008KT 9999 FEW030 07/01 Q1018 NOSIG'. A missing report reads 'NIL'.",
+          "DECODED adds the weather in English and Polish inline, for example '-RA[LIGHT RAIN / LEKKI DESZCZ]'.",
+          "METAR MIL and METAR INTL use the same rows with a search field. COLOURED / MONO and DECODED / RAW are shared by all five lists and remembered."
+        ],
+        "callsToAction": [
+          {
+            "label": "COLOURED",
+            "target": "in-place:colour-on"
+          },
+          {
+            "label": "MONO",
+            "target": "in-place:colour-off"
+          },
+          {
+            "label": "DECODED",
+            "target": "in-place:decode-on"
+          },
+          {
+            "label": "RAW",
+            "target": "in-place:decode-off"
+          }
+        ]
+      },
+      "layout": "Submenu: METAR PL, METAR MIL, METAR INTL, TAF PL, TAF INTL, WIND, RADAR, GAMET, SIGWX, a gap row, ICING, QNH, SAT EUR, SAT PL, TURB, SUN.\n\nPane (1108 px): one toolbar row with COLOURED / MONO and DECODED / RAW as text switches (on #5fd23a, off in the red they use today), 'refresh every 2 min' in small caps, and the search on MIL and INTL.\n\nTable: 18px/1.45 (26 px rows), narrow white station column, groups coloured as metarfmt.js assigns them today. The cloud colour --mt-cov moves from #24802a to #4cae3a. Rows alternate #000 and #2b2b2b with no rules and no header band.\n\nFit: 15 PL rows take 390 px, so list and toolbar fit 1440x900 and 1366x768 without scrolling.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "COLOURED / MONO and DECODED / RAW: the chosen option's colour changes over 120 ms while the rows re-render at once. The 2-minute refresh replaces rows in place; rows never re-enter or flash.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Switch colours change at 0 ms; rows are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Rows keep one line and the pane scrolls horizontally inside the list only if a long INTL report needs it.",
+        "expanded": "Full rows with the decode inline."
+      }
+    },
+    {
+      "id": "meteo-text",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-11",
+      "purpose": "Show forecasts and area bulletins as raw text, one report per block.",
+      "userQuestion": "What is forecast for my aerodromes and the GAMET areas over the next hours?",
+      "stage": "evaluate",
+      "dependencies": [
+        "meteo-metar"
+      ],
+      "evidence": [
+        "user-reference-11: raw GAMET text in white uppercase lines beside the METEO keys",
+        "frontend/js/tabs/meteo.js .gmt-areas keys; frontend/css/meteoimg.css .gmt-map"
+      ],
+      "copy": {
+        "heading": "GAMET",
+        "body": [
+          "Sample data: 'EPWW GAMET VALID 231200/231800 EPWA-', 'EPWW WARSAW FIR/A1 BLW FL100', 'SECN I', 'SFC WIND: 16/22 VRB/02KT', 'SECN II', 'FZLVL: 16/22 ABV 10000FT AMSL', beside the map of areas A1 to A5.",
+          "TAF PL and TAF INTL show one forecast per block with change groups on indented lines, for example 'TAF EPWA 231100Z 2312/2418 27010KT 9999 SCT035' then 'TEMPO 2312/2316 SHRA BKN020'.",
+          "Empty: 'No GAMET for area A3.'"
+        ],
+        "callsToAction": [
+          {
+            "label": "A1",
+            "target": "in-place:gamet-area"
+          },
+          {
+            "label": "ALL",
+            "target": "in-place:gamet-all"
+          }
+        ]
+      },
+      "layout": "Same pane. One report per block at 15px/1.45, raw uppercase white, change groups indented, blocks banded #000/#2b2b2b. GAMET splits into text and the area map (the map takes 38-40% at <=1365 px). Area keys A1 to A5 and ALL are square segments: active is a #14240f fill with #5fd23a text and a 2 px underline.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Area keys A1 to A5 and ALL: the active segment and its underline move over 120 ms while the text and map swap at once.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "The segment changes at 0 ms; text and map are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The GAMET map stacks under the text when the pane is narrow, as today.",
+        "expanded": "Text and map side by side."
+      }
+    },
+    {
+      "id": "meteo-qnh",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-4",
+      "purpose": "Show the regional QNH values over FIR EPWW on the map controllers know.",
+      "userQuestion": "What is the QNH in each region of the FIR?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-4: QNH regions with yellow and white values",
+        "frontend/css/qnh.css paper map palette (preserve)"
+      ],
+      "copy": {
+        "heading": "QNH",
+        "body": [
+          "Sample data: the regional QNH map on paper white, regions 1 to 14 and bands 15 to 17 with framed values such as '1014' and '1015', and the TMA and CTR outlines; the observation time sits under the map."
+        ],
+        "callsToAction": [
+          {
+            "label": "Zoom",
+            "target": "in-place:map-zoom"
+          }
+        ]
+      },
+      "layout": "The map fills the pane on its preserved paper palette from qnh.css: #fff paper, green region borders, orange 53°N and 51°N lines and band numbers, lilac TMA fill. Leaflet zoom bar: square with a 1px #9aa0a6 edge and no shadow. The caption with the time sits under the map in the label style.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "hover",
+        "behavior": "The zoom bar's buttons light a 1px #5fd23a edge on hover over 120 ms. The map, its values and the Leaflet tooltips keep their existing behaviour with no added motion.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The map scales with the pane and labels use labelScale().",
+        "expanded": "Full pane."
+      }
+    },
+    {
+      "id": "meteo-imagery",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-5",
+      "purpose": "Show the latest satellite, radar and chart imagery at full size with its time.",
+      "userQuestion": "What do the satellite, radar, SIGWX, icing and turbulence pictures show now and over the next hours?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-5: satellite image filling the screen with a small-caps caption below",
+        "frontend/css/meteoimg.css .mimg-stage, .mimg-steps, .mimg-seg"
+      ],
+      "copy": {
+        "heading": "SAT EUR",
+        "body": [
+          "Sample data: the IR 10.8 µm frame over Europe at 14:00Z fills the pane with its caption underneath; earlier frames are step keys.",
+          "RADAR, SIGWX, SAT PL and TURB use the same stage. TURB steps from +0 to +21 h with playback, and ICING covers FL050 to FL300.",
+          "A failed frame shows 'No preview' in its place."
+        ],
+        "callsToAction": [
+          {
+            "label": "Step keys",
+            "target": "in-place:frame-step"
+          }
+        ]
+      },
+      "layout": "Image stage at full pane width on #000: square, no shadow or overlay. Caption: 13px small caps #a3a3a3 under the image with its UTC time. Step keys form one row of square segments (active: #14240f fill, #5fd23a text, 2 px underline; failed: #ff6a5a). TURB playback controls are secondary buttons.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "A step key's active fill and underline move over 120 ms while the frame swaps at once. Playback advances frames at its existing interval with no crossfade.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "The step indicator changes at 0 ms; frames are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The image scales to the pane width. The TURB long labels hide at <=1599 px, as today.",
+        "expanded": "Full pane width."
+      }
+    },
+    {
+      "id": "meteo-wind-sun",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Give the forecast wind picture and the twilight times for any aerodrome.",
+      "userQuestion": "What is the wind aloft, and when do civil twilight, sunrise and sunset fall today?",
+      "stage": "explain",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/meteo.js SUN view: Aerodrome field with Show, sun map, SUN_ROWS (BMCT, Sunrise, Noon, Sunset, EECT)",
+        "frontend/css/wind.css"
+      ],
+      "copy": {
+        "heading": "SUN",
+        "body": [
+          "Sample data: EPWA on 2026-11-23: BMCT 05:31Z, Sunrise 06:09Z, Noon 10:20Z, Sunset 14:31Z, EECT 15:09Z, each with the Polish time beside it, next to the map with the night rings and the subsolar point.",
+          "WIND shows the wind map at the chosen level and reads 'Forecast unavailable.' when the forecast fails."
+        ],
+        "callsToAction": [
+          {
+            "label": "Show",
+            "target": "in-place:sun-for-aerodrome"
+          }
+        ]
+      },
+      "layout": "WIND fills the pane like the imagery stage. SUN has the Aerodrome field with Show on top, then the map with the night rings and the subsolar point beside the side table. The table rows are banded with times right-aligned, UTC in #ffffff and the Polish time in #a3a3a3 beside it.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "The Aerodrome field lights its #5fd23a edge on focus and Show gives press feedback over 120 ms. The table and the map update at once.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "wind.css two-column rule at <=1250 px, as today; the SUN side table stays beside the map.",
+        "expanded": "Full pane."
+      }
+    },
+    {
+      "id": "awalon",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Show the wind profile from the surface to 10 000 ft for every AD 2 aerodrome.",
+      "userQuestion": "How strong is the wind at each level over each aerodrome, and what does it mean for its runways?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/css/awalon.css AWALON speed palette (preserve)",
+        "frontend/js/tabs/awalon.js 'Runways · 0 ft and 3000 ft approach'"
+      ],
+      "copy": {
+        "heading": "AWALON",
+        "body": [
+          "Sample data: ALL shows wind from SFC to 10 000 ft every 1000 ft for the 15 AD 2 aerodromes, for example EPWA SFC 270/12 kt from the METAR and 260/28 kt at 3000 ft. Cells are coloured by speed band (0–10, 10–15, 15–20, 20–30, 30–40, 40–60, over 60 kt) unless colours are off, and rows below the aerodrome read GND.",
+          "Per aerodrome: the profile chart, the profile table (direction, speed, gust, minimum and maximum within ±1 h) and 'Runways · 0 ft and 3000 ft approach'.",
+          "Empty: 'No wind profile for EPZG'."
+        ],
+        "callsToAction": [
+          {
+            "label": "ALL",
+            "target": "#awalon"
+          },
+          {
+            "label": "EPWA",
+            "target": "#awalon/EPWA"
+          }
+        ]
+      },
+      "layout": "Submenu: ALL plus the 15 aerodromes. ALL is one table across the pane: header in the label style, cells on the preserved awalon.css palette, white figures, tabular alignment. Per aerodrome, the chart, profile table and runway panel keep their palette; only frames, headers and bands change. The SFC forecast stays in italics where there is no METAR.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Aerodrome keys take the active fill with the shared 120 ms press feedback while the table and chart swap at once. The colour toggle applies at once.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Key fills change at 0 ms; table and chart are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Cell text drops to 11px at <=1499 px, as today.",
+        "expanded": "Full table."
+      }
+    },
+    {
+      "id": "aerodrome-list",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "table-filter-bar"
+      ],
+      "referenceDirectionId": "user-reference-8",
+      "purpose": "Find any aerodrome fast by code, name or city, by touch or keyboard.",
+      "userQuestion": "Which aerodrome am I looking for, and who is staffing it?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-8: wide uppercase aerodrome list, search field, on-screen keyboard, red full-row selection",
+        "frontend/css/aerolist.css, frontend/js/aerolist.js"
+      ],
+      "copy": {
+        "heading": "EPWW",
+        "body": [
+          "Sample data: the EPWW list has one aerodrome per row, for example 'EPWA LOTNISKO CHOPINA W WARSZAWIE' with TWR and APP online tags and 'EPKK KRAKÓW/Balice', with MIL marked on military fields. The count reads '57 aerodromes', or '3 of 57' while a search filters it.",
+          "'()' searches every aerodrome by ICAO, name or city with the touch keyboard open, up to 100 rows, then 'N of M'.",
+          "A foreign aerodrome opens a card with METAR, TAF, ATIS and its APP, TWR, GND, DEL and ATIS positions."
+        ],
+        "callsToAction": [
+          {
+            "label": "SHOW",
+            "target": "in-place:filter-list"
+          },
+          {
+            "label": "CLEAR",
+            "target": "in-place:clear-search"
+          },
+          {
+            "label": "()",
+            "target": "#aerodrome/0"
+          },
+          {
+            "label": "EPWA",
+            "target": "#aerodrome/EPWA"
+          }
+        ]
+      },
+      "layout": "Submenu: (), EPWW, ESAA, ED, ET, LKAA, LZBB, UMKK, EYVL, UMMV, UKLV. Pane 1116 px (padding 8px 12px).\n\nBar:\n- paper search field: 380 px, max 36vw; #ffffff with a 2px #9a9a9a edge; 18px uppercase #1b1c20; placeholder #5a5a5a; focus edge #5fd23a\n- SHOW and CLEAR as primary keys\n- FIR title: code 18px white, name 14px #a3a3a3, tracking 0\n- count on the right, fixed 15ch\n\nList: fills the rest inside a 1px #2a2a2a frame. Rows are 38 px at 20px: ICAO white (online ICAO #5fd23a), name #e8e8e8, square MIL tag, online position tags.\n\nRow states:\n- bands: #000 and #2b2b2b (from #1b1f1b)\n- hover: a 1px #5fd23a edge with no green fill\n- selected: a full-width #a51d16 band with white text, no 4 px bar\n\nIn '()' the touch keyboard sits under the list on its paper tray. The sheet's 48 px row pitch and no-zebra rule are overridden by the reference.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "hover",
+        "behavior": "Hover edge over 120 ms. Selection moves the red band at 0 ms. The keyboard tray opens and closes over 120 ms (6 px rise plus opacity). Filtering updates rows and the count at 0 ms.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "At <=1250 px or <=640 px tall the legend wraps to its own row and the keyboard keys narrow by cqw, as today.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "aerodrome-info",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Put one Polish aerodrome on one screen: weather, wind, runways, ATIS, NOTAMs and frequencies.",
+      "userQuestion": "What is the weather, runway in use and staffing at this aerodrome?",
+      "stage": "evaluate",
+      "dependencies": [
+        "aerodrome-list"
+      ],
+      "evidence": [
+        "frontend/js/tabs/aerodrome.js titles: ATIS, Frequencies · online · bookings, NOTAM, Runways, TAF, Traffic, Wind 0 / 3000 ft · approach",
+        "frontend/css/style.css .aero-grid"
+      ],
+      "copy": {
+        "heading": "EPWA",
+        "body": [
+          "Sample data: METAR head 'EPWA 231030Z 27012KT CAVOK 08/02 Q1017 NOSIG'. 'Wind 0 / 3000 ft · approach' shows 270/12 kt at 0 ft and 260/28 kt at 3000 ft with runway 29 in use. 'Runways' lists 11/29 and 15/33.",
+          "'Frequencies · online · bookings' shows EPWA_TWR 118.300 online in bright green and EPWA_APP 128.800 booked with a dashed edge. 'ATIS', 'NOTAM' and 'TAF' follow. LVP reads 'LVP CANCELLED' or 'LVP not applicable'."
+        ],
+        "callsToAction": [
+          {
+            "label": "INFO",
+            "target": "#aerodrome/EPWA"
+          },
+          {
+            "label": "AWOS",
+            "target": "in-place:view-awos"
+          },
+          {
+            "label": "TRAFFIC",
+            "target": "#aerodrome/EPWA/dman"
+          },
+          {
+            "label": "Show",
+            "target": "in-place:open-icao"
+          }
+        ]
+      },
+      "layout": "Toolbar: the ICAO field with Show, then INFO / AWOS / TRAFFIC as square segments (active: #14240f fill, #5fd23a text, 2 px underline). The METAR head line comes next.\n\nGrid: 232 + 8 + 506.3 + 8 + 361.7 = 1116 at 1440; 463.2 and 330.8 at 1366; two columns at <=1250 px or <=640 px tall. Panels use label-style titles with no bands.\n\nFigures: wind rose 200 px; wind figure 28px white (from 26px); runway pair 28px (from 32px).\n\nFrequency boxes: white with 15px black figures and a 2px #9cdc84 edge; online fills #8cff5a; booked gets a 2px dashed #ffb020 edge. The runway table stays centred and banded.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "INFO, AWOS and TRAFFIC: the active segment and its underline move over 120 ms while the content swaps at once. Data refresh replaces values in place.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "The segment changes at 0 ms; content is identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Two columns with natural-height panels, as today at <=1250 px.",
+        "expanded": "Three columns summing to the pane."
+      }
+    },
+    {
+      "id": "aerodrome-awos-traffic",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Show live runway sensors and the departure and arrival sequence for the aerodrome.",
+      "userQuestion": "What do the runway sensors read, and which flights depart and arrive next?",
+      "stage": "act",
+      "dependencies": [
+        "aerodrome-info"
+      ],
+      "evidence": [
+        "frontend/css/awos.css, frontend/css/dman.css",
+        "README AERODROME row (AWOS, TRAFFIC)"
+      ],
+      "copy": {
+        "heading": "TRAFFIC",
+        "body": [
+          "Sample data: DMAN departures with TSAT, TTOT and CTOT, for example 'LOT3KM TSAT 15:42Z TTOT 15:50Z'. AMAN arrivals show ELDT and the entry point, with EOBT and ETOT where there is no A-CDM, and FLOW spacing.",
+          "AWOS: wind every 5 s, RVR, and the 1 RWY or 2 RWYS views. VMC applies when visibility is 5 km or more and the ceiling 1500 ft or more. Unknown values read '–' and simulated values are marked SYM.",
+          "Empty: 'No departures in this window', 'No airborne arrivals', 'No flights with CTOT'."
+        ],
+        "callsToAction": [
+          {
+            "label": "1 RWY",
+            "target": "in-place:awos-one"
+          },
+          {
+            "label": "2 RWYS",
+            "target": "in-place:awos-two"
+          }
+        ]
+      },
+      "layout": "AWOS keeps its runway tiles and figures; only frames, keys and bands change, with 1 RWY / 2 RWYS as segments.\n\nTRAFFIC (DMAN/AMAN):\n- dm-top: flat #207a11\n- dm-acts: flat #444444 (their lower stop) with #eeeeee labels\n- strip legend chips: flat in their lower stop colour\n- rows banded, times white and right-aligned\n\nThe 820 px, 1300 px and 1250 px rules stay.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "1 RWY / 2 RWYS and the DMAN action keys give press feedback over 120 ms while views switch at once. Sequence and sensor values update in place on refresh with no flash.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Key feedback at 0 ms; views and values are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Existing awos.css and dman.css width and height rules.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "ad-charts",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Give the eAIP and every aerodrome chart from AD CIV, AD MIL and AD VFR. Each is its own view with its own key and route.",
+      "userQuestion": "Where is the chart or AIP page I need for this aerodrome, this cycle or the next?",
+      "stage": "explain",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/aip.js (AD2 list, embedBar)",
+        "README AD CIV / AD MIL / AD VFR row"
+      ],
+      "copy": {
+        "heading": "AD CIV",
+        "body": [
+          "Sample data: AD CIV has the keys eAIP, NEXT AIRAC and the 15 AD 2 aerodromes from EPBY to EPZG. AD MIL has eAIP, NEXT AIRAC and 15 military aerodromes from EPCE to EPTM. AD VFR has eAIP, NEXT AIRAC and 69 aerodromes from EPBA.",
+          "An aerodrome page lists its charts beside the PDF with short names (AERODROME, PARKING APN 2, RWY 29 SID, RWY 11 ILS Z CAT II / LOC Z) and filters ALL, ADC, APDC, SID, STAR, IAC, VFR, OBST and OTHER with counts. 'No charts of this type.' shows when a filter is empty.",
+          "Before publication NEXT AIRAC reads 'eAIP VFR for AIRAC 2612 (effective 26.11.2026) has not been published yet.'"
+        ],
+        "callsToAction": [
+          {
+            "label": "PDF ↗",
+            "target": "external:chart-pdf"
+          },
+          {
+            "label": "AD 2 TEXT ↗",
+            "target": "external:ad2-text"
+          },
+          {
+            "label": "EPWA",
+            "target": "#adciv/EPWA"
+          },
+          {
+            "label": "NEXT AIRAC",
+            "target": "#adciv/next"
+          }
+        ]
+      },
+      "layout": "Submenu: eAIP, NEXT AIRAC, then the aerodrome keys. AD VFR's 69 keys scroll by whole rows with snap, and the long-submenu drawing uses #000 and #2a2a2a.\n\nPane:\n- the one-line embed bar (28 px; address and note shortened with an ellipsis)\n- the chart list as banded rows beside the white PDF frame\n- filter segments with counts in #a3a3a3\n- 'PDF ↗' and 'AD 2 TEXT ↗' (AD 4 TEXT on MIL and VFR) as secondary buttons\n\nThe eAIP frame fills the pane on white.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Aerodrome and filter keys take their active fill over 120 ms while the chart list and frame swap at once. The aerodrome from the address scrolls into view at once.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Key fills change at 0 ms; list and frame are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The chart list narrows and the PDF frame keeps the rest.",
+        "expanded": "List and frame side by side."
+      }
+    },
+    {
+      "id": "inop",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Reach the PL vACC operational procedures page.",
+      "userQuestion": "Where are the current INOP and operational procedures of PL vACC?",
+      "stage": "explain",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/inop.js (iframeWithFallback, embedBar)"
+      ],
+      "copy": {
+        "heading": "INOP",
+        "body": [
+          "The PL vACC operational procedures site (om.plvacc.pl) under a one-line bar. The site refuses framing, so the ↗ key opens it in a new tab."
+        ],
+        "callsToAction": [
+          {
+            "label": "↗",
+            "target": "https://om.plvacc.pl"
+          }
+        ]
+      },
+      "layout": "Fill pane: the embed bar (28 px, the address in #a3a3a3 with an ellipsis), then the frame or its fallback message. ↗ is a secondary button.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "The ↗ button lights its edge on hover and fills on press over 120 ms. The framed page itself has no motion.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Full pane.",
+        "expanded": "Full pane."
+      }
+    },
+    {
+      "id": "callsign",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "table-filter-bar"
+      ],
+      "referenceDirectionId": "user-reference-1",
+      "purpose": "Look up an airline's radiotelephony callsign by letter or search, by touch or keyboard.",
+      "userQuestion": "What is this operator's callsign, and who flies under it?",
+      "stage": "explain",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-1: A to Z letter keys in pairs beside the menu and a white on-screen keyboard",
+        "frontend/css/keyboard.css, frontend/js/api.js letterButtons, keyboardHtml"
+      ],
+      "copy": {
+        "heading": "CALLSIGN",
+        "body": [
+          "Rows read code, callsign, operator and country: 'LOT · POLLOT · LOT Polish Airlines · Poland', 'RYR · RYANAIR · Ryanair · Ireland', 'WZZ · WIZZ AIR · Wizz Air Hungary · Hungary'. The callsign is yellow; the rest is white.",
+          "Keys ALL and () span the column, and the letters A to Z come in half-width pairs. The search stays on top while the table scrolls.",
+          "The touch keyboard has digits, QWERTY, '-', CLEAR, SPACE and BACKSPACE. It sits under the list, is open by default on touch screens and is shared with AIRCRAFT."
+        ],
+        "callsToAction": [
+          {
+            "label": "ALL",
+            "target": "#callsign"
+          },
+          {
+            "label": "()",
+            "target": "in-place:toggle-keyboard"
+          },
+          {
+            "label": "L",
+            "target": "in-place:letter-filter"
+          }
+        ]
+      },
+      "layout": "Submenu letters: ALL and () full width; A to Z as 2 x 67 + 3 = 137 pairs on the 31 px pitch.\n\nPane: the search field on top (dark field style), then the table scrolling at its existing pitch. ICAO code white, callsign #f2d21b, operator and country #e8e8e8.\n\nRow states: bands #000/#2b2b2b, hover edge, selected red band.\n\nKeyboard: docked under the table when open. #d9d9d9 tray; #ffffff keys with #1b1c20 labels and 1px #9a9a9a edges; 56x44 keys (40 px tall at <=820 px).",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "Letter keys filter at 0 ms. Keyboard keys flash #5fd23a with a #0b2a06 label while pressed. The tray opens and closes over 120 ms. Escape closes it and returns focus to the search.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Keyboard keys narrow by cqw so ten fit the pane, as today.",
+        "expanded": "56 px keys centred under the table."
+      }
+    },
+    {
+      "id": "aircraft",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "table-filter-bar"
+      ],
+      "referenceDirectionId": "user-reference-7",
+      "purpose": "Identify an aircraft type and see its photo, dimensions, weights and speeds.",
+      "userQuestion": "What is this type, how big and heavy is it, and which wake category does it fall in?",
+      "stage": "explain",
+      "dependencies": [
+        "callsign"
+      ],
+      "evidence": [
+        "user-reference-7: white performance sheet with the type photo top left and its data beside it",
+        "frontend/css/aircraft.css; tests pin the ICAO code at 20px white"
+      ],
+      "copy": {
+        "heading": "AIRCRAFT",
+        "body": [
+          "Sample data: 'B738 · BOEING · 737-800 · 2 Jet · M · D' and 'A320 · AIRBUS · A-320 · 2 Jet · M · D'.",
+          "Opening a type shows its photo in a 3:2 frame up to 450 x 300 px, then 'span 35.8 m · ARC 4C · length 39.5 m', 'MTOW 79 016 kg · MLW 66 361 kg · WTC M' and 'VMO 340 kt · MMO 0.82 · ceiling FL410', a Performance link and the photo credit. Missing values read '–'.",
+          "Maker keys AIRBUS, BOEING, BOMBARDIER, EMBRAER and GA sit above the table. The frame shows 'Loading photo…' or 'Photo unavailable'."
+        ],
+        "callsToAction": [
+          {
+            "label": "BOEING",
+            "target": "in-place:maker-filter"
+          },
+          {
+            "label": "Performance",
+            "target": "external:performance"
+          }
+        ]
+      },
+      "layout": "Same letter submenu as CALLSIGN. Maker keys sit in one row above the table as primary keys.\n\nTable: ICAO code 20px white, banded rows, hover edge, the selected type row in the red band.\n\nDetail row: opens under the type row as a paper sheet (#ffffff, #1b1c20 text at 14px) instead of the old green --sel fill. Photo on the left, three data lines on the right. Performance link #207a11 underlined (5.4:1 on white); photo credit 12px #5a5a5a.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Pressing a type row gives the shared 120 ms press feedback. The red band and the paper detail sheet appear at once under it, and other rows keep their place.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; band, sheet and final states are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [
+        "aircraft-type-photos"
+      ],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The photo shrinks within its 3:2 frame and the data lines wrap under it in a narrow pane.",
+        "expanded": "Photo and data side by side."
+      }
+    },
+    {
+      "id": "map",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Show traffic and the staffed airspace at a chosen level.",
+      "userQuestion": "Where is the traffic, and who controls the airspace at this level?",
+      "stage": "evaluate",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/map.js panel titles: Visibility settings, Positions, Route, FMP, Legend; LEVELS 15-370",
+        "README MAP row"
+      ],
+      "copy": {
+        "heading": "MAP",
+        "body": [
+          "Sample data: a hover label reads 'LOT3KM 452', 'FL350 ↓', 'B738/M EPWA', and below the TL a level reads 'A 53'. Staffed airspace carries labels such as 'EPWW S 123.625' at the drawn level FL300. Aerodromes are hexagons and a tower shows as 'T'.",
+          "Side panel sections, all closed at first: VISIBILITY SETTINGS (Traffic, Airspace, Points and airways, Basemap), POSITIONS, ROUTE, FMP and LEGEND. FMP charts read 'No traffic in this period.' when empty."
+        ],
+        "callsToAction": [
+          {
+            "label": "VISIBILITY SETTINGS",
+            "target": "in-place:panel-visibility"
+          },
+          {
+            "label": "POSITIONS",
+            "target": "in-place:panel-positions"
+          },
+          {
+            "label": "FMP",
+            "target": "in-place:panel-fmp"
+          }
+        ]
+      },
+      "layout": "No submenu. Leaflet fills the 1290 px pane.\n\nSide panel: headers in the label style, the drawn level ('FL300') in white, flat controls.\n\nMap chrome: square zoom bar with a 1px edge and no shadow. Labels and tooltips on #000 or #0d0d0d with a 1px #5a5a5a edge, 11-12px white text. Airspace and traffic colours are preserved.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Panel section headers and level keys give press feedback over 120 ms while sections open or close and layers redraw at once. No animated flights or auto-zoom.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Feedback at 0 ms; sections and layers are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The side panel keeps its width and the map takes the rest.",
+        "expanded": "Full pane."
+      }
+    },
+    {
+      "id": "coordination",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Give the agreed transfer conditions and the LoA and LoP documents.",
+      "userQuestion": "At which point and level do I hand this traffic over, and where is the agreement?",
+      "stage": "de_risk",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/coordination.js titles: FIR, Position, Type, Points / filter, LoA and LOP documents"
+      ],
+      "copy": {
+        "heading": "COORDINATION",
+        "body": [
+          "LoA shows EXIT/COPX and ENTRY/COPN tables for the chosen position, filtered by FIR, LOA/LOP and point. 'No transfers for these settings.' shows when nothing matches.",
+          "Sample data: DOCUMENTS lists 7 LOA and 20 LOP (LOP ACC, LOP APP, LOP TWR), each with PDF and LoA keys. 'No documents for this filter.' shows when a filter is empty."
+        ],
+        "callsToAction": [
+          {
+            "label": "LoA",
+            "target": "#coordination/agreements"
+          },
+          {
+            "label": "DOCUMENTS",
+            "target": "#coordination/docs"
+          },
+          {
+            "label": "PDF",
+            "target": "in-place:open-pdf"
+          }
+        ]
+      },
+      "layout": "Submenu: LoA, DOCUMENTS. LoA has a filter row (FIR, Position, Type, Points / filter) with 28 px fields, then EXIT/COPX and ENTRY/COPN as banded tables with label-style headers. DOCUMENTS lists the 27 documents as 1px-framed rows with secondary PDF and LoA keys; the PDF opens alongside.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Filter keys and fields give press or focus feedback over 120 ms while the tables filter at once with stable row identity.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Feedback at 0 ms; tables are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Tables scroll inside their frame; the PDF stacks under the list.",
+        "expanded": "List and PDF side by side."
+      }
+    },
+    {
+      "id": "conversion",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Convert units and read UTC and Polish time.",
+      "userQuestion": "What is this value in the unit I need, and what time is it in Poland?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/conversion.js; backend/tests/test_conversion.py gradient values"
+      ],
+      "copy": {
+        "heading": "Unit conversion",
+        "body": [
+          "Sample data: UTC 14:32:07Z and Polish time 15:32:07 CET on top. '3.3 % = 200.5 ft/NM = 1.89°' and '3° at GS 140 kt ≈ 743 ft/min'.",
+          "Pairs for hPa/inHg/mmHg, ft/m/FL, altitude against FL at a QNH (ISA), NM/km/SM, kt/km/h/m/s/mph, Mach/TAS/CAS, ft/min against m/s, °C/°F/K and kg/lb/t."
+        ],
+        "callsToAction": []
+      },
+      "layout": "No submenu. A clock row on top: UTC and Polish time at 28px white. Calculator cards in 3 columns (2 at <=1150 px), each a 1px-framed panel with a label-style title, 28 px fields and white results.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "A field's edge turns #5fd23a over 120 ms when it takes focus. Results update at once as you type, and cleared inputs clear their results.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Two columns at <=1150 px, as today.",
+        "expanded": "Three columns."
+      }
+    },
+    {
+      "id": "sytop",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "table-filter-bar"
+      ],
+      "purpose": "List every NOTAM in force for FIR EPWW and the main aerodromes.",
+      "userQuestion": "Which NOTAMs are active now, and where?",
+      "stage": "de_risk",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/sytop.js SORTS (location, number, start, end)",
+        "frontend/css/sytop.css"
+      ],
+      "copy": {
+        "heading": "SYT OP – active NOTAMs FIR EPWW",
+        "body": [
+          "Sample data: 'A1234/26 NOTAMN' for EPWA, valid 2026-11-23 22:00Z to 2026-11-24 04:00Z, with its full text. Filters by location and text; sorted by location, number, start or end. 'No NOTAM matches the filter.' shows when nothing matches."
+        ],
+        "callsToAction": [
+          {
+            "label": "location",
+            "target": "in-place:sort-location"
+          },
+          {
+            "label": "number",
+            "target": "in-place:sort-number"
+          },
+          {
+            "label": "start",
+            "target": "in-place:sort-start"
+          },
+          {
+            "label": "end",
+            "target": "in-place:sort-end"
+          }
+        ]
+      },
+      "layout": "No submenu. Title row: the h2 at 16px white small caps (no 3 px left bar), then the filter field and sort segments. NOTAMs are banded rows: location and number white, validity #a3a3a3, full text #e8e8e8 at 13-15px.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "The active sort segment moves over 120 ms while rows reorder at once with stable identity. Filtering is immediate.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "The segment changes at 0 ms; rows are identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "sytop.css rules at <=1500 and <=1100 px, as today.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "aup",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Keep the AUP key a real view that says it is not ready yet.",
+      "userQuestion": "Is the airspace use plan available here?",
+      "stage": "continue",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/aup.js, soon.js"
+      ],
+      "copy": {
+        "heading": "AUP",
+        "body": [
+          "'AUP – This function will be available in the future.' in the middle of an empty pane."
+        ],
+        "callsToAction": [
+          {
+            "label": "AUP",
+            "target": "#aup"
+          }
+        ]
+      },
+      "layout": "soon-pane: the sentence centred in the pane, 'AUP' in #ffffff and the rest #e8e8e8 at 14px.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "Only the AUP key's shared press feedback (120 ms) marks arrival. The sentence shows at once and nothing in the pane moves.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Centred.",
+        "expanded": "Centred."
+      }
+    },
+    {
+      "id": "other",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Hold the working tools: flight plans, FMP, codes, minima, holding, checklists and documents.",
+      "userQuestion": "Which tool do I need now: a flight plan, the sector configuration, a squawk, minima or a checklist?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/other.js labels; flightplan.js, holding.js, vfrminima.js, squawk.js titles",
+        "frontend/css/other.css bars (rc-bar, vfr-bar, hold-bar, bp-bar)"
+      ],
+      "copy": {
+        "heading": "OTHER",
+        "body": [
+          "Keys: 4P, AFTN, BOMB PHONE, BRAKING ACTION, CHECKLIST, DOCS (default), FLIGHT PLAN, FMP, HOLDING, POSITION, REGCAUSE, SQUAWK, VFR MINIMA. 4P, AFTN, BRAKING ACTION and POSITION read 'This function will be available in the future.'",
+          "Sample data: FMP's CONFIGURATION bar runs from 1X ALL to 5X, with '2N ALL+NFIR' marked NOW. Below it are a SECTOR · CAPACITY (ENTRIES) · OCCUPANCY table, ENTRY and OCC charts, and the LOW FL330, MID FL350 and HIGH FL400 previews ('Preview only: nothing is activated.').",
+          "FLIGHT PLAN by callsign shows FPL fields 7 to 19 and the pilot, or 'No flight plan filed.'.",
+          "SQUAWK – SSR codes FIR EPWW has a search such as 7700 and pools such as EUR-E 0020–0037. BOMB PHONE shows 112 and Police 997 with 12 questions.",
+          "CHECKLIST has OPEN, CLOSE, HANDOVER, RWY CHG and TIPS. Then HOLDING (FLIRT), REGCAUSE, and VFR MINIMA (VMC minima, Special VFR, Night VFR, HEMS (LPR))."
+        ],
+        "callsToAction": [
+          {
+            "label": "FLIGHT PLAN",
+            "target": "#other/flightplan"
+          },
+          {
+            "label": "FMP",
+            "target": "#other/fmp"
+          },
+          {
+            "label": "SQUAWK",
+            "target": "#other/squawk"
+          },
+          {
+            "label": "CHECKLIST",
+            "target": "#other/checklist"
+          }
+        ]
+      },
+      "layout": "Submenu of 13 keys. Pages keep their layouts.\n\n- Section bars (rc-bar, vfr-bar, hold-bar, bp-bar): flat #207a11 with white labels.\n- FMP: the CONFIGURATION bar as keys, NOW in #5fd23a on #14240f; banded tables; chart colours preserved; the selected FMP row uses the red band.\n- BOMB PHONE: 112 stays the one large figure.\n- Placeholders: the AUP sentence style.",
+      "motion": {
+        "purpose": "state_change",
+        "trigger": "press",
+        "behavior": "Subpage keys and switches take their active state over 120 ms while content swaps at once. FMP configuration keys only preview and say so.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "Active states change at 0 ms; content is identical."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "other.css and flightplan.css rules at <=1100 and <=640 px, as today.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "about",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-2",
+      "purpose": "State what this system is, which data and cycle it runs on, and what changed.",
+      "userQuestion": "Which version and AIRAC cycle is this, what does each tab hold, and what changed recently?",
+      "stage": "orient",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-2: plain version, credits and recent-changes text on black",
+        "frontend/js/tabs/about.js (System rows, TILES, CHANGES)"
+      ],
+      "copy": {
+        "heading": "ABOUT",
+        "body": [
+          "The PolIDS logo with 'VATSIM PL vACC', then System as plain lines: Version, AIRAC cycle, Data, Navigation, CARTO key, OpenAIP key, Wind forecast (Open-Meteo.com, CC BY 4.0), Login, API.",
+          "Sample data: 'AIRAC cycle 2611 (from 2026-10-29)'.",
+          "One tile per tab with its one-line description; EMERGENCY's has a red edge. Recent changes follow as dated lines, newest first."
+        ],
+        "callsToAction": [
+          {
+            "label": "AERODROME",
+            "target": "#aerodrome"
+          },
+          {
+            "label": "/docs",
+            "target": "/docs"
+          }
+        ]
+      },
+      "layout": "Pane 1290 px with 20px 24px padding.\n\nTop: the logo block beside System as a definition list (labels small caps #a3a3a3, values #ffffff, no panel band).\n\nTiles: auto-fill columns of 230 px or wider, 8 px gaps. Each has a 1px #2a2a2a frame, name 14px white small caps (tracking 0, not green), description #a3a3a3. EMERGENCY gets a full 1px #e0302a edge instead of the coloured left bar. Hover is a #5fd23a edge with no fill change.\n\nRecent changes: banded rows, date in #a3a3a3, text #e8e8e8.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "hover",
+        "behavior": "Tile hover edge over 120 ms. A tile opens its tab at 0 ms.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [
+        "polids-logo"
+      ],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "The head wraps and tiles drop to fewer columns.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "emergency",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "referenceDirectionId": "user-reference-9",
+      "purpose": "Put the right emergency checklist in front of the controller at once.",
+      "userQuestion": "What must I do now for this emergency?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "user-reference-9: procedure title, uppercase bullet sections, red frame around the screen",
+        "frontend/js/tabs/emergency.js, data/seed/emergency.json"
+      ],
+      "copy": {
+        "heading": "EMERGENCY",
+        "body": [
+          "Sample data: keys ASSIST, A06, ACAS/TCAS, BIRDSTRIKE, BOMB, BRAKES, COM FAIL, ELECTRICAL, DESCENT, ENGINE, FIRE / APU, FUEL, GEAR, HYDRAULIC, ICING, PRESSURE, SMOKE, UNLAWFUL.",
+          "Each page has the procedure title, its subtitle, the ASSIST bar (Acknowledge, Separate, Silence, Inform, Support, Time) and sections such as 'Expect' and 'Remember' as bullet lists, inside a red frame."
+        ],
+        "callsToAction": [
+          {
+            "label": "ASSIST",
+            "target": "#emergency"
+          }
+        ]
+      },
+      "layout": "Submenu: one key per procedure (18).\n\nPane: framed by a 3px #e0302a line on all sides while the view is open (from --bad, which becomes #ff6a5a text).\n\nText: title h2 at 22px #ffffff small caps; subtitle small caps #a3a3a3. The ASSIST bar keeps six red-edged cells with white initials. Sections run up to 980 px wide: heads 16px #ffffff small caps, bullets 15px #e8e8e8, notes with their existing yellow edge.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "Procedure keys give the shared press feedback over 120 ms. The page and the 3px red frame appear at once, with no blinking or pulsing.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Sections run in one column within the frame.",
+        "expanded": "As laid out."
+      }
+    },
+    {
+      "id": "admin",
+      "layoutFamily": "dashboard",
+      "layoutCases": [
+        "app-screen"
+      ],
+      "purpose": "Let administrators control who may sign in.",
+      "userQuestion": "Who has access, and who was refused?",
+      "stage": "act",
+      "dependencies": [
+        "shell"
+      ],
+      "evidence": [
+        "frontend/js/tabs/admin.js titles: Access – VATSIM CIDs, Denied logins"
+      ],
+      "copy": {
+        "heading": "Access – VATSIM CIDs",
+        "body": [
+          "Sample data: allowed CIDs with a description, such as '1458203 · ATC training staff', each with Remove, which ends access at once. 'Denied logins' lists refused CIDs with their time, each addable with one click. 'No administrators in POLIDS_AUTH_ADMIN_CIDS.' shows when none are set."
+        ],
+        "callsToAction": [
+          {
+            "label": "Add",
+            "target": "in-place:add-cid"
+          },
+          {
+            "label": "Remove",
+            "target": "in-place:remove-cid"
+          }
+        ]
+      },
+      "layout": "No submenu. Two framed panels with label-style titles and banded rows. Add is a primary key. Remove is the one danger button: #2a0d0b fill with a #ff6a5a label.",
+      "motion": {
+        "purpose": "feedback",
+        "trigger": "press",
+        "behavior": "Press feedback on keys; lists update in place at 0 ms.",
+        "durationMs": 120,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "reducedMotion": "0 ms; same final states."
+      },
+      "componentNeeds": [],
+      "assetNeeds": [],
+      "transformation": {
+        "compact": "Out of scope below 641 px; unchanged.",
+        "medium": "Panels stack.",
+        "expanded": "Panels side by side."
+      }
+    }
+  ],
+  "responsive": [
+    "1920x1080 (browser about 1920x940-970): panes widen to 1620 or 1770 px, RADIO scales its board to --rb-f 15 px, and every block shows in full.",
+    "1440x900 is the reference capture: every named block shows its header and its first rows or figure without scrolling the page.",
+    "1366x768: keys stay 28 px (21 rows + foot = 758 px). AERODROME runs 232/463/331 and SELF CHECK-IN 272/513/367; the 15 METAR PL rows fit.",
+    "Short windows (700-820 px tall and less): keys shrink evenly to a 16 px minimum and keyboard keys to 40 px. RADIO and DMAN apply their height rules.",
+    "<=1250 px wide or <=640 px tall: AERODROME, SELF CHECK-IN, wind and DMAN drop to two columns or natural-height panels and the pane scrolls (existing rules).",
+    "641-1100 px (tablet): both key columns keep 150 px; CONVERSION goes to 2 columns at <=1150 px and SYT OP and OTHER rows compact at <=1100 px. Touch uses 28 px keys and 40-44 px keyboard keys.",
+    "Below 641 px: out of scope. No phone fold is added and the restyle introduces no new horizontal overflow compared with main."
+  ],
+  "interactions": [
+    "Menu, submenu and letter keys:\n- rest: flat #207a11\n- hover (hover-capable pointers): the 1px edge lights #5fd23a over 120 ms\n- pointerdown: fills #5fd23a with a #0b2a06 label at 0 ms; release returns over 120 ms unless selected\n- active: stays filled with aria-current ('page' in the menu, 'true' in submenus)\n- focus-visible: 2px #ffffff outline inset 2px\n- disabled: ← on the first screen at 35%",
+    "Rapid repeated taps on keys always leave exactly one active key per column and never a stuck pressed fill.",
+    "Top bar Reload, Brighter, Darker: same press and hover. Brighter and Darker disable at 45% at +2 and -2 and their titles show the brightness percentage.",
+    "Rows in lists and tables:\n- hover: a 1px #5fd23a edge round the row, fill unchanged\n- select (click, tap or Enter): a full-width #a51d16 band with white text, detail opens in place\n- arrows, PgUp and PgDn move the selection in the AERODROME list\n- focus-visible: 2px #ffffff outline inside the row",
+    "Switches (MINE/ALL, INFO/AWOS/TRAFFIC, SECTORS/SCENARIOS, GAMET areas, image steps, layer keys, sort segments): on is a #14240f fill with #5fd23a text or the existing 2 px underline, off is #a3a3a3. The on state moves to the chosen option over 120 ms while the content changes at 0 ms. States stay remembered where the code already remembers them. METAR's COLOURED/MONO and DECODED/RAW keep their green-on and red-off text.",
+    "Fields and selects:\n- rest: #141414 fill, 1px #5a5a5a edge, #e8e8e8 text, placeholder #a3a3a3\n- focus: edge #5fd23a over 120 ms\n- disabled: 35%\n- paper search fields: #ffffff, #1b1c20 text, placeholder #5a5a5a",
+    "Touch keyboard: () toggles it (aria-pressed, existing). The tray opens and closes over 120 ms (6 px rise plus opacity). Escape closes it and returns focus to its search field. Keys type at the cursor, and CLEAR, SPACE and BACKSPACE are wide keys.",
+    "Tooltips (data-tip and map labels): #0d0d0d fill, 1px #5a5a5a edge, 12px text. They appear on hover with no delay or motion.",
+    "Data refresh (METAR every 2 min when enabled, bookings every minute, RADIO and DMAN feeds): values replace in place with no flash, count-up or re-entrance. RADIO adds 'Data from HH:MMZ (N min old)' after 3 min.",
+    "Navigation: ← and Alt+← return to the previous screen of this session, Reload returns to the same screen, and F5 opens HOME.",
+    "EMERGENCY: opening the view draws the 3px red frame at once; leaving the view removes it.",
+    "Reduced motion: prefers-reduced-motion sets every transition to 0 ms with identical final states and the same operation."
+  ],
+  "acceptanceCriteria": [
+    "Scope: only frontend/css files change. The one exception is aria-current on the active menu and submenu keys, set where app.js and api.js already toggle .active. No route, API, data, markup structure or behaviour changes, and grid columns, key metrics and row pitches stay as they are.",
+    "Tokens in style.css :root:\n- --bg #000; --panel #0d0d0d; --panel-2 #141414; --line #2a2a2a\n- --text #e8e8e8; --muted #a3a3a3\n- --green #207a11; --green-dark #1f5a16; --green-hi and --ok #5fd23a; --green-text #5fd23a\n- --yellow and --warn #f2d21b; --bad #ff6a5a; --cyan #3ec7e0; --menu-lime #ccff66\n- --row and --list-row #000; --row-alt and --list-row-alt #2b2b2b; --sel #a51d16\n- the EMERGENCY frame and active EMERGENCY key use #e0302a\n- --head and --head-line no longer fill panel titles or table headers; --row-hover and --list-row-hover no longer fill rows",
+    "No fill gradients: grep frontend/css for 'linear-gradient(' finds only the hard-stop column drawing in style.css (recoloured to #000 and #2a2a2a) and repeating-linear-gradient hatches. Keys, the top bar, section bars, dm-top, dm-acts, .lg legend chips and the admin key are flat.",
+    "No green-tinted near-blacks remain (grep): #050605, #0d0f0d, #0d110d, #111611, #0a0c0a, #0f130f, #161a16, #161b16, #18221a, #1a2e18, #1b1f1b, #0b0d0b, #0f160f, #243024, #2f3a2f.",
+    "Type: the computed font-family resolves to Arial (Liberation Sans on Linux) on body, keys, tables and fields, and document.fonts.check('13px Arial') is true. No font-weight above 400. letter-spacing is 0 on keys, the top bar, titles, table headers and labels; AWALON's -.2px fit at <=1499 px stays.",
+    "Label style: panel titles, table headers, the HOME rating, about-tile names, SYT OP and EMERGENCY headings render with font-variant small-caps at tracking 0. Headers are #a3a3a3 and titles #ffffff, with no filled band; a 1px #1a1a1a rule sits under panel titles and a 1px #2a2a2a rule under sticky headers. HOME's h1 is 22px #ffffff at 400. No 3 px left bar remains on h2.title, selected rows or about tiles.",
+    "Radius 0 everywhere except true circles (50%). No box-shadow except 1px inset edges used as borders or 2px underlines. No text-shadow, glow or drop-shadow.",
+    "Contrast measured in the browser, each at least 4.5:1:\n- white on #207a11 (5.45); #ccff66 on #207a11 (4.69); #0b2a06 on #5fd23a (8.0)\n- white on #b3261e (6.5); white on #e0302a (4.54); white on #a51d16 (7.5)\n- #a3a3a3 on #2b2b2b (5.6); #ff6a5a on #2b2b2b (5.0); #4cae3a on #2b2b2b (5.0)\n- #f2d21b on #2b2b2b (9.4); #3ec7e0 on #2b2b2b (7.0); #7f9df2 on #2b2b2b (5.4)\n- #1b1c20 on #ffffff (17); #207a11 on #ffffff (5.45); #5a5a5a on #ffffff (6.9)",
+    "Keys:\n- 137x28 at 1.5 px margins on a 31 px pitch, rows aligned between menu and submenu at 1366x768, 1440x900 and 1920x1080, shrinking evenly to at least 16 px in a 1280x640 window\n- flat #207a11, 1px #1f5a16 edge, white 14px uppercase\n- exactly one active key per column (#5fd23a, #0b2a06 label)\n- EMERGENCY #b3261e, ADMIN #3a3a3a, SYT OP label #ccff66",
+    "Columns: menu and submenu stand on #000. The only column rule is the 1px #2a2a2a before the pane.",
+    "Rows: every banded list alternates #000 and #2b2b2b with no row rules, in AERODROME, CALLSIGN, AIRCRAFT, METAR, FMP and data tables. Hover draws a 1px #5fd23a edge without changing the fill. The selected record is a full-width #a51d16 band with white text.",
+    "AIRCRAFT: the expanded detail row is a paper sheet (#ffffff, #1b1c20 text) with the photo left in its 3:2 frame; the type row above keeps the red band.",
+    "Touch keyboard (CALLSIGN, AIRCRAFT, AERODROME '()'): #d9d9d9 tray, #ffffff keys with #1b1c20 labels and 1px #9a9a9a edges, square, 56x44 (40 px tall at <=820 px). A pressed key shows #5fd23a with #0b2a06 only while pressed.",
+    "EMERGENCY shows a 3px #e0302a frame round the pane while open. Frequency boxes stay white with dark figures, online #8cff5a, booked dashed #ffb020. Domain palettes in radio.css, qnh.css and awalon.css are unchanged.",
+    "Data agreement:\n- AIRAC ident and dates are identical in the menu foot, the HOME foot and ABOUT System\n- the version is identical on HOME and ABOUT\n- the AERODROME count equals its rows, and 'N of M' equals the visible rows while filtering\n- CALLSIGN and AIRCRAFT counts equal their visible rows\n- METAR PL, AD CIV and AWALON list the same 15 AD 2 aerodromes\n- the menu clock and CONVERSION's UTC clock agree to the second\n- RADIO's APP counts equal the APP frequencies it lists\nAll of these come from the live backend; none is retyped in CSS or copy.",
+    "Dataset shape (live, from the existing backend and data/seed):\n- aerodromes: 15 AD 2 IFR, 15 MIL AD 4, 69 VFR AD 4.13, and FIR lists for EPWW and 9 neighbour keys\n- ATC positions and sectors; online controllers and bookings\n- METAR, TAF and GAMET; NOTAMs\n- FMP configurations 1X to 5X; 7 LOA and 20 LOP documents; 18 EMERGENCY procedures\n- aircraft types and callsigns\nNo fixture or demo mode exists and none is added.",
+    "States:\n- loading keeps the final layout with the existing 'Loading…' or 'Checking…' line in #a3a3a3 inside the block\n- an error is one line in #ff6a5a inside the failing block, with TRY AGAIN or the retry text where the code has it; there is never a full-screen banner apart from the existing 'No connection to the PolIDS server' bar\n- an empty block keeps its frame and header and shows its existing sentence\n- a zero prints as 0, and a missing value as '–' in #a3a3a3",
+    "No 'Sample data' notice is added to the live UI. The figures labelled 'Sample data' in this blueprint are examples only; the app shows live operational data, and its README rule since 0.12.6 keeps source notes out of the interface. Controllers must never read live METARs as fake.",
+    "Motion: transitions exist only on controls and the keyboard tray: hover edges, press fill and release, switch and segment indicators, focus edges and the tray. All use 120 ms cubic-bezier(0.2, 0, 0, 1). Content swaps (views, submenu pages, filtered or sorted rows, the selection band, refreshed values) happen at 0 ms. prefers-reduced-motion sets every transition to 0 ms; check this with emulation in the browser.",
+    "Interaction checks in the browser:\n- rapid repeated taps leave one active key per column\n- Alt+← and ← walk back through the session\n- Escape closes the keyboard tray and returns focus to the search field\n- arrows, Enter and Esc work in the '()' search\n- every key, row and field shows a visible focus ring\n- the active menu key has aria-current='page' and the active submenu key aria-current='true'",
+    "Tests: python -m pytest backend/tests passes. Five test files pin values this pass retires and are updated in the same change, keeping their intent (list states stay distinct, keys stay square, no bold, no glow):\n- test_shell_look.py: top bar gradient, submenu #050605 and its column drawing\n- test_lists_look.py: hover fill and --sel\n- test_touch_keyboard.py: green .gbtn keyboard keys\n- test_aircraft_js.py: hover fill and the --sel detail row\n- test_callsign_js.py: hover fill",
+    "Review run:\n1. cp .env.example .env, set POLIDS_AUTH_MODE=dev with POLIDS_AUTH_ADMIN_CIDS=10000002 (the dev form's CID) and a localhost POLIDS_PUBLIC_URL.\n2. Start with docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build, or python -m uvicorn backend.app.main:app --port 1337.\n3. Open http://localhost:1337, sign in, and capture every route at 1440x900, 1366x768, 1920x1080 and 1280x720.\n4. Confirm each named block shows its header and first rows.\n5. Record which views showed error states because external feeds (VATSIM, weather, eAIP) were unreachable.",
+    "Colour budget: inside panes, colour sits only on data and states (white values, yellow highlights, cyan stations, blue trend, green online and active, red emergency, selection and NIL). Pane chrome is black and grey, and the green mass is the key panel alone."
+  ]
+}

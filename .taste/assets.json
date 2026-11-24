@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "polids-logo-bez-podpisu",
+      "kind": "image",
+      "status": "existing",
+      "purpose": "The PolIDS mark and wordmark that close the first key column, naming the product on every screen.",
+      "requirements": [
+        "Protected brand file: use it as is. Do not recolour it to the accent, redraw it, rasterise it or strip its embedded C2PA metadata.",
+        "Keep it in the menu foot (.brand): a 34 px tall block with 4px 0 3px padding, the image 26 px tall across the 137 px key width with object-fit: contain, on #000.",
+        "Keep its alt text 'PolIDS' and its link to #home.",
+        "Keep the 1px #2a2a2a rule above it, per the shell plan."
+      ],
+      "role": "logo",
+      "sectionIds": [
+        "shell"
+      ],
+      "aspectRatio": "95493:18872",
+      "composition": "Two parts on a transparent ground made for black:\n- left, about 18% of the width: the PolIDS mark, a map of Poland split white (#f4f4f4) over red (#dc1e35) with its region lines\n- right: the PolIDS wordmark in white and red (#ffffff, #e8283f)\n\nShown whole and centred, with no crop, in the 137 x 26 px slot at the foot of the menu column. Nothing overlaps it; the clock box above and the user box below keep their own space.",
+      "source": {
+        "kind": "project",
+        "reference": "frontend/icons/polids-logo-bez-podpisu.svg",
+        "license": "Project-owned PolIDS brand asset (VATSIM PL vACC)"
+      },
+      "destination": "frontend/icons/polids-logo-bez-podpisu.svg"
+    },
+    {
+      "id": "aircraft-type-photos",
+      "kind": "image",
+      "status": "ready",
+      "purpose": "The photo of an ICAO aircraft type in the AIRCRAFT detail sheet, so a controller recognises the type beside its dimensions, weights and speeds. This file is the verified B738 photo, the type the plan uses as its example; the live app supplies every other type's photo itself at runtime.",
+      "requirements": [
+        "This file is a review sample for the B738 sheet: a 1920 x 1080 JPEG. It is the same Wikipedia lead image (article 'Boeing 737 Next Generation') that the app's own photo service picks for B738 today.",
+        "The live app keeps its own pipeline, unchanged:\n- backend/app/services/photos.py downloads each type's Wikipedia lead photo on first open\n- it saves data/photos/<ICAO>.<ext> with <ICAO>.json (credit, page)\n- an operator photo in data/photos-manual/<ICAO>.<ext>, with its author in <ICAO>.txt, takes precedence",
+        "Build must not copy this file into data/photos, data/photos-manual or frontend, and must not bundle, generate, upscale, crop or replace aircraft photos. Use it only to judge how a real photo sits in the restyled sheet.",
+        "The frame stays as today: a 3:2 box (aspect-ratio 3 / 2) up to 450 x 300 px with object-fit: contain. A 16:9 photo like this one shows whole, with thin bands above and below.",
+        "The credit line stays under the frame. If this photo is ever shown, credit it as 'Photo: 4300streetcar, CC BY 4.0, via Wikimedia Commons'.",
+        "On the paper sheet, links in the photo box (Photo page, Performance) use #207a11 underlined; the current cyan is about 2:1 on white."
+      ],
+      "role": "photography",
+      "sectionIds": [
+        "aircraft"
+      ],
+      "aspectRatio": "16:9",
+      "composition": "Delta Air Lines Boeing 737-800 N371DA climbing out of Boston against a clear blue sky. The whole aircraft is in frame, nose at the left and tail at the right, centred on the horizontal axis, with no clutter. In the sheet it sits top left in the 3:2 contain frame (thin bands above and below), with the three data lines to its right as in reference 7. No text or overlay goes on the image; the credit sits on its own line under the frame.",
+      "source": {
+        "kind": "external",
+        "reference": "https://commons.wikimedia.org/wiki/File:Delta_Boeing_737-800_N371DA_departing_Boston_June_2025.jpg",
+        "license": "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Author: 4300streetcar (own work), via Wikimedia Commons; attribution required. Downloaded as the 1920 px Commons rendition of the 6680 x 3758 original.",
+        "contentType": "image/jpeg"
+      },
+      "destination": ".taste/assets/aircraft-type-photos/B738.jpg"
+    },
+    {
+      "id": "polids-logo",
+      "kind": "image",
+      "status": "existing",
+      "purpose": "The full PolIDS logo heading the ABOUT view beside the System facts.",
+      "requirements": [
+        "Protected brand file: use it as is. Do not recolour it (its grey caption stays as drawn and does not move to the new muted grey), redraw it, rasterise it or strip its C2PA metadata.",
+        "Keep it in the ABOUT head (.about-head .logo) beside the System definition list, with the small 'VATSIM PL vACC' line under it, on #000 with no frame or shadow.",
+        "Keep its alt text, built from the configured name plus ' – Polish Integrated Display System'."
+      ],
+      "role": "logo",
+      "sectionIds": [
+        "about"
+      ],
+      "aspectRatio": "107479:30883",
+      "composition": "On a transparent ground made for black:\n- left, about 28% of the width: the large Poland map mark, split white over red with its region lines\n- right: the PolIDS wordmark in white and red\n- under the wordmark: a small grey caption line (#8c948c)\n\nShown whole with no crop at the top left of the ABOUT pane, with the System list to its right and clear black space around it. Nothing overlaps it.",
+      "source": {
+        "kind": "project",
+        "reference": "frontend/icons/polids-logo.svg",
+        "license": "Project-owned PolIDS brand asset (VATSIM PL vACC)"
+      },
+      "destination": "frontend/icons/polids-logo.svg"
+    }
+  ]
+}

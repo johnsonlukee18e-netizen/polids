@@ -7,7 +7,7 @@
    (Traffic, Airspace, Points and airways, Basemap) jak "All sectors" w FMP, bez zwijania, z cienką linią nad grupą.
    Tylko pod .vis-card: .mapwrap, .mapside i .ms-card są też w AD CIV (lista kart lotniska) */
 .vis-card .vis-sub { margin: 8px 0 3px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--muted);
-  font: 10px/1.2 var(--ui); letter-spacing: .8px; text-transform: uppercase; }
+  font: 10px/1.2 var(--ui); text-transform: uppercase; }
 .vis-card > h4 + .vis-sub { margin-top: 0; padding-top: 0; border-top: 0; }
 /* rysowany poziom w nagłówku (jak liczba stanowisk w Positions) */
 .vis-card .vis-sum { margin-left: auto; color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 11px; }
@@ -17,34 +17,34 @@
 .as-card .as-lvl .sw { padding: 0; font-size: 12px; }
 .as-card .flbox input:disabled { color: var(--muted); border-color: var(--line); }
 .as-pre { display: flex; gap: 3px; margin: 0 0 6px; }
-.as-pre button { flex: 1; padding: 1px 0; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #aab4aa;
+.as-pre button { flex: 1; padding: 1px 0; background: var(--panel-2); border: 1px solid var(--control); border-radius: 0; color: var(--muted);
   font: 11px var(--mono); cursor: pointer; }
 .as-pre button:hover { border-color: var(--green-hi); color: #fff; }
 .as-pre button.on { background: var(--green); border-color: var(--green-hi); color: #fff; }
 .as-row { display: flex; align-items: center; gap: 6px; }
 .as-row > .sw { flex: 1; min-width: 0; }
-.pk-btn { flex: none; max-width: 104px; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #aab4aa;
+.pk-btn { flex: none; max-width: 104px; padding: 1px 6px; background: var(--panel-2); border: 1px solid var(--control); border-radius: 0; color: var(--muted);
   font: 11px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .pk-btn:hover { border-color: var(--green-hi); color: #fff; }
 .pk-btn.sub { color: var(--yellow); border-color: #6b5d12; }
 .pk-btn.open { background: var(--green); border-color: var(--green-hi); color: #fff; }
 
 /* --- lista wyboru sektorów (rozwijana pod przełącznikiem) */
-.pk { margin: 2px 0 6px 38px; border: 1px solid var(--line); background: #070907; }
+.pk { margin: 2px 0 6px 38px; border: 1px solid var(--line); background: var(--panel); }
 .pk-bar { display: flex; gap: 3px; padding: 3px; border-bottom: 1px solid var(--line); background: var(--head); }
 .pk-bar .pk-q { flex: 1; min-width: 0; padding: 1px 5px; font: 11px var(--mono); }
-.pk-bar button { flex: none; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #c3cdc3;
+.pk-bar button { flex: none; padding: 1px 6px; background: var(--panel-2); border: 1px solid var(--control); border-radius: 0; color: var(--text);
   font: 11px var(--mono); cursor: pointer; }
 .pk-bar button:hover { border-color: var(--green-hi); color: #fff; }
 .pk-bar .pk-q + button { margin-left: 0; }
 .pk-list { max-height: 230px; overflow: auto; }
 .pk-g, .pk-i { display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer; font: 11px/1.35 var(--mono); }
 .pk-g { position: sticky; top: 0; z-index: 1; background: var(--head); border-bottom: 1px solid var(--head-line); color: var(--green-text);
-  text-transform: uppercase; letter-spacing: .5px; }
+  text-transform: uppercase; }
 .pk-g b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pk-g small { color: var(--muted); letter-spacing: 0; }
-.pk-i { border-bottom: 1px solid #111611; color: #dbe3db; }
-.pk-i:hover { background: var(--row-hover); }
+.pk-i { border-bottom: 1px solid var(--rule); color: var(--text); }
+@media (hover: hover) { .pk-i:hover { box-shadow: inset 0 0 0 1px var(--green-hi); } }
 .pk-i span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pk-i span i { font-style: normal; color: var(--muted); }
 .pk-i small { flex: none; color: var(--muted); }
@@ -53,8 +53,8 @@
 .pk input[type=checkbox] { flex: none; width: 12px; height: 12px; margin: 0; cursor: pointer; }
 .pk-none { padding: 6px; color: var(--muted); font: 11px var(--mono); }
 /* sąsiednie FIR-y: domyślnie same nazwy FIR-ów, kliknięcie rozwija sektory; ● = ilu kontrolerów obsadza sektory FIR-u */
-.pk-g.fold { position: static; border-bottom-color: #1b241b; }
-.pk-g.fold:hover { background: var(--row-hover); }
+.pk-g.fold { position: static; border-bottom-color: var(--rule); }
+@media (hover: hover) { .pk-g.fold:hover { box-shadow: inset 0 0 0 1px var(--green-hi); } }
 .pk-g.fold:hover b { color: #fff; }
 .pk-g.fold.open { position: sticky; border-bottom-color: var(--head-line); }
 .pk-car { flex: none; width: 9px; color: var(--muted); }
@@ -66,28 +66,28 @@
 .pos-sum { margin-left: auto; color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; }
 .pos-bar { display: flex; gap: 3px; margin: 0 0 4px; }
 .pos-bar .pos-q { flex: 1; min-width: 0; padding: 1px 5px; font: 11px var(--mono); }
-.pos-bar button { flex: none; padding: 1px 6px; background: #0d110d; border: 1px solid #2f3a2f; border-radius: 0; color: #c3cdc3;
+.pos-bar button { flex: none; padding: 1px 6px; background: var(--panel-2); border: 1px solid var(--control); border-radius: 0; color: var(--text);
   font: 11px var(--mono); cursor: pointer; }
 .pos-bar button:hover:not(:disabled) { border-color: var(--green-hi); color: #fff; }
 .pos-bar button:disabled { color: #535b53; cursor: default; }
 .pos-state { margin: 0 0 4px; }
-.pos-tree { border: 1px solid var(--line); background: #070907; }
+.pos-tree { border: 1px solid var(--line); background: var(--panel); }
 .pt-list { max-height: 360px; overflow: auto; }
 .pt-f, .pt-g, .pt-i { display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer; font: 11px/1.35 var(--mono); }
-.pt-f { background: var(--head); border-bottom: 1px solid #1b241b; color: var(--green-text); letter-spacing: .5px; }
+.pt-f { background: var(--head); border-bottom: 1px solid var(--rule); color: var(--green-text); }
 /* rozwinięty nagłówek FIR-u (.pt-fw) i grupy (.pt-gw) przyklejony tylko w obrębie swojego pojemnika */
 .pt-f.open { position: sticky; top: 0; z-index: 2; border-bottom-color: var(--head-line); }
-.pt-g { padding-left: 16px; border-bottom: 1px solid #141b14; color: #c3cdc3; }
+.pt-g { padding-left: 16px; border-bottom: 1px solid #141b14; color: var(--text); }
 .pt-g.open { position: sticky; top: 19px; z-index: 1; background: #0b100b; }
-.pt-f:hover, .pt-g:hover { background: var(--row-hover); }
+@media (hover: hover) { .pt-f:hover, .pt-g:hover { box-shadow: inset 0 0 0 1px var(--green-hi); } }
 .pt-f:hover b, .pt-g:hover b { color: #fff; }
 .pt-f i, .pt-g i { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; color: var(--muted);
   letter-spacing: 0; }
 .pt-f small, .pt-g small { flex: none; min-width: 16px; text-align: right; color: var(--muted); letter-spacing: 0; }
 .pt-on { flex: none; color: #9dff6e; letter-spacing: 0; }
 .pt-sim { flex: none; color: var(--yellow); letter-spacing: 0; }
-.pt-i { padding-left: 30px; border-bottom: 1px solid #111611; color: #8d978d; }
-.pt-i:hover { background: var(--row-hover); }
+.pt-i { padding-left: 30px; border-bottom: 1px solid var(--rule); color: var(--muted); }
+@media (hover: hover) { .pt-i:hover { box-shadow: inset 0 0 0 1px var(--green-hi); } }
 .pt-i span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-i small { flex: none; color: var(--muted); }
 .pt-i b { flex: none; padding: 0 3px; border: 1px dashed var(--yellow); color: var(--yellow); font-size: 10px; line-height: 12px; }
@@ -187,7 +187,7 @@
    zielono, prędkość (b.gs) i linijki 2-3 na biało jak na etykiecie DOM004 z P21; wybrany lot: znak i ramka na
    pomarańczowo. Bez marginesu, który Leaflet dodaje dymkom z boku: odstęp od samolotu to samo przesunięcie dymka
    (AC_LABEL_GAP w airspace.js) */
-.leaflet-tooltip.ac-lbl { margin: 0; padding: 2px 4px; background: #000; border: 1px solid #4a584a; border-radius: 0; box-shadow: none;
+.leaflet-tooltip.ac-lbl { margin: 0; padding: 2px 4px; background: #000; border: 1px solid #4a4a4a; border-radius: 0; box-shadow: none;
   color: #f4f6f8; font: 11px/12px var(--mono); }
 .leaflet-tooltip.ac-lbl::before { display: none; }
 .leaflet-tooltip.ac-lbl.sel { border-color: #ff9f1a; }
@@ -195,7 +195,7 @@
 .ac-lbl b, .p21-sample b { font-weight: inherit; }
 .ac-lbl b.cs, .p21-sample b.cs { color: #00ff00; }
 .ac-lbl.sel b.cs { color: #ff9f1a; }
-.p21-sample { display: block; padding: 2px 3px; background: #000; border: 1px solid #4a584a; font: 10px/11px var(--mono); }
+.p21-sample { display: block; padding: 2px 3px; background: #000; border: 1px solid #4a4a4a; font: 10px/11px var(--mono); }
 .lgx .lgx-i.p21 { align-items: flex-start; }
 .ac-key { display: flex; gap: 10px; margin: -2px 0 2px 38px; font: 11px var(--mono); color: var(--muted); }
 .ac-key span { display: inline-flex; align-items: center; gap: 2px; }

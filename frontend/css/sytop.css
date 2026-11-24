@@ -21,20 +21,20 @@
 .sytop-msg:empty { display: none; }
 .sytop-msg b { color: #fff; }
 
-.sytop-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); background: #050605; }
+.sytop-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); background: var(--bg); }
 .sytop-empty { padding: 14px 12px; }
 .sytop-empty .sytop-why { margin: 6px 0; color: var(--text); }
 .sytop-empty .sytop-why b { color: var(--bad); }
 /* nagłówek grupy (kolejność "lokalizacja"): zostaje u góry listy, dopóki widać NOTAM-y tej lokalizacji */
 .sytop-group { position: sticky; top: 0; z-index: 1; padding: 4px 10px; background: var(--head); border-bottom: 1px solid var(--head-line);
-  color: var(--green-text); font: 12px/1.4 var(--ui); letter-spacing: .5px; text-transform: uppercase; }
+  color: #fff; font: 13px/1.4 var(--ui); font-variant: small-caps; }
 .sytop-group b { color: #fff; font-size: 13px; }
 .sytop-group i { font-style: normal; color: var(--muted); }
 .sytop-group .sytop-also { text-transform: none; letter-spacing: 0; font-weight: 400; }
 
 /* wiersz NOTAM: kolory ważności jak w AERODROME (.notam.active / .future w style.css), pasy jak lista PANDORY */
 .sytop-list .notam.sytop-item { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin: 0;
-  padding: 6px 12px 7px 10px; background: #0a0c0a; border-bottom: 1px solid #161b16; }
+  padding: 6px 12px 7px 10px; background: none; border-bottom: 1px solid var(--rule); }
 .sytop-list .notam.sytop-item.odd { background: #121612; }
 .sytop-side { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sytop-id { font: 14px/1.3 var(--mono); color: #fff; white-space: nowrap; }

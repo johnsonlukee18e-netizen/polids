@@ -22,7 +22,7 @@
 /* wiatr przy ziemi (METAR, 10 m) nad tabelą */
 .apw-sfc { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: baseline; margin-bottom: 6px; }
 .apw-sfc span { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
-.apw-sfc i { font: 400 10px var(--mono); font-style: normal; letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.apw-sfc i { font: 400 10px var(--mono); font-style: normal; text-transform: uppercase; color: var(--green-text); }
 .apw-sfc b { font: 400 15px var(--mono); color: #fff; }
 .apw-sfc b.sm { font-size: 12px; font-weight: 400; color: var(--text); }
 

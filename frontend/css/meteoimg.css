@@ -4,7 +4,7 @@
 .mimg { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .mimg-bar { flex: none; display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; padding: 6px 10px; background: var(--panel);
   border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
-.mimg-title { font: 13px var(--mono); letter-spacing: .8px; color: var(--green-text); }
+.mimg-title { font: 13px var(--mono); font-variant: small-caps; color: var(--muted); }
 /* opis (źródło, potem czas pobrania): gdy brak miejsca w jednym wierszu, w dwóch (pasek się nie wydłuża), dalej ucięty "…" */
 .mimg-hint { flex: 1 1 0; min-width: 0; text-align: right; line-height: 13px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
@@ -14,8 +14,8 @@
 
 /* przyciski w jednej ramce (jak dawny przełącznik 0 / 3000 ft w METEO › WIND) */
 .mimg-seg { display: inline-flex; flex: none; border: 1px solid var(--line); }
-.mimg-seg button { background: #0b0d0b; border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 9px; cursor: pointer;
-  font: 12px var(--mono); letter-spacing: .3px; white-space: nowrap; }
+.mimg-seg button { background: var(--panel-2); border: 0; border-right: 1px solid var(--line); color: var(--muted); padding: 4px 9px; cursor: pointer;
+  font: 12px var(--mono); white-space: nowrap; }
 .mimg-seg button:last-child { border-right: 0; }
 .mimg-seg button:hover { color: var(--text); background: var(--panel-2); }
 .mimg-seg button.active { background: #14240f; color: var(--green-hi); box-shadow: inset 0 -2px 0 var(--green-hi); }
@@ -51,8 +51,8 @@
 .gmt-text { flex: 1 1 0; min-width: 0; overflow: auto; padding: 10px 14px; }
 .gmt-area { margin: 0 0 14px; max-width: 110ch; }
 .gmt-area h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 6px; padding: 4px 8px;
-  background: var(--head); border-left: 3px solid var(--green-hi); font: 12px var(--mono); color: var(--muted); }
-.gmt-area h4 b { font: 14px var(--mono); color: var(--green-text); letter-spacing: .5px; }
+  border-bottom: 1px solid var(--rule); font: 12px var(--mono); color: var(--muted); }
+.gmt-area h4 b { font: 14px var(--mono); color: var(--green-text); }
 .gmt-area h4 .old { color: var(--bad); }
 .gmt-area pre { margin: 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); font: 14px/1.5 var(--mono);
   color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -74,17 +74,17 @@
 
 /* --- SUN (0.12.3): mapa świata z granicą dnia i nocy, obok karta lotniska (godziny UTC, pod nimi czas polski) */
 .sun-l { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.sun-icao { width: 64px; background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; border-radius: 0; padding: 3px 6px;
+.sun-icao { width: 64px; background: var(--panel-2); color: var(--text); border: 1px solid var(--control); border-radius: 0; padding: 3px 6px;
   font: 13px var(--mono); text-transform: uppercase; outline: none; }
 .sun-icao:focus { border-color: var(--green-hi); }
 .sun-body { flex: 1; min-height: 0; display: flex; }
 .sun-map { flex: 1 1 auto; min-width: 0; cursor: crosshair; }
-.sun-side { flex: none; width: 388px; overflow: auto; padding: 8px; background: #050605; border-left: 1px solid var(--line);
+.sun-side { flex: none; width: 388px; overflow: auto; padding: 8px; background: var(--bg); border-left: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 8px; }
 .sun-card .error { font: 12px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
 .sun-pos { font: 12px var(--mono); color: var(--muted); margin-bottom: 6px; }
 .sun-now { font: 13px var(--mono); margin-bottom: 4px; }
-.sun-now b { margin-right: 6px; letter-spacing: .5px; }
+.sun-now b { margin-right: 6px; }
 .sun-now.day b { color: var(--yellow); }
 .sun-now.civil b { color: #f29b38; }
 .sun-now.night b { color: #7fa7ff; }

@@ -227,7 +227,7 @@ def test_touch_keyboard_contract():
 
 
 def test_keyboard_css_look():
-    """Zielone klawisze PANDORY (.gbtn), ostre krawędzie, bez cieni i poświaty; klawisz co najmniej 40 px wysokości
+    """Białe klawisze z ciemnym napisem jak klawiatura PANDORY (zdjęcia 1 i 8, unslop), ostre krawędzie, bez cieni i poświaty; klawisz co najmniej 40 px wysokości
     (cel dotyku), 44 px w wysokim oknie; :hover tylko przy myszy; [hidden] naprawdę chowa (display: flex go przykrywał)."""
     assert '<link rel="stylesheet" href="/static/css/keyboard.css">' in INDEX
     assert INDEX.index("/static/css/aircraft.css") < INDEX.index("/static/css/keyboard.css")
@@ -252,7 +252,8 @@ def test_keyboard_css_look():
     # :hover tylko w @media (hover: hover): po stuknięciu palcem klawisz nie zostaje podświetlony
     hover = re.search(r"@media \(hover: hover\) \{(.*?)\n\}", css, re.S).group(1)
     assert ".tkbd .tk:hover" in hover and css.count(":hover") == 1
-    assert ".tkbd .tk:active { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }" in css
+    assert ".tkbd .tk:active { background: var(--green-hi); color: var(--key-ink-on); }" in css
+    assert "background: var(--paper); color: var(--paper-ink);" in key
     # klawiatura mieści się w panelu przy każdej szerokości (tablet pionowo: panel węższy niż 601 px): safe center
     # zamiast center (nadmiar nigdy w lewo pod podmenu), najwyżej szerokość panelu, klawisze węższe wg cqw panelu
     kbd = re.search(r"(?m)^\.tkbd \{([^}]*)\}", css).group(1)
@@ -266,6 +267,6 @@ def test_keyboard_css_look():
     pad = float(re.search(r"(?<![-\w])padding: ([\d.]+)px;", kbd).group(1))
     border = float(re.search(r"(?<![-\w])border: ([\d.]+)px solid", kbd).group(1))
     assert float(fit.group(1)) == widths[0] and float(fit.group(2)) == 9 * gap + 2 * pad + 2 * border == 41
-    # zielony klawisz z reguły .gbtn (ten sam gradient i ramka co przyciski menu)
-    assert re.search(r"(?m)^\.gbtn, \.menu nav button, \.submenu button \{[^}]*linear-gradient\(#45a832, #2f8a22\)",
+    # klawisz z reguły .gbtn (ramka i wielkie litery jak przyciski menu, płaska zieleń), przebarwiony na papier wyżej
+    assert re.search(r"(?m)^\.gbtn, \.menu nav button, \.submenu button \{[^}]*background: var\(--green\);",
                      (FRONTEND / "css" / "style.css").read_text("utf-8"))

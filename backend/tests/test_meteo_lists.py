@@ -253,7 +253,7 @@ def test_fixed_bar_height_like_field():
     assert "font: 13px/1.4 var(--sans);" in style
     assert "button, input, select, textarea { font: inherit; color: inherit; }" in style
     assert re.search(r"\.toolbar input, \.toolbar select, input\.field, textarea\.field, select\.field \{\s*"
-                     r"background: #0d110d; color: var\(--text\); border: 1px solid #2f3a2f; padding: 4px 8px;", style)
+                     r"background: var\(--panel-2\); color: var\(--text\); border: 1px solid var\(--control\); padding: 4px 8px;", style)
     # bez pogrubień, cieni i zaokrągleń w nowej regule
     rule = css[css.index(".mtr.fixed .mtr-bar"):]
     rule = rule[:rule.index("}")]
