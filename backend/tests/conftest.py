@@ -12,6 +12,11 @@ os.environ["POLIDS_STATE_DATABASE_URL"] = "sqlite:///" + os.path.join(tempfile.m
 # 0.14.2 (issue #35): zdjęcia dodane ręcznie z pustego katalogu: pliki wrzucone do data/photos-manual/ w repozytorium
 # nie zmieniają wyników testów zdjęć (test_aircraft_photos podstawia własny katalog)
 os.environ["POLIDS_MANUAL_PHOTOS_DIR"] = tempfile.mkdtemp()
+# 0.15.0: zdjęcia wrzucone przez adminów też z pustego katalogu (test_photo_upload podstawia własny)
+os.environ["POLIDS_UPLOADED_PHOTOS_DIR"] = tempfile.mkdtemp()
+# 0.15.0: bez zapasowego źródła NOTAM z lokalnego .env (test_notam_faa włącza je sam)
+os.environ["POLIDS_FAA_CLIENT_ID"] = ""
+os.environ["POLIDS_FAA_CLIENT_SECRET"] = ""
 
 
 @pytest.fixture

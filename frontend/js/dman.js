@@ -9,7 +9,7 @@
 // to krok do cofnięcia (←), a przy montowaniu i resume() widok tylko uzupełnia bieżący wpis (replace).
 // Dane: GET /api/aerodromes/{icao}/strips?dman=1 (paski + ELDT z vIFF, punkt wejścia, rejestracja; services/dman.py).
 // Czasy na drabinach liczymy od zegara serwera (now_ts), a etykiety przesuwają się co 2 s.
-import { api, esc, lsGet, lsSet, navigate } from "./api.js";
+import { api, esc, lsGet, lsSet, navigate, planespottersHtml, registrationPhoto } from "./api.js";
 import { SPANS, clock, depLabels, depTimes, hm, hmAt, overflow, relSec, stack } from "./dmancore.js";
 import { amanSequence, createAman } from "./aman.js";
 
@@ -137,6 +137,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
   };
   let data = null, offset = 0, byKey = new Map(), timer = null, clockTimer = null, dead = false, seq = 0, ticks = 0, aman = null;
   let firstList = { dep: true, arr: true }, lastClick = { k: null, t: 0 };
+  let photoReg;   // rejestracja, której zdjęcie jest w .dm-photo (renderPhoto)
   const nowMs = () => Date.now() + offset;
   const $ = (s) => body.querySelector(s);
 
@@ -153,6 +154,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
 
   // --- widok DMAN/AMAN
   const buildA = () => {
+    photoReg = undefined;
     body.innerHTML = `<div class="dm-a">
       <section class="dm-list dm-deps"><div class="dm-rows"><div class="dm-in"></div></div>
         <div class="dm-foot" data-g="dep"><button data-sort="cs">CSGN</button><button data-sort="t"></button></div></section>
@@ -160,6 +162,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
       <section class="dm-mid">
         <table class="dm-info"></table>
         <div class="dm-acts"><button data-act="map" title="Show the flight on the map (MAP)">MAP</button></div>
+        <div class="dm-photo" hidden></div>
         <div class="dm-spans"><div class="sp l" data-g="dep">${SPANS.map((m) => `<button data-span="${m}">${m}'</button>`).join("")}</div>
           <div class="sp r" data-g="arr">${SPANS.map((m) => `<button data-span="${m}">${m}'</button>`).join("")}</div></div>
         <div class="dm-rwys"></div>
@@ -288,6 +291,18 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
     }
   };
 
+  // 0.15.0: zdjęcie zaznaczonego samolotu po rejestracji (Planespotters.net), mała miniatura pod szczegółami lotu;
+  // rysowane tylko przy zmianie rejestracji, nie co odświeżenie szczegółów
+  const renderPhoto = (reg) => {
+    const box = $(".dm-photo");
+    if (!box || reg === photoReg) return;
+    photoReg = reg;
+    box.hidden = !reg;
+    if (!reg) { box.innerHTML = ""; return; }
+    box.innerHTML = `<p class="hint">Loading photo…</p>`;
+    registrationPhoto(reg).then((r) => planespottersHtml(r, { large: false }), (e) => `<p class="hint">${esc(e.message)}</p>`)
+      .then((html) => { if (!dead && reg === photoReg) box.innerHTML = html; });
+  };
   const acType = (s) => (s.aircraft ? s.aircraft + (s.wake ? "/" + s.wake : "") : "");
   const renderInfo = (now) => {
     const tbl = $(".dm-info");
@@ -350,6 +365,7 @@ export function mountDman(el, icao, { onUpdate, view, onView } = {}) {
         + R("RWY DEP", s.runway, "hl", rwySrc(s.runway_source, data.atis?.letter));
     }
     tbl.innerHTML = rows;
+    renderPhoto(s?.registration || null);
     const online = s && !s.planned;
     body.querySelector('[data-act="map"]').disabled = !online;
   };

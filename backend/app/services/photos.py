@@ -145,19 +145,114 @@ def manual_photo(icao: str) -> dict | None:
     img = next((files[n] for n in (f"{code.lower()}.{ext}" for ext in EXTS) if n in files), None)
     if img is None:
         return None
-    author = ""
-    if txt := files.get(f"{code.lower()}.txt"):
-        try:
-            line = next((s.strip() for s in txt.read_text("utf-8-sig").splitlines() if s.strip()), "")
-        except (OSError, UnicodeDecodeError):
-            line = ""
-        author = " ".join(re.sub(r"(?i)^photo\s*:\s*", "", line).split())[:CAPTION_MAX].rstrip()
+    author = _author_file(files.get(f"{code.lower()}.txt"))
     try:
         version = int(img.stat().st_mtime)
     except OSError:
         return None
     return {"url": f"/files/photos-manual/{quote(img.name)}?v={version}", "credit": "", "page": None,
             "author": author}
+
+
+def caption(text: str | None) -> str:
+    """Podpis autora: pierwsza niepusta linijka, spacje zwinięte, bez "Photo:" na początku, najwyżej CAPTION_MAX znaków."""
+    line = next((s.strip() for s in str(text or "").splitlines() if s.strip()), "")
+    return " ".join(re.sub(r"(?i)^photo\s*:\s*", "", line).split())[:CAPTION_MAX].rstrip()
+
+
+def _author_file(txt) -> str:
+    if txt is None:
+        return ""
+    try:
+        return caption(txt.read_text("utf-8-sig"))
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+# --- 0.15.0: zdjęcia typów wrzucane przez adminów w AIRCRAFT (POST /api/photos/type/<ICAO>) ---------------------------
+# Pliki <ICAO>.jpg|png|webp i <ICAO>.txt z autorem w settings.uploaded_photos_dir (domyślnie data/photos/uploaded/, na
+# wolumenie: przetrwają przebudowę obrazu). Takie zdjęcie ma pierwszeństwo przed wszystkim innym (type_photo).
+# Rodzaj pliku z jego pierwszych bajtów, nie z nazwy ani nagłówka przeglądarki.
+
+class UploadError(ValueError):
+    pass
+
+
+def sniff(data: bytes) -> str | None:
+    """Rozszerzenie z sygnatury pliku: jpg, png, webp; inny plik – None."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _uploaded_files(code: str) -> list:
+    return [settings.uploaded_photos_dir / f"{code}.{ext}" for ext in ("jpg", "png", "webp")]
+
+
+def uploaded_photo(icao: str) -> dict | None:
+    """Zdjęcie typu wrzucone przez admina: {url, credit, page, author, uploaded: True}; None – brak."""
+    code = _safe(icao)
+    if not code:
+        return None
+    img = next((f for f in _uploaded_files(code) if f.is_file()), None)
+    if img is None:
+        return None
+    try:
+        version = int(img.stat().st_mtime)
+    except OSError:
+        return None
+    txt = settings.uploaded_photos_dir / f"{code}.txt"
+    return {"url": f"/files/photos-uploaded/{img.name}?v={version}", "credit": "", "page": None,
+            "author": _author_file(txt if txt.is_file() else None), "uploaded": True}
+
+
+def save_upload(icao: str, data: bytes, author: str | None) -> dict:
+    """Zapisuje zdjęcie typu (zastępuje wcześniej wrzucone, także w innym formacie) i podpis autora (pusty – bez
+    pliku .txt). Zły plik albo za duży: UploadError z komunikatem do interfejsu."""
+    code = _safe(icao)
+    if not code:
+        raise UploadError("Unknown aircraft type")
+    if not data:
+        raise UploadError("Empty file")
+    if len(data) > settings.photo_upload_max_bytes:
+        raise UploadError(f"File too large (max {settings.photo_upload_max_bytes // 1024} KB)")
+    ext = sniff(data)
+    if ext is None:
+        raise UploadError("Only JPEG, PNG or WebP images")
+    folder = settings.uploaded_photos_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"{code}.{ext}"
+    tmp = folder / f".{code}.{ext}.part"
+    tmp.write_bytes(data)
+    tmp.replace(target)
+    for other in _uploaded_files(code):
+        if other != target:
+            other.unlink(missing_ok=True)
+    txt = folder / f"{code}.txt"
+    if text := caption(author):
+        txt.write_text(text + "\n", "utf-8")
+    else:
+        txt.unlink(missing_ok=True)
+    log.info("AIRCRAFT: zdjęcie %s wrzucone ręcznie (%d B, %s)", code, len(data), text or "bez autora")
+    return uploaded_photo(code)
+
+
+def delete_upload(icao: str) -> bool:
+    """Usuwa wrzucone zdjęcie typu i jego podpis; False – nie było zdjęcia."""
+    code = _safe(icao)
+    found = False
+    for f in _uploaded_files(code):
+        if f.is_file():
+            f.unlink()
+            found = True
+    (settings.uploaded_photos_dir / f"{code}.txt").unlink(missing_ok=True)
+    if found:
+        log.info("AIRCRAFT: wrzucone zdjęcie %s usunięte", code)
+    return found
 
 
 def _model_name(manufacturer: str | None, model: str | None) -> str:
@@ -450,6 +545,8 @@ async def type_photo(icao: str, manufacturer: str | None, model: str | None) -> 
     dalej (httpx.HTTPError, ValueError; w AIRCRAFT "Photo unavailable") i zdjęcie jest sprawdzane przy następnym
     otwarciu. Podmiana i ukrycie trafiają do logu."""
     code = _safe(icao)
+    if uploaded := uploaded_photo(code):
+        return uploaded
     if manual := manual_photo(code):
         return manual
     found = local_photo(code)

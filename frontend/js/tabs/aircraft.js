@@ -266,6 +266,38 @@ export default {
         rec.scrollIntoView({ block: "start" });
       }
     };
+    // 0.15.0: admin wrzuca własne zdjęcie typu z autorem (POST /api/photos/type/<ICAO>); ma pierwszeństwo przed
+    // wszystkimi innymi zdjęciami. REMOVE (tylko przy wrzuconym zdjęciu) wraca do zdjęcia z repozytorium albo Wikipedii
+    const uploadForm = (det, a, p) => {
+      if (!ctx.me?.admin) return;
+      const box = det.querySelector(".photo-box");
+      box.querySelector(".photo-up")?.remove();
+      const form = h(`<form class="photo-up" title="Own photo of ${esc(a.icao)} (JPEG, PNG or WebP); shown before all other photos">
+        <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required aria-label="Photo file">
+        <input type="text" class="field" name="author" maxlength="120" placeholder="Author" aria-label="Photo author" value="${esc(p?.uploaded ? p.author || "" : "")}">
+        <button class="btn" type="submit">UPLOAD</button>${p?.uploaded ? `<button class="btn photo-del" type="button">REMOVE</button>` : ""}
+        <span class="photo-up-msg hint"></span></form>`);
+      box.append(form);
+      const msg = form.querySelector(".photo-up-msg");
+      const url = `/api/photos/type/${encodeURIComponent(a.icao)}`;
+      const run = (options, busy) => {
+        msg.className = "photo-up-msg hint";
+        msg.textContent = busy;
+        form.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+        api(url, options).then(() => { if (current === a) photo(det, a); }).catch((e) => {
+          msg.className = "photo-up-msg error";
+          msg.textContent = e.message;
+          form.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+        });
+      };
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        run({ method: "POST", body: new FormData(form) }, "Uploading\u2026");
+      });
+      form.querySelector(".photo-del")?.addEventListener("click", () => {
+        if (confirm(`Remove the uploaded photo of ${a.icao}?`)) run({ method: "DELETE" }, "Removing\u2026");
+      });
+    };
     // zdjęcie w rozwinięciu; odpowiedź po zwinięciu albo po wyborze innego typu jest pomijana. 0.14.2 (issue #35):
     // zdjęcie albo komunikat w ramce, podpis w jednej linijce pod nią (dłuższy skracany wielokropkiem, cały w dymku);
     // ramka i linijka mają stały rozmiar, więc rozwinięcie nie zmienia wysokości po wczytaniu zdjęcia (bez ponownego
@@ -278,9 +310,13 @@ export default {
         frame.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}">`;
         cap.innerHTML = photoCredit(p);
         cap.title = photoCreditTitle(p);
+        uploadForm(det, a, p);
       }).catch((e) => {
         if (current !== a) return;
         frame.innerHTML = `<span class="hint">${esc(e.message)}</span>`;
+        cap.innerHTML = "";
+        cap.title = "";
+        uploadForm(det, a, null);
       });
     };
 

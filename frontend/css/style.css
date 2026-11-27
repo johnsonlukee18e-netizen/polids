@@ -783,3 +783,12 @@ a.btn { text-decoration: none; display: inline-block; }
     scroll-snap-type: x proximity; }
   .view:has(> .submenu:not(.letters) > :nth-child(22)) { background: none; }
 }
+
+/* 0.15.0: zdjęcie samolotu po rejestracji (Planespotters.net, api.js planespottersHtml): miniatura z odnośnikiem
+   do strony zdjęcia, pod nią autor (warunki API) */
+.ps-photo { margin: 0; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ps-photo a { color: inherit; }
+.ps-photo img { display: block; max-width: 100%; height: auto; border: 1px solid #3a3a3a; background: #000; }
+.ps-photo figcaption { font-size: 11px; color: #a0a0a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-photo figcaption a { color: #80b6dd; }
+.ps-none { margin: 0; }

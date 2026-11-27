@@ -1,17 +1,23 @@
 """NOTAM-y z serwera PL vACC (cv.plvacc.pl) w formacie ICAO.
 
 get_notams(icao) – NOTAM-y jednego lotniska (AERODROME, OVERVIEW).
-fir_notams(now) – SYT OP: wszystkie NOTAM-y FIR EPWW obowiązujące teraz (sam FIR i główne lotniska, bez duplikatów)."""
+fir_notams(now) – SYT OP: wszystkie NOTAM-y FIR EPWW obowiązujące teraz (sam FIR i główne lotniska, bez duplikatów).
+
+0.15.0: zapasowe źródło – FAA NOTAM API (location_text). Gdy ustawione są POLIDS_FAA_CLIENT_ID i
+POLIDS_FAA_CLIENT_SECRET, a serwer PL vACC nie odpowiada (albo oddaje tylko starsze dane z cache), NOTAM-y lokalizacji
+przychodzą z FAA. Odpowiedź FAA jest zamieniana na tekst w formacie ICAO, więc dalej działa ten sam parser."""
 
 import asyncio
+import json
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import httpx
 
 from ..config import settings
-from .http_cache import UpstreamError, fetch_text, peek
+from .http_cache import UpstreamError, fetch_text, forget, peek
 
 NOTAM_START = re.compile(r"\n+(?=\s*\(?[A-Z]\d{4}/\d{2}\s+NOTAM[NRC]\b)")
 FIELD = re.compile(r"\b([QABCDEFG])\)\s*")
@@ -19,6 +25,140 @@ FIELD = re.compile(r"\b([QABCDEFG])\)\s*")
 
 def notam_url(icao: str) -> str:
     return f"{settings.notam_server.rstrip('/')}/{settings.notam_prefix}{icao.upper()}{settings.notam_suffix}"
+
+
+# --- zapasowe źródło: FAA NOTAM API ----------------------------------------------------------------------------------
+
+FAA_PAGE_SIZE = 1000            # najwięcej, ile FAA oddaje na stronę
+FAA_MAX_PAGES = 3
+PRIMARY_DOWN_SECONDS = 90       # serwer PL vACC nie odpowiedział: tyle sekund od razu do FAA, bez czekania na timeout
+_primary_down_at: float | None = None
+
+
+def faa_enabled() -> bool:
+    return bool(settings.faa_client_id.strip() and settings.faa_client_secret.strip())
+
+
+def faa_url(icao: str, page: int = 1) -> str:
+    query = {"icaoLocation": icao.upper(), "responseFormat": "geoJson", "pageSize": FAA_PAGE_SIZE, "pageNum": page}
+    return f"{settings.faa_notam_url.rstrip('/')}?{urlencode(query)}"
+
+
+def _faa_time(v) -> str | None:
+    """Czas z FAA (ISO 8601, UTC) jako pole B)/C) RRMMDDggmm; "PERM" i inne słowa bez zmian; brak = None."""
+    if not isinstance(v, str) or not v.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return v.strip().upper()
+    dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%y%m%d%H%M")
+
+
+def faa_notam_text(item: dict) -> str | None:
+    """Jeden NOTAM z odpowiedzi FAA (geoJson) jako tekst ICAO: gotowe tłumaczenie ICAO (notamTranslation), a bez niego
+    tekst złożony z pól NOTAM-u (numer, Q), A), B), C), D), E), F), G)). None: brak treści."""
+    if not isinstance(item, dict):
+        return None
+    core = (item.get("properties") or {}).get("coreNOTAMData") or {}
+    for tr in core.get("notamTranslation") or []:
+        if isinstance(tr, dict) and tr.get("type") == "ICAO" and isinstance(tr.get("formattedText"), str) \
+                and tr["formattedText"].strip():
+            return tr["formattedText"].strip()
+    n = core.get("notam") or {}
+    text = n.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return None
+    s = lambda k: str(n.get(k) or "").strip()  # noqa: E731
+    number = s("number")
+    head = f"{number} NOTAM{s('type')[:1] or 'N'}" if re.fullmatch(r"[A-Z]\d{4}/\d{2}", number) else number
+    lines = [head] if head else []
+    code = s("selectionCode").upper()
+    if code:
+        code = code if code.startswith("Q") else "Q" + code
+        lines.append("Q) " + "/".join((s("affectedFIR"), code, s("traffic"), s("purpose"), s("scope"),
+                                       s("minimumFL"), s("maximumFL"), s("coordinates"))))
+    location = s("icaoLocation") or s("location")
+    if location:
+        lines.append(f"A) {location}")
+    start, end = _faa_time(n.get("effectiveStart")), _faa_time(n.get("effectiveEnd"))
+    if start:
+        lines.append(f"B) {start}")
+    if end:
+        lines.append(f"C) {end}{' EST' if n.get('estimatedEnd') in (True, 'Y', 'y') else ''}")
+    if s("schedule"):
+        lines.append(f"D) {s('schedule')}")
+    lines.append(f"E) {text.strip()}")
+    if s("lowerLimit"):
+        lines.append(f"F) {s('lowerLimit')}")
+    if s("upperLimit"):
+        lines.append(f"G) {s('upperLimit')}")
+    return "\n".join(lines)
+
+
+async def faa_text(icao: str) -> str:
+    """NOTAM-y lokalizacji z FAA NOTAM API jako tekst ICAO (NOTAM-y oddzielone pustą linią). Błąd sieci, kod HTTP albo
+    nieczytelna odpowiedź: UpstreamError (nieczytelna odpowiedź nie zostaje w cache)."""
+    headers = {"client_id": settings.faa_client_id.strip(), "client_secret": settings.faa_client_secret.strip(),
+               "Accept": "application/json"}
+    texts: list[str] = []
+    for page in range(1, FAA_MAX_PAGES + 1):
+        url = faa_url(icao, page)
+        raw = await fetch_text(url, settings.notam_cache_seconds, headers=headers)
+        try:
+            body = json.loads(raw)
+        except ValueError:
+            body = None
+        if not isinstance(body, dict) or "error" in body or not isinstance(body.get("items", []), list):
+            forget(url)
+            raise UpstreamError(f"{url}: unexpected reply")
+        texts += [t for t in map(faa_notam_text, body.get("items") or []) if t]
+        pages = body.get("totalPages")
+        if not isinstance(pages, int) or page >= pages:
+            break
+    return "\n\n".join(texts)
+
+
+def _freshest(icao: str) -> tuple[float, str] | None:
+    """Najświeższe dane lokalizacji w cache (serwer PL vACC albo FAA), bez pobierania."""
+    hits = [h for h in (peek(notam_url(icao)), peek(faa_url(icao)) if faa_enabled() else None) if h]
+    return min(hits, key=lambda h: h[0]) if hits else None
+
+
+async def location_text(icao: str) -> tuple[str, str]:
+    """Tekst NOTAM-ów lokalizacji i adres, z którego pochodzi (klucz cache, do peek). Najpierw serwer PL vACC; gdy nie
+    odpowiada albo oddaje tylko starsze dane z cache, a FAA jest ustawione – FAA. Po awarii serwera PL vACC przez
+    PRIMARY_DOWN_SECONDS od razu FAA. Oba źródła bez odpowiedzi: starsze dane PL vACC, jeśli są, inaczej UpstreamError."""
+    global _primary_down_at
+    url, ttl = notam_url(icao), settings.notam_cache_seconds
+    if not faa_enabled():
+        return await fetch_text(url, ttl), url
+    hit = peek(url)
+    fresh = bool(hit and hit[0] < ttl)
+    down = _primary_down_at is not None and time.monotonic() - _primary_down_at < PRIMARY_DOWN_SECONDS
+    text, primary_exc = (hit[1] if hit else None), None
+    if fresh or not down:
+        try:
+            text = await fetch_text(url, ttl)
+            hit = peek(url)
+            if hit and hit[0] < ttl:
+                _primary_down_at = None
+                return text, url
+        except UpstreamError as exc:
+            primary_exc = exc
+        _primary_down_at = time.monotonic()
+    try:
+        return await faa_text(icao), faa_url(icao)
+    except UpstreamError as exc:
+        if text is not None:
+            return text, url
+        raise primary_exc or exc
+
+
+def reset_fallback():
+    global _primary_down_at
+    _primary_down_at = None
 
 
 def split_notams(text: str) -> list[dict]:
@@ -77,8 +217,7 @@ def for_aerodrome(notams: list[dict], icao: str) -> list[dict]:
 
 
 async def get_notams(icao: str) -> dict:
-    url = notam_url(icao)
-    text = await fetch_text(url, settings.notam_cache_seconds)
+    text, url = await location_text(icao)
     allnotams = split_notams(text)
     notams = for_aerodrome(allnotams, icao)
     return {"icao": icao.upper(), "source": url, "notams": notams, "other": len(allnotams) - len(notams)}
@@ -283,15 +422,15 @@ async def _fetch_location(icao: str, sem: asyncio.Semaphore) -> tuple[list[dict]
 
     fetch_text przy błędzie serwera oddaje po cichu starsze dane z cache: wtedy wiek >= ttl i lokalizacja trafia do
     `stale`. Lokalizacja, która niedawno nie odpowiedziała, przez FIR_FAIL_SECONDS nie jest pytana ponownie."""
-    url, ttl = notam_url(icao), settings.notam_cache_seconds
-    hit, recent = peek(url), _fir_failed.get(icao)
+    ttl = settings.notam_cache_seconds
+    hit, recent = _freshest(icao), _fir_failed.get(icao)
     if recent and time.monotonic() - recent[0] < FIR_FAIL_SECONDS and not (hit and hit[0] < ttl):
         if hit is None:
             raise _StillDown(recent[1])
         return split_notams(hit[1]), hit[0]
     async with sem:
-        text = await fetch_text(url, ttl)
-    hit = peek(url)
+        text, used = await location_text(icao)
+    hit = peek(used)
     age = hit[0] if hit else 0.0
     if age >= ttl:
         _fir_failed[icao] = (time.monotonic(), STALE_TEXT)

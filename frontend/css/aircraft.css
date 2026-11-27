@@ -149,3 +149,10 @@ table.ac-table tr.selected td.recat { color: #fff; }
 .acb.wake > .lbl { color: #7a4f0e; }
 .acb.dim { background: #f1effb; border-color: #a89ee0; }
 .acb.dim > .lbl { color: #4b3f9a; }
+
+/* 0.15.0: admin – własne zdjęcie typu (POST /api/photos/type/<ICAO>) */
+.photo-up { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 6px; max-width: 450px; font-size: 11px; }
+.photo-up input[type="file"] { max-width: 220px; font-size: 11px; }
+.photo-up input[type="text"] { flex: 1 1 120px; min-width: 0; }
+.photo-up-msg { flex-basis: 100%; }
+.photo-up-msg:empty { display: none; }

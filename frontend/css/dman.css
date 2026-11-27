@@ -225,3 +225,13 @@
 @media (max-width: 1250px), (max-height: 640px) {
   .aero-pane .dm { flex: none; height: 640px; }
 }
+
+/* 0.15.0: zdjęcie zaznaczonego lotu po rejestracji (Planespotters.net), mała miniatura. W AMAN slot am-photo (nie
+   "photo": globalna .photo w style.css ma 340 px wysokości) może się zmniejszyć, żeby lista NOT SEQUENCED i LND/SEP
+   zostały w panelu */
+.dm-photo, .am-slot.am-photo { flex: none; padding: 2px 0; }
+.am-slot.am-photo { flex: 0 1 auto; min-height: 0; overflow: hidden; }
+.dm-photo[hidden], .am-slot.am-photo[hidden] { display: none; }
+.dm-photo .ps-photo img, .am-slot.am-photo .ps-photo img { max-height: 120px; width: auto; }
+.am-slot.am-photo .ps-photo img { max-height: 100px; }
+.dm-photo .hint, .am-slot.am-photo .hint { margin: 0; font-size: 10.5px; }

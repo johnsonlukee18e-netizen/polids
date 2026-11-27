@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
 
-VERSION = "0.14.4"
+VERSION = "0.15.0"
 
 
 def csv_set(value: str) -> set[str]:
@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # 0.14.2 (issue #35): zdjęcia typów dodane ręcznie (<ICAO>.jpg + <ICAO>.txt z autorem), w repozytorium i w obrazie
     # dockera, poza wolumenem data/photos; mają pierwszeństwo przed data/photos/ (services/photos.manual_photo)
     manual_photos_dir: Path = DATA_DIR / "photos-manual"
+    # 0.15.0: zdjęcia typów wrzucone przez adminów w AIRCRAFT (podkatalog wolumenu data/photos: przetrwają przebudowę
+    # obrazu); mają pierwszeństwo przed wszystkim innym (services/photos.uploaded_photo)
+    uploaded_photos_dir: Path = DATA_DIR / "photos" / "uploaded"
     frontend_dir: Path = ROOT_DIR / "frontend"
 
     default_aerodrome: str = "EPWA"
@@ -62,6 +65,21 @@ class Settings(BaseSettings):
     notam_server: str = "https://cv.plvacc.pl/"
     notam_prefix: str = "notam/get-icao-format?icao="
     notam_suffix: str = "&read=true"
+    # 0.15.0: zapasowe źródło NOTAM, gdy serwer PL vACC nie odpowiada: FAA NOTAM API (https://api.faa.gov, darmowe
+    # konto, nagłówki client_id i client_secret). Bez obu kluczy zapasowe źródło jest wyłączone.
+    faa_notam_url: str = "https://external-api.faa.gov/notamapi/v1/notams"
+    faa_client_id: str = ""
+    faa_client_secret: str = ""
+
+    # 0.15.0: zdjęcia konkretnych samolotów po rejestracji (REG/ w planie lotu) z Planespotters.net Photo API. Bez klucza;
+    # zdjęcia pobiera przeglądarka prosto z Planespotters (warunki API zabraniają zapisywania ich na serwerze).
+    # Pusty adres wyłącza zdjęcia po rejestracji.
+    planespotters_url: str = "https://api.planespotters.net/pub/photos"
+    planespotters_cache_seconds: int = 6 * 3600  # warunki API: odpowiedź JSON najwyżej 24 h w cache
+    # adres kontaktowy w User-Agent (warunki API Planespotters); pusty = POLIDS_PUBLIC_URL
+    contact_url: str = ""
+    # 0.15.0: zdjęcia typów wrzucane przez adminów w AIRCRAFT; największy plik w bajtach
+    photo_upload_max_bytes: int = 2 * 1024 * 1024
 
     # Zewnętrzne strony osadzane w zakładkach. eAIP PAŻP: puste = katalog poprawki bieżącego cyklu AIRAC, liczony przy
     # każdym zapytaniu (services/eaip.py, np. eaipifr/AIRAC%20AMDT%2010-26_2026_10_01/index-v2.html) i sprawdzony
@@ -99,7 +117,7 @@ class Settings(BaseSettings):
         # nagłówki HTTP muszą być w ASCII (Żółw -> Zolw)
         name = unicodedata.normalize("NFKD", self.name.replace("ł", "l").replace("Ł", "L"))
         name = re.sub(r"[^A-Za-z0-9._-]", "", name.encode("ascii", "ignore").decode()) or "polids"
-        origin = self.public_origin.encode("ascii", "ignore").decode()
+        origin = (self.contact_url.strip() or self.public_origin).encode("ascii", "ignore").decode()
         return f"{name}/{VERSION} (VATSIM PL vACC; +{origin})"
 
 

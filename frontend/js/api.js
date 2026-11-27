@@ -435,3 +435,31 @@ export function choiceSet(key, value) {
   choices.set(key, value);
   lsSet(key, value);
 }
+
+// --- 0.15.0: zdjęcie konkretnego samolotu po rejestracji (Planespotters.net, GET /api/photos/registration/<REG>) ---
+// Rejestracja z uwag planu lotu (REG/SPLWA), jak services/dman.py registration.
+export function registrationOf(remarks) {
+  return /(?:^|\s)REG\/([A-Z0-9-]{2,10})(?=\s|\/|$)/.exec(String(remarks || "").toUpperCase())?.[1] || null;
+}
+// jedna odpowiedź na rejestrację na czas życia strony (serwer i tak trzyma je kilka godzin); błąd nie zostaje w pamięci
+const regPhotos = new Map();
+export function registrationPhoto(reg) {
+  if (!regPhotos.has(reg)) {
+    if (regPhotos.size > 500) regPhotos.clear();
+    regPhotos.set(reg, api(`/api/photos/registration/${encodeURIComponent(reg)}`).catch((e) => {
+      regPhotos.delete(reg);
+      throw e;
+    }));
+  }
+  return regPhotos.get(reg);
+}
+// Warunki API Planespotters: miniatura prosto z ich serwera (adres bez zmian), zwykły odnośnik na miniaturze do strony
+// zdjęcia (bez rel="nofollow") i autor widoczny obok zdjęcia
+export function planespottersHtml(r, { large = true } = {}) {
+  const p = r?.photo;
+  if (!p) return `<p class="hint ps-none">No photo of ${esc(r?.registration || "this aircraft")}</p>`;
+  const src = large && p.thumbnail_large ? p.thumbnail_large : p.thumbnail;
+  const link = `href="${esc(p.link)}" target="_blank" rel="noopener"`;
+  return `<figure class="ps-photo"><a ${link} title="Open the photo page"><img src="${esc(src)}" alt="${esc(r.registration)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></a>`
+    + `<figcaption title="Photo: ${esc(p.photographer)}">Photo: ${esc(p.photographer)} \u00b7 <a ${link}>Photo page \u2197</a></figcaption></figure>`;
+}
