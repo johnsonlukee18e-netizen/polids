@@ -166,6 +166,35 @@ także próg wprowadzenia). Nieznana podstawa chmur (VV///, BKN///) i warstwa ni
 ///001) ani nie wprowadzają, ani nie odwołują LVP. METAR z czasem obserwacji ponad 30 min naprzód nie zmienia
 zapamiętanego stanu.
 
+## Zdjęcia samolotów i zapasowe NOTAM (0.15.0)
+
+**Zdjęcie po rejestracji.** Gdy plan lotu ma w uwagach `REG/` (np. `REG/SPLWA`), OTHER › FLIGHT PLAN (sekcja Aircraft obok
+danych pilota), szczegóły lotu w DMAN/AMAN i okno AMAN pokazują zdjęcie tego samolotu z Planespotters.net Photo API
+(`GET /api/photos/registration/<REG>`, `backend/app/services/planespotters.py`). Rejestracja bez łącznika jest sprawdzana
+też z łącznikiem po prefiksie kraju (`SPLWA` → `SP-LWA`). Warunki API Planespotters, których aplikacja pilnuje:
+serwer pyta API z własnym User-Agent z adresem kontaktowym (`POLIDS_CONTACT_URL`, domyślnie `POLIDS_PUBLIC_URL`),
+odpowiedź JSON trzyma w pamięci najwyżej 6 h (warunki: do 24 h), a adresy miniatury i strony zdjęcia idą do przeglądarki
+bez zmian – serwer nie pobiera, nie zapisuje i nie pośredniczy w pobieraniu obrazów, miniaturę ładuje przeglądarka prosto
+z CDN Planespotters. Pod zdjęciem zawsze autor, a miniatura i „Photo page ↗” to zwykłe odnośniki do strony zdjęcia
+(bez `rel="nofollow"`). Zdjęcie bez autora albo bez strony nie jest pokazywane. `POLIDS_PLANESPOTTERS_URL=` (pusty) wyłącza
+zdjęcia po rejestracji.
+
+**Zdjęcia typów wrzucane przez adminów.** W AIRCRAFT pod zdjęciem typu admin (`POLIDS_AUTH_ADMIN_CIDS`) ma formularz:
+plik (JPEG, PNG albo WebP, najwyżej `POLIDS_PHOTO_UPLOAD_MAX_BYTES`, domyślnie 2 MB; rodzaj pliku rozpoznawany po jego
+pierwszych bajtach) i autor, który pojawia się w podpisie „Photo: <autor>”. Pliki trafiają do `data/photos/uploaded/`
+(`<ICAO>.jpg|png|webp` i `<ICAO>.txt`), czyli na wolumen `photos` – przetrwają przebudowę obrazu. Wrzucone zdjęcie ma
+pierwszeństwo przed `data/photos-manual/` i zdjęciami z Wikipedii; REMOVE je usuwa i wraca poprzednie zdjęcie.
+API: `POST /api/photos/type/<ICAO>` (multipart: `file`, `author`), `DELETE /api/photos/type/<ICAO>`, oba tylko dla
+adminów. Za nginx `client_max_body_size` musi być większy od limitu (`deploy/nginx/polids.pl.conf`: 3m).
+
+**Zapasowe źródło NOTAM.** Gdy ustawione są `POLIDS_FAA_CLIENT_ID` i `POLIDS_FAA_CLIENT_SECRET` (darmowe konto FAA
+NOTAM API, https://api.faa.gov), a serwer PL vACC nie odpowiada albo oddaje tylko starsze dane z pamięci, NOTAM-y
+lokalizacji (AERODROME, OVERVIEW, SYT OP) przychodzą z FAA (`backend/app/services/notam.py`, `location_text`).
+Odpowiedź FAA jest zamieniana na tekst w formacie ICAO (gotowe tłumaczenie ICAO, a bez niego tekst z pól NOTAM-u),
+więc dalej działa ten sam parser. Przez 90 s po awarii serwera PL vACC aplikacja pyta od razu FAA, bez czekania na
+timeout. Klucze idą tylko w nagłówkach zapytania (nie w adresie). Gdy oba źródła nie odpowiadają, zostają starsze dane
+PL vACC, jeśli są. Bez kluczy działa jak dotąd (sam serwer PL vACC).
+
 ## Znane ograniczenia
 
 - PAŻP i om.plvacc.pl blokują ramki (`X-Frame-Options`) - zostaje przycisk otwierający stronę w nowej karcie (↗).
@@ -237,6 +266,9 @@ zapamiętanego stanu.
 - widok AWOS i mapa QNH wzorowane na [vAWOS](https://github.com/aleksandermarcingadomski-commits/vAWOS)
   (bez licencji, więc kod napisany od nowa)
 - zdjęcia samolotów z Wikipedii, autor i licencja na stronie artykułu
+- zdjęcia samolotów po rejestracji: [Planespotters.net Photo API](https://www.planespotters.net/photo/api) (autor i
+  odnośnik do strony zdjęcia przy każdym zdjęciu, obrazy pobiera przeglądarka prosto z Planespotters)
+- zapasowe NOTAM-y: [FAA NOTAM API](https://api.faa.gov) (po ustawieniu kluczy)
 - pliki EuroScope: pakiet sektorowy PL vACC / GNG
 
 PDF-y w `data/docs/` (ICAO Doc 4444, Doc 9432, RECAT-EU) są chronione prawem autorskim - na serwerze tylko po

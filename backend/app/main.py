@@ -10,8 +10,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import access, auth
 from .config import VERSION, settings
 from .importers.seed import init_db
-from .routers import (admin, aerodromes, aircraft, callsigns, coordination, docs, meteo, nav, notam, overview, radio,
-                      squawk, system, vatsim, viff)
+from .routers import (admin, aerodromes, aircraft, callsigns, coordination, docs, meteo, nav, notam, overview, photos,
+                      radio, squawk, system, vatsim, viff)
 from .services import eaip
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -34,8 +34,8 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title=f"{settings.name} API", version=VERSION, lifespan=lifespan)
 
 app.include_router(auth.router)
-for r in (system, meteo, aerodromes, overview, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs, coordination, squawk,
-          admin):
+for r in (system, meteo, aerodromes, overview, notam, aircraft, photos, callsigns, nav, radio, vatsim, viff, docs, coordination,
+          squawk, admin):
     app.include_router(r.router)
 
 
@@ -68,9 +68,12 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="ses
 settings.docs_dir.mkdir(parents=True, exist_ok=True)
 settings.photos_dir.mkdir(parents=True, exist_ok=True)
 settings.manual_photos_dir.mkdir(parents=True, exist_ok=True)
+settings.uploaded_photos_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/files/docs", StaticFiles(directory=settings.docs_dir), name="docs-files")
 # 0.14.2 (issue #35): zdjęcia dodane ręcznie (data/photos-manual/), osobno od pobranych (wolumen data/photos)
 app.mount("/files/photos-manual", StaticFiles(directory=settings.manual_photos_dir), name="photo-manual-files")
+# 0.15.0: zdjęcia typów wrzucone przez adminów w AIRCRAFT (domyślnie data/photos/uploaded/, na wolumenie)
+app.mount("/files/photos-uploaded", StaticFiles(directory=settings.uploaded_photos_dir), name="photo-uploaded-files")
 app.mount("/files/photos", StaticFiles(directory=settings.photos_dir), name="photo-files")
 app.mount("/static", StaticFiles(directory=settings.frontend_dir), name="static")
 

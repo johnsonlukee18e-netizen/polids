@@ -4,7 +4,7 @@
 // tylko, jak czytać okno (bez wzorów).
 // Boczne panele są budowane raz (suwak, przyciski strumieni, pola); odświeżenie i wybór lotu zmieniają tylko wartości,
 // więc przeciąganie suwaka i kliknięcie przycisku przy otwartym polu FLOW nie giną.
-import { esc, lsGet, lsSet } from "./api.js";
+import { esc, lsGet, lsSet, planespottersHtml, registrationPhoto } from "./api.js";
 import { DEFAULT_FLOW, OTHER_COLOR, clock, fixColor, fixColors, fixOrder, hm, lndSep, overflow, sequence, stack } from "./dmancore.js";
 
 const OTHER = "OTHER";
@@ -40,6 +40,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
       <div class="am-slot top1"></div>
       <label class="am-hor" title="Ladder horizon: minutes from now (bottom) to the top">HORIZON <input type="range" min="20" max="120" step="5"><span></span></label>
       <div class="am-slot info"></div>
+      <div class="am-slot am-photo" hidden></div>
       <div class="am-rest"></div>
       <div class="am-slot lnds"></div>
       <div class="am-slot flow1"></div>
@@ -94,7 +95,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
     if (!s || s.kind !== "arr") return "";
     const q = seq.get(st.sel);
     const L = (k, v) => `<div><i>${k}</i><b>${esc(v ?? "–")}</b></div>`;
-    return `<div class="am-info">${L("CALLSIGN", s.callsign)}${L("TYPE", s.aircraft)}${L("FROM", s.departure)}
+    return `<div class="am-info">${L("CALLSIGN", s.callsign)}${L("TYPE", s.aircraft)}${L("FROM", s.departure)}${L("REG", s.registration)}
       ${L("IAF", s.entry_fix?.fix)}${L("STAR", s.proc?.name)}${L("ELDT", s.eldt ? hm(s.eldt) + (s.eldt_source === "vIFF" ? " CDM" : " POS") : null)}
       ${L("STA", q ? clock(q.sta * 1000, false) : null)}${L("DELAY", q ? `${Math.round(q.delay / 6) / 10} min` : null)}
       ${L("DIST", s.dist_nm !== null && s.dist_nm !== undefined ? s.dist_nm + " NM" : null)}${L("GS", s.groundspeed ? s.groundspeed + " kt" : null)}
@@ -128,6 +129,22 @@ export function createAman(host, { icao, st, nowMs, getData }) {
     });
   };
 
+  // 0.15.0: zdjęcie zaznaczonego przylotu po rejestracji (Planespotters.net) pod polami lotu; rysowane tylko przy
+  // zmianie rejestracji
+  let photoReg;
+  const photo = (d) => {
+    const s = st.sel && [...d.arrivals, ...d.planned].find((x) => x.kind + ":" + x.callsign === st.sel);
+    const reg = s && s.kind === "arr" ? s.registration || null : null;
+    const box = slot("am-photo");
+    if (!box || reg === photoReg) return;
+    photoReg = reg;
+    box.hidden = !reg;
+    if (!reg) { box.innerHTML = ""; return; }
+    box.innerHTML = `<p class="hint">Loading photo…</p>`;
+    registrationPhoto(reg).then((r) => planespottersHtml(r, { large: false }), (e) => `<p class="hint">${esc(e.message)}</p>`)
+      .then((html) => { if (reg === photoReg && box.isConnected) box.innerHTML = html; });
+  };
+
   const sides = (d) => {
     const colors = colorsFor(d);
     const rw = runways(d);
@@ -142,6 +159,7 @@ export function createAman(host, { icao, st, nowMs, getData }) {
       setHtml(slot("flow1"), rw[1] ? flowBox(rw[1]) : "");
     }
     setHtml(slot("info"), infoHtml(d));
+    photo(d);
     const rest = el.querySelector(".am-rest");
     const top = rest.scrollTop;
     setHtml(rest, restHtml(d));

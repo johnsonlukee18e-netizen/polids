@@ -1,5 +1,8 @@
 # Zdjęcia typów samolotów dodawane ręcznie
 
+Od 0.15.0 admin może też wrzucić zdjęcie typu prosto w AIRCRAFT (formularz pod zdjęciem); takie zdjęcie trafia na
+wolumen (`data/photos/uploaded/`), działa bez wdrożenia i ma pierwszeństwo przed zdjęciami z tego katalogu.
+
 Zdjęcia z tego katalogu są pokazywane w zakładce AIRCRAFT zamiast zdjęć pobieranych automatycznie. Pod zdjęciem jest
 zwykły podpis z autorem (`Photo: <autor>`), bez odnośnika.
 

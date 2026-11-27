@@ -596,6 +596,10 @@ export const h = () => makeEl();
 export const api = (url) => new Promise((res, rej) => globalThis.__pending.push({ url, res, rej }));
 export function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 export function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { /* tryb prywatny */ } }
+// 0.15.0: zdjęcie po rejestracji (REG/) – tu bez rejestracji, więc bez zdjęcia i bez zapytań (test_planespotters)
+export const registrationOf = () => null;
+export const registrationPhoto = () => new Promise(() => {});
+export const planespottersHtml = () => "";
 """
 
 FP_MOUNT_SCRIPT = r"""

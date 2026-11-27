@@ -1,4 +1,4 @@
-import { api, esc, h, lsGet, lsSet, ONLINE_EVENT } from "./api.js";
+import { api, esc, h, lsGet, lsSet, ONLINE_EVENT, planespottersHtml, registrationOf, registrationPhoto } from "./api.js";
 import { equipment, field18, levelText, voiceType, xlHtml } from "./xlabel.js";
 
 export { equipment, field18, levelText, voiceType };
@@ -125,8 +125,16 @@ function planHtml(d) {
   </section>`;
 }
 
+// 0.15.0: zdjęcie samolotu po rejestracji z planu (REG/), Planespotters.net; st: undefined = wczytuję, {error}, albo
+// odpowiedź /api/photos/registration/<REG>
+export function regPhotoHtml(reg, st) {
+  const body = st === undefined ? `<p class="hint">Loading photo\u2026</p>`
+    : st.error ? `<p class="hint">${esc(st.error)}</p>` : planespottersHtml(st);
+  return `<section class="fpl-group fpl-photo"><h3 class="fpl-h">Aircraft ${esc(reg)}</h3>${body}</section>`;
+}
+
 // cały wynik dla danych z /api/vatsim/flightplan; czysta funkcja (testy w Node), każdy tekst z sieci escapowany;
-// opts.key = okno z nazwami pól (KEY)
+// opts.key = okno z nazwami pól (KEY); opts.reg + opts.photo = zdjęcie samolotu (regPhotoHtml), bez reg bez zdjęcia
 export function fplHtml(d, opts = {}) {
   const online = d.status === "online";
   const cs = String(d.callsign || "");
@@ -135,7 +143,7 @@ export function fplHtml(d, opts = {}) {
       <span class="fpl-state ${online ? "on" : "pre"}" title="${online ? "Pilot connected now" : "Flight plan filed before connecting"}">${online ? "ONLINE" : "PREFILED"}</span>
       ${online ? `<a class="fpl-map" href="#map/${encodeURIComponent(cs)}" title="Show the flight on the map">MAP \u203a</a>` : ""}
     </div>
-    <div class="fpl-row">${xlHtml(d, { key: !!opts.key })}<div class="fpl-side">${pilotHtml(d)}${online ? nowHtml(d.position) : ""}</div></div>
+    <div class="fpl-row">${xlHtml(d, { key: !!opts.key })}<div class="fpl-side">${pilotHtml(d)}${online ? nowHtml(d.position) : ""}${opts.reg ? regPhotoHtml(opts.reg, opts.photo) : ""}</div></div>
     ${planHtml(d)}`;
 }
 
@@ -162,6 +170,20 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
   let cs = "", data = null, failed = false, loadedAt = 0, seq = 0, timer = null, retry = null, dead = false, shown = EMPTY;
   // key: nazwy pól w oknie EXTENDED LABEL; zostaje przy odświeżeniu i przy następnych lotach
   let key = loadKey();
+  // 0.15.0: rejestracja pokazanego planu i stan jej zdjęcia (undefined = wczytuję); zdjęcie pobierane raz na rejestrację
+  let reg = null, photo;
+  const view = (d) => fplHtml(d, { key, reg, photo });
+  const loadPhoto = (d) => {
+    const r = d?.flight_plan ? registrationOf(d.flight_plan.remarks) : null;
+    if (r === reg) return;
+    reg = r; photo = undefined;
+    if (!r) return;
+    registrationPhoto(r).then((x) => x, (e) => ({ error: e.message })).then((x) => {
+      if (dead || r !== reg) return;
+      photo = x;
+      if (data) put(view(data));
+    });
+  };
   const visible = () => root.isConnected && root.offsetParent !== null;
   const note = (text = "", cls = "hint") => { msg.className = "fpl-msg " + cls; msg.textContent = text; };
   const put = (html) => { if (html !== shown) { out.innerHTML = html; shown = html; } };
@@ -175,7 +197,8 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
       const d = await api(`/api/vatsim/flightplan/${encodeURIComponent(want)}`);
       if (dead || my !== seq) return;
       data = d; failed = false; loadedAt = Date.now();
-      put(fplHtml(d, { key }));
+      loadPhoto(d);
+      put(view(d));
       note();
       if (d.hours_pending && retry === null) retry = setTimeout(() => load(true), HOURS_RETRY_MS);
     } catch (e) {
@@ -226,7 +249,7 @@ export function mountFlightPlan(pane, { start = "", onLookup = () => {} } = {}) 
     key = !key;
     saveKey(key);
     if (data) {
-      put(fplHtml(data, { key }));
+      put(view(data));
       out.querySelector(".xl-key")?.focus();
     }
   });
